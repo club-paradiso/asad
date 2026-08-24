@@ -13,29 +13,23 @@ import {
   PUNNABLE_NOUNS,
   UNTRANSLATABLES,
 } from "./lexicon";
-
-/** Korean particles that can follow a noun, used to spot a bare noun in text. */
-const PARTICLES = [
-  "이", "가", "을", "를", "은", "는", "에", "에서", "으로", "로",
-  "도", "만", "과", "와", "의", "인", "이라는", "이라고", "처럼", "같이",
-];
+import { findWholeWordOccurrences } from "../glossary/match-korean";
 
 /** Phrases a speaker uses when pointing at their own name. */
 const SELF_NAME_MARKERS = [
   "제 이름", "내 이름", "저의 이름", "이름에도", "이름이", "이름은", "이름 뜻",
 ];
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 /**
  * True when `noun` appears in `text` as a standalone word — followed by a
  * particle, punctuation or a space — rather than merely as a substring of a
  * longer word.
+ *
+ * This is the same rule the glossary uses, and for the same reason: 길 must
+ * match in 길을 잘 찾아야 but not in 길이가 (length) or 갈림길에서.
  */
 export function containsBareNoun(text: string, noun: string): boolean {
-  const tail = PARTICLES.map(escape).sort((a, b) => b.length - a.length).join("|");
-  const re = new RegExp(`${escape(noun)}(?:${tail})?(?![가-힣])`);
-  return re.test(text);
+  return findWholeWordOccurrences(text, noun).length > 0;
 }
 
 /**
@@ -99,11 +93,25 @@ export function detectHanjaHints(text: string): CulturalNote[] {
   return notes;
 }
 
+/**
+ * Shortest entry that may be matched by plain substring search.
+ *
+ * Anything shorter has to match as a whole word. Korean agglutinates, so a
+ * two-syllable entry will otherwise fire inside an unrelated word — 한 matches
+ * inside 거룩한, 정 inside 정말 — and a false cultural note on a live console is
+ * worse than no note at all.
+ */
+const SUBSTRING_SAFE_LENGTH = 3;
+
 /** Detect known idioms and untranslatable set phrases. */
 export function detectIdioms(text: string): CulturalNote[] {
   const notes: CulturalNote[] = [];
   for (const entry of [...UNTRANSLATABLES, ...IDIOMS]) {
-    if (!text.includes(entry.korean)) continue;
+    const matched =
+      entry.korean.replace(/\s/g, "").length >= SUBSTRING_SAFE_LENGTH
+        ? text.includes(entry.korean)
+        : containsBareNoun(text, entry.korean);
+    if (!matched) continue;
     notes.push({
       kind: entry.kind,
       korean: entry.korean,

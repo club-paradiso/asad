@@ -127,6 +127,12 @@ export interface GlossaryItem {
   alternatives?: string[];
   /** Where the entry came from — prep sheet, built-in lexicon, or live model. */
   source?: "prep" | "lexicon" | "live";
+  /**
+   * True for discourse/register markers rather than terminology. These inform
+   * the model's sense of register but are filtered off the live rail, where
+   * screen space belongs to terms the interpreter might actually need.
+   */
+  register?: boolean;
 }
 
 export type CulturalNoteKind =

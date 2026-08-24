@@ -95,18 +95,18 @@ export const THEOLOGICAL_LEXICON: GlossaryItem[] = [
 
 /** Register and discourse vocabulary — active in BOTH modes. */
 export const GENERAL_LEXICON: GlossaryItem[] = [
-  { korean: "여러분", english: "everyone", note: "Often better dropped entirely in English", alternatives: ["you all", "—"], source: "lexicon" },
-  { korean: "말씀드리다", english: "to tell you", source: "lexicon" },
-  { korean: "다시 한번", english: "again", alternatives: ["once more"], source: "lexicon" },
-  { korean: "어떻게 보면", english: "in a sense", alternatives: ["—"], source: "lexicon" },
-  { korean: "사실은", english: "actually", alternatives: ["—"], source: "lexicon" },
-  { korean: "그래서", english: "so", source: "lexicon" },
-  { korean: "그러니까", english: "in other words", alternatives: ["so"], source: "lexicon" },
-  { korean: "결론적으로", english: "to sum up", source: "lexicon" },
-  { korean: "정리하자면", english: "to put it simply", source: "lexicon" },
-  { korean: "예를 들어", english: "for example", source: "lexicon" },
-  { korean: "한편으로는", english: "on one hand", source: "lexicon" },
-  { korean: "무엇보다", english: "above all", source: "lexicon" },
+  { korean: "여러분", english: "everyone", note: "Often better dropped entirely in English", alternatives: ["you all", "—"], source: "lexicon", register: true },
+  { korean: "말씀드리다", english: "to tell you", source: "lexicon", register: true },
+  { korean: "다시 한번", english: "again", alternatives: ["once more"], source: "lexicon", register: true },
+  { korean: "어떻게 보면", english: "in a sense", alternatives: ["—"], source: "lexicon", register: true },
+  { korean: "사실은", english: "actually", alternatives: ["—"], source: "lexicon", register: true },
+  { korean: "그래서", english: "so", source: "lexicon", register: true },
+  { korean: "그러니까", english: "in other words", alternatives: ["so"], source: "lexicon", register: true },
+  { korean: "결론적으로", english: "to sum up", source: "lexicon", register: true },
+  { korean: "정리하자면", english: "to put it simply", source: "lexicon", register: true },
+  { korean: "예를 들어", english: "for example", source: "lexicon", register: true },
+  { korean: "한편으로는", english: "on one hand", source: "lexicon", register: true },
+  { korean: "무엇보다", english: "above all", source: "lexicon", register: true },
 ];
 
 export const lexiconFor = (mode: "sermon" | "general"): GlossaryItem[] =>

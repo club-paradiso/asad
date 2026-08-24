@@ -41,6 +41,7 @@ export const glossaryItemSchema = z.object({
   note: z.string().max(160).optional(),
   alternatives: z.array(z.string()).max(4).optional(),
   source: z.enum(["prep", "lexicon", "live"]).optional(),
+  register: z.boolean().optional(),
 });
 
 export const culturalNoteSchema = z.object({

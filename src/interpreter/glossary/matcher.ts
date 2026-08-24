@@ -10,6 +10,7 @@
  */
 import type { GlossaryItem, InterpretationMode } from "@/types";
 import { lexiconFor } from "./lexicon";
+import { findWholeWordOccurrences } from "./match-korean";
 
 export interface GlossaryMatch extends GlossaryItem {
   /** Character offset of the last occurrence, used for recency ordering. */
@@ -43,10 +44,9 @@ export function matchGlossary(
   const matches: GlossaryMatch[] = [];
 
   for (const entry of entries) {
-    let from = 0;
-    for (;;) {
-      const index = text.indexOf(entry.korean, from);
-      if (index === -1) break;
+    // Whole-word only. Korean agglutinates, so substring search would report
+    // 감사 ("thanksgiving") inside 감사합니다 ("thank you").
+    for (const index of findWholeWordOccurrences(text, entry.korean)) {
       const end = index + entry.korean.length;
       let overlaps = false;
       for (let i = index; i < end; i += 1) {
@@ -55,11 +55,9 @@ export function matchGlossary(
           break;
         }
       }
-      if (!overlaps) {
-        for (let i = index; i < end; i += 1) claimed[i] = true;
-        matches.push({ ...entry, index });
-      }
-      from = index + 1;
+      if (overlaps) continue;
+      for (let i = index; i < end; i += 1) claimed[i] = true;
+      matches.push({ ...entry, index });
     }
   }
 
@@ -77,9 +75,15 @@ export function liveGlossary(
   extra: GlossaryItem[] = [],
   limit = LIVE_GLOSSARY_LIMIT,
 ): GlossaryItem[] {
-  return matchGlossary(recentText, mode, extra)
-    .slice(0, limit)
-    .map(({ index: _index, ...item }) => item);
+  return (
+    matchGlossary(recentText, mode, extra)
+      // Discourse markers (여러분, 사실은, 그러니까) are useful to the model as
+      // register context but they are noise on the rail — an interpreter does
+      // not need to be told that 여러분 means "everyone".
+      .filter((item) => !item.register)
+      .slice(0, limit)
+      .map(({ index: _index, ...item }) => item)
+  );
 }
 
 /** Collapse duplicates, keeping the first (highest-priority) occurrence. */

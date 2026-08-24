@@ -44,7 +44,10 @@ export const UNTRANSLATABLES: IdiomEntry[] = [
   { korean: "화이팅", kind: "cultural", note: "Encouragement, from English 'fighting'", suggestion: "You can do it!" },
   { korean: "눈치", kind: "cultural", note: "Reading the room; social radar", suggestion: "Sensing what the room needs." },
   { korean: "정이 많은", kind: "cultural", note: "정 is deep, accumulated attachment — not just 'affection'", suggestion: "Someone with a lot of warmth toward people." },
-  { korean: "한", kind: "cultural", note: "Deep collective sorrow — usually keep the Korean word", suggestion: "That deep, long-held sorrow Koreans call 'han'." },
+  // 한 is never matched bare: it is also the adjectival ending (거룩한), the
+  // determiner "one", and a dozen other things. Only real collocations match.
+  { korean: "한이 맺힌", kind: "cultural", note: "한 — deep, long-held collective sorrow", suggestion: "Carrying that deep, long-held sorrow." },
+  { korean: "한을 품고", kind: "cultural", note: "한 — deep, long-held collective sorrow", suggestion: "Holding on to that deep sorrow." },
   { korean: "효도", kind: "cultural", note: "Filial devotion as a duty, stronger than 'being a good child'", suggestion: "Honouring your parents." },
   { korean: "밥 먹었어요", kind: "cultural", note: "A greeting, not a question about food", suggestion: "How are you doing?" },
   { korean: "우리 교회", kind: "cultural", note: "우리 is collective possession — 'our church', not 'my church'", suggestion: "Our church." },
