@@ -1,0 +1,39 @@
+{
+  "name": "tong-yuck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A real-time AI copilot for human interpreters.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "icons": "node scripts/generate-icons.mjs"
+  },
+  "dependencies": {
+    "next": "^16.3.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
+    "@tailwindcss/postcss": "4.1.13",
+    "@testing-library/react": "16.3.0",
+    "@types/node": "22.18.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "5.0.2",
+    "eslint": "9.35.0",
+    "eslint-config-next": "^16.3.2",
+    "jsdom": "26.1.0",
+    "postcss": "8.5.6",
+    "tailwindcss": "4.1.13",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}
