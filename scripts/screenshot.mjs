@@ -9,6 +9,7 @@
  *   node scripts/screenshot.mjs <url> <out.png> <preset> <waitMs> "click:Start|wait:8000|key:t"
  */
 import { chromium } from "playwright";
+import { chromiumLaunchOptions } from "./browser.mjs";
 
 const [, , url = "http://localhost:3000/", out = "shot.png", preset = "laptop", waitMs = "2000", actions = ""] =
   process.argv;
@@ -28,9 +29,7 @@ if (!config) {
   process.exit(1);
 }
 
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
-});
+const browser = await chromium.launch(chromiumLaunchOptions());
 const context = await browser.newContext({ ...config, colorScheme: "dark" });
 const page = await context.newPage();
 
