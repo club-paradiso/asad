@@ -1,28 +1,32 @@
 /**
  * POST /api/interpret — the live interpretation endpoint.
  *
- * Runs on the server so the LLM key never reaches the browser. Two invariants:
+ * Runs on the server so provider keys never reach the browser. Three
+ * invariants, all of them load-bearing:
  *
- *  1. It always answers with a valid `InterpreterOutput`. A vendor failure, a
- *     timeout or malformed model output degrades to the deterministic local
- *     interpreter and is reported in `degraded` — the console keeps running.
- *  2. It never streams prose. The response is validated against the Zod schema
- *     before it leaves this file.
+ *  1. **It always answers with a valid `InterpreterOutput`.** Every vendor
+ *     failure path ends at the deterministic local interpreter.
+ *  2. **It never blocks the console.** The deadline comes from the lag profile
+ *     the interpreter chose, not from a fixed twelve seconds.
+ *  3. **Zod is the trust boundary.** A provider's JSON mode is a hint; schema
+ *     validation is the contract, and failing it is a provider failure that
+ *     moves the router on to the next candidate.
  */
 import { NextResponse } from "next/server";
-import { interpretRequestSchema, parseInterpreterOutput } from "@/lib/schema";
+import { interpretRequestSchema, interpreterOutputSchema, parseInterpreterOutput } from "@/lib/schema";
 import { buildLiveUserPrompt, systemPromptFor } from "@/interpreter/prompts/live";
-import { resolveLlmProvider } from "@/providers/llm";
+import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
+import { applyProfile, chooseProfile } from "@/interpreter/context/profiles";
+import { capabilitiesFor, deadlineFor, llmRouter, turnBudgetFor } from "@/providers/llm";
 import { interpretLocally } from "@/providers/llm/mock";
-import { LlmError } from "@/providers/llm/types";
+import { estimateTokens, telemetry } from "@/lib/telemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** A live turn that takes longer than this is already useless. */
-const TIMEOUT_MS = 12_000;
-
 export async function POST(request: Request) {
+  const receivedAt = Date.now();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -38,70 +42,144 @@ export async function POST(request: Request) {
     );
   }
   const input = parsed.data;
+  const router = llmRouter();
 
-  const { provider, degraded: providerDegraded, reason } = resolveLlmProvider();
+  const localOutput = () =>
+    interpretLocally({
+      pending: input.pending,
+      mode: input.mode,
+      allowAnticipation: input.allowAnticipation,
+    });
 
-  // The local interpreter needs no round trip at all.
-  if (provider.id === "mock") {
+  const preferred = router.preferred();
+
+  // No cloud candidate at all: answer locally without pretending otherwise.
+  if (!preferred || preferred === "local") {
     return NextResponse.json({
-      output: interpretLocally({
-        pending: input.pending,
-        mode: input.mode,
-        allowAnticipation: input.allowAnticipation,
-      }),
-      provider: "mock",
-      degraded: providerDegraded,
-      reason,
+      output: localOutput(),
+      provider: "local",
+      model: "deterministic",
+      degraded: true,
+      reason: "No cloud interpretation provider is available — using the local interpreter.",
+      profile: "full",
     });
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  /* --- Context budgeting ------------------------------------------------ */
+  const caps = capabilitiesFor(preferred);
+  const decision = chooseProfile({
+    recommendedLiveTokens: caps.recommendedLiveContextTokens,
+    quotaPressure: router.pressureFor(preferred),
+    latencyP95Ms: telemetry.stage("provider_response", preferred).p95 || undefined,
+    lag: input.lag,
+  });
+
+  const budgeted = { ...input, context: applyProfile(input.context, decision.profile) };
+  const system = systemPromptFor(input.mode);
+  const user = buildLiveUserPrompt(budgeted);
+
+  const systemTokens = estimateTokens(system);
+  const pendingTokens = estimateTokens(input.pending);
+  const contextTokens = Math.max(0, estimateTokens(user) - pendingTokens);
+
+  /* --- Route ------------------------------------------------------------ */
+  const dispatchedAt = Date.now();
+  telemetry.recordLatency({
+    stage: "trigger_to_dispatch",
+    ms: dispatchedAt - receivedAt,
+    provider: preferred,
+  });
+
+  const turnDeadline = turnBudgetFor(input.lag);
+  const turnController = new AbortController();
+  const turnTimer = setTimeout(() => turnController.abort(), turnDeadline);
 
   try {
-    const raw = await provider.complete({
-      system: systemPromptFor(input.mode),
-      user: buildLiveUserPrompt(input),
-      maxOutputTokens: 700,
-      temperature: 0.2,
-      signal: controller.signal,
-    });
+    const result = await router.complete(
+      {
+        system,
+        user,
+        maxOutputTokens: 700,
+        temperature: 0.2,
+        // Native schema enforcement where the provider has it. Zod still runs.
+        jsonSchema: INTERPRETER_JSON_SCHEMA,
+        // Live interpretation never wants extended reasoning.
+        thinking: "none",
+        signal: turnController.signal,
+      },
+      {
+        deadlineMs: deadlineFor({ workflow: "live", lag: input.lag, provider: preferred }),
+        estimatedTokens: systemTokens + contextTokens + pendingTokens,
+        validate: (response) => parseInterpreterOutput(response.text) !== null,
+      },
+    );
 
-    const output = parseInterpreterOutput(raw);
+    const output = parseInterpreterOutput(result.response.text);
+    telemetry.recordSchemaResult(output !== null);
+
+    for (const attempt of result.attempts) {
+      if (!attempt.ok && attempt.failureKind) telemetry.recordFailure(attempt.failureKind);
+    }
+
     if (!output) {
-      // Malformed output is a provider fault, not a session-ending event.
+      // The router's validator should have caught this; belt and braces.
       return NextResponse.json({
-        output: interpretLocally({
-          pending: input.pending,
-          mode: input.mode,
-          allowAnticipation: input.allowAnticipation,
-        }),
-        provider: provider.id,
+        output: localOutput(),
+        provider: "local",
+        model: "deterministic",
         degraded: true,
         reason: "The interpretation model returned output that did not match the schema.",
+        profile: decision.profile,
+        attempts: result.attempts,
       });
     }
 
-    return NextResponse.json({ output, provider: provider.id, degraded: false });
-  } catch (error) {
-    const aborted = error instanceof Error && error.name === "AbortError";
-    const message = aborted
-      ? "The interpretation model did not respond in time."
-      : error instanceof LlmError
-        ? error.message
-        : "The interpretation model is unavailable.";
+    telemetry.recordLatency({
+      stage: "provider_response",
+      ms: result.response.latencyMs,
+      provider: result.provider,
+      model: result.model,
+    });
+    telemetry.recordTokens({
+      provider: result.provider,
+      systemTokens,
+      contextTokens,
+      pendingTokens,
+      outputTokens: result.response.usage?.outputTokens,
+      totalTokens:
+        result.response.usage?.totalTokens ?? systemTokens + contextTokens + pendingTokens,
+      reported: result.response.usage?.totalTokens !== undefined,
+    });
 
     return NextResponse.json({
-      output: interpretLocally({
-        pending: input.pending,
-        mode: input.mode,
-        allowAnticipation: input.allowAnticipation,
-      }),
-      provider: provider.id,
+      output,
+      provider: result.provider,
+      model: result.model,
+      degraded: result.degraded,
+      reason: result.reason,
+      profile: decision.profile,
+      profileReason: decision.reason,
+      latencyMs: result.response.latencyMs,
+      attempts: result.attempts,
+    });
+  } catch (error) {
+    telemetry.recordFailure("turn_failed");
+    return NextResponse.json({
+      output: localOutput(),
+      provider: "local",
+      model: "deterministic",
       degraded: true,
-      reason: message,
+      reason:
+        error instanceof Error
+          ? `Interpretation unavailable: ${error.message}`
+          : "Interpretation is unavailable.",
+      profile: decision.profile,
     });
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(turnTimer);
   }
 }
+
+/** Re-exported so the benchmark harness validates the same way the route does. */
+export const validateOutput = (text: string) =>
+  interpreterOutputSchema.safeParse(parseInterpreterOutput(text)).success;

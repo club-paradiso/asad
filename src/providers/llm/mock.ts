@@ -23,7 +23,7 @@ import { detectScriptureReferences } from "@/interpreter/scripture/detect";
 import { liveGlossary } from "@/interpreter/glossary/matcher";
 import { detectCultural } from "@/interpreter/cultural/detect";
 import { frameShortcut } from "@/interpreter/engine/rhetoric";
-import type { LlmProvider, LlmProviderId, LlmRequest } from "./types";
+import type { LlmProvider, LlmRequest, LlmResponse } from "./types";
 
 const normalise = (text: string) => text.replace(/[\s.,!?…·"'"'']+/g, "");
 
@@ -151,19 +151,31 @@ export function interpretLocally(input: MockInterpretInput): InterpreterOutput {
 }
 
 /**
- * `LlmProvider` adapter, so the mock sits behind the same port as the real
- * vendors and the server route needs no special case.
+ * `LlmProvider` adapter, so the local interpreter sits behind the same port as
+ * the real vendors and the router needs no special case for it.
+ *
+ * This is the floor the whole system falls back to: it always answers, it never
+ * costs anything, and it never sends a byte anywhere.
  */
-export class MockLlmProvider implements LlmProvider {
-  readonly id: LlmProviderId = "mock";
+export class LocalLlmProvider implements LlmProvider {
+  readonly id = "local" as const;
+  readonly model = "deterministic";
 
-  async complete(request: LlmRequest): Promise<string> {
+  async complete(request: LlmRequest): Promise<LlmResponse> {
+    const started = Date.now();
     const pending = extractPending(request.user);
     const mode = /DOMAIN: KOREAN CHURCH SERMON/.test(request.system) ? "sermon" : "general";
     const allowAnticipation = !/Do not return anticipatedChunks/.test(request.user);
-    return JSON.stringify(interpretLocally({ pending, mode, allowAnticipation }));
+    return {
+      text: JSON.stringify(interpretLocally({ pending, mode, allowAnticipation })),
+      model: "deterministic",
+      latencyMs: Date.now() - started,
+    };
   }
 }
+
+/** Phase 1 name, kept so existing imports and tests keep working. */
+export { LocalLlmProvider as MockLlmProvider };
 
 /** Recover the Korean from the assembled user prompt. */
 export function extractPending(user: string): string {

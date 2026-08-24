@@ -1,55 +1,30 @@
 /**
- * LLM provider factory. Server-side only — API keys never reach the browser.
+ * LLM entry point. Server-side only — API keys never reach the browser.
  */
 import "server-only";
-import { AnthropicLlmProvider } from "./anthropic";
-import { MockLlmProvider } from "./mock";
-import { OpenAiLlmProvider } from "./openai";
-import type { LlmProvider, LlmProviderId } from "./types";
+import { appEnv } from "@/lib/env";
+import { LlmRouter } from "./router";
 
 export * from "./types";
-
-const isProviderId = (value: string): value is LlmProviderId =>
-  value === "mock" || value === "openai" || value === "anthropic";
+export * from "./capabilities";
+export { LlmRouter } from "./router";
+export type { ProviderHealth, RouteResult, RouteAttempt } from "./router";
+export { deadlineFor, turnBudgetFor } from "./deadlines";
 
 /**
- * Resolve the configured provider.
+ * Process-wide router.
  *
- * Falls back to the deterministic local interpreter whenever the requested
- * vendor has no key — a misconfigured deployment degrades to Korean-transcript
- * plus rule-based assistance, it does not 500 in the middle of a service.
+ * Held across requests on purpose: circuit-breaker and quota state are only
+ * useful if they survive from one live turn to the next. A serverless cold
+ * start resets them, which is harmless — the breaker simply relearns.
  */
-export function resolveLlmProvider(): { provider: LlmProvider; degraded: boolean; reason?: string } {
-  const requested = (process.env.LLM_PROVIDER ?? "mock").trim().toLowerCase();
-  const key = process.env.LLM_API_KEY?.trim();
+let router: LlmRouter | null = null;
 
-  if (!isProviderId(requested)) {
-    return {
-      provider: new MockLlmProvider(),
-      degraded: true,
-      reason: `Unknown LLM_PROVIDER "${requested}" — using the local interpreter.`,
-    };
-  }
-
-  if (requested === "mock") return { provider: new MockLlmProvider(), degraded: false };
-
-  if (!key) {
-    return {
-      provider: new MockLlmProvider(),
-      degraded: true,
-      reason: `LLM_PROVIDER is "${requested}" but LLM_API_KEY is not set — using the local interpreter.`,
-    };
-  }
-
-  if (requested === "openai") {
-    return {
-      provider: new OpenAiLlmProvider(key, process.env.OPENAI_LLM_MODEL || undefined),
-      degraded: false,
-    };
-  }
-
-  return {
-    provider: new AnthropicLlmProvider(key, process.env.ANTHROPIC_LLM_MODEL || undefined),
-    degraded: false,
-  };
+export function llmRouter(): LlmRouter {
+  return (router ??= new LlmRouter(appEnv()));
 }
+
+/** Test seam. */
+export const __resetRouter = () => {
+  router = null;
+};
