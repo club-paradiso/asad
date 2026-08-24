@@ -272,7 +272,11 @@ export class LlmRouter {
         }
 
         breaker.recordSuccess();
-        this.sticky = id;
+        // The local interpreter is the floor, never a preference. Making it
+        // sticky would mean one cloud failure silently ends cloud
+        // interpretation for the rest of the session, including after the
+        // provider recovers.
+        if (id !== "local") this.sticky = id;
         attempts.push({
           provider: id,
           model: response.model ?? provider.model,

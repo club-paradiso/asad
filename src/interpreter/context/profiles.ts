@@ -47,7 +47,8 @@ export const PROFILE_BUDGETS: Record<ContextProfile, ProfileBudget> = {
     corrections: 16,
     summary: true,
     prepNotes: true,
-    targetTokens: 1900,
+    // MEASURED by `npm run bench:live`, not estimated.
+    targetTokens: 2718,
   },
   compact: {
     koreanSegments: 5,
@@ -58,7 +59,7 @@ export const PROFILE_BUDGETS: Record<ContextProfile, ProfileBudget> = {
     corrections: 10,
     summary: true,
     prepNotes: false,
-    targetTokens: 1100,
+    targetTokens: 2432,
   },
   "ultra-compact": {
     // Only what the interpreter cannot recover from: the last thing said, the
@@ -71,7 +72,9 @@ export const PROFILE_BUDGETS: Record<ContextProfile, ProfileBudget> = {
     corrections: 8,
     summary: false,
     prepNotes: false,
-    targetTokens: 600,
+    // Only ~20% below full: the system prompt dominates, so context trimming
+    // has a hard floor. See docs/llm-benchmark.md.
+    targetTokens: 2177,
   },
 };
 
@@ -122,9 +125,10 @@ export function chooseProfile(input: {
 }): ProfileDecision {
   const recommended = input.recommendedLiveTokens ?? PROFILE_BUDGETS.full.targetTokens;
 
-  // A provider whose sustainable per-call budget is below the full profile
-  // simply cannot be given the full profile. This is the Groq case.
-  if (recommended <= PROFILE_BUDGETS["ultra-compact"].targetTokens * 1.4) {
+  // Thresholds sit just above each profile's MEASURED cost, so a provider whose
+  // sustainable budget is around a profile's real price gets that profile.
+  // This is the Groq case: its budget sits at the ultra-compact price.
+  if (recommended < PROFILE_BUDGETS.compact.targetTokens) {
     return {
       profile: "ultra-compact",
       reason: `Provider sustains only ~${recommended} tokens per live call.`,
@@ -135,7 +139,7 @@ export function chooseProfile(input: {
     return { profile: "ultra-compact", reason: "Free-tier quota nearly exhausted." };
   }
 
-  if (recommended <= PROFILE_BUDGETS.compact.targetTokens * 1.3) {
+  if (recommended < PROFILE_BUDGETS.full.targetTokens) {
     return {
       profile: "compact",
       reason: `Provider sustains ~${recommended} tokens per live call.`,

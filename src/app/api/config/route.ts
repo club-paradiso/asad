@@ -9,13 +9,25 @@
  * Only capability flags are exposed. No keys, no ids, no endpoints.
  */
 import { NextResponse } from "next/server";
+import { appEnv } from "@/lib/env";
+import { capabilitiesFor, trainsOnFreeTier } from "@/providers/llm/capabilities";
+import { llmRouter } from "@/providers/llm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export interface AppConfig {
   stt: { configured: string; cloudAvailable: boolean };
-  llm: { configured: string; modelAvailable: boolean };
+  llm: {
+    configured: string;
+    modelAvailable: boolean;
+    routingMode: string;
+    /**
+     * Providers in the active chain whose free tier may use submitted content
+     * to improve their products. Labels and notes only — never keys.
+     */
+    freeTierDisclosure: Array<{ label: string; note: string }>;
+  };
   bible: { configured: string; textAvailable: boolean; translation: string };
 }
 
@@ -34,9 +46,20 @@ export async function GET() {
     bible === "public-domain" ||
     (bible === "api-bible" && !!process.env.BIBLE_API_KEY?.trim() && !!process.env.BIBLE_ID?.trim());
 
+  const env = appEnv();
+  const plan = llmRouter().plan();
+  const freeTierDisclosure = plan.chain
+    .filter((id) => id !== "local" && trainsOnFreeTier(id))
+    .map((id) => ({ label: capabilitiesFor(id).label, note: capabilitiesFor(id).privacyNote }));
+
   const config: AppConfig = {
     stt: { configured: stt, cloudAvailable },
-    llm: { configured: llm, modelAvailable },
+    llm: {
+      configured: llm,
+      modelAvailable,
+      routingMode: env.llm.routingMode,
+      freeTierDisclosure,
+    },
     bible: {
       configured: bible,
       textAvailable,

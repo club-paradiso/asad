@@ -1,0 +1,55 @@
+# Repository quality checks.
+#
+# Deliberately boring and fast: install, lint, typecheck, test, build. No real
+# API keys — provider integration is exercised by the smoke test, which skips
+# cleanly when no credential is configured, so CI never depends on a secret and
+# never spends money.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Runs against the local interpreter only when no key is configured,
+      # which is the CI case. It verifies the harness itself still works.
+      - name: LLM smoke test (local only, no credentials)
+        run: npm run smoke:llm
+
+      # A short soak proves the bounded-growth invariants on every PR without
+      # making CI slow.
+      - name: Soak (5 simulated minutes)
+        run: npm run soak -- --minutes 5

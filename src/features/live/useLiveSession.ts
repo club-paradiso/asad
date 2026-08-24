@@ -72,6 +72,8 @@ export function useLiveSession(options: LiveSessionOptions) {
   const [error, setError] = useState<string | null>(null);
   const [demoBeat, setDemoBeat] = useState<DemoBeat | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  /** Which provider answered the most recent turn — drives the AI pill. */
+  const [lastProvider, setLastProvider] = useState<string | undefined>(undefined);
 
   const engineRef = useRef<InterpretationEngine | null>(null);
   const providerRef = useRef<SpeechProvider | null>(null);
@@ -97,6 +99,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         // console rather than an impossibly instant one.
         await new Promise((resolve) => setTimeout(resolve, 420));
         if (signal.aborted) throw new DOMException("aborted", "AbortError");
+        setLastProvider("local");
         return {
           output: interpretLocally({
             pending: request.pending,
@@ -120,12 +123,14 @@ export function useLiveSession(options: LiveSessionOptions) {
 
       const data = (await response.json()) as {
         output: unknown;
+        provider?: string;
         degraded?: boolean;
         reason?: string;
       };
       const parsed = interpreterOutputSchema.safeParse(data.output);
       if (!parsed.success) throw new Error("Interpretation response failed validation.");
 
+      setLastProvider(data.provider);
       return { output: parsed.data, degraded: data.degraded, reason: data.reason };
     },
     [script.id],
@@ -281,6 +286,7 @@ export function useLiveSession(options: LiveSessionOptions) {
     phase,
     error,
     demoBeat,
+    lastProvider,
     startedAt,
     script,
     start,
