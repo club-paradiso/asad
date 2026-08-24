@@ -180,6 +180,7 @@ npm run typecheck  # tsc --noEmit
 npm test           # vitest
 npm run icons      # regenerate PWA icons
 npm run shot       # device screenshots, for the design pass
+npm run e2e        # end-to-end flow check against a running server
 ```
 
 ---
