@@ -119,6 +119,11 @@ export function EnglishStream({
     <div
       ref={containerRef}
       className="scroll-y h-full px-4 sm:px-8 lg:px-12"
+      // `container-type: size` (not Tailwind's inline-size `@container`, which
+      // only exposes cqw) so the tail spacer below can be a fraction of THIS
+      // region — what is left after the Korean panel and context rail have
+      // taken their share — rather than of the whole viewport.
+      style={{ containerType: "size" }}
       aria-live="polite"
       aria-atomic="false"
       aria-label="Interpreter-ready English"
@@ -135,7 +140,10 @@ export function EnglishStream({
         // reading anchor the auto-scroll uses once the stream is long enough to
         // scroll. Without it the first few lines of a session sit at the top of
         // the screen and then jump down.
-        <div className="flex min-h-full flex-col justify-end">
+        // `max-w` caps the measure. A 1,100-pixel line of 46px type is slower
+        // to read than two shorter ones, and the interpreter is reading it
+        // peripherally with about a second to spare.
+        <div className="flex min-h-full max-w-[48rem] flex-col justify-end xl:max-w-[56rem]">
           {chunks.map((chunk) => (
             <ChunkLine
               key={chunk.id}
@@ -150,9 +158,9 @@ export function EnglishStream({
               }
             />
           ))}
-          {/* Reserves the lower 45% so the active line never sits at the
-              bottom edge — the interpreter needs to see what is coming. */}
-          <div aria-hidden className="h-[45dvh] shrink-0" />
+          {/* Reserves the lower portion so the active line never sits at the
+              bottom edge — the interpreter needs to see what is coming next. */}
+          <div aria-hidden className="h-[46cqh] shrink-0" />
         </div>
       )}
     </div>

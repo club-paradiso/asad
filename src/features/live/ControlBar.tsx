@@ -14,7 +14,6 @@
  */
 import type { ConsoleView } from "@/types";
 import { Button } from "@/components/ui/primitives";
-import { cn } from "@/lib/cn";
 
 export function ControlBar({
   frozen,
@@ -43,29 +42,38 @@ export function ControlBar({
 }) {
   return (
     <div
-      className="flex shrink-0 items-center gap-2 border-t border-[var(--line)] bg-[var(--bg-raised)] px-2 py-2 sm:px-4"
-      style={{ paddingBottom: "calc(0.5rem + var(--safe-bottom))" }}
+      className="flex shrink-0 items-center gap-2 border-t border-[var(--line)] bg-[var(--bg-raised)] px-2 py-1.5 sm:px-4 tall:py-2"
+      style={{ paddingBottom: "calc(0.375rem + var(--safe-bottom))" }}
     >
       <Button
         onClick={onToggleFreeze}
         size="lg"
         tone={frozen ? "primary" : "neutral"}
-        className="flex-1 max-w-[22rem] font-semibold tracking-wide"
+        // Shorter on a phone in landscape, where every pixel of height is
+        // competing with the English.
+        className="h-12 min-h-0 flex-1 max-w-[22rem] font-semibold tracking-wide tall:h-14"
         title="Freeze the display — processing continues (Space)"
       >
         {frozen ? "FROZEN — TAP TO RESUME" : "FREEZE"}
       </Button>
 
       {!atLive && !frozen && (
-        <Button onClick={onReturnToLive} size="lg" tone="neutral" title="Jump back to live (F)">
+        <Button
+          onClick={onReturnToLive}
+          size="lg"
+          tone="neutral"
+          className="h-12 min-h-0 tall:h-14"
+          title="Jump back to live (F)"
+        >
           ↓ Live
         </Button>
       )}
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-0.5">
         <Button
-          size="sm"
+          size="md"
           tone="quiet"
+          className="min-w-11 px-2"
           active={view === "teleprompter"}
           onClick={onToggleView}
           title="Teleprompter view (T)"
@@ -74,8 +82,9 @@ export function ControlBar({
           T
         </Button>
         <Button
-          size="sm"
+          size="md"
           tone="quiet"
+          className="min-w-11 px-2"
           active={showKorean}
           onClick={onToggleKorean}
           title="Show or hide Korean (K)"
@@ -84,8 +93,9 @@ export function ControlBar({
           <span className="font-korean">한</span>
         </Button>
         <Button
-          size="sm"
+          size="md"
           tone="quiet"
+          className="min-w-11 px-2"
           active={showGlossary}
           onClick={onToggleGlossary}
           title="Show or hide the glossary (G)"
@@ -93,11 +103,23 @@ export function ControlBar({
         >
           G
         </Button>
-        <div className="ml-1 flex items-center gap-0.5 rounded-md border border-[var(--line-strong)]">
-          <Button size="sm" tone="quiet" onClick={() => onFontScale(-0.1)} ariaLabel="Smaller text">
-            <span className={cn("text-xs")}>A−</span>
+        <div className="ml-1 flex items-center rounded-md border border-[var(--line-strong)]">
+          <Button
+            size="md"
+            tone="quiet"
+            className="min-w-11 px-2"
+            onClick={() => onFontScale(-0.1)}
+            ariaLabel="Smaller text"
+          >
+            <span className="text-xs">A−</span>
           </Button>
-          <Button size="sm" tone="quiet" onClick={() => onFontScale(0.1)} ariaLabel="Larger text">
+          <Button
+            size="md"
+            tone="quiet"
+            className="min-w-11 px-2"
+            onClick={() => onFontScale(0.1)}
+            ariaLabel="Larger text"
+          >
             <span className="text-base">A+</span>
           </Button>
         </div>

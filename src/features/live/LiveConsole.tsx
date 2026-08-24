@@ -200,7 +200,10 @@ export function LiveConsole({
       {source === "demo" && demoBeat ? <DemoRibbon beat={demoBeat} /> : <div />}
 
       {/* --- English: the dominant region ---------------------------------- */}
-      <main className="relative min-h-0">
+      {/* `min-w-0` on every row: a grid item defaults to `min-width: auto`,
+          which lets a long Korean segment push the row wider than the column
+          instead of wrapping — the text then runs off the right edge. */}
+      <main className="relative min-h-0 min-w-0">
         {teleprompter ? (
           <Teleprompter
             chunks={snapshot.chunks}
@@ -247,7 +250,9 @@ export function LiveConsole({
 
       {/* --- Korean: secondary, capped ------------------------------------- */}
       {settings.showKorean && !teleprompter && (
-        <section className="max-h-[22dvh] min-h-0 border-t border-[var(--line)] bg-[var(--bg)]">
+        // Capped as a fraction of the viewport, and capped harder on a short
+        // one: on an iPhone in landscape the Korean must not eat the English.
+        <section className="max-h-[17dvh] min-h-0 min-w-0 border-t border-[var(--line)] bg-[var(--bg)] tall:max-h-[22dvh]">
           <KoreanStream
             segments={snapshot.segments}
             partial={snapshot.partial}

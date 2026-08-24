@@ -15,7 +15,7 @@ import type { DemoBeat } from "@/demo/types";
 export function DemoRibbon({ beat }: { beat: DemoBeat }) {
   return (
     <div
-      className="flex h-7 shrink-0 items-center gap-2 overflow-hidden border-b border-[var(--line)] bg-[var(--bg-overlay)] px-3 sm:px-4"
+      className="flex h-6 shrink-0 items-center gap-2 overflow-hidden border-b border-[var(--line)] bg-[var(--bg-overlay)] px-3 sm:px-4 tall:h-7"
       aria-hidden
     >
       <span className="type-label shrink-0 text-[var(--info)]">demo · showing</span>

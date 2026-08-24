@@ -14,8 +14,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** Where the active line sits, as a fraction of container height. */
-const ANCHOR = 0.45;
+/**
+ * Where the active line's centre sits, as a fraction of the reading region.
+ *
+ * Slightly below the middle: the interpreter gets more of what they have just
+ * said above the line, and the space below only has to hold the one or two
+ * short anticipated chunks. Sitting it dead centre wastes the lower half.
+ */
+const ANCHOR = 0.55;
 
 /** Distance from the anchor before a scroll is worth performing at all. */
 const DEAD_ZONE_PX = 24;
@@ -38,8 +44,15 @@ export function useAutoScroll<T extends HTMLElement>(options: {
     const active = activeRef.current;
     if (!container || !active) return;
 
-    const target =
-      active.offsetTop - container.clientHeight * ANCHOR + active.offsetHeight / 2;
+    // Measured from rects rather than `offsetTop`: the chunks' offset parent is
+    // the positioned <main>, not the scroll container, so offsetTop would be
+    // measured from the wrong origin and the anchor would never be hit.
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    const activeCentre =
+      activeRect.top - containerRect.top + container.scrollTop + activeRect.height / 2;
+
+    const target = activeCentre - container.clientHeight * ANCHOR;
     const clamped = Math.max(0, Math.min(target, container.scrollHeight - container.clientHeight));
     if (Math.abs(clamped - container.scrollTop) < DEAD_ZONE_PX) return;
 

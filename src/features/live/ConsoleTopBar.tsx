@@ -71,7 +71,7 @@ export function ConsoleTopBar({
   const state = effectiveState(connection, health);
 
   return (
-    <header className="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--bg-raised)] pl-3 pr-1 sm:pl-4 text-[0.75rem]">
+    <header className="flex h-8 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--bg-raised)] pl-3 pr-1 text-[0.7rem] sm:pl-4 tall:h-9 tall:text-[0.75rem]">
       <span className="flex items-center gap-1.5" title={degradedReason}>
         <StatusDot state={state} />
         <span
@@ -104,10 +104,16 @@ export function ConsoleTopBar({
         </span>
       </span>
 
-      <Button size="sm" tone="quiet" onClick={onOpenSettings} ariaLabel="Session settings">
-        <span aria-hidden>⋯</span>
+      <Button
+        size="sm"
+        tone="quiet"
+        className="h-7 min-w-9 tall:h-9"
+        onClick={onOpenSettings}
+        ariaLabel="Session settings"
+      >
+        <span aria-hidden className="text-base leading-none">⋯</span>
       </Button>
-      <Button size="sm" tone="quiet" onClick={onEnd} className="text-[var(--danger)]">
+      <Button size="sm" tone="quiet" className="h-7 text-[var(--danger)] tall:h-9" onClick={onEnd}>
         End
       </Button>
     </header>

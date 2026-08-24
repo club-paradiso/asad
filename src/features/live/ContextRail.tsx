@@ -44,11 +44,11 @@ export function ContextRail({
   return (
     <div
       className={cn(
-        "border-t border-[var(--line)] bg-[var(--bg-raised)]",
+        "min-w-0 border-t border-[var(--line)] bg-[var(--bg-raised)]",
         className,
       )}
     >
-      <div className="scroll-x flex items-stretch gap-2 px-3 py-2 sm:px-5">
+      <div className="scroll-x flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
         {empty && (
           <span className="type-context self-center text-[var(--fg-dim)]">
             Scripture, terminology and cultural notes appear here.

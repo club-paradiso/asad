@@ -29,6 +29,20 @@ const TONE: Record<ButtonTone, string> = {
     "bg-transparent text-[var(--danger)] border-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_14%,transparent)]",
 };
 
+/**
+ * Pressed styles are a separate map rather than classes layered on top of
+ * TONE. Two arbitrary `text-[...]` utilities have equal specificity, so which
+ * one wins depends on their order in the generated stylesheet, not on the
+ * order they appear in the class list — the on-state would silently lose.
+ * A toggle you cannot read without pressing is not a toggle.
+ */
+const TONE_ACTIVE: Record<ButtonTone, string> = {
+  neutral: "bg-[var(--accent-dim)] text-[var(--accent)] border-[var(--accent)]",
+  primary: "bg-[var(--accent)] text-[#141007] border-[var(--accent)] font-semibold",
+  quiet: "bg-[var(--accent-dim)] text-[var(--accent)] border-[color-mix(in_srgb,var(--accent)_35%,transparent)]",
+  danger: "bg-[color-mix(in_srgb,var(--danger)_16%,transparent)] text-[var(--danger)] border-[var(--danger)]",
+};
+
 const SIZE: Record<ButtonSize, string> = {
   sm: "h-9 px-3 text-[0.8125rem]",
   md: "min-h-11 px-4 text-sm",
@@ -70,8 +84,7 @@ export function Button({
         "inline-flex items-center justify-center gap-2 rounded-md border transition-colors select-none",
         "disabled:opacity-40 disabled:pointer-events-none",
         SIZE[size],
-        TONE[tone],
-        active && tone === "neutral" && "border-[var(--accent)] text-[var(--accent)]",
+        active ? TONE_ACTIVE[tone] : TONE[tone],
         className,
       )}
     >

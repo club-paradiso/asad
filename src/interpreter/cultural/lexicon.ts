@@ -50,7 +50,6 @@ export const UNTRANSLATABLES: IdiomEntry[] = [
   { korean: "한을 품고", kind: "cultural", note: "한 — deep, long-held collective sorrow", suggestion: "Holding on to that deep sorrow." },
   { korean: "효도", kind: "cultural", note: "Filial devotion as a duty, stronger than 'being a good child'", suggestion: "Honouring your parents." },
   { korean: "밥 먹었어요", kind: "cultural", note: "A greeting, not a question about food", suggestion: "How are you doing?" },
-  { korean: "우리 교회", kind: "cultural", note: "우리 is collective possession — 'our church', not 'my church'", suggestion: "Our church." },
   { korean: "추석", kind: "cultural", note: "Autumn harvest holiday, family-focused", suggestion: "Chuseok — the Korean harvest holiday." },
   { korean: "설날", kind: "cultural", note: "Lunar New Year", suggestion: "Korean New Year." },
   { korean: "수능", kind: "cultural", note: "The national university entrance exam — enormous cultural weight", suggestion: "The national college entrance exam." },
