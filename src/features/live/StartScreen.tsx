@@ -194,6 +194,21 @@ export function StartScreen() {
         </p>
       )}
 
+      {/* A different job on the same footing, not a sub-feature: the console is
+          for an interpreter working a room, the counter is for staff at a desk
+          with a stranger in front of them. */}
+      <Link
+        href="/counter"
+        className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] p-4 transition-colors hover:border-[var(--line-strong)]"
+      >
+        <p className="text-base font-semibold">현장 응대 · Counter Mode</p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
+          Show a QR code; the visitor joins on their own phone in their own
+          language. Chat and voice, both languages visible to both sides, 24
+          languages. No install.
+        </p>
+      </Link>
+
       <nav className="mt-auto flex flex-wrap gap-3 border-t border-[var(--line)] pt-5 text-sm">
         <Link
           href="/prep"

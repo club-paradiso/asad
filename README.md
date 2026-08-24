@@ -98,6 +98,42 @@ prayer, testimony, rhetorical repetition and humour.
 
 ---
 
+## Run tong-yuck for free
+
+Real live interpretation, no paid API anywhere:
+
+```bash
+# .env.local
+STT_PROVIDER=webspeech        # browser speech recognition — $0
+LLM_ROUTING_MODE=auto-free    # free-tier interpretation — $0
+GEMINI_API_KEY=your-free-key  # from Google AI Studio, no card required
+BIBLE_PROVIDER=reference-only # no network call at all — $0
+```
+
+```bash
+npm install && npm run dev
+```
+
+Open in **Chrome**, pick **Sermon**, choose **Browser** as the audio source,
+press Start. Check `/diagnostics` to confirm what is actually configured.
+
+**Limitations, stated plainly:**
+
+- Web Speech is good in Chrome and Edge, partial in Safari, and unreliable on
+  iOS. It also stops on silence and restarts automatically, which can drop a
+  phrase.
+- Gemini's free tier sustains about **two 45-minute sermons a day**
+  (1,000 requests). After that the console keeps running on the local
+  interpreter and the status pill shows `AI LOCAL`.
+- **Privacy: Gemini's free tier may use prompts and responses to improve Google
+  products, including human review.** For sermon content — testimonies, prayer
+  requests, names — that is a real tradeoff. tong-yuck tells you once, in-app,
+  before the first live cloud session, and offers `LLM_ROUTING_MODE=local`
+  (sends nothing) or `LLM_PRIVACY_MODE=strict` (excludes training-capable
+  providers) as alternatives.
+
+Full detail: [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md).
+
 ## Going live
 
 Copy `.env.example` to `.env.local` and fill in what you need. Every value is
@@ -108,11 +144,22 @@ STT_PROVIDER=deepgram        # demo | webspeech | deepgram | openai
 DEEPGRAM_API_KEY=...
 DEEPGRAM_PROJECT_ID=...      # needed to mint short-lived browser keys
 
-LLM_PROVIDER=anthropic       # mock | openai | anthropic
-LLM_API_KEY=...
+# local | auto-free | pinned | reliable
+LLM_ROUTING_MODE=auto-free
+LLM_PRIVACY_MODE=standard    # strict excludes providers that may train on you
+LLM_ALLOW_PAID_FALLBACK=false
+
+GEMINI_API_KEY=...           # free tier
+GROQ_API_KEY=...             # free tier, does not train on your data
+OPENROUTER_API_KEY=...       # free tier, experimental
+ANTHROPIC_API_KEY=...        # paid
+OPENAI_API_KEY=...           # paid
 
 BIBLE_PROVIDER=reference-only  # reference-only | public-domain | api-bible
 ```
+
+Phase 1's `LLM_PROVIDER` / `LLM_API_KEY` still work and report their migration
+path on `/diagnostics`.
 
 | Setting | Behaviour |
 | --- | --- |
@@ -169,6 +216,49 @@ is never retained.
 
 ---
 
+## Counter Mode — 현장 응대
+
+A second surface for a different job. The console is for an interpreter working
+a room; Counter Mode is for staff at a desk with a stranger in front of them
+who does not share their language.
+
+Open `/counter` on the iPad or the spare phone on the desk, pick the staff
+language, press **QR 코드 띄우기**. The visitor scans the code, picks their
+language from a list written in their own script, and starts talking — chat or
+push-to-talk voice, on their own phone, with nothing installed.
+
+Four decisions carry it, and all four exist because field translators produce
+too many errors, not too few translations:
+
+- **Both languages are on both screens, always.** Every bubble shows the
+  viewer's language large and the other language underneath, fully legible.
+  That is what lets either party catch an error; a single-language screen gives
+  neither of them any way to.
+- **Quick phrases never touch a model.** The twenty-odd things a counter says
+  all day are pre-written in ~17 languages and delivered by lookup. No latency,
+  no variance, no mistranslation on the fortieth repetition.
+- **Numbers, times, dates, money and names are flagged.** They are highlighted
+  in the translation and one tap sends just those values back for verbal
+  read-back. `3시` heard as `13시` is the error that actually costs someone
+  their appointment.
+- **A failed translation says so.** There is no local fallback that fakes one.
+  A counter is exactly the wrong place to show something that is not a
+  translation as though it were.
+
+Open-weight models by default (`LLM_COUNTER_PREFER_OPEN=true`) — Groq's
+`gpt-oss-120b`, OpenRouter's Llama. The counter's workload is ~2,400 tokens per
+minute against Groq's 6,000 TPM free tier, so unlike the live console it fits
+in a free tier comfortably, and Groq does not train on inputs on either tier.
+
+24 languages offered; the interface itself is translated into 17 and falls back
+to English rather than Korean beyond that. `/diagnostics` lists exactly which
+language gets what. Full design note: [docs/counter-mode.md](docs/counter-mode.md).
+
+Sessions live in one process's memory, expire after four hours idle, and are
+deleted outright when the staff member ends them. Nothing is written to disk.
+
+---
+
 ## Commands
 
 ```bash
@@ -178,9 +268,15 @@ npm start          # serve the production build
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
 npm test           # vitest
+npm run verify     # everything CI runs, in one command
 npm run icons      # regenerate PWA icons
 npm run shot       # device screenshots, for the design pass
 npm run e2e        # end-to-end flow check against a running server
+
+npm run smoke:llm  # one fixture per configured provider; skips cleanly
+npm run bench:llm  # 20-case interpretation benchmark, JSON + Markdown reports
+npm run bench:live # replay real transcript timing, measure latency
+npm run soak       # 45-minute session: bounded memory, context, no backlog
 ```
 
 ---
@@ -207,6 +303,10 @@ Scripture normalisation, glossary matching and cultural detection all run
 - [`docs/privacy.md`](docs/privacy.md) — what leaves the device, and what
   cannot be promised
 - [`docs/cost.md`](docs/cost.md) — per-session and monthly estimates
+- [`docs/llm-benchmark.md`](docs/llm-benchmark.md) — provider comparison,
+  measured workload, and what was **not** measured
+- [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md) — the
+  zero-cost setup and its tradeoffs
 - [`docs/repository-audit.md`](docs/repository-audit.md) — what was here before
 
 ---
@@ -246,6 +346,16 @@ Stated plainly, because a tool used live should not surprise you.
   overwrite.
 - **No prompt caching yet.** The system prompt is constant per session and is
   the largest fixed input — caching it would cut cost materially.
+- **Counter Mode sessions do not survive a restart or span instances.** They
+  are held in one process's memory. That is correct for a venue running this as
+  a single Node process, and wrong for a multi-instance or serverless
+  deployment, where a poll may reach a worker that has never seen the session.
+  `/diagnostics` states this; swapping `CounterStore` for a shared
+  implementation is the fix.
+- **Counter Mode voice input depends on the browser.** Several of the languages
+  that turn up most often at a Korean desk — Uzbek, Mongolian, Khmer, Burmese —
+  have no reliable browser speech recognition, so those visitors type. Typing is
+  always available and never a degraded path.
 
 ---
 

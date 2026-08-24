@@ -9,14 +9,44 @@
  * Only capability flags are exposed. No keys, no ids, no endpoints.
  */
 import { NextResponse } from "next/server";
+import { appEnv } from "@/lib/env";
+import { capabilitiesFor, trainsOnFreeTier } from "@/providers/llm/capabilities";
+import { llmRouter } from "@/providers/llm";
+import { OPEN_WEIGHT } from "@/providers/llm/router";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export interface AppConfig {
   stt: { configured: string; cloudAvailable: boolean };
-  llm: { configured: string; modelAvailable: boolean };
+  llm: {
+    configured: string;
+    modelAvailable: boolean;
+    routingMode: string;
+    /**
+     * Providers in the active chain whose free tier may use submitted content
+     * to improve their products. Labels and notes only — never keys.
+     */
+    freeTierDisclosure: Array<{ label: string; note: string }>;
+  };
   bible: { configured: string; textAvailable: boolean; translation: string };
+  /**
+   * What the visitor is told before they say anything.
+   *
+   * A stranger at a counter is asked to type medical, legal or immigration
+   * details into a phone they did not choose. They are owed the name of the
+   * company that will see it, and whether that company may keep it — on the
+   * join screen, not buried in a policy page they cannot read.
+   */
+  counter: {
+    /** Provider label, or null when nothing can translate. */
+    provider: string | null;
+    /** True when the active free tier may use submissions for training. */
+    mayTrain: boolean;
+    /** The provider's own data-use note, in English. */
+    note: string;
+    openWeightModel: boolean;
+  };
 }
 
 export async function GET() {
@@ -34,13 +64,39 @@ export async function GET() {
     bible === "public-domain" ||
     (bible === "api-bible" && !!process.env.BIBLE_API_KEY?.trim() && !!process.env.BIBLE_ID?.trim());
 
+  const env = appEnv();
+  const plan = llmRouter().plan();
+  const freeTierDisclosure = plan.chain
+    .filter((id) => id !== "local" && trainsOnFreeTier(id))
+    .map((id) => ({ label: capabilitiesFor(id).label, note: capabilitiesFor(id).privacyNote }));
+
+  // The provider a counter turn would actually reach, which is not necessarily
+  // the one the live console prefers.
+  const counterProvider = llmRouter().preferred(
+    env.llm.counterPreferOpen ? OPEN_WEIGHT : undefined,
+  );
+  const counterCaps = counterProvider ? capabilitiesFor(counterProvider) : null;
+
   const config: AppConfig = {
     stt: { configured: stt, cloudAvailable },
-    llm: { configured: llm, modelAvailable },
+    llm: {
+      configured: llm,
+      modelAvailable,
+      routingMode: env.llm.routingMode,
+      freeTierDisclosure,
+    },
     bible: {
       configured: bible,
       textAvailable,
       translation: process.env.BIBLE_TRANSLATION?.trim() || "WEB",
+    },
+    counter: {
+      provider: counterCaps?.label ?? null,
+      mayTrain: counterProvider ? trainsOnFreeTier(counterProvider) : false,
+      note: counterCaps?.privacyNote ?? "",
+      openWeightModel: counterProvider
+        ? OPEN_WEIGHT(counterProvider, env.llm.providers[counterProvider].model)
+        : false,
     },
   };
 

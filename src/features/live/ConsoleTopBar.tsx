@@ -13,6 +13,7 @@
  */
 import type { ConnectionState, SubsystemHealth } from "@/types";
 import { Button, StatusDot } from "@/components/ui/primitives";
+import { AiStatus, type AiState } from "./AiStatus";
 import { cn } from "@/lib/cn";
 
 const CONNECTION_LABEL: Record<ConnectionState, string> = {
@@ -54,6 +55,8 @@ export function ConsoleTopBar({
   sourceLabel,
   thinking,
   degradedReason,
+  aiState,
+  aiTitle,
   onOpenSettings,
   onEnd,
 }: {
@@ -65,6 +68,8 @@ export function ConsoleTopBar({
   sourceLabel: string;
   thinking: boolean;
   degradedReason?: string;
+  aiState: AiState;
+  aiTitle?: string;
   onOpenSettings: () => void;
   onEnd: () => void;
 }) {
@@ -88,6 +93,13 @@ export function ConsoleTopBar({
         /
       </span>
       <span className="text-[var(--fg-dim)]">{sourceLabel}</span>
+
+      <span aria-hidden className="text-[var(--line-strong)]">
+        /
+      </span>
+      {/* Three words is the entire AI story the live console tells. Everything
+          else lives on /diagnostics. */}
+      <AiStatus state={aiState} title={aiTitle} />
 
       <span className="ml-auto flex items-center gap-2.5 text-[var(--fg-dim)]">
         {/* A dot rather than a spinner: it reads as "working" in peripheral

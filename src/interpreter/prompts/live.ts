@@ -6,12 +6,25 @@
  * — the rolling context has already been compressed before it gets here.
  */
 import type { InterpretRequest } from "@/lib/schema";
-import { GENERAL_SYSTEM_PROMPT } from "./general";
-import { SERMON_SYSTEM_PROMPT } from "./sermon";
+import { generalSystemPrompt } from "./general";
+import { sermonSystemPrompt } from "./sermon";
 import { contextBlock } from "./shared";
 
-export const systemPromptFor = (mode: "sermon" | "general"): string =>
-  mode === "sermon" ? SERMON_SYSTEM_PROMPT : GENERAL_SYSTEM_PROMPT;
+/**
+ * The system prompt for a live turn.
+ *
+ * `schemaEnforced` drops the prose restatement of the JSON shape when the
+ * provider is validating against `INTERPRETER_JSON_SCHEMA` itself. Measured at
+ * ~230 tokens saved per call — which matters at eleven calls a minute for
+ * forty-five minutes.
+ */
+export const systemPromptFor = (
+  mode: "sermon" | "general",
+  options: { schemaEnforced?: boolean } = {},
+): string =>
+  mode === "sermon"
+    ? sermonSystemPrompt(options.schemaEnforced ?? false)
+    : generalSystemPrompt(options.schemaEnforced ?? false);
 
 /** Per-lag steer, appended to the user turn. */
 const LAG_STEER: Record<InterpretRequest["lag"], string> = {

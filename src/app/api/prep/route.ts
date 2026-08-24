@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prepBriefSchema, prepRequestSchema, extractJsonObject } from "@/lib/schema";
 import { buildPrepUserPrompt, PREP_SYSTEM_PROMPT } from "@/interpreter/prompts/prep";
-import { resolveLlmProvider } from "@/providers/llm";
+import { deadlineFor, llmRouter } from "@/providers/llm";
 import { localPrepBrief } from "@/interpreter/prep/local-brief";
 
 export const runtime = "nodejs";
@@ -34,15 +34,15 @@ export async function POST(request: Request) {
   }
   const input = parsed.data;
 
-  const { provider, degraded: providerDegraded, reason } = resolveLlmProvider();
+  const router = llmRouter();
+  const preferred = router.preferred();
 
-  if (provider.id === "mock") {
+  if (!preferred || preferred === "local") {
     return NextResponse.json({
       brief: localPrepBrief(input),
-      provider: "mock",
-      degraded: providerDegraded || true,
+      provider: "local",
+      degraded: true,
       reason:
-        reason ??
         "No interpretation model configured — this brief was built from your prep sheet alone.",
     });
   }
@@ -51,14 +51,21 @@ export async function POST(request: Request) {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const raw = await provider.complete({
-      system: PREP_SYSTEM_PROMPT,
-      user: buildPrepUserPrompt(input),
-      maxOutputTokens: 2400,
-      temperature: 0.3,
-      signal: controller.signal,
-    });
+    // Prep is not latency-critical, so unlike the live path it is allowed to
+    // think and to take its time.
+    const result = await router.complete(
+      {
+        system: PREP_SYSTEM_PROMPT,
+        user: buildPrepUserPrompt(input),
+        maxOutputTokens: 2400,
+        temperature: 0.3,
+        thinking: "low",
+        signal: controller.signal,
+      },
+      { deadlineMs: deadlineFor({ workflow: "prep" }) },
+    );
 
+    const raw = result.response.text;
     const json = extractJsonObject(raw);
     const value: unknown = json ? safeJson(json) : null;
     const brief = prepBriefSchema.safeParse(value);
@@ -66,18 +73,23 @@ export async function POST(request: Request) {
     if (!brief.success) {
       return NextResponse.json({
         brief: localPrepBrief(input),
-        provider: provider.id,
+        provider: result.provider,
         degraded: true,
         reason: "The model returned a brief that did not match the schema.",
       });
     }
 
-    return NextResponse.json({ brief: brief.data, provider: provider.id, degraded: false });
+    return NextResponse.json({
+      brief: brief.data,
+      provider: result.provider,
+      model: result.model,
+      degraded: result.degraded,
+    });
   } catch (error) {
     const aborted = error instanceof Error && error.name === "AbortError";
     return NextResponse.json({
       brief: localPrepBrief(input),
-      provider: provider.id,
+      provider: "local",
       degraded: true,
       reason: aborted
         ? "The model did not respond in time."

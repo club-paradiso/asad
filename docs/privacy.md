@@ -25,6 +25,9 @@ Demo mode is fully offline. That is not a limitation — it is the mode to use
 for a demonstration, a rehearsal, or any session you would rather not put on
 someone else's network.
 
+Counter Mode has its own shape — a visitor, not an operator, bears the risk —
+and is covered [below](#counter-mode).
+
 ---
 
 ## Audio
@@ -61,10 +64,11 @@ provider whose retention terms you have actually read.
 
 ### Interpretation
 
-With `LLM_PROVIDER=mock` (the default) **no text leaves the device at all** —
-Scripture normalisation, terminology and wordplay detection all run locally.
+With `LLM_ROUTING_MODE=local` **no text leaves the device at all** — Scripture
+normalisation, terminology and wordplay detection all run locally, and always
+did.
 
-With a real provider, each call sends only the bounded rolling window:
+With a cloud provider, each call sends only the bounded rolling window:
 
 - the Korean just stabilised, and the unresolved tail when predicting;
 - up to ~900 characters of recent Korean and ~700 of recent English;
@@ -104,22 +108,91 @@ handlers and are never included in the client bundle.
 
 ---
 
-## Vendor retention
+## Vendor retention — including the free tiers
 
 tong-yuck cannot control what a third party does with data you send it, and it
-will not pretend otherwise. As of writing, in broad terms:
+will not pretend otherwise. Verified against provider documentation on
+**2026-08-24**:
 
-- **Deepgram** does not retain audio or transcripts by default on pay-as-you-go
-  plans; opt-in retention exists for model improvement.
-- **OpenAI** API data is not used for training by default; a limited retention
-  window applies for abuse monitoring, with zero-retention available to
-  eligible accounts.
-- **Anthropic** API data is not used for training by default, with a similar
-  limited abuse-monitoring window.
+| Provider | Free tier | Paid tier |
+| --- | --- | --- |
+| **Gemini** | **May be used to improve Google products, including human review** | Not used for training |
+| **Groq** | **Does not train** on inputs or outputs. Short abuse/reliability logs; zero-data-retention available self-serve | Same |
+| **OpenRouter** | Does not store prompts by default, but forwards them to a downstream provider whose own policy then applies. Account settings control routing to training-capable providers | Same |
+| **OpenAI** | n/a — no free tier | Not used for training by default; limited abuse-monitoring retention |
+| **Anthropic** | n/a — no free tier | Not used for training by default; limited abuse-monitoring window |
+| **Deepgram** | n/a | Does not retain audio or transcripts by default on pay-as-you-go |
+
+### Free inference is not free of consequences
+
+This is the single most important thing on this page.
+
+**Gemini's free tier — the default `auto-free` provider — may use your prompts
+and responses to improve Google products, and that includes human review.** For
+tong-yuck the prompt contains the Korean transcript and the English assistance.
+In a sermon that can mean testimonies, prayer requests, names and pastoral
+information.
+
+Because of that, tong-yuck:
+
+- **shows a one-time in-app disclosure** before the first live cloud session,
+  naming the actual configured provider, with local-only mode offered as a real
+  alternative. It appears once per browser, not every session — interrupting
+  every service would train people to dismiss it unread;
+- provides **`LLM_PRIVACY_MODE=strict`**, which excludes providers that may
+  train on free-tier submissions from the routing chain entirely;
+- provides **`LLM_ROUTING_MODE=local`**, which sends nothing anywhere;
+- **never silently escalates to a paid provider**: `auto-free` degrades to the
+  local interpreter unless `LLM_ALLOW_PAID_FALLBACK` is explicitly set.
+
+There is a genuine tension here and no configuration resolves it for free:
+Gemini has the quota to run a sermon but trains on the data; Groq protects the
+data but its free tier cannot sustain the workload. See
+[`free-tier-deployment.md`](./free-tier-deployment.md) for the options.
 
 **Verify these against each vendor's current terms before handling anything
 sensitive.** They change, and the summary above is not a contract. If a session
-must not leave the room, use demo mode or run without a cloud provider.
+must not leave the room, use `LLM_ROUTING_MODE=local` or demo mode.
+
+---
+
+## Counter Mode
+
+Counter Mode is a different privacy shape from the interpretation console,
+because the person at risk is not the operator. A visitor at a counter is asked
+to type medical symptoms, immigration status or money problems into a device
+they did not choose, in a language they cannot audit.
+
+- **Nothing is persisted.** A counter session lives in the server process's
+  memory, holds no more than 500 messages, expires four hours after the last
+  activity, and is **deleted outright** — not marked ended — when the staff
+  member closes it. Nothing is written to disk, to a database, or to
+  `localStorage` on either device.
+- **The visitor is told who will see their words before they say anything**, on
+  the join screen, in their own language: the provider's name, and an explicit
+  warning when that provider's free tier may use submissions for training. The
+  staff member sees the same, with the provider's full data-use note, on the
+  setup screen.
+- **Quick phrases never reach a model.** The ~20 phrases a counter repeats all
+  day are local lookups in both languages, so the most-repeated content of the
+  day leaves the building zero times.
+- **Confirmation read-backs never reach a model** either — they echo the
+  flagged values verbatim.
+- **Open-weight models by default** (`LLM_COUNTER_PREFER_OPEN=true`). With the
+  recommended Groq configuration, no training occurs on either tier.
+- **A join link is a private conversation** and the page carries
+  `robots: noindex`. Room codes are 4 characters from an unambiguous alphabet
+  (390,625 combinations) and are only useful while the session is live.
+- The QR code is generated **in the browser**, so the join URL never reaches an
+  image service or any third party.
+- A visitor may correct a mis-tapped language freely until they send their
+  first message; after that a different language claim is refused, so a second
+  scanner cannot slide into someone else's consultation mid-conversation.
+
+`/diagnostics` reports live counts of counter sessions, and the shared latency
+telemetry records provider, model and timings for counter turns as it does for
+live ones. Neither records message content, the languages involved, or the room
+code.
 
 ---
 
@@ -164,8 +237,18 @@ always live. A stale interpretation would be worse than none.
 
 ## Telemetry
 
-There is none. No analytics, no error reporting, no beacons. The only network
+There is no analytics, no error reporting and no beacons. The only network
 requests tong-yuck makes are the ones described above.
+
+Phase 2 added **in-process latency and token measurement**, surfaced on
+`/diagnostics`. It records durations, token counts, provider ids and failure
+kinds. It **never** records transcript content — that is a hard rule enforced
+at the type level in `src/lib/telemetry.ts`, not a convention. Nothing is
+transmitted anywhere; the numbers live in memory and disappear on restart.
+
+The `/api/diagnostics` payload reports credential state as booleans only. There
+is no code path in it that can emit a key, a partial key, or a fingerprint of
+one.
 
 ---
 

@@ -90,6 +90,20 @@ Only "safeChunks" and "confidence" are required. Omit an array rather than
 sending an empty one. Keep every "note" under 100 characters — it is read at a
 glance, not studied.`;
 
+/**
+ * Short form of the output contract, for providers that enforce the JSON schema
+ * natively (Gemini `responseJsonSchema`, OpenAI-compatible `json_schema`).
+ *
+ * Measured: the full contract above is ~230 tokens restating a shape the
+ * provider is already validating. On a live path that fires ~11 times a minute
+ * that is pure recurring waste, so it is sent only when it is doing work.
+ */
+export const OUTPUT_CONTRACT_SCHEMA_ENFORCED = `OUTPUT
+Reply with a single JSON object matching the supplied schema and nothing else.
+No prose, no code fence, no commentary. Only "safeChunks" and "confidence" are
+required; omit an array rather than sending an empty one. Keep every "note"
+under 100 characters — it is read at a glance, not studied.`;
+
 /** Rendered context block shared by every live prompt. */
 export function contextBlock(context: {
   summary?: string;

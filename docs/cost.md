@@ -6,6 +6,35 @@ writing; treat the *shape* as durable and the numbers as indicative.
 
 ---
 
+> **Updated for Phase 2 with measured figures.** Phase 1's estimates
+> (7.5 calls/min, 1,900 tokens/call) were optimistic. `npm run bench:live` now
+> measures **11.17 calls/min at ~2,718 tokens/call — about 30,360 TPM**. The
+> tables below use the measured numbers.
+
+## The zero-cost path
+
+| | |
+| --- | --- |
+| Web Speech STT | $0 |
+| Gemini free tier | $0 — but ~90 min/day, and it may train on your data |
+| Scripture (reference-only) | $0 — no network call |
+| Vercel hobby | $0 at personal-project scale |
+
+Sustainable for roughly **two 45-minute sermons per day**. See
+[`free-tier-deployment.md`](./free-tier-deployment.md) for the privacy
+tradeoff, which is the real price.
+
+## Free tier: technically $0 vs. actually sustainable
+
+These are not the same claim, and the difference is the whole point.
+
+| Provider | Technically $0 | Sustains a 45-min sermon | Binding limit |
+| --- | --- | --- | --- |
+| Gemini 3.5 Flash-Lite | Yes | **Yes** — ~2 sermons/day | 1,000 req/day |
+| Groq free | Yes | **No** — 5.1× over | 6,000 tokens/min |
+| OpenRouter `:free` unfunded | Yes | **No** — lasts ~4 min | 50 req/day |
+| Local interpreter | Yes | Yes, indefinitely | none (but does not translate) |
+
 ## What drives cost
 
 **Speech to text is billed per minute of audio and is essentially fixed.** A
