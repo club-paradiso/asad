@@ -4,12 +4,32 @@
 # API keys — provider integration is exercised by the smoke test, which skips
 # cleanly when no credential is configured, so CI never depends on a secret and
 # never spends money.
+#
+# NO MARKETPLACE ACTIONS. Checkout and the Node toolchain are done with the
+# runner's own git and its preinstalled toolcache instead of
+# `actions/checkout` and `actions/setup-node`.
+#
+# That is not a style preference. Every run of the previous version of this
+# file failed in ~2 seconds with an empty check summary and an HTTP 404 on the
+# job log — a startup failure, before any step executes. The two causes that
+# produce exactly that signature on a private repository are an allowed-actions
+# policy blocking third-party actions, and exhausted Actions minutes. This
+# version rules the first one out: it uses nothing that a policy can block, so
+# if it still fails identically, the answer is billing and no change to this
+# file can fix it.
+#
+# The cost is losing `setup-node`'s npm cache. Worth it to get a workflow that
+# runs at all; restore `actions/setup-node` once the cause is confirmed and
+# fixed.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -19,18 +39,56 @@ jobs:
   check:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      # Printed first so that even a failing run says something about where it
+      # got to. The previous workflow's failure produced no output at all.
+      - name: Runner facts
+        run: |
+          echo "runner:  $RUNNER_OS $RUNNER_ARCH"
+          echo "event:   $GITHUB_EVENT_NAME"
+          echo "sha:     $GITHUB_SHA"
+          echo "node:    $(node -v 2>/dev/null || echo 'not on PATH')"
+          echo "git:     $(git --version)"
+          ls -d /opt/hostedtoolcache/node/*/x64 2>/dev/null || echo "no node toolcache"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      # What actions/checkout does, without actions/checkout. Shallow, single
+      # commit — nothing here needs history.
+      - name: Check out the commit under test
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+          git -c http.extraheader="$header" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+          # Drop the credential so nothing later in the job can reuse it.
+          git remote set-url origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git log -1 --oneline
+
+      # Prefer a toolcached Node 22, then 24, then 20; fall back to whatever
+      # the image ships. Next 16 needs >= 20.9.
+      - name: Select Node
+        run: |
+          set -euo pipefail
+          for major in 22 24 20; do
+            found=$(ls -d /opt/hostedtoolcache/node/${major}.*/x64 2>/dev/null | sort -V | tail -1 || true)
+            if [ -n "$found" ]; then
+              echo "using $found"
+              echo "$found/bin" >> "$GITHUB_PATH"
+              exit 0
+            fi
+          done
+          echo "no toolcached Node found; using the image default"
 
       - name: Install
-        run: npm ci
+        run: |
+          node -v
+          npm -v
+          npm ci
 
       - name: Lint
         run: npm run lint
