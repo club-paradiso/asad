@@ -72,6 +72,17 @@ const respond = (body: unknown, init: { status?: number; headers?: Record<string
     headers: { "content-type": "application/json", ...init.headers },
   });
 
+/** Await a promise expected to reject with an LlmError, and return it typed. */
+async function expectRejection(promise: Promise<unknown>): Promise<LlmError> {
+  try {
+    await promise;
+  } catch (error) {
+    expect(error).toBeInstanceOf(LlmError);
+    return error as LlmError;
+  }
+  throw new Error("expected the request to reject, but it resolved");
+}
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
@@ -114,7 +125,7 @@ describe.each(ADAPTERS)("$name adapter contract", ({ create, successBody, expect
 
   it("classifies a plain 429 as retryable rate limiting", async () => {
     fetchMock.mockResolvedValue(respond({ error: { message: "slow down" } }, { status: 429 }));
-    const error = await create().complete(request).catch((e) => e as LlmError);
+    const error = await expectRejection(create().complete(request));
     expect(error.kind).toBe("rate_limited");
     expect(error.retryable).toBe(true);
   });
@@ -123,7 +134,7 @@ describe.each(ADAPTERS)("$name adapter contract", ({ create, successBody, expect
     fetchMock.mockResolvedValue(
       respond({ error: { message: "quota exceeded for this project" } }, { status: 429 }),
     );
-    const error = await create().complete(request).catch((e) => e as LlmError);
+    const error = await expectRejection(create().complete(request));
     // Different cooldown: "too fast" and "you are out" are not the same thing.
     expect(error.kind).toBe("quota_exhausted");
   });
@@ -168,7 +179,7 @@ describe.each(ADAPTERS)("$name adapter contract", ({ create, successBody, expect
     fetchMock.mockResolvedValue(
       respond({ error: { message: "slow down" } }, { status: 429, headers: { "retry-after": "42" } }),
     );
-    const error = await create().complete(request).catch((e) => e as LlmError);
+    const error = await expectRejection(create().complete(request));
     expect(error.retryAfterSeconds).toBe(42);
   });
 
