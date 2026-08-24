@@ -46,7 +46,7 @@ jobs:
 
       # v5, not v4: the runner now forces v4 onto Node 24 and warns that its
       # Node 20 target is deprecated. v5 targets Node 24 natively.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v5
         with:
@@ -90,7 +90,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v5
         with:
