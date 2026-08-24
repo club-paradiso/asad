@@ -11,6 +11,7 @@ import {
   COMPRESSION_RULES,
   CORE_PRIORITIES,
   OUTPUT_CONTRACT,
+  OUTPUT_CONTRACT_SCHEMA_ENFORCED,
   RESTRUCTURING_RULES,
   ROLE,
   UNCERTAINTY_RULES,
@@ -79,7 +80,7 @@ RIGHT: "We need to find the right way." / "And speaking of \\"the way,\\" it's e
 The interpreter must be able to see, in one glance, that the second line is an
 adaptation rather than a literal rendering.`;
 
-export const SERMON_SYSTEM_PROMPT = [
+const SERMON_BODY = [
   ROLE,
   CORE_PRIORITIES,
   SERMON_DOMAIN,
@@ -89,5 +90,10 @@ export const SERMON_SYSTEM_PROMPT = [
   WORDPLAY,
   UNCERTAINTY_RULES,
   ANTICIPATION_RULES,
-  OUTPUT_CONTRACT,
 ].join("\n\n");
+
+export const sermonSystemPrompt = (schemaEnforced: boolean): string =>
+  [SERMON_BODY, schemaEnforced ? OUTPUT_CONTRACT_SCHEMA_ENFORCED : OUTPUT_CONTRACT].join("\n\n");
+
+/** Phase 1 export, kept for tests and any caller that wants the full contract. */
+export const SERMON_SYSTEM_PROMPT = sermonSystemPrompt(false);

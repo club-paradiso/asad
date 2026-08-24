@@ -11,12 +11,13 @@ import {
   COMPRESSION_RULES,
   CORE_PRIORITIES,
   OUTPUT_CONTRACT,
+  OUTPUT_CONTRACT_SCHEMA_ENFORCED,
   RESTRUCTURING_RULES,
   ROLE,
   UNCERTAINTY_RULES,
 } from "./shared";
 
-export const GENERAL_SYSTEM_PROMPT = [
+const GENERAL_BODY = [
   ROLE,
   CORE_PRIORITIES,
   CHUNKING_RULES,
@@ -37,5 +38,10 @@ Korean 우리 is collective: "our team", "our company" — not "my".`,
 - Romanise a new Korean name using Revised Romanisation: 류정길 → "Ryu Jeong-gil".
 - Numbers, dates and amounts are high-risk. If the recognition is unclear, mark
   the chunk "low" and leave the number out rather than guessing it.`,
-  OUTPUT_CONTRACT,
 ].join("\n\n");
+
+export const generalSystemPrompt = (schemaEnforced: boolean): string =>
+  [GENERAL_BODY, schemaEnforced ? OUTPUT_CONTRACT_SCHEMA_ENFORCED : OUTPUT_CONTRACT].join("\n\n");
+
+/** Phase 1 export, kept for tests and any caller that wants the full contract. */
+export const GENERAL_SYSTEM_PROMPT = generalSystemPrompt(false);

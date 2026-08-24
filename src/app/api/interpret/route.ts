@@ -75,7 +75,12 @@ export async function POST(request: Request) {
   });
 
   const budgeted = { ...input, context: applyProfile(input.context, decision.profile) };
-  const system = systemPromptFor(input.mode);
+  // When the provider validates against INTERPRETER_JSON_SCHEMA itself, the
+  // prose restatement of that shape is ~188 tokens of duplicated effort on
+  // every one of ~11 calls a minute.
+  const system = systemPromptFor(input.mode, {
+    schemaEnforced: caps.structuredOutput,
+  });
   const user = buildLiveUserPrompt(budgeted);
 
   const systemTokens = estimateTokens(system);

@@ -61,16 +61,28 @@ export interface LlmProviderCapabilities {
 /**
  * Live workload reference point, used to judge quota viability.
  *
- * Measured from Phase 1: roughly one interpretation call every 8 seconds of
- * speech, ~1,700 input + ~180 output tokens per call at the FULL context
- * profile. A 45-minute service is therefore ~340 calls and ~640k tokens.
+ * MEASURED, not estimated — `npm run bench:live` replays the demo sermon at a
+ * realistic Korean speaking rate (~6 syllables/second) through the real engine:
+ *
+ *   calls/minute            11.17
+ *   tokens/call  full        2,718
+ *   tokens/call  compact     2,432
+ *   tokens/call  ultra       2,177
+ *   sermon (45 min)         ~503 calls, ~1.37M tokens at full
+ *
+ * The important thing this revealed: the system prompt is ~1,700–1,900 of
+ * those tokens, so trimming rolling CONTEXT barely moves the total. Context
+ * profiles are worth ~20%; the system prompt is the real lever. That is why
+ * the output contract is now dropped for providers that enforce the schema
+ * natively, and why prompt caching is the highest-value remaining optimisation.
  */
 export const LIVE_WORKLOAD = {
-  callsPerMinute: 7.5,
-  tokensPerCallFull: 1900,
-  tokensPerCallCompact: 1100,
-  tokensPerCallUltraCompact: 600,
+  callsPerMinute: 11.17,
+  tokensPerCallFull: 2718,
+  tokensPerCallCompact: 2432,
+  tokensPerCallUltraCompact: 2177,
   sermonMinutes: 45,
+  measuredAt: "2026-08-24",
 } as const;
 
 export const PROVIDER_CAPABILITIES: Record<LlmProviderId, LlmProviderCapabilities> = {
@@ -125,9 +137,12 @@ export const PROVIDER_CAPABILITIES: Record<LlmProviderId, LlmProviderCapabilitie
     usageTelemetry: true,
     rateLimitHeaders: true, // x-ratelimit-* on every response
     maxContextTokens: 131_072,
-    // The binding constraint is 6k TPM, not context length: at ~7.5 calls/min
-    // anything above ~800 tokens per call exceeds the free tier.
-    recommendedLiveContextTokens: 800,
+    // Measured: even the ultra-compact profile costs ~2,177 tokens/call, and
+    // at 11.17 calls/min that is ~24,300 TPM against a 6,000 free-tier limit.
+    // No context profile rescues this — the system prompt alone exceeds it.
+    // Groq free is therefore a fallback and a benchmark target, not a live
+    // default. Its paid Developer tier (250k+ TPM) is entirely viable.
+    recommendedLiveContextTokens: 2200,
     freeTierQuota: { requestsPerMinute: 30, tokensPerMinute: 6000, requestsPerDay: 14_400 },
     freeTierPrivacy: "no-training",
     paidTierPrivacy: "no-training",

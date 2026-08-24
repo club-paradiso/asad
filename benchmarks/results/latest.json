@@ -1,0 +1,666 @@
+{
+  "startedAt": "2026-08-24T08:03:28.281Z",
+  "finishedAt": "2026-08-24T08:03:28.305Z",
+  "deadlineMs": 12000,
+  "repeats": 1,
+  "cases": 20,
+  "scores": [
+    {
+      "provider": "local",
+      "model": "deterministic",
+      "cases": [
+        {
+          "caseId": "b01",
+          "category": "declarative",
+          "ok": true,
+          "latencyMs": 1,
+          "safeChunks": [
+            "Good morning, everyone.",
+            "Thank you for being here today."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 2,
+              "meanWordsPerChunk": 4.5,
+              "maxWordsPerChunk": 6
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b02",
+          "category": "delayed-predicate",
+          "ok": false,
+          "latencyMs": 3,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "today"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b03",
+          "category": "fast-rhetorical",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b04",
+          "category": "incomplete",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "And yet, even after receiving this amazing grace..."
+          ],
+          "anticipatedChunks": [
+            "we so easily forget who we are."
+          ],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 1,
+              "meanWordsPerChunk": 8,
+              "maxWordsPerChunk": 8
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b05",
+          "category": "self-correction",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b06",
+          "category": "scripture-reference",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "Today we're going to look at...",
+            "1 Peter 2:9."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 2,
+              "meanWordsPerChunk": 4.5,
+              "maxWordsPerChunk": 6
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b07",
+          "category": "scripture-paraphrase",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "chosen"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b08",
+          "category": "terminology",
+          "ok": false,
+          "latencyMs": 1,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "justification",
+              "sanctification"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b09",
+          "category": "idiom",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "You know the saying —",
+            "little by little, it adds up.",
+            "Small acts of obedience pile up."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 3,
+              "meanWordsPerChunk": 5.7,
+              "maxWordsPerChunk": 6
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b10",
+          "category": "proper-noun",
+          "ok": false,
+          "latencyMs": 1,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "ryu"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b11",
+          "category": "wordplay",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "So we need to find the right way.",
+            "And speaking of \"the way,\" it's even in my name."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 2,
+              "meanWordsPerChunk": 9,
+              "maxWordsPerChunk": 10
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b12",
+          "category": "testimony",
+          "ok": false,
+          "latencyMs": 1,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b13",
+          "category": "prayer",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "God of love,",
+            "meet us today through this word."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 2,
+              "meanWordsPerChunk": 4.5,
+              "maxWordsPerChunk": 6
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b14",
+          "category": "humour",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "I'll be honest —",
+            "last night I fell asleep preparing this sermon.",
+            "Anyone want to say amen to that?"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 3,
+              "meanWordsPerChunk": 6.3,
+              "maxWordsPerChunk": 8
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b15",
+          "category": "repetition",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "You are a chosen people.",
+            "You are a royal priesthood.",
+            "You are a holy nation."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 3,
+              "meanWordsPerChunk": 5,
+              "maxWordsPerChunk": 5
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b16",
+          "category": "cultural",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "Our church is known for early morning prayer."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 1,
+              "meanWordsPerChunk": 8,
+              "maxWordsPerChunk": 8
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b17",
+          "category": "ambiguous-pronoun",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b18",
+          "category": "context-dependent-term",
+          "ok": true,
+          "latencyMs": 0,
+          "safeChunks": [
+            "I hope you're richly blessed today."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 1,
+              "meanWordsPerChunk": 6,
+              "maxWordsPerChunk": 6
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b19",
+          "category": "early-restructuring",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "people"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b20",
+          "category": "anticipation-hazard",
+          "ok": false,
+          "latencyMs": 2,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        }
+      ],
+      "latency": {
+        "count": 20,
+        "p50": 0,
+        "p90": 1,
+        "p95": 2,
+        "max": 3,
+        "mean": 0
+      },
+      "components": {
+        "fidelity": 0.5,
+        "speakability": 1,
+        "latency": 1,
+        "schema": 1,
+        "sustainability": 1,
+        "privacy": 1
+      },
+      "total": 0.85,
+      "hardFailures": [
+        "no_output"
+      ],
+      "disqualified": true,
+      "notes": []
+    }
+  ],
+  "skipped": [
+    {
+      "provider": "gemini",
+      "reason": "no GEMINI_API_KEY configured"
+    },
+    {
+      "provider": "groq",
+      "reason": "no GROQ_API_KEY configured"
+    },
+    {
+      "provider": "openrouter",
+      "reason": "no OPENROUTER_API_KEY configured"
+    },
+    {
+      "provider": "openai",
+      "reason": "no OPENAI_API_KEY configured"
+    },
+    {
+      "provider": "anthropic",
+      "reason": "no ANTHROPIC_API_KEY configured"
+    }
+  ],
+  "environment": {
+    "node": "v22.22.2",
+    "reachability": {}
+  }
+}
