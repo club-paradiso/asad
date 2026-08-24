@@ -220,6 +220,41 @@ export const PROVIDER_CAPABILITIES: Record<LlmProviderId, LlmProviderCapabilitie
   },
 };
 
+/**
+ * Whether a model id names open weights.
+ *
+ * Matched on the model rather than the provider, because the provider is not
+ * the thing that decides: Groq serves open weights and Gemini serves
+ * proprietary ones by default, but a deployer who sets `GEMINI_LLM_MODEL` to a
+ * Gemma id has switched to open weights, and one who points OpenRouter at a
+ * closed model has switched away from them. The default model of every
+ * provider is classified correctly by these patterns; an unrecognised id is
+ * treated as closed, which is the safe direction to be wrong in for a
+ * preference that is meant to *guarantee* open weights.
+ */
+const OPEN_WEIGHT_MODELS: readonly RegExp[] = [
+  /gpt-oss/i,
+  /llama/i,
+  /qwen/i,
+  /mi(s|x)tral/i,
+  /magistral|devstral|ministral/i,
+  /gemma/i,
+  /deepseek/i,
+  /\bphi-\d/i,
+  /kimi/i,
+  /\bglm-/i,
+  /olmo/i,
+  /nemotron/i,
+  /falcon/i,
+  /command-?r/i,
+  /exaone/i,
+  /solar-/i,
+  /aya-/i,
+];
+
+export const isOpenWeightModel = (model: string): boolean =>
+  OPEN_WEIGHT_MODELS.some((pattern) => pattern.test(model));
+
 export const capabilitiesFor = (id: LlmProviderId): LlmProviderCapabilities =>
   PROVIDER_CAPABILITIES[id];
 

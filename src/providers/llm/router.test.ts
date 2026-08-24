@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { LlmRouter } from "./router";
+import { LlmRouter, OPEN_WEIGHT } from "./router";
+import { isOpenWeightModel } from "./capabilities";
 import { CircuitBreaker } from "./circuit-breaker";
 import { RateLimitTracker } from "./rate-limit";
 import { LlmError, type LlmFailureKind } from "./errors";
@@ -355,5 +356,79 @@ describe("fallback behaviour", () => {
     // OpenRouter's 50/day cap and Gemini's training posture both matter.
     expect(warnings).toMatch(/OpenRouter/);
     expect(warnings).toMatch(/improve Google products/);
+  });
+});
+
+describe("open-weight preference — Counter Mode", () => {
+  it("recognises open weights from the model, not the vendor", () => {
+    // The vendor is not the thing that decides: Gemini pointed at Gemma is
+    // open weights, and OpenRouter pointed at a closed model is not.
+    expect(isOpenWeightModel("openai/gpt-oss-120b")).toBe(true);
+    expect(isOpenWeightModel("meta-llama/llama-3.3-70b-instruct:free")).toBe(true);
+    expect(isOpenWeightModel("gemma-3-27b-it")).toBe(true);
+    expect(isOpenWeightModel("qwen/qwen3-32b")).toBe(true);
+    expect(isOpenWeightModel("gemini-2.5-flash")).toBe(false);
+    expect(isOpenWeightModel("gpt-4.1-mini")).toBe(false);
+    expect(isOpenWeightModel("claude-sonnet-4-5")).toBe(false);
+  });
+
+  it("lists the configured providers serving open weights", () => {
+    const router = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", GEMINI_API_KEY: KEY, GROQ_API_KEY: KEY }),
+    );
+    // Gemini's default model is proprietary; Groq's is gpt-oss.
+    expect(router.matching(OPEN_WEIGHT)).toEqual(["groq"]);
+  });
+
+  it("reaches an open-weight provider ahead of the default free order", () => {
+    const router = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", GEMINI_API_KEY: KEY, GROQ_API_KEY: KEY }),
+    );
+    // Live routing still prefers Gemini for its quota headroom…
+    expect(router.preferred()).toBe("gemini");
+    // …while a counter turn asks for open weights and gets Groq.
+    expect(router.preferred(OPEN_WEIGHT)).toBe("groq");
+  });
+
+  it("follows the deployer's model override in both directions", () => {
+    const closed = new LlmRouter(
+      env({
+        LLM_ROUTING_MODE: "auto-free",
+        GROQ_API_KEY: KEY,
+        GROQ_LLM_MODEL: "some-proprietary-model",
+      }),
+    );
+    expect(closed.matching(OPEN_WEIGHT)).toEqual([]);
+
+    const open = new LlmRouter(
+      env({
+        LLM_ROUTING_MODE: "auto-free",
+        GEMINI_API_KEY: KEY,
+        GEMINI_LLM_MODEL: "gemma-3-27b-it",
+      }),
+    );
+    expect(open.matching(OPEN_WEIGHT)).toEqual(["gemini"]);
+  });
+
+  it("returns nothing to prefer when no open-weight provider is configured", () => {
+    const router = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", GEMINI_API_KEY: KEY }),
+    );
+    // The caller treats this as "no preference satisfied", not as "no
+    // provider": refusing to translate at a counter is the worse failure.
+    expect(router.preferred(OPEN_WEIGHT)).toBeNull();
+    expect(router.preferred()).toBe("gemini");
+  });
+});
+
+describe("counter open-weight configuration", () => {
+  it("defaults on, because the counter asked for open weights by name", () => {
+    expect(env({}).llm.counterPreferOpen).toBe(true);
+  });
+
+  it("can be turned off explicitly", () => {
+    expect(env({ LLM_COUNTER_PREFER_OPEN: "false" }).llm.counterPreferOpen).toBe(false);
+    expect(env({ LLM_COUNTER_PREFER_OPEN: "0" }).llm.counterPreferOpen).toBe(false);
+    expect(env({ LLM_COUNTER_PREFER_OPEN: "true" }).llm.counterPreferOpen).toBe(true);
   });
 });

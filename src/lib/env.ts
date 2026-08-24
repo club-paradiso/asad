@@ -69,6 +69,7 @@ const rawEnvSchema = z.object({
   LLM_ROUTING_MODE: z.string().trim().toLowerCase().optional(),
   LLM_PRIVACY_MODE: z.string().trim().toLowerCase().optional(),
   LLM_ALLOW_PAID_FALLBACK: z.string().trim().toLowerCase().optional(),
+  LLM_COUNTER_PREFER_OPEN: z.string().trim().toLowerCase().optional(),
 
   // Phase 1 compatibility.
   LLM_PROVIDER: z.string().trim().toLowerCase().optional(),
@@ -124,6 +125,12 @@ export interface AppEnv {
     privacyMode: PrivacyMode;
     /** AUTO-FREE never spends money unless this is explicitly true. */
     allowPaidFallback: boolean;
+    /**
+     * Counter Mode routes to open-weight models first. On by default: it is
+     * the stated requirement for the counter, and the providers serving open
+     * weights also happen to have the better data-use posture on a free tier.
+     */
+    counterPreferOpen: boolean;
     /** Explicit provider for `pinned` / `reliable`. */
     pinned?: LlmProviderId;
     providers: Record<LlmProviderId, ProviderConfig>;
@@ -142,6 +149,7 @@ export interface AppEnv {
 /* -------------------------------------------------------------------------- */
 
 const BOOLEAN_TRUE = new Set(["1", "true", "yes", "on"]);
+const BOOLEAN_FALSE = new Set(["0", "false", "no", "off"]);
 
 /**
  * Parse process.env into a validated config. Never throws.
@@ -237,6 +245,9 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   const allowPaidFallback = BOOLEAN_TRUE.has(raw.LLM_ALLOW_PAID_FALLBACK ?? "");
+  // Defaults ON, unlike the other flags: the counter is the one surface where
+  // open weights were asked for by name.
+  const counterPreferOpen = !BOOLEAN_FALSE.has(raw.LLM_COUNTER_PREFER_OPEN ?? "");
 
   /* --- Per-provider keys, with Phase 1 migration ------------------------ */
   let pinned: LlmProviderId | undefined;
@@ -371,7 +382,14 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       openaiKey: raw.OPENAI_API_KEY,
       openaiModel: raw.OPENAI_STT_MODEL ?? "gpt-live-transcribe",
     },
-    llm: { routingMode, privacyMode, allowPaidFallback, pinned, providers },
+    llm: {
+      routingMode,
+      privacyMode,
+      allowPaidFallback,
+      counterPreferOpen,
+      pinned,
+      providers,
+    },
     bible: {
       provider: bibleProvider,
       apiKey: raw.BIBLE_API_KEY,

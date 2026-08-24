@@ -18,7 +18,12 @@
  *     no configuration in which the console goes silent because a vendor is
  *     down.
  */
-import { assessFreeTierViability, capabilitiesFor, trainsOnFreeTier } from "./capabilities";
+import {
+  assessFreeTierViability,
+  capabilitiesFor,
+  isOpenWeightModel,
+  trainsOnFreeTier,
+} from "./capabilities";
 import { CircuitBreaker, type BreakerSnapshot } from "./circuit-breaker";
 import { LlmError, toLlmError } from "./errors";
 import { GeminiLlmProvider } from "./gemini";
@@ -33,6 +38,13 @@ import type { AppEnv, PrivacyMode, RoutingMode } from "@/lib/env";
 const FREE_PROVIDERS: readonly LlmProviderId[] = ["gemini", "groq", "openrouter"] as const;
 /** Paid providers, in default preference order. */
 const PAID_PROVIDERS: readonly LlmProviderId[] = ["anthropic", "openai"] as const;
+
+/** Chooses which providers a request would rather reach. */
+export type ProviderFilter = (id: LlmProviderId, model: string) => boolean;
+
+/** Providers currently configured with an open-weight model. */
+export const OPEN_WEIGHT: ProviderFilter = (id, model) =>
+  id !== "local" && isOpenWeightModel(model);
 
 export interface RouteAttempt {
   provider: LlmProviderId;
@@ -199,10 +211,20 @@ export class LlmRouter {
    *
    * Sticky while healthy; otherwise the first eligible candidate.
    */
-  preferred(): LlmProviderId | null {
-    if (this.sticky && this.eligibility(this.sticky).ok) return this.sticky;
-    const next = this.candidates().find((id) => this.eligibility(id).ok);
+  preferred(prefer?: ProviderFilter): LlmProviderId | null {
+    if (!prefer && this.sticky && this.eligibility(this.sticky).ok) return this.sticky;
+    const candidates = prefer
+      ? this.candidates().filter((id) => prefer(id, this.env.llm.providers[id].model))
+      : this.candidates();
+    const next = candidates.find((id) => this.eligibility(id).ok);
     return next ?? null;
+  }
+
+  /** The configured providers whose model matches a filter. Diagnostics. */
+  matching(prefer: ProviderFilter): LlmProviderId[] {
+    return this.candidates().filter((id) =>
+      prefer(id, this.env.llm.providers[id].model),
+    );
   }
 
   /** Quota pressure for the provider we would use, for context budgeting. */
@@ -228,10 +250,18 @@ export class LlmRouter {
       validate?: (response: LlmResponse) => boolean;
       /** Estimated tokens for quota accounting. */
       estimatedTokens?: number;
+      /**
+       * Providers matching this go to the front of the chain, ahead of the
+       * sticky one. Counter Mode uses it to reach an open-weight model first.
+       * It is a preference, not a filter: the rest of the chain still follows,
+       * because refusing to translate at a counter is worse than translating
+       * on the second choice.
+       */
+      prefer?: ProviderFilter;
     },
   ): Promise<RouteResult> {
     const attempts: RouteAttempt[] = [];
-    const chain = this.buildChain();
+    const chain = this.buildChain(options.prefer);
 
     for (const id of chain) {
       const eligibility = this.eligibility(id);
@@ -320,10 +350,18 @@ export class LlmRouter {
   }
 
   /** Cloud candidates, then always the local interpreter as the floor. */
-  private buildChain(): LlmProviderId[] {
-    const preferred = this.sticky && this.eligibility(this.sticky).ok ? [this.sticky] : [];
-    const rest = this.candidates().filter((id) => id !== this.sticky);
-    return [...preferred, ...rest, "local"];
+  private buildChain(prefer?: ProviderFilter): LlmProviderId[] {
+    const candidates = this.candidates();
+    // An explicit preference outranks stickiness: stickiness exists to keep
+    // terminology consistent within one live session, which is not a reason to
+    // send a counter turn to a proprietary model.
+    const front = prefer
+      ? candidates.filter((id) => prefer(id, this.env.llm.providers[id].model))
+      : this.sticky && this.eligibility(this.sticky).ok
+        ? [this.sticky]
+        : [];
+    const rest = candidates.filter((id) => !front.includes(id));
+    return [...front, ...rest, "local"];
   }
 
   /* --- Introspection ---------------------------------------------------- */

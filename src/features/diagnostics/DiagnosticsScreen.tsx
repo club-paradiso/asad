@@ -56,6 +56,23 @@ interface Payload {
     warnings: string[];
     providers: ProviderRow[];
   };
+  counter: {
+    sessions: { active: number; waiting: number; totalMessages: number };
+    preferOpenWeightModels: boolean;
+    openWeightProviders: string[];
+    openWeightAvailable: boolean;
+    translationProvider: string | null;
+    languages: number;
+    quickPhrases: number;
+    coverage: Array<{
+      code: string;
+      label: string;
+      quickPhrases: number;
+      interfaceTranslated: boolean;
+      speechInput: boolean;
+    }>;
+    storeLimitation: string;
+  };
   bible: { provider: string; translation: string; textAvailable: boolean };
   workload: Record<string, number | string>;
   telemetry: {
@@ -344,6 +361,72 @@ export function DiagnosticsScreen() {
             tone={data.stt.ephemeralKeysAvailable ? "ok" : "bad"}
           />
         )}
+      </Section>
+
+      <Section title="Counter Mode">
+        <Row
+          k="Open-weight models preferred"
+          v={data.counter.preferOpenWeightModels ? "yes" : "no"}
+        />
+        <Row
+          k="Open-weight provider configured"
+          v={
+            data.counter.openWeightAvailable
+              ? data.counter.openWeightProviders.join(", ")
+              : "none — the counter will use whatever is configured"
+          }
+          tone={data.counter.openWeightAvailable ? "ok" : "warn"}
+        />
+        <Row
+          k="Provider a counter turn would reach"
+          v={<code>{data.counter.translationProvider ?? "none configured"}</code>}
+          tone={data.counter.translationProvider ? "ok" : "bad"}
+        />
+        <Row
+          k="Sessions"
+          v={`${data.counter.sessions.active} active · ${data.counter.sessions.waiting} waiting`}
+        />
+        <Row
+          k="Session storage"
+          v={data.counter.storeLimitation}
+          tone="warn"
+        />
+        <Row
+          k="Languages"
+          v={`${data.counter.languages} offered · ${data.counter.quickPhrases} quick phrases`}
+        />
+
+        {/* Coverage is where a visitor's experience actually differs, so it is
+            listed rather than averaged into a single misleading percentage. */}
+        <details className="mt-1">
+          <summary className="cursor-pointer text-sm text-[var(--fg-muted)]">
+            Per-language coverage
+          </summary>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[26rem] text-left text-xs">
+              <thead className="text-[var(--fg-dim)]">
+                <tr>
+                  <th className="py-1 pr-3 font-normal">Language</th>
+                  <th className="py-1 pr-3 font-normal">Quick phrases</th>
+                  <th className="py-1 pr-3 font-normal">Interface</th>
+                  <th className="py-1 font-normal">Speech input</th>
+                </tr>
+              </thead>
+              <tbody className="text-[var(--fg-muted)]">
+                {data.counter.coverage.map((row) => (
+                  <tr key={row.code} className="border-t border-[var(--line)]">
+                    <td className="py-1 pr-3 text-[var(--fg)]">{row.label}</td>
+                    <td className="py-1 pr-3">{row.quickPhrases}%</td>
+                    <td className="py-1 pr-3">
+                      {row.interfaceTranslated ? "translated" : "English"}
+                    </td>
+                    <td className="py-1">{row.speechInput ? "yes" : "type only"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </Section>
 
       <Section title="Browser capability">

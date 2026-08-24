@@ -187,3 +187,57 @@ export function extractJsonObject(raw: string): string | null {
   }
   return null;
 }
+
+/* --------------------------------------------------------------------------
+ * Counter Mode
+ * ------------------------------------------------------------------------ */
+
+/** What the model must return for one counter utterance. */
+export const counterOutputSchema = z.object({
+  translation: z.string().max(2000),
+  confidence: confidenceSchema.default("medium"),
+  note: z.string().max(180).optional(),
+});
+
+export type CounterOutput = z.infer<typeof counterOutputSchema>;
+
+/** Parse a counter translation, returning null rather than throwing. */
+export function parseCounterOutput(raw: string): CounterOutput | null {
+  const json = extractJsonObject(raw);
+  if (!json) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  const result = counterOutputSchema.safeParse(value);
+  return result.success ? result.data : null;
+}
+
+const languageTag = z
+  .string()
+  .trim()
+  .min(2)
+  .max(12)
+  .regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, "expected a BCP-47 language tag");
+
+export const createCounterSessionSchema = z.object({
+  hostLang: languageTag,
+  deskLabel: z.string().trim().max(60).optional(),
+});
+
+export const joinCounterSessionSchema = z.object({
+  code: z.string().trim().min(1).max(16),
+  guestLang: languageTag,
+});
+
+export const counterMessageSchema = z.object({
+  code: z.string().trim().min(1).max(16),
+  from: z.enum(["host", "guest"]),
+  source: z.enum(["voice", "text", "quick-phrase", "confirm"]).default("text"),
+  /** Free text, or a quick-phrase id when `source` is `quick-phrase`. */
+  text: z.string().trim().min(1).max(2000),
+  /** Set when re-running an earlier message with different wording. */
+  rephraseOf: z.string().max(64).optional(),
+});

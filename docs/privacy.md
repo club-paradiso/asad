@@ -25,6 +25,9 @@ Demo mode is fully offline. That is not a limitation — it is the mode to use
 for a demonstration, a rehearsal, or any session you would rather not put on
 someone else's network.
 
+Counter Mode has its own shape — a visitor, not an operator, bears the risk —
+and is covered [below](#counter-mode).
+
 ---
 
 ## Audio
@@ -150,6 +153,46 @@ data but its free tier cannot sustain the workload. See
 **Verify these against each vendor's current terms before handling anything
 sensitive.** They change, and the summary above is not a contract. If a session
 must not leave the room, use `LLM_ROUTING_MODE=local` or demo mode.
+
+---
+
+## Counter Mode
+
+Counter Mode is a different privacy shape from the interpretation console,
+because the person at risk is not the operator. A visitor at a counter is asked
+to type medical symptoms, immigration status or money problems into a device
+they did not choose, in a language they cannot audit.
+
+- **Nothing is persisted.** A counter session lives in the server process's
+  memory, holds no more than 500 messages, expires four hours after the last
+  activity, and is **deleted outright** — not marked ended — when the staff
+  member closes it. Nothing is written to disk, to a database, or to
+  `localStorage` on either device.
+- **The visitor is told who will see their words before they say anything**, on
+  the join screen, in their own language: the provider's name, and an explicit
+  warning when that provider's free tier may use submissions for training. The
+  staff member sees the same, with the provider's full data-use note, on the
+  setup screen.
+- **Quick phrases never reach a model.** The ~20 phrases a counter repeats all
+  day are local lookups in both languages, so the most-repeated content of the
+  day leaves the building zero times.
+- **Confirmation read-backs never reach a model** either — they echo the
+  flagged values verbatim.
+- **Open-weight models by default** (`LLM_COUNTER_PREFER_OPEN=true`). With the
+  recommended Groq configuration, no training occurs on either tier.
+- **A join link is a private conversation** and the page carries
+  `robots: noindex`. Room codes are 4 characters from an unambiguous alphabet
+  (~1.3M combinations) and are only useful while the session is live.
+- The QR code is generated **in the browser**, so the join URL never reaches an
+  image service or any third party.
+- A visitor may correct a mis-tapped language freely until they send their
+  first message; after that a different language claim is refused, so a second
+  scanner cannot slide into someone else's consultation mid-conversation.
+
+`/diagnostics` reports live counts of counter sessions, and the shared latency
+telemetry records provider, model and timings for counter turns as it does for
+live ones. Neither records message content, the languages involved, or the room
+code.
 
 ---
 

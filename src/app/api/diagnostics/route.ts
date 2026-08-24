@@ -12,6 +12,11 @@ import { NextResponse } from "next/server";
 import { appEnv } from "@/lib/env";
 import { capabilitiesFor, assessFreeTierViability, LIVE_WORKLOAD } from "@/providers/llm/capabilities";
 import { llmRouter } from "@/providers/llm";
+import { OPEN_WEIGHT } from "@/providers/llm/router";
+import { counterStore } from "@/counter/store";
+import { COUNTER_LANGUAGES } from "@/counter/languages";
+import { QUICK_PHRASES, quickPhraseCoverage } from "@/counter/quick-phrases";
+import { hasStrings } from "@/counter/ui-strings";
 import { LLM_PROVIDER_IDS } from "@/providers/llm/types";
 import { telemetry } from "@/lib/telemetry";
 
@@ -89,6 +94,35 @@ export async function GET() {
         };
       }),
     },
+
+    counter: (() => {
+      const openWeight = router.matching(OPEN_WEIGHT);
+      return {
+        // Live counts only — never a code, a language pair or a word of text.
+        sessions: counterStore().stats(),
+        preferOpenWeightModels: env.llm.counterPreferOpen,
+        openWeightProviders: openWeight,
+        // The honest headline: the preference is set but nothing satisfies it.
+        openWeightAvailable: openWeight.length > 0,
+        translationProvider: router.preferred(
+          env.llm.counterPreferOpen ? OPEN_WEIGHT : undefined,
+        ),
+        languages: COUNTER_LANGUAGES.length,
+        quickPhrases: QUICK_PHRASES.length,
+        // Where a visitor gets the full experience, and where they get
+        // English chrome and model-translated phrases instead.
+        coverage: COUNTER_LANGUAGES.map((language) => ({
+          code: language.code,
+          label: language.en,
+          quickPhrases: Math.round(quickPhraseCoverage(language.code) * 100),
+          interfaceTranslated: hasStrings(language.code),
+          speechInput: language.speechSupported,
+        })),
+        // Stated, not discovered in front of a visitor. See docs/counter-mode.md.
+        storeLimitation:
+          "Sessions live in the memory of one process. Multi-instance or serverless deployments will lose them between requests.",
+      };
+    })(),
 
     bible: {
       provider: env.bible.provider,
