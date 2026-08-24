@@ -182,7 +182,7 @@ they did not choose, in a language they cannot audit.
   recommended Groq configuration, no training occurs on either tier.
 - **A join link is a private conversation** and the page carries
   `robots: noindex`. Room codes are 4 characters from an unambiguous alphabet
-  (~1.3M combinations) and are only useful while the session is live.
+  (390,625 combinations) and are only useful while the session is live.
 - The QR code is generated **in the browser**, so the join URL never reaches an
   image service or any third party.
 - A visitor may correct a mis-tapped language freely until they send their

@@ -33,6 +33,16 @@ describe("room codes", () => {
     expect(normaliseCode(`TY${code}`)).toBe(code);
   });
 
+  it("accepts a generated code that itself begins with the prefix", () => {
+    // `T` and `Y` are both in the alphabet, so ~1 in 625 codes looks like a
+    // prefixed one. Stripping blindly made those codes impossible to type in.
+    expect(normaliseCode("TY4A")).toBe("TY4A");
+    expect(normaliseCode("ty4a")).toBe("TY4A");
+    // Still unambiguous when the prefix is genuinely a prefix.
+    expect(normaliseCode("TY-TY4A")).toBe("TY4A");
+    expect(normaliseCode("TYTY4A")).toBe("TY4A");
+  });
+
   it("rejects malformed codes rather than guessing", () => {
     expect(normaliseCode("")).toBeNull();
     expect(normaliseCode("ABC")).toBeNull();

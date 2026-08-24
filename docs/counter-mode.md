@@ -188,7 +188,7 @@ medical symptoms, legal problems, immigration status or money.
 ## Session and pairing
 
 - **Room code**: 4 characters from an unambiguous alphabet (no `0/O`, `1/I/L`),
-  giving ~1.3M combinations. Displayed as `TY-4821` and spoken aloud easily.
+  giving 390,625 combinations. Displayed as `TY-4821` and spoken aloud easily.
 - **QR** encodes the full join URL, generated client-side — no image service,
   no third party sees the code.
 - **Lifetime**: 4 hours idle, then discarded. A counter session is not a
