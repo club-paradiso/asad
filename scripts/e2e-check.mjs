@@ -10,6 +10,7 @@
  * Exits non-zero if any check fails or the page logs an error.
  */
 import { chromium } from "playwright";
+import { chromiumLaunchOptions } from "./browser.mjs";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -23,9 +24,7 @@ const check = (name, passed, detail = "") => {
   console.log(`${passed ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
 };
 
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
-});
+const browser = await chromium.launch(chromiumLaunchOptions());
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   colorScheme: "dark",

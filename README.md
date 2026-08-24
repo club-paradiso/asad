@@ -268,7 +268,7 @@ npm start          # serve the production build
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
 npm test           # vitest
-npm run verify     # everything CI runs, in one command
+npm run verify     # everything CI's fast job runs, in one command
 npm run icons      # regenerate PWA icons
 npm run shot       # device screenshots, for the design pass
 npm run e2e        # end-to-end flow check against a running server

@@ -1,0 +1,31 @@
+# Keep dependencies current without anyone having to remember to look.
+#
+# Written after a `postcss` high and a `vitest` critical sat in the lockfile
+# unnoticed — not because nobody cared, but because CI produced no logs for
+# four runs, so `npm ci`'s audit summary was never read by anyone. Automation
+# is the fix for that class of problem; vigilance is not.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Patch and minor bumps land as a single PR. Twenty individual PRs a week
+    # is how a repository learns to ignore Dependabot.
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore"
+      include: scope
+
+  # The Node 20 deprecation on actions/checkout@v4 was a warning for months
+  # before it became an error. This catches the next one.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

@@ -80,3 +80,64 @@ jobs:
       # making CI slow.
       - name: Soak (5 simulated minutes)
         run: npm run soak -- --minutes 5
+
+  # The checks a unit test cannot make: does the built app actually work in a
+  # browser. Kept as a separate job so a failure here is legible on its own,
+  # and because it needs Chromium, which the fast job has no use for.
+  e2e:
+    name: End-to-end flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # This job is the one place Chromium is wanted, so it is installed here
+      # rather than on every `npm ci` in the repository.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      # Started detached and waited for, rather than slept at: a fixed sleep is
+      # either too short on a slow runner or wasted time on a fast one.
+      - name: Start the server
+        run: |
+          npm start -- --port 3000 > /tmp/server.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/config > /dev/null; then
+              echo "server up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server never came up"
+          cat /tmp/server.log
+          exit 1
+
+      - name: End-to-end checks
+        run: npm run e2e -- http://localhost:3000 ./e2e-out
+
+      # The screenshots are the point when a check fails: they show what the
+      # page actually looked like, which no assertion message can.
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e-out/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Server log
+        if: failure()
+        run: cat /tmp/server.log
