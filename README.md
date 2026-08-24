@@ -98,6 +98,42 @@ prayer, testimony, rhetorical repetition and humour.
 
 ---
 
+## Run tong-yuck for free
+
+Real live interpretation, no paid API anywhere:
+
+```bash
+# .env.local
+STT_PROVIDER=webspeech        # browser speech recognition — $0
+LLM_ROUTING_MODE=auto-free    # free-tier interpretation — $0
+GEMINI_API_KEY=your-free-key  # from Google AI Studio, no card required
+BIBLE_PROVIDER=reference-only # no network call at all — $0
+```
+
+```bash
+npm install && npm run dev
+```
+
+Open in **Chrome**, pick **Sermon**, choose **Browser** as the audio source,
+press Start. Check `/diagnostics` to confirm what is actually configured.
+
+**Limitations, stated plainly:**
+
+- Web Speech is good in Chrome and Edge, partial in Safari, and unreliable on
+  iOS. It also stops on silence and restarts automatically, which can drop a
+  phrase.
+- Gemini's free tier sustains about **two 45-minute sermons a day**
+  (1,000 requests). After that the console keeps running on the local
+  interpreter and the status pill shows `AI LOCAL`.
+- **Privacy: Gemini's free tier may use prompts and responses to improve Google
+  products, including human review.** For sermon content — testimonies, prayer
+  requests, names — that is a real tradeoff. tong-yuck tells you once, in-app,
+  before the first live cloud session, and offers `LLM_ROUTING_MODE=local`
+  (sends nothing) or `LLM_PRIVACY_MODE=strict` (excludes training-capable
+  providers) as alternatives.
+
+Full detail: [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md).
+
 ## Going live
 
 Copy `.env.example` to `.env.local` and fill in what you need. Every value is
@@ -108,11 +144,22 @@ STT_PROVIDER=deepgram        # demo | webspeech | deepgram | openai
 DEEPGRAM_API_KEY=...
 DEEPGRAM_PROJECT_ID=...      # needed to mint short-lived browser keys
 
-LLM_PROVIDER=anthropic       # mock | openai | anthropic
-LLM_API_KEY=...
+# local | auto-free | pinned | reliable
+LLM_ROUTING_MODE=auto-free
+LLM_PRIVACY_MODE=standard    # strict excludes providers that may train on you
+LLM_ALLOW_PAID_FALLBACK=false
+
+GEMINI_API_KEY=...           # free tier
+GROQ_API_KEY=...             # free tier, does not train on your data
+OPENROUTER_API_KEY=...       # free tier, experimental
+ANTHROPIC_API_KEY=...        # paid
+OPENAI_API_KEY=...           # paid
 
 BIBLE_PROVIDER=reference-only  # reference-only | public-domain | api-bible
 ```
+
+Phase 1's `LLM_PROVIDER` / `LLM_API_KEY` still work and report their migration
+path on `/diagnostics`.
 
 | Setting | Behaviour |
 | --- | --- |
@@ -181,6 +228,11 @@ npm test           # vitest
 npm run icons      # regenerate PWA icons
 npm run shot       # device screenshots, for the design pass
 npm run e2e        # end-to-end flow check against a running server
+
+npm run smoke:llm  # one fixture per configured provider; skips cleanly
+npm run bench:llm  # 20-case interpretation benchmark, JSON + Markdown reports
+npm run bench:live # replay real transcript timing, measure latency
+npm run soak       # 45-minute session: bounded memory, context, no backlog
 ```
 
 ---
@@ -207,6 +259,10 @@ Scripture normalisation, glossary matching and cultural detection all run
 - [`docs/privacy.md`](docs/privacy.md) — what leaves the device, and what
   cannot be promised
 - [`docs/cost.md`](docs/cost.md) — per-session and monthly estimates
+- [`docs/llm-benchmark.md`](docs/llm-benchmark.md) — provider comparison,
+  measured workload, and what was **not** measured
+- [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md) — the
+  zero-cost setup and its tradeoffs
 - [`docs/repository-audit.md`](docs/repository-audit.md) — what was here before
 
 ---

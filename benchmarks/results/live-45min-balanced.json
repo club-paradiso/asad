@@ -1,0 +1,56 @@
+{
+  "minutes": 45,
+  "lag": "balanced",
+  "segments": 499,
+  "interpretationCalls": 499,
+  "callsPerMinute": 11.09,
+  "latency": {
+    "providerResponse": {
+      "count": 499,
+      "p50": 0,
+      "p90": 0,
+      "p95": 1,
+      "max": 1,
+      "mean": 0
+    },
+    "stableToSafe": {
+      "count": 499,
+      "p50": 200,
+      "p90": 201,
+      "p95": 1000,
+      "max": 1001,
+      "mean": 250
+    }
+  },
+  "tokens": {
+    "perCall": {
+      "count": 499,
+      "p50": 2726,
+      "p90": 2774,
+      "p95": 2787,
+      "max": 2788,
+      "mean": 2724
+    },
+    "sessionTotal": 1359221,
+    "profileCounts": {
+      "full": 499
+    }
+  },
+  "fallbacks": 499,
+  "rateLimitEvents": 0,
+  "providersUsed": {
+    "local": 499
+  },
+  "bounds": {
+    "finalChunks": 400,
+    "finalSegments": 499,
+    "peakContextTokens": 2788,
+    "maxInFlight": 1
+  },
+  "slo": {
+    "stableToSafeP50Met": true,
+    "stableToSafeP95Met": true,
+    "providerP50Met": true,
+    "providerP95Met": true
+  }
+}

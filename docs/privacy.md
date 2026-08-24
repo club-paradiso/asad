@@ -61,10 +61,11 @@ provider whose retention terms you have actually read.
 
 ### Interpretation
 
-With `LLM_PROVIDER=mock` (the default) **no text leaves the device at all** —
-Scripture normalisation, terminology and wordplay detection all run locally.
+With `LLM_ROUTING_MODE=local` **no text leaves the device at all** — Scripture
+normalisation, terminology and wordplay detection all run locally, and always
+did.
 
-With a real provider, each call sends only the bounded rolling window:
+With a cloud provider, each call sends only the bounded rolling window:
 
 - the Korean just stabilised, and the unresolved tail when predicting;
 - up to ~900 characters of recent Korean and ~700 of recent English;
@@ -104,22 +105,51 @@ handlers and are never included in the client bundle.
 
 ---
 
-## Vendor retention
+## Vendor retention — including the free tiers
 
 tong-yuck cannot control what a third party does with data you send it, and it
-will not pretend otherwise. As of writing, in broad terms:
+will not pretend otherwise. Verified against provider documentation on
+**2026-08-24**:
 
-- **Deepgram** does not retain audio or transcripts by default on pay-as-you-go
-  plans; opt-in retention exists for model improvement.
-- **OpenAI** API data is not used for training by default; a limited retention
-  window applies for abuse monitoring, with zero-retention available to
-  eligible accounts.
-- **Anthropic** API data is not used for training by default, with a similar
-  limited abuse-monitoring window.
+| Provider | Free tier | Paid tier |
+| --- | --- | --- |
+| **Gemini** | **May be used to improve Google products, including human review** | Not used for training |
+| **Groq** | **Does not train** on inputs or outputs. Short abuse/reliability logs; zero-data-retention available self-serve | Same |
+| **OpenRouter** | Does not store prompts by default, but forwards them to a downstream provider whose own policy then applies. Account settings control routing to training-capable providers | Same |
+| **OpenAI** | n/a — no free tier | Not used for training by default; limited abuse-monitoring retention |
+| **Anthropic** | n/a — no free tier | Not used for training by default; limited abuse-monitoring window |
+| **Deepgram** | n/a | Does not retain audio or transcripts by default on pay-as-you-go |
+
+### Free inference is not free of consequences
+
+This is the single most important thing on this page.
+
+**Gemini's free tier — the default `auto-free` provider — may use your prompts
+and responses to improve Google products, and that includes human review.** For
+tong-yuck the prompt contains the Korean transcript and the English assistance.
+In a sermon that can mean testimonies, prayer requests, names and pastoral
+information.
+
+Because of that, tong-yuck:
+
+- **shows a one-time in-app disclosure** before the first live cloud session,
+  naming the actual configured provider, with local-only mode offered as a real
+  alternative. It appears once per browser, not every session — interrupting
+  every service would train people to dismiss it unread;
+- provides **`LLM_PRIVACY_MODE=strict`**, which excludes providers that may
+  train on free-tier submissions from the routing chain entirely;
+- provides **`LLM_ROUTING_MODE=local`**, which sends nothing anywhere;
+- **never silently escalates to a paid provider**: `auto-free` degrades to the
+  local interpreter unless `LLM_ALLOW_PAID_FALLBACK` is explicitly set.
+
+There is a genuine tension here and no configuration resolves it for free:
+Gemini has the quota to run a sermon but trains on the data; Groq protects the
+data but its free tier cannot sustain the workload. See
+[`free-tier-deployment.md`](./free-tier-deployment.md) for the options.
 
 **Verify these against each vendor's current terms before handling anything
 sensitive.** They change, and the summary above is not a contract. If a session
-must not leave the room, use demo mode or run without a cloud provider.
+must not leave the room, use `LLM_ROUTING_MODE=local` or demo mode.
 
 ---
 
@@ -164,8 +194,18 @@ always live. A stale interpretation would be worse than none.
 
 ## Telemetry
 
-There is none. No analytics, no error reporting, no beacons. The only network
+There is no analytics, no error reporting and no beacons. The only network
 requests tong-yuck makes are the ones described above.
+
+Phase 2 added **in-process latency and token measurement**, surfaced on
+`/diagnostics`. It records durations, token counts, provider ids and failure
+kinds. It **never** records transcript content — that is a hard rule enforced
+at the type level in `src/lib/telemetry.ts`, not a convention. Nothing is
+transmitted anywhere; the numbers live in memory and disappear on restart.
+
+The `/api/diagnostics` payload reports credential state as booleans only. There
+is no code path in it that can emit a key, a partial key, or a fingerprint of
+one.
 
 ---
 

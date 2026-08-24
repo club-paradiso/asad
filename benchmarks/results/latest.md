@@ -1,6 +1,6 @@
 # tong-yuck LLM benchmark
 
-Run 2026-08-24T08:03:28.281Z → 2026-08-24T08:03:28.305Z
+Run 2026-08-24T08:26:11.199Z → 2026-08-24T08:26:11.223Z
 
 20 interpretation cases, 1× each, 12000ms deadline, Node v22.22.2.
 
@@ -241,7 +241,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — When I was twenty I went through a really hard time. / That's when I met God.
 
-**local** — 1ms · 0 chunks · schema ok · **no_output**
+**local** — 0ms · 0 chunks · schema ok · **no_output**
 
 > [no interpretation model configured — Korean transcript only]
 
@@ -274,7 +274,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — Last night I actually fell asleep preparing this sermon. / Anyone want to say amen to that?
 
-**local** — 0ms · 3 chunks · schema ok
+**local** — 1ms · 3 chunks · schema ok
 
 > I'll be honest —
 > last night I fell asleep preparing this sermon.
@@ -358,7 +358,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — Over the last three years working on this project, / the biggest thing I learned was this: / in the end, it's all about people.
 
-**local** — 0ms · 0 chunks · schema ok · **no_output**
+**local** — 1ms · 0 chunks · schema ok · **no_output**
 
 > [no interpretation model configured — Korean transcript only]
 

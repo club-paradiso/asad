@@ -186,12 +186,50 @@ Three ports, three factories, no vendor names above them:
 
 ```
 providers/stt/    demo · webspeech · deepgram · openai
-providers/llm/    mock · openai · anthropic          (server only)
+providers/llm/    local · gemini · groq · openrouter · openai · anthropic
 providers/bible/  reference-only · public-domain · api-bible
 ```
 
 Switching vendor is an environment variable. The engine, the console and the
 prompts do not know which one answered.
+
+### The LLM layer (Phase 2)
+
+Groq, OpenRouter and OpenAI all speak the OpenAI chat-completions format, so
+they share one `OpenAiCompatibleLlmProvider` and differ only by configuration
+data. Gemini deliberately does **not** go through that shim: its native API is
+the only way to get `responseJsonSchema` (real schema enforcement),
+`thinkingConfig` (which dominates live latency on Flash-class models) and
+`usageMetadata`. Those are precisely the three things this product needs.
+
+```
+LlmRouter
+ ├─ candidates()      routing mode + privacy mode + configured keys
+ ├─ CircuitBreaker    per provider; permanent for auth/bad-model failures
+ ├─ RateLimitTracker  headers + local accounting → quota pressure
+ ├─ sticky provider   one model per session; no roulette between sentences
+ └─ always ends at    local (deterministic, never fails, never leaves the box)
+```
+
+**Routing modes** — `local`, `auto-free`, `pinned`, `reliable`.
+`auto-free` never escalates to a paid provider unless
+`LLM_ALLOW_PAID_FALLBACK` is explicitly set; a free tier hiccuping must not
+start spending the deployer's money.
+
+**Deadlines** come from the lag profile the interpreter chose (2.5s FAST,
+3.5s BALANCED, 5s SAFE), replacing Phase 1's flat 12 seconds. A response that
+arrives after the interpreter has moved on is worthless, so a fast local
+fallback beats a late perfect translation.
+
+**Context profiles** (`full` / `compact` / `ultra-compact`) are chosen from the
+provider's sustainable budget and live quota pressure. Measured honestly they
+are worth about 20%, because the system prompt is ~70% of every call — see
+[`llm-benchmark.md`](./llm-benchmark.md).
+
+**Zod remains the trust boundary.** Native JSON-schema support makes valid
+output far more likely; it does not make validation unnecessary. Output that
+fails the schema is treated as a *provider failure*, so the router moves to the
+next candidate rather than returning rubbish to the console.
 
 ### The LLM boundary
 
@@ -261,6 +299,7 @@ src/
     stt/ llm/ bible/       vendor ports + factories
   interpreter/
     engine/                session state machine, stabiliser, chunk store, lag
+    context/profiles.ts    provider-aware context budgeting
     prompts/               prompt modules by mode — never inline in components
     context/               rolling window, compression, session memory
     glossary/              lexicons + whole-word Korean matching
@@ -268,7 +307,9 @@ src/
     cultural/              idioms, wordplay, name puns
     prep/                  deterministic brief
   demo/                    scripted sermon fixtures
-  lib/                     schema, export, storage, romanisation
+  lib/                     schema, export, storage, romanisation, env, telemetry,
+                           speakability heuristics
+benchmarks/                dataset, scoring, runner, live harness, reports
   hooks/                   auto-scroll, hotkeys, wake lock, capability
 tests/                     acceptance cases + evaluation fixtures
 docs/

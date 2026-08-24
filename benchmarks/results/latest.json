@@ -1,6 +1,6 @@
 {
-  "startedAt": "2026-08-24T08:03:28.281Z",
-  "finishedAt": "2026-08-24T08:03:28.305Z",
+  "startedAt": "2026-08-24T08:26:11.199Z",
+  "finishedAt": "2026-08-24T08:26:11.223Z",
   "deadlineMs": 12000,
   "repeats": 1,
   "cases": 20,
@@ -349,7 +349,7 @@
           "caseId": "b12",
           "category": "testimony",
           "ok": false,
-          "latencyMs": 1,
+          "latencyMs": 0,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -408,7 +408,7 @@
           "caseId": "b14",
           "category": "humour",
           "ok": true,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "I'll be honest —",
             "last night I fell asleep preparing this sermon.",
@@ -554,7 +554,7 @@
           "caseId": "b19",
           "category": "early-restructuring",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -619,7 +619,7 @@
         "p90": 1,
         "p95": 2,
         "max": 3,
-        "mean": 0
+        "mean": 1
       },
       "components": {
         "fidelity": 0.5,
