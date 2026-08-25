@@ -5,10 +5,12 @@ import { scoreProvider, type CaseResult } from "../benchmarks/score";
 import { parseEnv } from "@/lib/env";
 
 const KEY = "test-key-that-is-long-enough";
+const testEnv = (values: Record<string, string>) =>
+  parseEnv(values as NodeJS.ProcessEnv);
 
 describe("benchmark provider tiers", () => {
   it("honours a paid-tier declaration for Gemini", () => {
-    const env = parseEnv({ GEMINI_API_KEY: KEY, LLM_PAID_TIER: "gemini" });
+    const env = testEnv({ GEMINI_API_KEY: KEY, LLM_PAID_TIER: "gemini" });
     const gemini = availableProviders(env).available.find(
       (entry) => entry.id === "gemini",
     );
@@ -17,7 +19,7 @@ describe("benchmark provider tiers", () => {
   });
 
   it("does not award paid-tier scoring to an undeclared Gemini key", () => {
-    const env = parseEnv({ GEMINI_API_KEY: KEY });
+    const env = testEnv({ GEMINI_API_KEY: KEY });
     const gemini = availableProviders(env).available.find(
       (entry) => entry.id === "gemini",
     );
@@ -26,7 +28,7 @@ describe("benchmark provider tiers", () => {
   });
 
   it("treats providers without a free API tier as paid", () => {
-    const env = parseEnv({ OPENAI_API_KEY: KEY, ANTHROPIC_API_KEY: KEY });
+    const env = testEnv({ OPENAI_API_KEY: KEY, ANTHROPIC_API_KEY: KEY });
     const providers = availableProviders(env).available;
 
     expect(providers.find((entry) => entry.id === "openai")?.paid).toBe(true);
