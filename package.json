@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "A real-time AI copilot for human interpreters.",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
