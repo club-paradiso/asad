@@ -17,6 +17,12 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # Next.js 16.3.2 still pulls React/import/a11y plugins whose peer ranges
+    # stop at ESLint 9. Keep Dependabot from reopening a known-broken major
+    # until that plugin stack advertises ESLint 10 support.
+    ignore:
+      - dependency-name: eslint
+        versions: [">=10"]
     commit-message:
       prefix: "chore"
       include: scope
