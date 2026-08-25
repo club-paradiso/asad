@@ -70,6 +70,7 @@ const rawEnvSchema = z.object({
   LLM_PRIVACY_MODE: z.string().trim().toLowerCase().optional(),
   LLM_ALLOW_PAID_FALLBACK: z.string().trim().toLowerCase().optional(),
   LLM_COUNTER_PREFER_OPEN: z.string().trim().toLowerCase().optional(),
+  LLM_PAID_TIER: z.string().trim().toLowerCase().optional(),
 
   // Phase 1 compatibility.
   LLM_PROVIDER: z.string().trim().toLowerCase().optional(),
@@ -131,6 +132,26 @@ export interface AppEnv {
      * weights also happen to have the better data-use posture on a free tier.
      */
     counterPreferOpen: boolean;
+    /**
+     * Providers the deployer declares are on a billed plan.
+     *
+     * This cannot be detected — an API key looks identical either way — so it
+     * is a declaration, and it is trusted. Two things change for a provider
+     * listed here:
+     *
+     *   1. Its free-tier quota stops being used as a local ceiling. Otherwise
+     *      a paid key is throttled against limits it does not have, and the
+     *      router benches it as "quota nearly exhausted" while the account has
+     *      plenty left.
+     *   2. Its PAID data-use posture applies. Gemini does not train on paid
+     *      API data, so `LLM_PRIVACY_MODE=strict` should admit it — which it
+     *      cannot do while every provider is judged by its free tier.
+     *
+     * Declaring a provider paid when it is not sends content to a
+     * training-capable tier while the interface says otherwise, so the default
+     * is empty and the value is echoed on /diagnostics.
+     */
+    paidTier: ReadonlySet<LlmProviderId>;
     /** Explicit provider for `pinned` / `reliable`. */
     pinned?: LlmProviderId;
     providers: Record<LlmProviderId, ProviderConfig>;
@@ -248,6 +269,22 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   // Defaults ON, unlike the other flags: the counter is the one surface where
   // open weights were asked for by name.
   const counterPreferOpen = !BOOLEAN_FALSE.has(raw.LLM_COUNTER_PREFER_OPEN ?? "");
+
+  const paidTier = new Set<LlmProviderId>();
+  for (const entry of (raw.LLM_PAID_TIER ?? "").split(",")) {
+    const name = entry.trim();
+    if (!name) continue;
+    const id = normaliseProviderId(name);
+    if (!id || id === "local") {
+      problems.push({
+        level: "error",
+        field: "LLM_PAID_TIER",
+        message: `Unknown provider "${name}". Valid: ${LLM_PROVIDER_IDS.filter((p) => p !== "local").join(", ")}.`,
+      });
+      continue;
+    }
+    paidTier.add(id);
+  }
 
   /* --- Per-provider keys, with Phase 1 migration ------------------------ */
   let pinned: LlmProviderId | undefined;
@@ -387,6 +424,7 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       privacyMode,
       allowPaidFallback,
       counterPreferOpen,
+      paidTier,
       pinned,
       providers,
     },

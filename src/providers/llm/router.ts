@@ -22,7 +22,7 @@ import {
   assessFreeTierViability,
   capabilitiesFor,
   isOpenWeightModel,
-  trainsOnFreeTier,
+  trainsOnSubmissions,
 } from "./capabilities";
 import { CircuitBreaker, type BreakerSnapshot } from "./circuit-breaker";
 import { LlmError, toLlmError } from "./errors";
@@ -109,7 +109,7 @@ export class LlmRouter {
 
     const configured = (id: LlmProviderId) => this.env.llm.providers[id].configured;
     const privacyOk = (id: LlmProviderId) =>
-      privacyMode !== "strict" || !trainsOnFreeTier(id);
+      privacyMode !== "strict" || !trainsOnSubmissions(id, this.isPaid(id));
 
     switch (mode) {
       case "local":
@@ -144,10 +144,21 @@ export class LlmRouter {
     return breaker;
   }
 
+  /** Whether the deployer declared this provider to be on a billed plan. */
+  private isPaid(id: LlmProviderId): boolean {
+    return this.env.llm.paidTier.has(id);
+  }
+
   private limiterFor(id: LlmProviderId): RateLimitTracker {
     let tracker = this.limits.get(id);
     if (!tracker) {
-      tracker = new RateLimitTracker(id, capabilitiesFor(id).freeTierQuota, this.now);
+      // A paid plan gets no locally-imposed ceiling. Metering it against
+      // free-tier numbers benches a healthy provider as "quota nearly
+      // exhausted" while the account still has plenty — the tracker still
+      // reads whatever the provider reports in its headers, which is the only
+      // authority worth trusting on a billed plan.
+      const quota = this.isPaid(id) ? undefined : capabilitiesFor(id).freeTierQuota;
+      tracker = new RateLimitTracker(id, quota, this.now);
       this.limits.set(id, tracker);
     }
     return tracker;
@@ -386,6 +397,8 @@ export class LlmRouter {
     mode: RoutingMode;
     privacyMode: PrivacyMode;
     allowPaidFallback: boolean;
+    /** Providers declared to be on a billed plan. */
+    paidTier: LlmProviderId[];
     chain: LlmProviderId[];
     active: LlmProviderId | null;
     warnings: string[];
@@ -395,13 +408,15 @@ export class LlmRouter {
 
     for (const id of this.candidates()) {
       const caps = capabilitiesFor(id);
-      if (caps.freeTierPossible) {
+      const paid = this.isPaid(id);
+      // A free-tier ceiling is not a fact about a billed plan.
+      if (caps.freeTierPossible && !paid) {
         const verdict = assessFreeTierViability(id);
         if (!verdict.viable) {
           warnings.push(`${caps.label} free tier: ${verdict.detail}`);
         }
       }
-      if (trainsOnFreeTier(id) && this.env.llm.privacyMode !== "strict") {
+      if (trainsOnSubmissions(id, paid) && this.env.llm.privacyMode !== "strict") {
         warnings.push(`${caps.label}: ${caps.privacyNote}`);
       }
     }
@@ -410,6 +425,7 @@ export class LlmRouter {
       mode: this.env.llm.routingMode,
       privacyMode: this.env.llm.privacyMode,
       allowPaidFallback: this.env.llm.allowPaidFallback,
+      paidTier: [...this.env.llm.paidTier],
       chain,
       active: this.preferred(),
       warnings,

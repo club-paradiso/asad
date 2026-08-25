@@ -432,3 +432,83 @@ describe("counter open-weight configuration", () => {
     expect(env({ LLM_COUNTER_PREFER_OPEN: "true" }).llm.counterPreferOpen).toBe(true);
   });
 });
+
+describe("paid tier — what a billed plan changes", () => {
+  it("stops metering a paid provider against free-tier limits", () => {
+    // The defect this pins: a paid key was metered against quota numbers it
+    // does not have, so the router could bench a healthy provider as "quota
+    // nearly exhausted" while the account still had plenty.
+    const free = new LlmRouter(env({ LLM_ROUTING_MODE: "auto-free", GROQ_API_KEY: KEY }));
+    const paid = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", GROQ_API_KEY: KEY, LLM_PAID_TIER: "groq" }),
+    );
+
+    const pressureOf = (router: LlmRouter) =>
+      router.health().find((h) => h.provider === "groq")!.rateLimit.pressure;
+
+    // The free tracker meters against Groq's documented 6,000 tokens/minute.
+    expect(pressureOf(free).detail).toContain("6,000");
+    expect(pressureOf(free).binding).toBe("tpm");
+
+    // The paid one tracks nothing locally and says so, leaving the provider's
+    // own rate-limit headers as the only authority — which is correct, because
+    // they are the only thing that knows the real plan.
+    expect(pressureOf(paid).detail).toMatch(/no documented quota/i);
+    expect(pressureOf(paid).binding).toBeUndefined();
+  });
+
+  it("admits a paid Gemini under strict privacy, and excludes a free one", () => {
+    // Gemini's free tier may use prompts to improve Google products; its paid
+    // tier does not. Judging both by the free tier threw away the guarantee a
+    // deployer is paying for.
+    const free = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", LLM_PRIVACY_MODE: "strict", GEMINI_API_KEY: KEY }),
+    );
+    expect(free.plan().chain).toEqual(["local"]);
+
+    const paid = new LlmRouter(
+      env({
+        LLM_ROUTING_MODE: "auto-free",
+        LLM_PRIVACY_MODE: "strict",
+        GEMINI_API_KEY: KEY,
+        LLM_PAID_TIER: "gemini",
+      }),
+    );
+    expect(paid.plan().chain).toEqual(["gemini", "local"]);
+    expect(paid.preferred()).toBe("gemini");
+  });
+
+  it("drops the free-tier capacity warning for a billed plan", () => {
+    const free = new LlmRouter(env({ LLM_ROUTING_MODE: "auto-free", GROQ_API_KEY: KEY }));
+    expect(free.plan().warnings.some((w) => /free tier/.test(w))).toBe(true);
+
+    const paid = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", GROQ_API_KEY: KEY, LLM_PAID_TIER: "groq" }),
+    );
+    expect(paid.plan().warnings.some((w) => /free tier/.test(w))).toBe(false);
+  });
+
+  it("reports which providers were declared paid", () => {
+    const router = new LlmRouter(
+      env({
+        LLM_ROUTING_MODE: "auto-free",
+        GEMINI_API_KEY: KEY,
+        GROQ_API_KEY: KEY,
+        LLM_PAID_TIER: "gemini,groq",
+      }),
+    );
+    expect(router.plan().paidTier.sort()).toEqual(["gemini", "groq"]);
+  });
+
+  it("rejects an unknown provider name rather than silently ignoring it", () => {
+    // Silently dropping it would leave the deployer believing a guarantee they
+    // do not have.
+    const parsed = env({ LLM_PAID_TIER: "gemini,nonsense" });
+    expect(parsed.llm.paidTier.has("gemini")).toBe(true);
+    expect(parsed.problems.some((p) => p.field === "LLM_PAID_TIER")).toBe(true);
+  });
+
+  it("defaults to declaring nothing paid", () => {
+    expect(env({ GEMINI_API_KEY: KEY }).llm.paidTier.size).toBe(0);
+  });
+});

@@ -14,7 +14,7 @@ import {
   LIVE_WORKLOAD,
   assessFreeTierViability,
   capabilitiesFor,
-  trainsOnFreeTier,
+  trainsOnSubmissions,
 } from "@/providers/llm/capabilities";
 import { llmRouter } from "@/providers/llm";
 import { OPEN_WEIGHT } from "@/providers/llm/router";
@@ -88,14 +88,15 @@ export async function GET() {
   const modelAvailable = active !== null && active !== "local";
 
   // Connected is not the same as sufficient. Say which.
+  const activePaid = active !== null && env.llm.paidTier.has(active);
   const viability =
-    modelAvailable && capabilitiesFor(active).freeTierPossible
+    modelAvailable && capabilitiesFor(active).freeTierPossible && !activePaid
       ? assessFreeTierViability(active, LIVE_WORKLOAD.tokensPerCallFull)
       : undefined;
 
   const textAvailable = env.bible.provider !== "reference-only";
   const freeTierDisclosure = plan.chain
-    .filter((id) => id !== "local" && trainsOnFreeTier(id))
+    .filter((id) => id !== "local" && trainsOnSubmissions(id, env.llm.paidTier.has(id)))
     .map((id) => ({ label: capabilitiesFor(id).label, note: capabilitiesFor(id).privacyNote }));
 
   // The provider a counter turn would actually reach, which is not necessarily
@@ -124,7 +125,9 @@ export async function GET() {
     },
     counter: {
       provider: counterCaps?.label ?? null,
-      mayTrain: counterProvider ? trainsOnFreeTier(counterProvider) : false,
+      mayTrain: counterProvider
+        ? trainsOnSubmissions(counterProvider, env.llm.paidTier.has(counterProvider))
+        : false,
       note: counterCaps?.privacyNote ?? "",
       openWeightModel: counterProvider
         ? OPEN_WEIGHT(counterProvider, env.llm.providers[counterProvider].model)
