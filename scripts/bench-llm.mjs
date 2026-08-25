@@ -7,6 +7,8 @@
  *   npm run bench:llm                    # everything configured
  *   npm run bench:llm -- --only gemini   # one provider
  *   npm run bench:llm -- --repeats 3     # median of three runs per case
+ *   npm run bench:llm -- --stdout markdown --no-write
+ *                                        # deployment logs; no ephemeral file
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,10 +20,19 @@ const flag = (name, fallback) => {
   const at = args.indexOf(`--${name}`);
   return at === -1 ? fallback : args[at + 1];
 };
+const hasFlag = (name) => args.includes(`--${name}`);
 
-const only = flag("only")?.split(",").map((s) => s.trim());
+const only = flag("only")
+  ?.split(",")
+  .map((s) => s.trim());
 const repeats = Number(flag("repeats", "1"));
 const deadlineMs = Number(flag("deadline", "12000"));
+const stdout = flag("stdout");
+const noWrite = hasFlag("no-write");
+
+if (stdout && stdout !== "markdown" && stdout !== "json") {
+  throw new Error('--stdout must be either "markdown" or "json"');
+}
 
 const run = await runBenchmark({
   only,
@@ -32,11 +43,16 @@ const run = await runBenchmark({
 
 console.log(renderConsole(run));
 
-const dir = join(process.cwd(), "benchmarks", "results");
-mkdirSync(dir, { recursive: true });
-writeFileSync(join(dir, "latest.json"), JSON.stringify(run, null, 2));
-writeFileSync(join(dir, "latest.md"), renderMarkdown(run));
-console.log(`Wrote benchmarks/results/latest.json and latest.md`);
+if (stdout === "json") console.log(JSON.stringify(run, null, 2));
+if (stdout === "markdown") console.log(renderMarkdown(run));
+
+if (!noWrite) {
+  const dir = join(process.cwd(), "benchmarks", "results");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "latest.json"), JSON.stringify(run, null, 2));
+  writeFileSync(join(dir, "latest.md"), renderMarkdown(run));
+  console.log(`Wrote benchmarks/results/latest.json and latest.md`);
+}
 
 // A disqualified provider is a real result, not a crash.
 const eligible = run.scores.filter((s) => !s.disqualified);
