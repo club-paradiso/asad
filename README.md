@@ -299,9 +299,34 @@ npm run e2e        # end-to-end flow check against a running server
 
 npm run smoke:llm  # one fixture per configured provider; skips cleanly
 npm run bench:llm  # 20-case interpretation benchmark, JSON + Markdown reports
+                   # (or run it in CI, with no key on your machine — see below)
 npm run bench:live # replay real transcript timing, measure latency
 npm run soak       # 45-minute session: bounded memory, context, no backlog
 ```
+
+---
+
+## Benchmarking without handing anyone a key
+
+Benchmarking needs a real credential, and the obvious ways to supply one are
+all bad: pasting it into a chat, putting it on someone else's machine, or
+committing it.
+
+So the benchmark also runs as an on-demand GitHub Action, with the key read
+from repository secrets. It never leaves GitHub.
+
+1. **Settings → Secrets and variables → Actions → New repository secret.**
+   Add whichever you have: `GEMINI_API_KEY`, `GROQ_API_KEY`,
+   `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`.
+2. **Actions → Benchmark → Run workflow.** Optionally override the Gemini
+   model, and list any providers you are billed for so free-tier ceilings are
+   not applied to them.
+3. Read the result in the run summary; the JSON and Markdown reports are
+   attached as an artifact for 90 days.
+
+It never runs on a schedule or on push — real API calls cost real money, so a
+person decides each time. Providers with no secret are skipped and the report
+says which, rather than quietly reporting on fewer models than you expected.
 
 ---
 

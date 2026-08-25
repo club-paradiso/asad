@@ -1,0 +1,97 @@
+# Run the interpretation benchmark against real providers, on demand.
+#
+# The point is where the key lives. Benchmarking needs a real credential, and
+# the three obvious ways to supply one are all bad: pasting it into a chat,
+# handing it to someone else's machine, or committing it. This runs the
+# benchmark on GitHub's runner with the key read from repository secrets, so it
+# never leaves GitHub and never touches a person.
+#
+# Nothing here runs on a schedule or on push. Real API calls cost real money,
+# so a person decides each time.
+#
+#   Actions → Benchmark → Run workflow
+#
+# Set whichever of these you have, under Settings → Secrets and variables →
+# Actions. Providers with no secret are skipped, and the report says so.
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Override the Gemini model (blank = repository default)"
+        required: false
+        type: string
+      paid_tier:
+        description: "Comma-separated providers on a billed plan, e.g. gemini"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: Interpretation benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LLM_PAID_TIER: ${{ inputs.paid_tier }}
+      LLM_ROUTING_MODE: auto-free
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Which providers have a credential, as booleans. Never the values —
+      # this line exists so a run with no secrets set is obvious at a glance
+      # rather than looking like a broken benchmark.
+      - name: Credentials present
+        run: |
+          for name in GEMINI GROQ OPENROUTER OPENAI ANTHROPIC; do
+            var="${name}_API_KEY"
+            if [ -n "${!var}" ]; then echo "$name: yes"; else echo "$name: no"; fi
+          done
+
+      - name: Benchmark
+        env:
+          MODEL_INPUT: ${{ inputs.model }}
+        run: |
+          # Exported only when non-empty: an empty string is not a valid model
+          # id and would be reported as a configuration problem.
+          if [ -n "$MODEL_INPUT" ]; then
+            export GEMINI_LLM_MODEL="$MODEL_INPUT"
+            echo "model override: $MODEL_INPUT"
+          fi
+          npm run bench:llm
+
+      # The whole point of the run. Markdown for reading, JSON for diffing
+      # against the next one.
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmark-reports
+          path: benchmarks/results/
+          if-no-files-found: warn
+          retention-days: 90
+
+      # So the result is readable without downloading anything.
+      - name: Summary
+        if: always()
+        run: cat benchmarks/results/latest.md >> "$GITHUB_STEP_SUMMARY" || echo "No report produced." >> "$GITHUB_STEP_SUMMARY"
