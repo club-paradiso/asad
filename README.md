@@ -96,6 +96,30 @@ unfinished one, a recogniser self-correction, Scripture, theological
 vocabulary, an idiom, a cultural reference, name wordplay, a proper noun,
 prayer, testimony, rhetorical repetition and humour.
 
+### What is running when you do that
+
+**No cloud model.** The repository ships with no API key, and nothing is
+configured by default, so the console runs on the **local interpreter** — a
+deterministic, rule-based path built from the parts of the job that genuinely
+are deterministic:
+
+| Runs locally, always | Needs a cloud model |
+| --- | --- |
+| Scripture detection and reference normalisation | Translating arbitrary Korean into English |
+| Glossary and terminology matching | Rendering idiom, humour and wordplay |
+| Cultural-reference and wordplay *detection* | Early syntactic restructuring |
+| Name correction and romanisation | Register and tone |
+| Transcript stabilisation and temporal locking | Counter Mode's free-text translation |
+
+The local path **flags** the hard cases rather than solving them, marks
+anything it cannot support as low confidence, and never invents content. That
+is deliberate — a wrong translation delivered confidently is worse than a
+marked gap — but it is assistance, not interpretation.
+
+Add one free key and the whole right-hand column turns on. `/diagnostics` says
+which provider is live, and the console shows `AI LOCAL` in the status pill
+whenever it is not.
+
 ---
 
 ## Run tong-yuck for free
@@ -375,4 +399,5 @@ parts).
 
 ## Licence
 
-Unlicensed at present — all rights reserved by the repository owner.
+[MIT](LICENSE). Use it, change it, ship it, sell it — keep the copyright notice
+and the licence text, and understand there is no warranty.
