@@ -7,6 +7,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // Lets server route handlers be imported into tests; the real guard
+      // still runs during `next build`. See the stub for why.
+      "server-only": fileURLToPath(new URL("./src/test/server-only.stub.ts", import.meta.url)),
     },
   },
   test: {

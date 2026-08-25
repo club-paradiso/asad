@@ -10,7 +10,12 @@
  */
 import { NextResponse } from "next/server";
 import { appEnv } from "@/lib/env";
-import { capabilitiesFor, trainsOnFreeTier } from "@/providers/llm/capabilities";
+import {
+  LIVE_WORKLOAD,
+  assessFreeTierViability,
+  capabilitiesFor,
+  trainsOnFreeTier,
+} from "@/providers/llm/capabilities";
 import { llmRouter } from "@/providers/llm";
 import { OPEN_WEIGHT } from "@/providers/llm/router";
 
@@ -20,9 +25,20 @@ export const dynamic = "force-dynamic";
 export interface AppConfig {
   stt: { configured: string; cloudAvailable: boolean };
   llm: {
+    /** The provider a live turn would actually reach right now. */
     configured: string;
     modelAvailable: boolean;
     routingMode: string;
+    /**
+     * Whether that provider's quota can carry a full 45-minute sermon.
+     *
+     * A separate question from `modelAvailable`, and the one that actually
+     * bites: Groq's and OpenRouter's free tiers connect perfectly and then run
+     * out within minutes, which looks identical to "not configured" unless the
+     * launcher says otherwise.
+     */
+    sustainsLiveSermon: boolean;
+    capacityNote?: string;
     /**
      * Providers in the active chain whose free tier may use submitted content
      * to improve their products. Labels and notes only — never keys.
@@ -50,22 +66,34 @@ export interface AppConfig {
 }
 
 export async function GET() {
-  const stt = (process.env.STT_PROVIDER ?? "demo").trim().toLowerCase();
-  const llm = (process.env.LLM_PROVIDER ?? "mock").trim().toLowerCase();
-  const bible = (process.env.BIBLE_PROVIDER ?? "reference-only").trim().toLowerCase();
-
-  const cloudAvailable =
-    (stt === "deepgram" && !!process.env.DEEPGRAM_API_KEY?.trim()) ||
-    (stt === "openai" && !!process.env.OPENAI_API_KEY?.trim());
-
-  const modelAvailable = llm !== "mock" && !!process.env.LLM_API_KEY?.trim();
-
-  const textAvailable =
-    bible === "public-domain" ||
-    (bible === "api-bible" && !!process.env.BIBLE_API_KEY?.trim() && !!process.env.BIBLE_ID?.trim());
-
+  // Read the PARSED environment, not raw process.env. The two disagree in the
+  // case that matters: a deployment configured the Phase 2 way — GROQ_API_KEY,
+  // OPENROUTER_API_KEY, GEMINI_API_KEY — sets none of the Phase 1 variables
+  // this route used to check, so a correctly connected deployment reported
+  // itself as having no model at all while the router was happily using one.
   const env = appEnv();
   const plan = llmRouter().plan();
+
+  const stt = env.stt.provider;
+  const bible = env.bible.provider;
+
+  const cloudAvailable =
+    (stt === "deepgram" && !!env.stt.deepgramKey) ||
+    (stt === "openai" && !!env.stt.openaiKey);
+
+  // The router is the authority on what a live turn would reach: it accounts
+  // for every provider, the routing mode, the privacy mode, breaker state and
+  // quota pressure.
+  const active = plan.active;
+  const modelAvailable = active !== null && active !== "local";
+
+  // Connected is not the same as sufficient. Say which.
+  const viability =
+    modelAvailable && capabilitiesFor(active).freeTierPossible
+      ? assessFreeTierViability(active, LIVE_WORKLOAD.tokensPerCallFull)
+      : undefined;
+
+  const textAvailable = env.bible.provider !== "reference-only";
   const freeTierDisclosure = plan.chain
     .filter((id) => id !== "local" && trainsOnFreeTier(id))
     .map((id) => ({ label: capabilitiesFor(id).label, note: capabilitiesFor(id).privacyNote }));
@@ -80,15 +108,19 @@ export async function GET() {
   const config: AppConfig = {
     stt: { configured: stt, cloudAvailable },
     llm: {
-      configured: llm,
+      configured: active ? capabilitiesFor(active).label : "local interpreter",
       modelAvailable,
       routingMode: env.llm.routingMode,
+      // No cloud model cannot "fail to sustain" anything; that reads as a
+      // second problem when there is only one.
+      sustainsLiveSermon: !modelAvailable || (viability?.viable ?? true),
+      capacityNote: viability && !viability.viable ? viability.detail : undefined,
       freeTierDisclosure,
     },
     bible: {
       configured: bible,
       textAvailable,
-      translation: process.env.BIBLE_TRANSLATION?.trim() || "WEB",
+      translation: env.bible.translation,
     },
     counter: {
       provider: counterCaps?.label ?? null,

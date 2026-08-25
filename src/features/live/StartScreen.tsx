@@ -83,6 +83,7 @@ export function StartScreen() {
   }
 
   const llmDegraded = config ? !config.llm.modelAvailable : false;
+  const llmCapacityNote = config && !config.llm.sustainsLiveSermon ? config.llm.capacityNote : null;
 
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-8 px-5 py-8 sm:py-14">
@@ -190,7 +191,21 @@ export function StartScreen() {
         <p className="rounded-md border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] bg-[color-mix(in_srgb,var(--warn)_8%,transparent)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--warn)]">
           No interpretation model is configured. Scripture normalisation, terminology and wordplay
           detection still run locally, but English assistance will be rule-based rather than
-          translated. Set <code>LLM_PROVIDER</code> and <code>LLM_API_KEY</code> for full output.
+          translated. Set a provider key — <code>GEMINI_API_KEY</code>, <code>GROQ_API_KEY</code> or{" "}
+          <code>OPENROUTER_API_KEY</code> — for full output.
+        </p>
+      )}
+
+      {/* Connected but not sufficient. Its own warning, because it is a
+          different problem with a different fix, and because a free tier that
+          runs out eight minutes into a service looks exactly like a broken
+          deployment from the booth. */}
+      {llmCapacityNote && (
+        <p className="rounded-md border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] bg-[color-mix(in_srgb,var(--warn)_8%,transparent)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--warn)]">
+          <span className="font-semibold">{config?.llm.configured}</span> is connected, but its free
+          tier will not carry a whole service: {llmCapacityNote} The console keeps running on the
+          local interpreter after that, showing <code>AI LOCAL</code>. Add a provider with more
+          headroom, or use this for Counter Mode, which fits comfortably.
         </p>
       )}
 
