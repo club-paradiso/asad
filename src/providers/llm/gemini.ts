@@ -115,5 +115,6 @@ const mapUsage = (usage: GeminiResponse["usageMetadata"]): LlmUsage | undefined 
         inputTokens: usage.promptTokenCount,
         outputTokens: usage.candidatesTokenCount,
         totalTokens: usage.totalTokenCount,
+        cachedInputTokens: usage.cachedContentTokenCount,
       }
     : undefined;

@@ -259,9 +259,26 @@ export const capabilitiesFor = (id: LlmProviderId): LlmProviderCapabilities =>
   PROVIDER_CAPABILITIES[id];
 
 /** Providers whose free tier may use submitted content to improve products. */
+const MAY_TRAIN = new Set<PrivacyPosture>(["may-train", "varies"]);
+
 export const trainsOnFreeTier = (id: LlmProviderId): boolean =>
-  PROVIDER_CAPABILITIES[id].freeTierPrivacy === "may-train" ||
-  PROVIDER_CAPABILITIES[id].freeTierPrivacy === "varies";
+  MAY_TRAIN.has(PROVIDER_CAPABILITIES[id].freeTierPrivacy);
+
+/**
+ * Whether a provider may train on what is sent to it, given which tier it is on.
+ *
+ * The tier is the whole question for Gemini: its free tier may use prompts and
+ * responses to improve Google products, including human review, and its paid
+ * tier does not. Judging every provider by its free tier — as the code did
+ * before this existed — meant a deployer paying specifically for that
+ * guarantee had it discarded by `LLM_PRIVACY_MODE=strict`.
+ */
+export const trainsOnSubmissions = (id: LlmProviderId, paidTier: boolean): boolean =>
+  MAY_TRAIN.has(
+    paidTier
+      ? PROVIDER_CAPABILITIES[id].paidTierPrivacy
+      : PROVIDER_CAPABILITIES[id].freeTierPrivacy,
+  );
 
 export interface QuotaVerdict {
   viable: boolean;

@@ -67,6 +67,16 @@ export interface LlmUsage {
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
+  /**
+   * Input tokens served from the provider's prompt cache.
+   *
+   * Worth carrying because of what the workload measurement found: the system
+   * prompt is ~70% of every live call and never changes within a session. This
+   * is the number that says whether that 70% is being re-billed every turn or
+   * served from cache — and without it, "should we implement caching?" cannot
+   * be answered with anything but a guess.
+   */
+  cachedInputTokens?: number;
 }
 
 /** Rate-limit state scraped from response headers, where available. */
