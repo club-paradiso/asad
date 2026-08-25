@@ -17,10 +17,16 @@
  *
  * Hard failures short-circuit the score entirely — see `HARD_FAILURES`.
  */
-import { assessSpeakability, type SpeakabilityReport } from "@/lib/speakability";
-import { assessFreeTierViability, capabilitiesFor } from "@/providers/llm/capabilities";
+import {
+  assessSpeakability,
+  type SpeakabilityReport,
+} from "@/lib/speakability";
+import {
+  assessFreeTierViability,
+  capabilitiesFor,
+} from "@/providers/llm/capabilities";
 import { LATENCY_SLO, summarise } from "@/lib/telemetry";
-import type { LlmProviderId } from "@/providers/llm/types";
+import type { LlmProviderId, LlmUsage } from "@/providers/llm/types";
 import type { InterpreterOutput } from "@/types";
 import type { BenchCase } from "./dataset";
 
@@ -61,12 +67,17 @@ export interface CaseResult {
     culturalMissing: string[];
   };
   hardFailures: HardFailure[];
+  /** Provider-reported usage summed across every repeat of this case. */
+  usage?: LlmUsage;
+  /** Number of repeated requests that returned usage metadata. */
+  usageReports?: number;
   error?: string;
 }
 
 export interface ProviderScore {
   provider: LlmProviderId;
   model: string;
+  tier: "paid" | "free-or-unknown";
   cases: CaseResult[];
   latency: ReturnType<typeof summarise>;
   components: {
@@ -78,6 +89,14 @@ export interface ProviderScore {
     privacy: number;
   };
   total: number;
+  usage: {
+    requestsWithUsage: number;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cacheHitRate: number | null;
+  };
   hardFailures: HardFailure[];
   /** True when hard failures make the candidate unsuitable at any score. */
   disqualified: boolean;
@@ -102,7 +121,9 @@ const NON_ANSWER = [
 
 const isNonAnswer = (chunks: string[]): boolean =>
   chunks.length === 0 ||
-  chunks.every((chunk) => NON_ANSWER.some((marker) => lower(chunk).includes(marker)));
+  chunks.every((chunk) =>
+    NON_ANSWER.some((marker) => lower(chunk).includes(marker)),
+  );
 
 /** Score one case against its expectations. */
 export function scoreCase(
@@ -175,7 +196,8 @@ export function scoreCase(
   );
   const kinds = (output.culturalNotes ?? []).map((n) => n.kind);
   const culturalMissing =
-    benchCase.expect.culturalKinds && !benchCase.expect.culturalKinds.some((k) => kinds.includes(k as never))
+    benchCase.expect.culturalKinds &&
+    !benchCase.expect.culturalKinds.some((k) => kinds.includes(k as never))
       ? benchCase.expect.culturalKinds
       : [];
 
@@ -183,8 +205,12 @@ export function scoreCase(
   // ways this product fails, not stylistic preferences.
   if (forbiddenHit.length > 0) {
     hardFailures.push("forbidden_rendering");
-    if (benchCase.category === "wordplay") hardFailures.push("literal_wordplay");
-    if (benchCase.category === "scripture-reference" || benchCase.category === "scripture-paraphrase") {
+    if (benchCase.category === "wordplay")
+      hardFailures.push("literal_wordplay");
+    if (
+      benchCase.category === "scripture-reference" ||
+      benchCase.category === "scripture-paraphrase"
+    ) {
       hardFailures.push("invented_scripture");
     }
   }
@@ -246,32 +272,52 @@ export function scoreProvider(
   options: { paidTier?: boolean } = {},
 ): ProviderScore {
   const caps = capabilitiesFor(provider);
-  const latency = summarise(cases.filter((c) => c.schemaValid).map((c) => c.latencyMs));
+  const latency = summarise(
+    cases.filter((c) => c.schemaValid).map((c) => c.latencyMs),
+  );
   const notes: string[] = [];
 
   const fidelity = mean(cases.map((c) => c.fidelity.score));
   const speakability = mean(cases.map((c) => c.speakability.score));
-  const schema = cases.length ? cases.filter((c) => c.schemaValid).length / cases.length : 0;
+  const schema = cases.length
+    ? cases.filter((c) => c.schemaValid).length / cases.length
+    : 0;
 
   // Latency scored against the SLO: full marks at or below the p50 target,
   // zero at twice the p95 target.
   const target = LATENCY_SLO.provider_response;
-  const latencyScore = latency.count === 0
-    ? 0
-    : clamp01(1 - (latency.p95 - target.p50) / (target.p95 * 2 - target.p50));
+  const latencyScore =
+    latency.count === 0
+      ? 0
+      : clamp01(1 - (latency.p95 - target.p50) / (target.p95 * 2 - target.p50));
 
   const viability = assessFreeTierViability(provider);
   const sustainability = options.paidTier ? 1 : viability.viable ? 1 : 0.25;
-  if (!options.paidTier && !viability.viable) {
+  if (options.paidTier) {
+    notes.push(
+      "Tier: paid (declared by LLM_PAID_TIER or required by the provider).",
+    );
+  } else if (!viability.viable) {
     notes.push(`Free-tier quota: ${viability.detail}`);
   } else if (viability.sustainedMinutes) {
-    notes.push(`Free tier sustains ~${viability.sustainedMinutes} min/day of continuous speech.`);
+    notes.push(
+      `Free tier sustains ~${viability.sustainedMinutes} min/day of continuous speech.`,
+    );
   }
 
-  const posture = options.paidTier ? caps.paidTierPrivacy : caps.freeTierPrivacy;
+  const posture = options.paidTier
+    ? caps.paidTierPrivacy
+    : caps.freeTierPrivacy;
   const privacy =
-    posture === "local" ? 1 : posture === "no-training" ? 1 : posture === "varies" ? 0.4 : 0.2;
-  if (posture === "may-train" || posture === "varies") notes.push(caps.privacyNote);
+    posture === "local"
+      ? 1
+      : posture === "no-training"
+        ? 1
+        : posture === "varies"
+          ? 0.4
+          : 0.2;
+  if (posture === "may-train" || posture === "varies")
+    notes.push(caps.privacyNote);
 
   const components = {
     fidelity,
@@ -293,18 +339,48 @@ export function scoreProvider(
   const hardFailures = [...new Set(cases.flatMap((c) => c.hardFailures))];
   // A single literal wordplay or invented Scripture is disqualifying however
   // good the average looks.
-  const disqualifying: HardFailure[] = ["literal_wordplay", "invented_scripture", "schema_broken"];
+  const disqualifying: HardFailure[] = [
+    "literal_wordplay",
+    "invented_scripture",
+    "schema_broken",
+  ];
   const disqualified =
     hardFailures.some((f) => disqualifying.includes(f)) ||
     cases.filter((c) => c.hardFailures.length > 0).length > cases.length * 0.2;
 
+  const usage = cases.reduce(
+    (aggregate, benchCase) => {
+      if (!benchCase.usage) return aggregate;
+      aggregate.requestsWithUsage += benchCase.usageReports ?? 1;
+      aggregate.inputTokens += benchCase.usage.inputTokens ?? 0;
+      aggregate.cachedInputTokens += benchCase.usage.cachedInputTokens ?? 0;
+      aggregate.outputTokens += benchCase.usage.outputTokens ?? 0;
+      aggregate.totalTokens += benchCase.usage.totalTokens ?? 0;
+      return aggregate;
+    },
+    {
+      requestsWithUsage: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      cacheHitRate: null as number | null,
+    },
+  );
+  usage.cacheHitRate =
+    usage.requestsWithUsage > 0 && usage.inputTokens > 0
+      ? usage.cachedInputTokens / usage.inputTokens
+      : null;
+
   return {
     provider,
     model,
+    tier: options.paidTier ? "paid" : "free-or-unknown",
     cases,
     latency,
     components,
     total: Number(total.toFixed(4)),
+    usage,
     hardFailures,
     disqualified,
     notes,

@@ -4,24 +4,24 @@
 benchmarked, because no API key was available in the build environment.**
 
 That sentence is the most important one in this document. Everything below
-distinguishes between what was *measured* and what was *derived from provider
-documentation*, and nothing is presented as a benchmark result that was not
+distinguishes between what was _measured_ and what was _derived from provider
+documentation_, and nothing is presented as a benchmark result that was not
 actually run.
 
 ---
 
 ## What was measured, and what was not
 
-| | Status |
-| --- | --- |
-| Live pipeline latency and token cost | **Measured** — `npm run bench:live`, 45-minute soak |
-| Context profile cost | **Measured** — all three profiles |
-| System prompt token cost | **Measured** |
-| Local interpreter benchmark score | **Measured** — `npm run bench:llm` |
-| Free-tier quota viability | **Derived** from documented limits × measured workload |
-| Provider data-use policy | **Derived** from provider documentation, verified 2026-08-24 |
-| Gemini / Groq / OpenRouter quality | **NOT MEASURED** — no API key available |
-| Gemini / Groq / OpenRouter latency | **NOT MEASURED** — no API key available |
+|                                      | Status                                                       |
+| ------------------------------------ | ------------------------------------------------------------ |
+| Live pipeline latency and token cost | **Measured** — `npm run bench:live`, 45-minute soak          |
+| Context profile cost                 | **Measured** — all three profiles                            |
+| System prompt token cost             | **Measured**                                                 |
+| Local interpreter benchmark score    | **Measured** — `npm run bench:llm`                           |
+| Free-tier quota viability            | **Derived** from documented limits × measured workload       |
+| Provider data-use policy             | **Derived** from provider documentation, verified 2026-08-24 |
+| Gemini / Groq / OpenRouter quality   | **NOT MEASURED** — no API key available                      |
+| Gemini / Groq / OpenRouter latency   | **NOT MEASURED** — no API key available                      |
 
 Additionally, the build environment's egress policy reaches
 `generativelanguage.googleapis.com` and `api.anthropic.com` but blocks
@@ -38,6 +38,25 @@ GEMINI_API_KEY=... npm run bench:live -- --minutes 45
 Reports land in `benchmarks/results/latest.{json,md}`, including a
 side-by-side sheet for a human interpreter.
 
+### Run where the deployment key already lives
+
+Do not copy a production key to a laptop just to benchmark it. In Railway,
+open the deployed service's **Console** and run:
+
+```bash
+npm run bench:gemini
+```
+
+This uses the service's existing `GEMINI_API_KEY`, prints the full Markdown
+report into the console log, and does not rely on Railway's ephemeral
+filesystem. It also honors `LLM_PAID_TIER=gemini`, reports the paid privacy and
+quota posture, and shows both `cachedInputTokens` and the cache rate. A 0% rate
+means Gemini reported usage but no cached prompt tokens; “not reported” means
+the API did not return enough telemetry to decide.
+
+The command sends the 20 synthetic benchmark cases to the configured model.
+It does not read application data or print credentials.
+
 ---
 
 ## The measured live workload
@@ -45,14 +64,14 @@ side-by-side sheet for a human interpreter.
 `npm run bench:live` replays the demo sermon through the real engine at a
 realistic Korean speaking rate (~6 syllables/second):
 
-| | Measured |
-| --- | --- |
-| Interpretation calls | **11.17 per minute** |
-| Tokens per call — full profile | **2,718** |
-| Tokens per call — compact | **2,432** |
-| Tokens per call — ultra-compact | **2,177** |
-| Implied token rate | **~30,360 TPM** |
-| 45-minute sermon | ~503 calls, ~1.37M tokens |
+|                                 | Measured                  |
+| ------------------------------- | ------------------------- |
+| Interpretation calls            | **11.17 per minute**      |
+| Tokens per call — full profile  | **2,718**                 |
+| Tokens per call — compact       | **2,432**                 |
+| Tokens per call — ultra-compact | **2,177**                 |
+| Implied token rate              | **~30,360 TPM**           |
+| 45-minute sermon                | ~503 calls, ~1.37M tokens |
 
 Phase 1's documentation estimated 7.5 calls/min at 1,900 tokens. Both were
 optimistic; the registry now carries the measured figures.
@@ -86,18 +105,18 @@ actually matter are, in order:
 Documented limits against the measured workload. This is arithmetic on
 published numbers, not a benchmark.
 
-| Provider | RPM | TPM | RPD | Viable for a 45-min sermon? |
-| --- | --- | --- | --- | --- |
-| **Gemini 3.5 Flash-Lite** | 15 | 250,000 | 1,000 | **Yes** — ~90 min/day, about two sermons |
-| **Groq** (`openai/gpt-oss-120b`) | 30 | **6,000** | 14,400 | **No** — needs ~30,360 TPM, **5.1× over** |
-| **OpenRouter** `:free`, unfunded | 20 | — | **50** | **No** — lasts ~4 minutes |
-| OpenRouter `:free`, $10+ credited | 20 | — | 1,000 | Marginal — ~90 min/day, model may rotate |
+| Provider                          | RPM | TPM       | RPD    | Viable for a 45-min sermon?               |
+| --------------------------------- | --- | --------- | ------ | ----------------------------------------- |
+| **Gemini 3.5 Flash-Lite**         | 15  | 250,000   | 1,000  | **Yes** — ~90 min/day, about two sermons  |
+| **Groq** (`openai/gpt-oss-120b`)  | 30  | **6,000** | 14,400 | **No** — needs ~30,360 TPM, **5.1× over** |
+| **OpenRouter** `:free`, unfunded  | 20  | —         | **50** | **No** — lasts ~4 minutes                 |
+| OpenRouter `:free`, $10+ credited | 20  | —         | 1,000  | Marginal — ~90 min/day, model may rotate  |
 
 Two conclusions follow directly:
 
 **Groq's free tier cannot run this workload at any context profile.** Even
 ultra-compact needs ~24,300 TPM against a 6,000 limit — 4.1× over. Even a
-*zero-context* call would need ~21,000 TPM for the system prompt alone. This is
+_zero-context_ call would need ~21,000 TPM for the system prompt alone. This is
 not a tuning problem; the system prompt would have to drop below ~500 tokens,
 which would gut the interpretation rules. Groq's **paid** Developer tier
 (250k+ TPM) is entirely viable, and Groq remains valuable as a fallback, as a
@@ -114,13 +133,13 @@ fallback and a manual model-selection gateway, exactly as the brief anticipated.
 Verified against provider documentation on **2026-08-24**. Re-verify before
 trusting these: policies change.
 
-| Provider | Free tier | Paid tier |
-| --- | --- | --- |
-| **Groq** | **Does not train** on inputs or outputs. Short abuse/reliability logs, zero-data-retention available self-serve | Same |
-| **Gemini** | **May be used to improve Google products, including human review** | Not used for training |
-| **OpenRouter** | Does not store prompts by default, but forwards to a downstream provider whose own policy applies | Same |
-| OpenAI | Not used for training by default | Same |
-| Anthropic | Not used for training by default | Same |
+| Provider       | Free tier                                                                                                       | Paid tier             |
+| -------------- | --------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **Groq**       | **Does not train** on inputs or outputs. Short abuse/reliability logs, zero-data-retention available self-serve | Same                  |
+| **Gemini**     | **May be used to improve Google products, including human review**                                              | Not used for training |
+| **OpenRouter** | Does not store prompts by default, but forwards to a downstream provider whose own policy applies               | Same                  |
+| OpenAI         | Not used for training by default                                                                                | Same                  |
+| Anthropic      | Not used for training by default                                                                                | Same                  |
 
 ### The tension this creates
 
@@ -197,7 +216,7 @@ These disqualify a candidate regardless of score:
 ### A scoring bug worth recording
 
 The first run scored the local interpreter at **98%**, which is absurd — it
-does not translate. The cause: fidelity rewarded the *absence* of forbidden
+does not translate. The cause: fidelity rewarded the _absence_ of forbidden
 renderings, and a non-answer trivially avoids every one of them. Declining to
 translate was being scored as perfect accuracy.
 

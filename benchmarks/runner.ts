@@ -7,17 +7,32 @@
  */
 import { parseEnv } from "@/lib/env";
 import { parseInterpreterOutput } from "@/lib/schema";
-import { buildLiveUserPrompt, systemPromptFor } from "@/interpreter/prompts/live";
+import {
+  buildLiveUserPrompt,
+  systemPromptFor,
+} from "@/interpreter/prompts/live";
 import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
 import { GeminiLlmProvider } from "@/providers/llm/gemini";
 import { AnthropicLlmProvider } from "@/providers/llm/anthropic";
 import { LocalLlmProvider } from "@/providers/llm/mock";
-import { OPENAI_COMPATIBLE_VENDORS, createOpenAiCompatible } from "@/providers/llm/vendors";
+import {
+  OPENAI_COMPATIBLE_VENDORS,
+  createOpenAiCompatible,
+} from "@/providers/llm/vendors";
 import { toLlmError } from "@/providers/llm/errors";
-import type { LlmProvider, LlmProviderId } from "@/providers/llm/types";
+import type {
+  LlmProvider,
+  LlmProviderId,
+  LlmUsage,
+} from "@/providers/llm/types";
 import type { InterpretRequest } from "@/lib/schema";
 import { BENCH_CASES, type BenchCase } from "./dataset";
-import { scoreCase, scoreProvider, type CaseResult, type ProviderScore } from "./score";
+import {
+  scoreCase,
+  scoreProvider,
+  type CaseResult,
+  type ProviderScore,
+} from "./score";
 
 export interface RunnerOptions {
   /** Restrict to these providers. */
@@ -44,33 +59,64 @@ export interface BenchmarkRun {
 }
 
 /** Build the provider instances we actually have keys for. */
-export function availableProviders(
-  env = parseEnv(),
-): { available: Array<{ id: LlmProviderId; provider: LlmProvider; paid: boolean }>; skipped: Array<{ provider: LlmProviderId; reason: string }> } {
-  const available: Array<{ id: LlmProviderId; provider: LlmProvider; paid: boolean }> = [];
+export function availableProviders(env = parseEnv()): {
+  available: Array<{ id: LlmProviderId; provider: LlmProvider; paid: boolean }>;
+  skipped: Array<{ provider: LlmProviderId; reason: string }>;
+} {
+  const available: Array<{
+    id: LlmProviderId;
+    provider: LlmProvider;
+    paid: boolean;
+  }> = [];
   const skipped: Array<{ provider: LlmProviderId; reason: string }> = [];
 
   // The local interpreter always participates: it is the floor every cloud
   // provider has to beat to be worth its latency and its privacy cost.
-  available.push({ id: "local", provider: new LocalLlmProvider(), paid: false });
+  available.push({
+    id: "local",
+    provider: new LocalLlmProvider(),
+    paid: false,
+  });
 
-  const paidTier: Record<string, boolean> = { openai: true, anthropic: true };
-
-  for (const id of ["gemini", "groq", "openrouter", "openai", "anthropic"] as const) {
+  for (const id of [
+    "gemini",
+    "groq",
+    "openrouter",
+    "openai",
+    "anthropic",
+  ] as const) {
     const config = env.llm.providers[id];
     if (!config.apiKey) {
-      skipped.push({ provider: id, reason: `no ${id.toUpperCase()}_API_KEY configured` });
+      skipped.push({
+        provider: id,
+        reason: `no ${id.toUpperCase()}_API_KEY configured`,
+      });
       continue;
     }
     let provider: LlmProvider;
     if (id === "gemini") {
-      provider = new GeminiLlmProvider({ apiKey: config.apiKey, model: config.model });
+      provider = new GeminiLlmProvider({
+        apiKey: config.apiKey,
+        model: config.model,
+      });
     } else if (id === "anthropic") {
-      provider = new AnthropicLlmProvider({ apiKey: config.apiKey, model: config.model });
+      provider = new AnthropicLlmProvider({
+        apiKey: config.apiKey,
+        model: config.model,
+      });
     } else {
-      provider = createOpenAiCompatible(OPENAI_COMPATIBLE_VENDORS[id], config.apiKey, config.model);
+      provider = createOpenAiCompatible(
+        OPENAI_COMPATIBLE_VENDORS[id],
+        config.apiKey,
+        config.model,
+      );
     }
-    available.push({ id, provider, paid: paidTier[id] ?? false });
+    // OpenAI and Anthropic have no free API tier. The other providers must be
+    // explicitly declared paid; otherwise the benchmark must not award paid
+    // privacy or sustainability points to an unknown/free key.
+    const paid =
+      id === "openai" || id === "anthropic" || env.llm.paidTier.has(id);
+    available.push({ id, provider, paid });
   }
 
   return { available, skipped };
@@ -88,7 +134,13 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
       glossary: [],
       entities:
         benchCase.category === "wordplay"
-          ? [{ korean: "류정길", english: "Ryu Jeong-gil", kind: "person" as const }]
+          ? [
+              {
+                korean: "류정길",
+                english: "Ryu Jeong-gil",
+                kind: "person" as const,
+              },
+            ]
           : [],
       scripture: [],
       corrections: [],
@@ -108,6 +160,7 @@ async function runCase(
   const user = buildLiveUserPrompt(request);
 
   const latencies: number[] = [];
+  const usages: LlmUsage[] = [];
   let lastText: string | null = null;
   let lastError: string | undefined;
 
@@ -126,6 +179,7 @@ async function runCase(
         signal: controller.signal,
       });
       latencies.push(response.latencyMs || Date.now() - started);
+      if (response.usage) usages.push(response.usage);
       lastText = response.text;
       lastError = undefined;
     } catch (error) {
@@ -137,12 +191,28 @@ async function runCase(
     }
   }
 
-  const median = latencies.sort((a, b) => a - b)[Math.floor(latencies.length / 2)] ?? 0;
+  const median =
+    latencies.sort((a, b) => a - b)[Math.floor(latencies.length / 2)] ?? 0;
   const output = lastText ? parseInterpreterOutput(lastText) : null;
-  return scoreCase(benchCase, output, median, lastError);
+  const result = scoreCase(benchCase, output, median, lastError);
+  const usage = usages.reduce<LlmUsage>(
+    (total, current) => ({
+      inputTokens: (total.inputTokens ?? 0) + (current.inputTokens ?? 0),
+      outputTokens: (total.outputTokens ?? 0) + (current.outputTokens ?? 0),
+      totalTokens: (total.totalTokens ?? 0) + (current.totalTokens ?? 0),
+      cachedInputTokens:
+        (total.cachedInputTokens ?? 0) + (current.cachedInputTokens ?? 0),
+    }),
+    {},
+  );
+  return usages.length > 0
+    ? { ...result, usage, usageReports: usages.length }
+    : result;
 }
 
-export async function runBenchmark(options: RunnerOptions = {}): Promise<BenchmarkRun> {
+export async function runBenchmark(
+  options: RunnerOptions = {},
+): Promise<BenchmarkRun> {
   const startedAt = new Date().toISOString();
   const deadlineMs = options.deadlineMs ?? 12_000;
   const repeats = options.repeats ?? 1;
@@ -159,12 +229,23 @@ export async function runBenchmark(options: RunnerOptions = {}): Promise<Benchma
     log(`\n▸ ${entry.id} (${entry.provider.model})`);
     const cases: CaseResult[] = [];
     for (const benchCase of BENCH_CASES) {
-      const result = await runCase(entry.provider, benchCase, deadlineMs, repeats);
+      const result = await runCase(
+        entry.provider,
+        benchCase,
+        deadlineMs,
+        repeats,
+      );
       cases.push(result);
       const mark = result.ok ? "·" : result.hardFailures.length ? "✗" : "!";
-      log(`  ${mark} ${benchCase.id} ${benchCase.category} ${result.latencyMs}ms`);
+      log(
+        `  ${mark} ${benchCase.id} ${benchCase.category} ${result.latencyMs}ms`,
+      );
     }
-    scores.push(scoreProvider(entry.id, entry.provider.model, cases, { paidTier: entry.paid }));
+    scores.push(
+      scoreProvider(entry.id, entry.provider.model, cases, {
+        paidTier: entry.paid,
+      }),
+    );
   }
 
   scores.sort((a, b) => {

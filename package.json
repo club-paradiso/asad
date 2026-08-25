@@ -17,6 +17,7 @@
     "shot": "node scripts/screenshot.mjs",
     "e2e": "node scripts/e2e-check.mjs",
     "bench:llm": "tsx scripts/bench-llm.mjs",
+    "bench:gemini": "tsx scripts/bench-llm.mjs --only gemini --stdout markdown --no-write",
     "smoke:llm": "tsx scripts/smoke-llm.mjs",
     "bench:live": "tsx scripts/bench-live.mjs",
     "soak": "tsx scripts/soak.mjs"

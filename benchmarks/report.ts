@@ -12,12 +12,17 @@ import { WEIGHTS } from "./score";
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const ms = (n: number) => (n > 0 ? `${n}ms` : "—");
+const tokens = (n: number) => n.toLocaleString("en-US");
+const cache = (rate: number | null) =>
+  rate === null ? "not reported" : pct(rate);
 
 export function renderConsole(run: BenchmarkRun): string {
   const lines: string[] = [];
   lines.push("");
   lines.push("═".repeat(72));
-  lines.push(`  tong-yuck LLM benchmark · ${run.cases} cases · ${run.repeats}× each`);
+  lines.push(
+    `  tong-yuck LLM benchmark · ${run.cases} cases · ${run.repeats}× each`,
+  );
   lines.push("═".repeat(72));
 
   if (run.scores.length === 0) {
@@ -29,13 +34,22 @@ export function renderConsole(run: BenchmarkRun): string {
     const flag = score.disqualified ? " ✗ DISQUALIFIED" : "";
     lines.push("");
     lines.push(`  ${score.provider} (${score.model})${flag}`);
+    lines.push(`    tier             ${score.tier}`);
     lines.push(`    total            ${pct(score.total)}`);
     lines.push(`    fidelity         ${pct(score.components.fidelity)}`);
     lines.push(`    speakability     ${pct(score.components.speakability)}`);
-    lines.push(`    latency          ${pct(score.components.latency)}  p50 ${ms(score.latency.p50)} · p95 ${ms(score.latency.p95)}`);
+    lines.push(
+      `    latency          ${pct(score.components.latency)}  p50 ${ms(score.latency.p50)} · p95 ${ms(score.latency.p95)}`,
+    );
     lines.push(`    schema           ${pct(score.components.schema)}`);
     lines.push(`    sustainability   ${pct(score.components.sustainability)}`);
     lines.push(`    privacy          ${pct(score.components.privacy)}`);
+    lines.push(
+      `    usage            ${tokens(score.usage.inputTokens)} input · ${tokens(score.usage.outputTokens)} output`,
+    );
+    lines.push(
+      `    prompt cache     ${tokens(score.usage.cachedInputTokens)} tokens · ${cache(score.usage.cacheHitRate)}`,
+    );
     if (score.hardFailures.length) {
       lines.push(`    hard failures    ${score.hardFailures.join(", ")}`);
     }
@@ -65,7 +79,9 @@ export function renderMarkdown(run: BenchmarkRun): string {
   out.push("");
 
   if (run.scores.length === 0) {
-    out.push("**No providers ran.** Every candidate was skipped for lack of credentials.");
+    out.push(
+      "**No providers ran.** Every candidate was skipped for lack of credentials.",
+    );
     out.push("");
   }
 
@@ -77,24 +93,49 @@ export function renderMarkdown(run: BenchmarkRun): string {
   );
   out.push("");
   out.push(
-    "| Provider | Model | Total | Fidelity | Speakable | Latency p50 / p95 | Schema | Quota | Privacy | Verdict |",
+    "| Provider | Model | Tier | Total | Fidelity | Speakable | Latency p50 / p95 | Schema | Quota | Privacy | Cache | Verdict |",
   );
-  out.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  out.push(
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  );
   for (const s of run.scores) {
     out.push(
-      `| ${s.provider} | \`${s.model}\` | **${pct(s.total)}** | ${pct(s.components.fidelity)} | ${pct(
+      `| ${s.provider} | \`${s.model}\` | ${s.tier} | **${pct(s.total)}** | ${pct(s.components.fidelity)} | ${pct(
         s.components.speakability,
       )} | ${ms(s.latency.p50)} / ${ms(s.latency.p95)} | ${pct(s.components.schema)} | ${pct(
         s.components.sustainability,
-      )} | ${pct(s.components.privacy)} | ${s.disqualified ? "**disqualified**" : "eligible"} |`,
+      )} | ${pct(s.components.privacy)} | ${cache(s.usage.cacheHitRate)} | ${s.disqualified ? "**disqualified**" : "eligible"} |`,
     );
   }
+  out.push("");
+
+  out.push("## Provider-reported usage");
+  out.push("");
+  out.push(
+    "| Provider | Requests reporting usage | Input | Cached input | Cache rate | Output | Total |",
+  );
+  out.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+  for (const s of run.scores) {
+    out.push(
+      `| ${s.provider} | ${s.usage.requestsWithUsage} | ${tokens(s.usage.inputTokens)} | ${tokens(
+        s.usage.cachedInputTokens,
+      )} | ${cache(s.usage.cacheHitRate)} | ${tokens(s.usage.outputTokens)} | ${tokens(
+        s.usage.totalTokens,
+      )} |`,
+    );
+  }
+  out.push("");
+  out.push(
+    "A reported 0% means the provider returned usage but no cached input. ‘not reported’ means it did not return enough usage data to measure caching.",
+  );
   out.push("");
 
   if (run.skipped.length) {
     out.push("### Not tested");
     out.push("");
-    out.push("These providers were skipped because no credential was configured:");
+    out.push(
+      "These providers were skipped because no credential was configured:",
+    );
     out.push("");
     for (const s of run.skipped) out.push(`- **${s.provider}** — ${s.reason}`);
     out.push("");
@@ -109,7 +150,9 @@ export function renderMarkdown(run: BenchmarkRun): string {
   if (withFailures.length) {
     out.push("## Hard failures");
     out.push("");
-    out.push("These make a candidate unsuitable regardless of its numeric score.");
+    out.push(
+      "These make a candidate unsuitable regardless of its numeric score.",
+    );
     out.push("");
     for (const s of withFailures) {
       out.push(`### ${s.provider}`);
@@ -118,9 +161,13 @@ export function renderMarkdown(run: BenchmarkRun): string {
       const failing = s.cases.filter((c) => c.hardFailures.length > 0);
       out.push("");
       for (const c of failing) {
-        out.push(`- **${c.caseId}** (${c.category}): ${c.hardFailures.join(", ")}`);
+        out.push(
+          `- **${c.caseId}** (${c.category}): ${c.hardFailures.join(", ")}`,
+        );
         if (c.fidelity.forbiddenHit.length) {
-          out.push(`  - produced a forbidden rendering: ${c.fidelity.forbiddenHit.map((f) => `"${f}"`).join(", ")}`);
+          out.push(
+            `  - produced a forbidden rendering: ${c.fidelity.forbiddenHit.map((f) => `"${f}"`).join(", ")}`,
+          );
         }
       }
       out.push("");
@@ -158,7 +205,9 @@ export function renderMarkdown(run: BenchmarkRun): string {
         `${result.latencyMs}ms`,
         `${result.speakability.stats.chunks} chunks`,
         result.schemaValid ? "schema ok" : "**schema FAILED**",
-        ...(result.hardFailures.length ? [`**${result.hardFailures.join(", ")}**`] : []),
+        ...(result.hardFailures.length
+          ? [`**${result.hardFailures.join(", ")}**`]
+          : []),
       ];
       out.push(`**${score.provider}** — ${marks.join(" · ")}`);
       out.push("");
@@ -166,9 +215,12 @@ export function renderMarkdown(run: BenchmarkRun): string {
         out.push(`> _(no output${result.error ? `: ${result.error}` : ""})_`);
       } else {
         for (const chunk of result.safeChunks) out.push(`> ${chunk}`);
-        for (const chunk of result.anticipatedChunks) out.push(`> ◦ _${chunk}_ (anticipated)`);
+        for (const chunk of result.anticipatedChunks)
+          out.push(`> ◦ _${chunk}_ (anticipated)`);
       }
-      const warnings = result.speakability.issues.filter((i) => i.severity === "error");
+      const warnings = result.speakability.issues.filter(
+        (i) => i.severity === "error",
+      );
       if (warnings.length) {
         out.push(">");
         for (const w of warnings) out.push(`> ⚠ ${w.code}: ${w.detail}`);
