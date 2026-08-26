@@ -1,6 +1,6 @@
 # tong-yuck LLM benchmark
 
-Run 2026-08-24T08:26:11.199Z → 2026-08-24T08:26:11.223Z
+Run 2026-08-26T05:49:56.355Z → 2026-08-26T05:49:56.402Z
 
 20 interpretation cases, 1× each, 12000ms deadline, Node v22.22.2.
 
@@ -8,9 +8,17 @@ Run 2026-08-24T08:26:11.199Z → 2026-08-24T08:26:11.223Z
 
 Weights: fidelity 30% · speakability 25% · latency 20% · schema 10% · sustainability 10% · privacy 5%.
 
-| Provider | Model | Total | Fidelity | Speakable | Latency p50 / p95 | Schema | Quota | Privacy | Verdict |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| local | `deterministic` | **85%** | 50% | 100% | — / 2ms | 100% | 100% | 100% | **disqualified** |
+| Provider | Model | Tier | Total | Fidelity | Speakable | Latency p50 / p95 | Schema | Quota | Privacy | Cache | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| local | `deterministic` | free-or-unknown | **85%** | 50% | 100% | 1ms / 2ms | 100% | 100% | 100% | not reported | **disqualified** |
+
+## Provider-reported usage
+
+| Provider | Requests reporting usage | Input | Cached input | Cache rate | Output | Total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| local | 0 | 0 | 0 | not reported | 0 | 0 |
+
+A reported 0% means the provider returned usage but no cached input. ‘not reported’ means it did not return enough usage data to measure caching.
 
 ### Not tested
 
@@ -59,7 +67,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — Good morning, everyone. / Thank you for being here today.
 
-**local** — 1ms · 2 chunks · schema ok
+**local** — 0ms · 2 chunks · schema ok
 
 > Good morning, everyone.
 > Thank you for being here today.
@@ -76,7 +84,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — There's one thing I really want to share with you today... / and it's about who we are.
 
-**local** — 3ms · 0 chunks · schema ok · **no_output**
+**local** — 4ms · 0 chunks · schema ok · **no_output**
 
 > [no interpretation model configured — Korean transcript only]
 
@@ -92,7 +100,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — Isn't that right? / Isn't it though? / Are we really living like that?
 
-**local** — 0ms · 0 chunks · schema ok · **no_output**
+**local** — 2ms · 0 chunks · schema ok · **no_output**
 
 > [no interpretation model configured — Korean transcript only]
 
@@ -158,7 +166,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — Peter says we are a chosen people.
 
-**local** — 0ms · 0 chunks · schema ok · **no_output**
+**local** — 1ms · 0 chunks · schema ok · **no_output**
 
 > [no interpretation model configured — Korean transcript only]
 
@@ -190,7 +198,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — You know the saying — little by little, it adds up.
 
-**local** — 0ms · 3 chunks · schema ok
+**local** — 1ms · 3 chunks · schema ok
 
 > You know the saying —
 > little by little, it adds up.
@@ -224,7 +232,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — So we need to find the right way. / And speaking of "the way," it's even in my name.
 
-**local** — 0ms · 2 chunks · schema ok
+**local** — 1ms · 2 chunks · schema ok
 
 > So we need to find the right way.
 > And speaking of "the way," it's even in my name.
@@ -241,7 +249,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — When I was twenty I went through a really hard time. / That's when I met God.
 
-**local** — 0ms · 0 chunks · schema ok · **no_output**
+**local** — 1ms · 0 chunks · schema ok · **no_output**
 
 > [no interpretation model configured — Korean transcript only]
 
@@ -274,7 +282,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — Last night I actually fell asleep preparing this sermon. / Anyone want to say amen to that?
 
-**local** — 1ms · 3 chunks · schema ok
+**local** — 0ms · 3 chunks · schema ok
 
 > I'll be honest —
 > last night I fell asleep preparing this sermon.
@@ -292,7 +300,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — You are a chosen people. / You are a royal priesthood. / You are a holy nation.
 
-**local** — 0ms · 3 chunks · schema ok
+**local** — 1ms · 3 chunks · schema ok
 
 > You are a chosen people.
 > You are a royal priesthood.
@@ -326,7 +334,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — When he said that, the other man didn't answer at all.
 
-**local** — 0ms · 0 chunks · schema ok · **no_output**
+**local** — 1ms · 0 chunks · schema ok · **no_output**
 
 > [no interpretation model configured — Korean transcript only]
 
@@ -342,7 +350,7 @@ For a human interpreter. The scores above are proxies; whether English is *sayab
 
 **Reference rendering** — I hope you're richly blessed today.
 
-**local** — 0ms · 1 chunks · schema ok
+**local** — 1ms · 1 chunks · schema ok
 
 > I hope you're richly blessed today.
 

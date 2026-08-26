@@ -1,6 +1,6 @@
 {
-  "startedAt": "2026-08-24T08:26:11.199Z",
-  "finishedAt": "2026-08-24T08:26:11.223Z",
+  "startedAt": "2026-08-26T05:49:56.355Z",
+  "finishedAt": "2026-08-26T05:49:56.402Z",
   "deadlineMs": 12000,
   "repeats": 1,
   "cases": 20,
@@ -8,12 +8,13 @@
     {
       "provider": "local",
       "model": "deterministic",
+      "tier": "free-or-unknown",
       "cases": [
         {
           "caseId": "b01",
           "category": "declarative",
           "ok": true,
-          "latencyMs": 1,
+          "latencyMs": 0,
           "safeChunks": [
             "Good morning, everyone.",
             "Thank you for being here today."
@@ -42,7 +43,7 @@
           "caseId": "b02",
           "category": "delayed-predicate",
           "ok": false,
-          "latencyMs": 3,
+          "latencyMs": 4,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -74,7 +75,7 @@
           "caseId": "b03",
           "category": "fast-rhetorical",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 2,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -193,7 +194,7 @@
           "caseId": "b07",
           "category": "scripture-paraphrase",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -258,7 +259,7 @@
           "caseId": "b09",
           "category": "idiom",
           "ok": true,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "You know the saying —",
             "little by little, it adds up.",
@@ -320,7 +321,7 @@
           "caseId": "b11",
           "category": "wordplay",
           "ok": true,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "So we need to find the right way.",
             "And speaking of \"the way,\" it's even in my name."
@@ -349,7 +350,7 @@
           "caseId": "b12",
           "category": "testimony",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -408,7 +409,7 @@
           "caseId": "b14",
           "category": "humour",
           "ok": true,
-          "latencyMs": 1,
+          "latencyMs": 0,
           "safeChunks": [
             "I'll be honest —",
             "last night I fell asleep preparing this sermon.",
@@ -438,7 +439,7 @@
           "caseId": "b15",
           "category": "repetition",
           "ok": true,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "You are a chosen people.",
             "You are a royal priesthood.",
@@ -496,7 +497,7 @@
           "caseId": "b17",
           "category": "ambiguous-pronoun",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -526,7 +527,7 @@
           "caseId": "b18",
           "category": "context-dependent-term",
           "ok": true,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "I hope you're richly blessed today."
           ],
@@ -615,10 +616,10 @@
       ],
       "latency": {
         "count": 20,
-        "p50": 0,
-        "p90": 1,
+        "p50": 1,
+        "p90": 2,
         "p95": 2,
-        "max": 3,
+        "max": 4,
         "mean": 1
       },
       "components": {
@@ -630,6 +631,14 @@
         "privacy": 1
       },
       "total": 0.85,
+      "usage": {
+        "requestsWithUsage": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "cacheHitRate": null
+      },
       "hardFailures": [
         "no_output"
       ],

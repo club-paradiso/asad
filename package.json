@@ -20,7 +20,9 @@
     "bench:gemini": "tsx scripts/bench-llm.mjs --only gemini --stdout markdown --no-write",
     "smoke:llm": "tsx scripts/smoke-llm.mjs",
     "bench:live": "tsx scripts/bench-live.mjs",
-    "soak": "tsx scripts/soak.mjs"
+    "soak": "tsx scripts/soak.mjs",
+    "health:openrouter": "tsx scripts/health-openrouter.mjs",
+    "measure:prompt": "tsx scripts/measure-prompt.mjs"
   },
   "dependencies": {
     "next": "^16.3.2",
