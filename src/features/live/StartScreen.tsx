@@ -23,6 +23,7 @@ import { Button, Label, Segmented } from "@/components/ui/primitives";
 import type { AppConfig } from "@/app/api/config/route";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
+import { preferredSttSource } from "./sourcePreference";
 import { SessionSummary } from "@/features/sessions/SessionSummary";
 import { cn } from "@/lib/cn";
 
@@ -54,17 +55,15 @@ export function StartScreen() {
     };
   }, []);
 
-  // Browser Speech is the zero-configuration live path. Prefer an explicitly
-  // configured cloud provider when it is genuinely available; otherwise use
-  // browser speech whenever the current browser supports it. This means a
-  // deployment accidentally left on STT_PROVIDER=demo still opens ready for
-  // live interpretation instead of forcing the operator into a fake session.
-  // A manual choice always wins.
-  const configuredSource = useMemo<SttProviderId>(() => {
-    if (config?.stt.cloudAvailable) return config.stt.configured as SttProviderId;
-    if (browserSttAvailable) return "webspeech";
-    return "demo";
-  }, [browserSttAvailable, config]);
+  const configuredSource = useMemo<SttProviderId>(
+    () =>
+      preferredSttSource({
+        browserSttAvailable,
+        cloudAvailable: config?.stt.cloudAvailable ?? false,
+        configured: config?.stt.configured as SttProviderId | undefined,
+      }),
+    [browserSttAvailable, config],
+  );
 
   const source = sourceOverride ?? configuredSource;
 
@@ -125,7 +124,6 @@ export function StartScreen() {
         </p>
       </header>
 
-      {/* --- 1. Mode ------------------------------------------------------- */}
       <section className="flex flex-col gap-3">
         <Label>1 · Mode</Label>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -158,7 +156,6 @@ export function StartScreen() {
         </div>
       </section>
 
-      {/* --- 2. Audio source ---------------------------------------------- */}
       <section className="flex flex-col gap-3">
         <Label>2 · Audio</Label>
         <div className="flex flex-wrap gap-2">
@@ -180,7 +177,11 @@ export function StartScreen() {
               >
                 <p className="flex items-center gap-2 text-sm font-medium">
                   {info.label}
-                  {id !== "demo" && <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--ok)]">Live</span>}
+                  {id !== "demo" && (
+                    <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--ok)]">
+                      Live
+                    </span>
+                  )}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--fg-muted)]">{info.detail}</p>
               </button>
@@ -195,7 +196,6 @@ export function StartScreen() {
         )}
       </section>
 
-      {/* --- Start --------------------------------------------------------- */}
       <section className="flex flex-col gap-3">
         <Button tone="primary" size="lg" onClick={beginSession} className="w-full">
           {source === "demo" ? "Run demo" : "Start live interpreting"}
@@ -229,10 +229,6 @@ export function StartScreen() {
         </p>
       )}
 
-      {/* Connected but not sufficient. Its own warning, because it is a
-          different problem with a different fix, and because a free tier that
-          runs out eight minutes into a service looks exactly like a broken
-          deployment from the booth. */}
       {llmCapacityNote && (
         <p className="rounded-md border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] bg-[color-mix(in_srgb,var(--warn)_8%,transparent)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--warn)]">
           <span className="font-semibold">{config?.llm.configured}</span> is connected, but its free
@@ -242,18 +238,14 @@ export function StartScreen() {
         </p>
       )}
 
-      {/* A different job on the same footing, not a sub-feature: the console is
-          for an interpreter working a room, the counter is for staff at a desk
-          with a stranger in front of them. */}
       <Link
         href="/counter"
         className="touch-manipulation rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] p-4 transition-[color,background-color,border-color,transform] hover:border-[var(--line-strong)] active:scale-[0.99]"
       >
         <p className="text-base font-semibold">현장 응대 · Counter Mode</p>
         <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
-          Show a QR code; the visitor joins on their own phone in their own
-          language. Chat and voice, both languages visible to both sides, 24
-          languages. No install.
+          Show a QR code; the visitor joins on their own phone in their own language. Chat and voice,
+          both languages visible to both sides, 24 languages. No install.
         </p>
       </Link>
 
