@@ -55,7 +55,10 @@ await page.screenshot({ path: join(outDir, "prep.png") });
 
 // --- Live session ---------------------------------------------------------
 await page.goto(base, { waitUntil: "networkidle" });
-await page.getByText("Start interpreting").click();
+// The launcher names the action honestly: Demo when there is no recogniser,
+// live interpretation when one is configured. CI intentionally runs with no
+// microphone/provider, so it normally takes the Demo branch.
+await page.getByRole("button", { name: /Run demo|Start live interpreting/ }).click();
 await page.waitForTimeout(3000);
 
 await page.getByLabel("Session settings").click();
@@ -72,7 +75,7 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(14000);
 
 // --- Review ---------------------------------------------------------------
-await page.getByRole("button", { name: "End" }).click();
+await page.getByRole("button", { name: /End session|End/ }).click();
 await page.waitForTimeout(1500);
 
 const review = await page.locator("body").innerText();
