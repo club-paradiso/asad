@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSpeechProvider } from "./webspeech";
 
+interface FakeSpeechResult {
+  isFinal: boolean;
+  0: { transcript: string };
+  length: number;
+}
+
+interface FakeSpeechEvent {
+  resultIndex: number;
+  results: { length: number; [index: number]: FakeSpeechResult };
+}
+
 class FakeRecognition {
   static last: FakeRecognition | null = null;
 
@@ -11,7 +22,7 @@ class FakeRecognition {
   start = vi.fn();
   stop = vi.fn();
   abort = vi.fn();
-  onresult: ((event: any) => void) | null = null;
+  onresult: ((event: FakeSpeechEvent) => void) | null = null;
   onerror: ((event: { error?: string; message?: string }) => void) | null = null;
   onend: (() => void) | null = null;
   onstart: (() => void) | null = null;
@@ -21,7 +32,7 @@ class FakeRecognition {
   }
 }
 
-const result = (text: string, isFinal: boolean) => ({
+const result = (text: string, isFinal: boolean): FakeSpeechResult => ({
   isFinal,
   0: { transcript: text },
   length: 1,
