@@ -19,6 +19,8 @@ export const MAX_MESSAGES = 500;
 const UPDATE_RETRIES = 8;
 const REDIS_KEY_PREFIX = "tong-yuck:counter:session:v1:";
 
+type Awaitable<T> = T | Promise<T>;
+
 export interface CounterStoreStats {
   active: number;
   waiting: number;
@@ -28,15 +30,15 @@ export interface CounterStoreStats {
 export interface CounterStore {
   readonly kind: "memory" | "redis";
   readonly shared: boolean;
-  create(input: { hostLang: string; deskLabel?: string }): Promise<CounterSession>;
-  get(code: string): Promise<CounterSession | undefined>;
+  create(input: { hostLang: string; deskLabel?: string }): Awaitable<CounterSession>;
+  get(code: string): Awaitable<CounterSession | undefined>;
   update(
     code: string,
     mutate: (session: CounterSession) => void,
-  ): Promise<CounterSession | undefined>;
-  end(code: string): Promise<boolean>;
+  ): Awaitable<CounterSession | undefined>;
+  end(code: string): Awaitable<boolean>;
   /** Diagnostics only — counts, never content. */
-  stats(): Promise<CounterStoreStats>;
+  stats(): Awaitable<CounterStoreStats>;
 }
 
 class MemoryCounterStore implements CounterStore {
@@ -54,7 +56,7 @@ class MemoryCounterStore implements CounterStore {
     }
   }
 
-  async create(input: { hostLang: string; deskLabel?: string }): Promise<CounterSession> {
+  create(input: { hostLang: string; deskLabel?: string }): CounterSession {
     this.sweep();
     let code = generateCode();
     for (let attempt = 0; attempt < UPDATE_RETRIES && this.sessions.has(code); attempt += 1) {
@@ -77,16 +79,16 @@ class MemoryCounterStore implements CounterStore {
     return cloneSession(session);
   }
 
-  async get(code: string): Promise<CounterSession | undefined> {
+  get(code: string): CounterSession | undefined {
     this.sweep();
     const session = this.sessions.get(code);
     return session ? cloneSession(session) : undefined;
   }
 
-  async update(
+  update(
     code: string,
     mutate: (session: CounterSession) => void,
-  ): Promise<CounterSession | undefined> {
+  ): CounterSession | undefined {
     this.sweep();
     const current = this.sessions.get(code);
     if (!current) return undefined;
@@ -99,17 +101,17 @@ class MemoryCounterStore implements CounterStore {
     return cloneSession(session);
   }
 
-  async end(code: string): Promise<boolean> {
+  end(code: string): boolean {
     return this.sessions.delete(code);
   }
 
-  async stats(): Promise<CounterStoreStats> {
+  stats(): CounterStoreStats {
     this.sweep();
     return countSessions(this.sessions.values());
   }
 }
 
-interface RedisConfig {
+export interface RedisConfig {
   url: string;
   token: string;
   source: "upstash" | "vercel-kv";
@@ -388,7 +390,6 @@ export const counterStore = (): CounterStore => {
 export const __setCounterStore = (next: CounterStore | null) => {
   store = next;
 };
-export const createMemoryStore = (now?: () => number): CounterStore =>
-  new MemoryCounterStore(now);
-export const createRedisStore = (config: RedisConfig, now?: () => number): CounterStore =>
+export const createMemoryStore = (now?: () => number) => new MemoryCounterStore(now);
+export const createRedisStore = (config: RedisConfig, now?: () => number) =>
   new RedisCounterStore(config, now);
