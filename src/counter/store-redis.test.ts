@@ -23,6 +23,7 @@ describe("counter Redis configuration", () => {
   it("accepts both native Upstash and Vercel KV-style environment names", () => {
     expect(
       resolveCounterRedisConfig({
+        NODE_ENV: "test",
         UPSTASH_REDIS_REST_URL: " https://upstash.example ",
         UPSTASH_REDIS_REST_TOKEN: " token ",
       }),
@@ -30,6 +31,7 @@ describe("counter Redis configuration", () => {
 
     expect(
       resolveCounterRedisConfig({
+        NODE_ENV: "test",
         KV_REST_API_URL: "https://kv.example",
         KV_REST_API_TOKEN: "kv-token",
       }),
@@ -37,8 +39,12 @@ describe("counter Redis configuration", () => {
   });
 
   it("does not enable Redis from a half-configured credential pair", () => {
-    expect(resolveCounterRedisConfig({ UPSTASH_REDIS_REST_URL: "https://x" })).toBeNull();
-    expect(resolveCounterRedisConfig({ KV_REST_API_TOKEN: "token" })).toBeNull();
+    expect(
+      resolveCounterRedisConfig({ NODE_ENV: "test", UPSTASH_REDIS_REST_URL: "https://x" }),
+    ).toBeNull();
+    expect(
+      resolveCounterRedisConfig({ NODE_ENV: "test", KV_REST_API_TOKEN: "token" }),
+    ).toBeNull();
   });
 });
 
