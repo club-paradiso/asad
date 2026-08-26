@@ -22,6 +22,7 @@ import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { Button, Label, Segmented } from "@/components/ui/primitives";
 import type { AppConfig } from "@/app/api/config/route";
 import { LiveConsole } from "./LiveConsole";
+import { useLiveSession } from "./useLiveSession";
 import { SessionSummary } from "@/features/sessions/SessionSummary";
 import { cn } from "@/lib/cn";
 
@@ -32,10 +33,18 @@ export function StartScreen() {
   const [settings, updateSettings] = useLocalStore(settingsStore);
   const [prep] = useLocalStore(prepStore);
   const [source, setSource] = useState<SttProviderId>("demo");
+  const [sourceTouched, setSourceTouched] = useState(false);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
 
   const browserSttAvailable = useCapability(() => WebSpeechProvider.isSupported());
+
+  const session = useLiveSession({
+    mode: settings.mode,
+    lag: settings.lag,
+    prep,
+    source,
+  });
 
   // Ask the server once what it can actually do, so the launcher never offers
   // a provider that will fail the moment the interpreter presses Start.
@@ -46,13 +55,28 @@ export function StartScreen() {
       .then((value: AppConfig | null) => {
         if (cancelled || !value) return;
         setConfig(value);
-        if (value.stt.cloudAvailable) setSource(value.stt.configured as SttProviderId);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Honour the deployment's configured recogniser, including browser speech.
+  // The old launcher only auto-selected cloud providers, so a deployment with
+  // STT_PROVIDER=webspeech still opened on Demo and looked as if the microphone
+  // did not work. Never override a source the interpreter picked themselves.
+  useEffect(() => {
+    if (!config || sourceTouched || screen !== "start") return;
+    const configured = config.stt.configured as SttProviderId;
+
+    if (configured === "webspeech") {
+      if (browserSttAvailable) setSource("webspeech");
+      return;
+    }
+
+    if (config.stt.cloudAvailable) setSource(configured);
+  }, [browserSttAvailable, config, screen, sourceTouched]);
 
   const sources = useMemo(() => {
     const list: SttProviderId[] = ["demo"];
@@ -70,9 +94,10 @@ export function StartScreen() {
         onSettingsChange={updateSettings}
         prep={prep}
         source={source}
-        onEnd={(session) => {
-          setFinished(session);
-          setScreen(session ? "review" : "start");
+        session={session}
+        onEnd={(stored) => {
+          setFinished(stored);
+          setScreen(stored ? "review" : "start");
         }}
       />
     );
@@ -84,6 +109,15 @@ export function StartScreen() {
 
   const llmDegraded = config ? !config.llm.modelAvailable : false;
   const llmCapacityNote = config && !config.llm.sustainsLiveSermon ? config.llm.capacityNote : null;
+
+  const beginSession = () => {
+    // start() is deliberately invoked inside the button's click handler. The
+    // Web Speech API is permission-sensitive on Safari/iOS and other browsers;
+    // deferring SpeechRecognition.start() to a mounted component effect loses
+    // the transient user activation that came from this tap.
+    setScreen("live");
+    void session.start();
+  };
 
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-8 px-5 py-8 sm:py-14">
@@ -107,7 +141,7 @@ export function StartScreen() {
                 onClick={() => updateSettings({ ...settings, mode })}
                 aria-pressed={selected}
                 className={cn(
-                  "rounded-lg border p-4 text-left transition-colors",
+                  "touch-manipulation rounded-lg border p-4 text-left transition-[color,background-color,border-color,transform] active:scale-[0.99]",
                   selected
                     ? "border-[var(--accent)] bg-[var(--accent-dim)]"
                     : "border-[var(--line)] bg-[var(--bg-raised)] hover:border-[var(--line-strong)]",
@@ -138,16 +172,22 @@ export function StartScreen() {
               <button
                 key={id}
                 type="button"
-                onClick={() => setSource(id)}
+                onClick={() => {
+                  setSourceTouched(true);
+                  setSource(id);
+                }}
                 aria-pressed={selected}
                 className={cn(
-                  "min-h-11 flex-1 basis-56 rounded-md border px-3.5 py-2.5 text-left transition-colors",
+                  "touch-manipulation min-h-12 flex-1 basis-56 rounded-md border px-3.5 py-2.5 text-left transition-[color,background-color,border-color,transform] active:scale-[0.99]",
                   selected
                     ? "border-[var(--accent)] bg-[var(--accent-dim)]"
                     : "border-[var(--line)] bg-[var(--bg-raised)] hover:border-[var(--line-strong)]",
                 )}
               >
-                <p className="text-sm font-medium">{info.label}</p>
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  {info.label}
+                  {id !== "demo" && <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--ok)]">Live</span>}
+                </p>
                 <p className="mt-0.5 text-xs text-[var(--fg-muted)]">{info.detail}</p>
               </button>
             );
@@ -164,8 +204,8 @@ export function StartScreen() {
 
       {/* --- Start --------------------------------------------------------- */}
       <section className="flex flex-col gap-3">
-        <Button tone="primary" size="lg" onClick={() => setScreen("live")} className="w-full">
-          Start interpreting
+        <Button tone="primary" size="lg" onClick={beginSession} className="w-full">
+          {source === "demo" ? "Run demo" : "Start live interpreting"}
         </Button>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--fg-dim)]">
@@ -214,7 +254,7 @@ export function StartScreen() {
           with a stranger in front of them. */}
       <Link
         href="/counter"
-        className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] p-4 transition-colors hover:border-[var(--line-strong)]"
+        className="touch-manipulation rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] p-4 transition-[color,background-color,border-color,transform] hover:border-[var(--line-strong)] active:scale-[0.99]"
       >
         <p className="text-base font-semibold">현장 응대 · Counter Mode</p>
         <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
