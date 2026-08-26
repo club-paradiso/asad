@@ -40,7 +40,8 @@ import { SettingsSheet } from "./SettingsSheet";
 import { Teleprompter } from "./Teleprompter";
 import { DemoRibbon } from "./DemoRibbon";
 import { aiStateFrom } from "./AiStatus";
-import { PrivacyDisclosure, type DisclosureProvider } from "./PrivacyDisclosure";
+import { PrivacyDisclosure } from "./PrivacyDisclosure";
+import { useCloudConsent } from "./useCloudConsent";
 import type { PrepSheet } from "@/types";
 
 const FONT_SCALE_RANGE = { min: 0.7, max: 1.9 } as const;
@@ -73,35 +74,24 @@ export function LiveConsole({
   const { snapshot, phase, error, demoBeat, startedAt, lastProvider, start, stop, correct } =
     session;
 
-  // Providers whose free tier may use submitted content to improve products.
-  // Fetched once so the disclosure names the actual configured provider rather
-  // than a generic warning.
-  const [disclosureProviders, setDisclosureProviders] = useState<DisclosureProvider[]>([]);
-  useEffect(() => {
-    if (source === "demo") return;
-    let cancelled = false;
-    fetch("/api/config")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((config: { llm?: { freeTierDisclosure?: DisclosureProvider[] } } | null) => {
-        if (!cancelled && config?.llm?.freeTierDisclosure) {
-          setDisclosureProviders(config.llm.freeTierDisclosure);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [source]);
+  // The gate between mounting and anything leaving the machine. Its `mayStart`
+  // is the ONLY thing that authorises `start()`.
+  const consent = useCloudConsent(source);
 
   const wakeLock = useWakeLock(phase === "running");
 
-  // One start per mount. Getting to live in as few taps as possible is the
-  // product requirement; the console starts itself.
+  // One start per mount, and not before consent resolves.
+  //
+  // The second half of that sentence is the whole point. This effect used to
+  // call `start()` unconditionally on mount while the disclosure was still
+  // being fetched, so the microphone opened and the first Korean reached a
+  // cloud provider before the interpreter had been told it would. A dialog
+  // that appears after the data has left is not consent.
   useEffect(() => {
-    if (startedRef.current) return;
+    if (startedRef.current || !consent.mayStart) return;
     startedRef.current = true;
     void start();
-  }, [start]);
+  }, [start, consent.mayStart]);
 
   useEffect(() => {
     if (phase !== "running" || !startedAt) return;
@@ -251,11 +241,15 @@ export function LiveConsole({
             containerRef={autoScroll.containerRef}
             activeRef={autoScroll.activeRef}
             emptyMessage={
-              phase === "starting"
-                ? "Connecting…"
-                : source === "demo"
-                  ? "Starting the scripted session…"
-                  : "English assistance will appear here as the speaker begins."
+              consent.phase === "checking"
+                ? "Checking privacy settings…"
+                : consent.phase === "needed"
+                  ? "Waiting for you to confirm how this session is processed."
+                  : phase === "starting"
+                    ? "Connecting…"
+                    : source === "demo"
+                      ? "Starting the scripted session…"
+                      : "English assistance will appear here as the speaker begins."
             }
           />
         )}
@@ -329,15 +323,17 @@ export function LiveConsole({
         onFontScale={adjustFontScale}
       />
 
-      {/* Shown once per browser, before the first live cloud session. */}
-      <PrivacyDisclosure
-        providers={disclosureProviders}
-        onAccept={() => setDisclosureProviders([])}
-        onUseLocalOnly={() => {
-          setDisclosureProviders([]);
-          void handleEnd();
-        }}
-      />
+      {/* Shown once per browser, BEFORE anything reaches a cloud provider. */}
+      {consent.phase === "needed" && (
+        <PrivacyDisclosure
+          providers={consent.providers}
+          onAccept={consent.grant}
+          onUseLocalOnly={() => {
+            consent.decline();
+            void handleEnd();
+          }}
+        />
+      )}
 
       <SettingsSheet
         open={settingsOpen}
