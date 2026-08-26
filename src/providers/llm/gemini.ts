@@ -123,9 +123,11 @@ export class GeminiLlmProvider implements LlmProvider {
         `Gemini returned no content${reason ? ` (finishReason: ${reason})` : ""}${
           data.error?.message ? `: ${data.error.message}` : ""
         }.`,
-        // A safety block is a bad_request-shaped problem: retrying identical
-        // input will fail identically.
-        reason === "SAFETY" || reason === "PROHIBITED_CONTENT" ? "bad_request" : "malformed_output",
+        // A safety/content rejection belongs to this utterance, not the provider
+        // configuration. It must never permanently bench Gemini for everyone.
+        reason === "SAFETY" || reason === "PROHIBITED_CONTENT"
+          ? "request_rejected"
+          : "malformed_output",
       );
     }
 
