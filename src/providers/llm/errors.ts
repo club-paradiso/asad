@@ -25,8 +25,10 @@ export type LlmFailureKind =
   | "malformed_output"
   /** 401/403. Permanent until configuration changes — never retry. */
   | "auth"
-  /** 400 or a model id the provider rejects. Permanent until config changes. */
+  /** Bad endpoint/model/configuration. Permanent for this process config. */
   | "bad_request"
+  /** Request-specific 400/422 (shape/capability/safety). Recoverable. */
+  | "request_rejected"
   /** Anything unclassified. */
   | "unknown";
 
@@ -66,6 +68,26 @@ export class LlmError extends Error {
   }
 }
 
+/**
+ * Providers unfortunately use HTTP 400 for two different classes of problem:
+ * a deployment-level configuration error (for example a removed model id) and
+ * a request-level incompatibility (for example a newly rejected generation
+ * option). Only the former deserves a permanent circuit break.
+ */
+function looksLikePermanentModelError(body?: string): boolean {
+  const text = (body ?? "").toLowerCase();
+  return (
+    text.includes("no such model") ||
+    text.includes("model not found") ||
+    text.includes("unknown model") ||
+    text.includes("invalid model") ||
+    text.includes("unsupported model") ||
+    text.includes("model does not exist") ||
+    text.includes("model doesn't exist") ||
+    (text.includes("model") && text.includes("not found"))
+  );
+}
+
 /** Map an HTTP status (plus body hints) onto a failure kind. */
 export function classifyHttpStatus(status: number, body?: string): LlmFailureKind {
   if (status === 401 || status === 403) return "auth";
@@ -80,7 +102,12 @@ export function classifyHttpStatus(status: number, body?: string): LlmFailureKin
       text.includes("credits");
     return exhausted ? "quota_exhausted" : "rate_limited";
   }
-  if (status === 404 || status === 400 || status === 422) return "bad_request";
+
+  // A missing route/model is deployment configuration, not an individual turn.
+  if (status === 404) return "bad_request";
+  if (status === 400 || status === 422) {
+    return looksLikePermanentModelError(body) ? "bad_request" : "request_rejected";
+  }
   if (status >= 500) return "server_error";
   return "unknown";
 }

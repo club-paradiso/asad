@@ -41,9 +41,12 @@ export const OPENAI_COMPATIBLE_VENDORS: Record<
     id: "openrouter",
     label: "OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
-    // A pinned free model rather than a random router: consistency within one
-    // sermon matters more than squeezing out marginal quality.
-    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
+    // OpenRouter's free router selects from the currently available free model
+    // pool and filters by required capabilities such as structured output. That
+    // makes the integration resilient to individual free-model deprecations
+    // instead of pinning the app to one model that may disappear underneath it.
+    // Deployers can still pin any OpenRouter model with OPENROUTER_LLM_MODEL.
+    defaultModel: "openrouter/free",
     structuredOutput: "json_schema",
     headers: {
       "HTTP-Referer": "https://github.com/lucanomics/tong-yuck",

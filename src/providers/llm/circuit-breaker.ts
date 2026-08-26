@@ -84,9 +84,11 @@ export class CircuitBreaker {
   /**
    * Record a failure.
    *
-   * `fatal` failures (bad key, bad model, exhausted quota) skip the strike
-   * count entirely — there is no point burning two more sermon phrases proving
-   * that an invalid API key is still invalid.
+   * Authentication and known deployment-level model/configuration failures do
+   * not heal while the process keeps the same environment, so they are disabled
+   * immediately. Request-specific rejections are classified separately as
+   * `request_rejected`; those count as ordinary transient failures instead of
+   * benching the provider forever after one incompatible turn.
    */
   recordFailure(
     kind: LlmFailureKind,
@@ -97,7 +99,6 @@ export class CircuitBreaker {
     this.consecutiveFailures += 1;
     this.lastFailure = { kind, message, at: this.now() };
 
-    // Configuration errors never fix themselves at runtime.
     if (kind === "auth" || kind === "bad_request") {
       this.permanent = true;
       this.openUntil = Number.POSITIVE_INFINITY;
