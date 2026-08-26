@@ -84,9 +84,12 @@ export class CircuitBreaker {
   /**
    * Record a failure.
    *
-   * `fatal` failures (bad key, bad model, exhausted quota) skip the strike
-   * count entirely — there is no point burning two more sermon phrases proving
-   * that an invalid API key is still invalid.
+   * Authentication failures really are configuration failures and remain
+   * disabled until a deploy resets the process. HTTP 400/404/422 responses are
+   * different: providers also use them for request-shape and model-capability
+   * mismatches. Permanently disabling an otherwise healthy provider after one
+   * such response made a single incompatible turn take Counter Mode offline.
+   * Those errors now open the breaker temporarily and are probed again later.
    */
   recordFailure(
     kind: LlmFailureKind,
@@ -97,8 +100,8 @@ export class CircuitBreaker {
     this.consecutiveFailures += 1;
     this.lastFailure = { kind, message, at: this.now() };
 
-    // Configuration errors never fix themselves at runtime.
-    if (kind === "auth" || kind === "bad_request") {
+    // A bad credential cannot heal while this process keeps the same env.
+    if (kind === "auth") {
       this.permanent = true;
       this.openUntil = Number.POSITIVE_INFINITY;
       return;
