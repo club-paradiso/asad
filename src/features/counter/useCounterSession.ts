@@ -7,8 +7,10 @@
  * sub-second delivery, and polling works everywhere — including serverless,
  * where a long-lived SSE connection does not survive.
  *
- * Backs off when the tab is hidden: a counter iPad spends a lot of its day
- * asleep on a desk and there is no reason to keep hammering the server.
+ * Message sends are queued rather than UI-locked. The user can type, tap the
+ * microphone, and submit the next turn while the previous translation is still
+ * running; network requests are still executed in order so conversational
+ * context and server sequence numbers remain deterministic.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CounterMessage, Participant, SessionView } from "@/counter/types";
@@ -33,6 +35,8 @@ export function useCounterSession(code: string | null, role: Participant) {
 
   const cursor = useRef(0);
   const stopped = useRef(false);
+  const sendQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingSends = useRef(0);
 
   /** Merge a batch, replacing by id so a resend does not duplicate. */
   const merge = useCallback((incoming: CounterMessage[]) => {
@@ -101,33 +105,55 @@ export function useCounterSession(code: string | null, role: Participant) {
   }, [code, poll]);
 
   const send = useCallback(
-    async (input: SendInput) => {
-      if (!code || !input.text.trim()) return null;
+    (input: SendInput): Promise<CounterMessage | null> => {
+      const text = input.text.trim();
+      if (!code || !text) return Promise.resolve(null);
+
+      pendingSends.current += 1;
       setSending(true);
       setError(null);
-      try {
-        const response = await fetch("/api/counter/message", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ code, from: role, ...input }),
-        });
-        const data = (await response.json()) as {
-          message?: CounterMessage;
-          error?: string;
-        };
-        if (!response.ok || !data.message) {
-          setError(data.error ?? "Could not send that.");
-          return null;
+
+      let resolveResult: (message: CounterMessage | null) => void = () => {};
+      const result = new Promise<CounterMessage | null>((resolve) => {
+        resolveResult = resolve;
+      });
+
+      const run = async () => {
+        try {
+          const response = await fetch("/api/counter/message", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ code, from: role, ...input, text }),
+          });
+          const data = (await response.json()) as {
+            message?: CounterMessage;
+            error?: string;
+          };
+          if (!response.ok || !data.message) {
+            setError(data.error ?? "Could not send that.");
+            resolveResult(null);
+            return;
+          }
+          merge([data.message]);
+          cursor.current = Math.max(cursor.current, data.message.seq);
+          resolveResult(data.message);
+        } catch {
+          setError("Network problem — check the connection and try again.");
+          resolveResult(null);
+        } finally {
+          pendingSends.current = Math.max(0, pendingSends.current - 1);
+          setSending(pendingSends.current > 0);
         }
-        merge([data.message]);
-        cursor.current = Math.max(cursor.current, data.message.seq);
-        return data.message;
-      } catch {
-        setError("Network problem — check the connection and try again.");
-        return null;
-      } finally {
-        setSending(false);
-      }
+      };
+
+      // Keep the server-facing turns strictly ordered, but recover the queue
+      // after any unexpected failure so one bad message never jams later ones.
+      sendQueue.current = sendQueue.current
+        .catch(() => {})
+        .then(run)
+        .catch(() => {});
+
+      return result;
     },
     [code, role, merge],
   );
