@@ -84,8 +84,9 @@ export function Composer({
             type="button"
             disabled={disabled}
             onClick={toggleVoice}
-            aria-label={voice.listening ? strings.listening : "Voice input"}
+            aria-label="Voice input"
             aria-pressed={voice.listening}
+            title={voice.listening ? strings.listening : "Voice input"}
             className={cn(
               "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors",
               "disabled:pointer-events-none disabled:opacity-40",
