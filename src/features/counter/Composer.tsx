@@ -1,18 +1,14 @@
 "use client";
 
 /**
- * The input bar: hold to speak, or type.
+ * Counter input bar: tap once to speak, or type at any time.
  *
- * Typing is always available and always first-class. Speech recognition is
- * missing or unreliable for several of the languages that turn up most often at
- * a Korean counter — Uzbek, Mongolian, Khmer, Burmese — and a visitor who
- * cannot get the microphone to work must not be stuck.
- *
- * Push-to-talk rather than continuous listening: at a counter there is a queue,
- * a radio, and two people talking. Holding a button is unambiguous about whose
- * turn it is.
+ * Typing stays first-class even while speech recognition or translation is in
+ * progress. A microphone tap starts one browser-recognised utterance; a natural
+ * pause ends it and sends the recognised text into the conversation. Tapping the
+ * microphone again ends the utterance early.
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { findLanguage } from "@/counter/languages";
 import type { CounterStrings } from "@/counter/ui-strings";
 import { useVoiceInput } from "./useVoiceInput";
@@ -35,9 +31,6 @@ export function Composer({
   const voice = useVoiceInput(lang);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
-  // Guards a double-fire when a device emits both pointer and mouse events.
-  const holding = useRef(false);
-
   const submit = useCallback(() => {
     const text = draft.trim();
     if (!text || disabled) return;
@@ -45,27 +38,26 @@ export function Composer({
     onSend(text, "text");
   }, [draft, disabled, onSend]);
 
-  const beginHold = useCallback(() => {
-    if (holding.current || disabled) return;
-    holding.current = true;
+  const toggleVoice = useCallback(() => {
+    if (disabled) return;
+
+    if (voice.listening) {
+      voice.stop();
+      return;
+    }
+
     void voice.start().then((text) => {
-      holding.current = false;
       const spoken = text.trim();
       if (spoken) onSend(spoken, "voice");
     });
   }, [disabled, onSend, voice]);
-
-  const endHold = useCallback(() => {
-    if (!holding.current) return;
-    voice.stop();
-  }, [voice]);
 
   return (
     <div
       className="border-t border-[var(--line)] bg-[var(--bg-raised)] px-3 pt-2.5 sm:px-5"
       style={{ paddingBottom: "calc(0.625rem + var(--safe-bottom))" }}
     >
-      {/* What was heard so far, so the speaker can see it is working. */}
+      {/* Live transcript preview. The text field remains independently usable. */}
       {voice.listening && (
         <p
           className="mb-2 line-clamp-2 text-sm text-[var(--fg-muted)]"
@@ -91,22 +83,14 @@ export function Composer({
           <button
             type="button"
             disabled={disabled}
-            // Pointer events cover mouse, touch and pen with one path, and
-            // `pointercancel` matters: a scroll gesture must not leave the
-            // microphone open.
-            onPointerDown={beginHold}
-            onPointerUp={endHold}
-            onPointerCancel={endHold}
-            onPointerLeave={endHold}
-            // Stops iOS turning a long press into text selection or a callout.
-            onContextMenu={(event) => event.preventDefault()}
-            aria-label={strings.holdToSpeak}
+            onClick={toggleVoice}
+            aria-label={voice.listening ? strings.listening : "Voice input"}
             aria-pressed={voice.listening}
             className={cn(
-              "flex h-12 w-12 shrink-0 touch-none items-center justify-center rounded-full border transition-colors select-none",
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors",
               "disabled:pointer-events-none disabled:opacity-40",
               voice.listening
-                ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)]"
+                ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)] shadow-[0_0_0_4px_var(--accent-dim)]"
                 : "border-[var(--line-strong)] bg-[var(--bg-overlay)] text-[var(--fg)]",
             )}
           >
@@ -116,6 +100,7 @@ export function Composer({
 
         <form
           className="flex min-w-0 flex-1 items-end gap-2"
+          aria-busy={busy}
           onSubmit={(event) => {
             event.preventDefault();
             submit();
@@ -139,21 +124,21 @@ export function Composer({
           />
           <button
             type="submit"
-            disabled={disabled || busy || draft.trim().length === 0}
+            disabled={disabled || draft.trim().length === 0}
             className={cn(
               "h-12 shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent)] px-5",
               "text-base font-semibold text-[var(--bg)] transition-opacity",
               "disabled:pointer-events-none disabled:opacity-40",
             )}
           >
-            {busy ? "…" : strings.send}
+            {strings.send}
           </button>
         </form>
       </div>
 
-      {voice.supported && (
+      {voice.supported && voice.listening && (
         <p className="mx-auto mt-1.5 max-w-3xl text-center text-[0.7rem] text-[var(--fg-dim)]">
-          {strings.holdToSpeak}
+          {strings.listening}
         </p>
       )}
     </div>
