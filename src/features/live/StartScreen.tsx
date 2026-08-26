@@ -4,8 +4,8 @@
  * The launcher.
  *
  * Requirement: live interpretation in three interactions or fewer. This gets
- * there in two — pick a mode, press Start — with the audio source
- * pre-selected from what the deployment actually has configured.
+ * there in two — pick a mode, press Start — with the best available audio
+ * source selected automatically.
  *
  * Everything optional (prep, saved sessions, lag, view) is reachable but never
  * in the way. An interpreter opening this ninety seconds before a service
@@ -39,7 +39,7 @@ export function StartScreen() {
   const browserSttAvailable = useCapability(() => WebSpeechProvider.isSupported());
 
   // Ask the server once what it can actually do, so the launcher never offers
-  // a provider that will fail the moment the interpreter presses Start.
+  // a cloud provider that will fail the moment the interpreter presses Start.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/config")
@@ -54,14 +54,15 @@ export function StartScreen() {
     };
   }, []);
 
-  // Derive the deployment preference instead of mirroring it into state. The
-  // previous launcher only treated cloud STT as configurable, so even
-  // STT_PROVIDER=webspeech opened on Demo. A manual choice always wins.
+  // Browser Speech is the zero-configuration live path. Prefer an explicitly
+  // configured cloud provider when it is genuinely available; otherwise use
+  // browser speech whenever the current browser supports it. This means a
+  // deployment accidentally left on STT_PROVIDER=demo still opens ready for
+  // live interpretation instead of forcing the operator into a fake session.
+  // A manual choice always wins.
   const configuredSource = useMemo<SttProviderId>(() => {
-    if (!config) return "demo";
-    const configured = config.stt.configured as SttProviderId;
-    if (configured === "webspeech") return browserSttAvailable ? "webspeech" : "demo";
-    if (config.stt.cloudAvailable) return configured;
+    if (config?.stt.cloudAvailable) return config.stt.configured as SttProviderId;
+    if (browserSttAvailable) return "webspeech";
     return "demo";
   }, [browserSttAvailable, config]);
 
@@ -188,9 +189,8 @@ export function StartScreen() {
         </div>
         {sources.length === 1 && (
           <p className="text-xs leading-relaxed text-[var(--fg-dim)]">
-            No live recogniser is available here. Demo mode runs the full pipeline on a scripted
-            Korean sermon — no microphone, no key, no network. Set <code>STT_PROVIDER</code> to go
-            live.
+            No live recogniser is available in this browser. Demo mode runs the full pipeline on a
+            scripted Korean sermon — no microphone, no key, no network.
           </p>
         )}
       </section>
