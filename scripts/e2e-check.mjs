@@ -55,7 +55,16 @@ await page.screenshot({ path: join(outDir, "prep.png") });
 
 // --- Live session ---------------------------------------------------------
 await page.goto(base, { waitUntil: "networkidle" });
-await page.getByText("Start interpreting").click();
+// Chromium exposes the Web Speech constructor even on a headless CI runner,
+// so the production launcher correctly prefers it. The E2E transcript checks,
+// however, need deterministic audio. Explicitly choose Demo rather than
+// pretending a microphone is absent and accidentally testing silence.
+//
+// The audio picker is a radiogroup, not a row of buttons: it is a choice
+// between mutually exclusive options, and saying so is what lets a screen
+// reader announce "2 of 3" instead of reading three unrelated buttons.
+await page.getByRole("radio", { name: /^Demo/ }).click();
+await page.getByRole("button", { name: "Run demo" }).click();
 await page.waitForTimeout(3000);
 
 await page.getByLabel("Session settings").click();
@@ -72,7 +81,7 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(14000);
 
 // --- Review ---------------------------------------------------------------
-await page.getByRole("button", { name: "End" }).click();
+await page.getByRole("button", { name: /End session|End/ }).click();
 await page.waitForTimeout(1500);
 
 const review = await page.locator("body").innerText();
@@ -113,6 +122,51 @@ await page.screenshot({ path: join(outDir, "sessions.png") });
 // else.
 const host = await context.newPage();
 const guest = await context.newPage();
+
+// Give the visitor page a deterministic browser speech recogniser. It behaves
+// like one natural utterance: one tap starts listening, a final transcript
+// arrives, then silence ends the utterance automatically.
+await guest.addInitScript(() => {
+  class MockSpeechRecognition {
+    lang = "";
+    continuous = false;
+    interimResults = true;
+    onresult = null;
+    onerror = null;
+    onend = null;
+    timer = null;
+
+    start() {
+      this.timer = window.setTimeout(() => {
+        this.onresult?.({
+          resultIndex: 0,
+          results: {
+            length: 1,
+            0: {
+              isFinal: true,
+              length: 1,
+              0: { transcript: "I need help with my visa" },
+            },
+          },
+        });
+        window.setTimeout(() => this.onend?.(), 120);
+      }, 700);
+    }
+
+    stop() {
+      if (this.timer) window.clearTimeout(this.timer);
+      this.onend?.();
+    }
+
+    abort() {
+      if (this.timer) window.clearTimeout(this.timer);
+      this.onend?.();
+    }
+  }
+
+  window.SpeechRecognition = MockSpeechRecognition;
+  window.webkitSpeechRecognition = MockSpeechRecognition;
+});
 
 // Once the staff member ends the conversation the visitor's next poll gets a
 // 404 — that IS the design, and the browser logs it as a failed resource. It is
@@ -193,6 +247,103 @@ check("a table phrase is marked as one", /Set phrase|정형 문구/.test(guestCo
 
 await host.screenshot({ path: join(outDir, "counter-host-conversation.png") });
 await guest.screenshot({ path: join(outDir, "counter-guest-conversation.png") });
+
+// Tap-to-talk and non-blocking typing. Intercept just these two messages so the
+// test controls translation latency without needing a paid model credential.
+const queuedRequests = [];
+await guest.route("**/api/counter/message", async (route) => {
+  if (route.request().method() !== "POST") {
+    await route.continue();
+    return;
+  }
+
+  const body = route.request().postDataJSON();
+  if (
+    body?.source !== "voice" &&
+    !(body?.source === "text" && body?.text === "typed while listening")
+  ) {
+    await route.continue();
+    return;
+  }
+
+  queuedRequests.push({ source: body.source, text: body.text, at: Date.now() });
+  if (body.source === "voice") await new Promise((resolve) => setTimeout(resolve, 1200));
+
+  const seq = body.source === "voice" ? 2 : 3;
+  await route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      message: {
+        id: `e2e-${body.source}`,
+        seq,
+        from: "guest",
+        source: body.source,
+        originalText: body.text,
+        originalLang: "en-US",
+        translatedText:
+          body.source === "voice" ? "비자 관련 도움이 필요합니다" : "입력도 동시에 가능합니다",
+        targetLang: "ko-KR",
+        at: Date.now(),
+        status: "done",
+        confidence: "high",
+      },
+      viaModel: true,
+      provider: "e2e",
+      latencyMs: body.source === "voice" ? 1200 : 0,
+    }),
+  });
+});
+
+const guestInput = guest.getByPlaceholder("Type your message");
+const guestMic = guest.getByRole("button", { name: "Voice input" });
+await guestMic.click();
+await guest.waitForTimeout(50);
+
+check(
+  "one mic tap starts listening",
+  (await guestMic.getAttribute("aria-pressed")) === "true",
+);
+
+await guestInput.fill("typed while listening");
+check(
+  "typing remains editable while listening",
+  (await guestInput.inputValue()) === "typed while listening",
+);
+
+// The mock utterance ends naturally and auto-submits the voice message. Its
+// translation is intentionally delayed so we can submit typed text meanwhile.
+await guest.waitForTimeout(850);
+check(
+  "speech auto-submits after the utterance ends",
+  queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
+);
+
+const guestSend = guest.getByRole("button", { name: "Send" });
+check("Send stays enabled while translation is pending", await guestSend.isEnabled());
+await guestSend.click();
+check("typed draft clears immediately when queued", (await guestInput.inputValue()) === "");
+
+await guest.waitForTimeout(250);
+check(
+  "second message waits behind the in-flight translation",
+  queuedRequests.length === 1,
+);
+
+await guest.waitForTimeout(1150);
+check(
+  "queued text sends after voice in order",
+  queuedRequests.length === 2 &&
+    queuedRequests[0]?.source === "voice" &&
+    queuedRequests[1]?.source === "text",
+);
+
+await guest.waitForTimeout(250);
+const afterTapToTalk = await guest.locator("body").innerText();
+check("voice transcript appears in the chat", /I need help with my visa/.test(afterTapToTalk));
+check("queued typed message also appears in the chat", /typed while listening/.test(afterTapToTalk));
+await guest.screenshot({ path: join(outDir, "counter-guest-tap-to-talk.png") });
+await guest.unroute("**/api/counter/message");
 
 // Ending discards the session outright, rather than leaving it readable.
 sessionEnded = true;

@@ -8,15 +8,24 @@
  *
  *   Am I ready?   What am I interpreting?   Which microphone?   Can I start?
  *
- * The previous version answered none of them. It opened with two paragraph-
- * sized mode cards that pushed Start below the fold on a phone, and its
- * loudest element was an amber block naming three environment variables. An
- * interpreter ninety seconds before a service cannot set an environment
- * variable; the person who can is not in the room and reads /diagnostics.
+ * TWO CONSTRAINTS MEET HERE, and they look like they conflict:
  *
- * So: readiness first, in English; controls as compact segmented rows; Start
- * above the fold on the smallest supported screen; everything optional behind
- * a disclosure.
+ *  1. `start()` must run inside the button's own click handler. The Web Speech
+ *     API is permission-sensitive on Safari/iOS: deferring
+ *     `SpeechRecognition.start()` to a mounted component effect loses the
+ *     transient user activation from the tap, and recognition silently never
+ *     begins.
+ *
+ *  2. Nothing may reach a cloud provider before the privacy disclosure has
+ *     been acknowledged. The console used to fetch that disclosure after
+ *     starting, so the microphone opened and the first Korean of the sermon
+ *     was sent before the interpreter was told it would be.
+ *
+ * They reconcile by resolving consent BEFORE the tap rather than after it.
+ * The disclosure is settled here, on the launcher, while the interpreter is
+ * still choosing a mode — and when it is outstanding, the interpreter's
+ * "I understand" IS the user gesture that starts the session. Both constraints
+ * hold, and neither is traded away.
  */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -30,6 +39,10 @@ import { Button, Segmented } from "@/components/ui/primitives";
 import { openSession, readSessionState } from "@/lib/session-client";
 import type { AppConfig } from "@/app/api/config/route";
 import { LiveConsole } from "./LiveConsole";
+import { useLiveSession } from "./useLiveSession";
+import { preferredSttSource } from "./sourcePreference";
+import { useCloudConsent } from "./useCloudConsent";
+import { PrivacyDisclosure } from "./PrivacyDisclosure";
 import { Readiness, type ReadinessRow } from "./Readiness";
 import { SessionSummary } from "@/features/sessions/SessionSummary";
 
@@ -39,7 +52,7 @@ export function StartScreen() {
   const [screen, setScreen] = useState<Screen>("start");
   const [settings, updateSettings] = useLocalStore(settingsStore);
   const [prep] = useLocalStore(prepStore);
-  const [source, setSource] = useState<SttProviderId>("demo");
+  const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
   const [advanced, setAdvanced] = useState(false);
@@ -52,7 +65,7 @@ export function StartScreen() {
   const browserSttAvailable = useCapability(() => WebSpeechProvider.isSupported());
 
   // Ask the server once what it can actually do, so the launcher never offers
-  // a provider that will fail the moment the interpreter presses Start.
+  // a cloud provider that will fail the moment the interpreter presses Start.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/config")
@@ -60,7 +73,6 @@ export function StartScreen() {
       .then((value: AppConfig | null) => {
         if (cancelled || !value) return;
         setConfig(value);
-        if (value.stt.cloudAvailable) setSource(value.stt.configured as SttProviderId);
       })
       .catch(() => {});
     void readSessionState().then((state) => {
@@ -71,6 +83,28 @@ export function StartScreen() {
     };
   }, []);
 
+  const configuredSource = useMemo<SttProviderId>(
+    () =>
+      preferredSttSource({
+        browserSttAvailable,
+        cloudAvailable: config?.stt.cloudAvailable ?? false,
+        configured: config?.stt.configured as SttProviderId | undefined,
+      }),
+    [browserSttAvailable, config],
+  );
+
+  const source = sourceOverride ?? configuredSource;
+
+  const session = useLiveSession({
+    mode: settings.mode,
+    lag: settings.lag,
+    prep,
+    source,
+  });
+
+  // Resolved here, before the tap, so pressing Start can never outrun it.
+  const consent = useCloudConsent(source);
+
   const sources = useMemo(() => {
     const list: SttProviderId[] = ["demo"];
     if (browserSttAvailable) list.push("webspeech");
@@ -79,8 +113,8 @@ export function StartScreen() {
   }, [browserSttAvailable, config]);
 
   const rows = useMemo(
-    () => readinessRows({ config, source, browserSttAvailable }),
-    [config, source, browserSttAvailable],
+    () => readinessRows({ config, source, consent: consent.phase }),
+    [config, source, consent.phase],
   );
 
   if (screen === "live") {
@@ -90,9 +124,10 @@ export function StartScreen() {
         onSettingsChange={updateSettings}
         prep={prep}
         source={source}
-        onEnd={(session) => {
-          setFinished(session);
-          setScreen(session ? "review" : "start");
+        session={session}
+        onEnd={(stored) => {
+          setFinished(stored);
+          setScreen(stored ? "review" : "start");
         }}
       />
     );
@@ -148,6 +183,21 @@ export function StartScreen() {
     );
   }
 
+  /**
+   * Start the session.
+   *
+   * Called synchronously from a click handler — the button's, or the
+   * disclosure's "I understand". Both are user gestures, which is what keeps
+   * Safari's recogniser permission alive.
+   */
+  const beginSession = () => {
+    // Belt and braces around the invariant: nothing starts while consent is
+    // unresolved or outstanding, whatever the button happens to be doing.
+    if (!consent.mayStart) return;
+    setScreen("live");
+    void session.start();
+  };
+
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-5 px-5 py-7 sm:py-10">
       <header className="flex items-baseline justify-between gap-4">
@@ -192,7 +242,7 @@ export function StartScreen() {
           <Segmented
             label="Audio source"
             value={source}
-            onChange={setSource}
+            onChange={setSourceOverride}
             options={sources.map((id) => ({
               value: id,
               label: STT_PROVIDER_INFO[id].label,
@@ -216,8 +266,22 @@ export function StartScreen() {
         <p className="text-xs text-[var(--fg-muted)]">{LAG_PROFILES[settings.lag].description}</p>
       </section>
 
-      <Button tone="primary" size="lg" onClick={() => setScreen("live")} className="w-full">
-        Start interpreting
+      <Button
+        tone="primary"
+        size="lg"
+        // Disabled only while we genuinely do not yet know what starting would
+        // send. That window is short and it is the one the old race lived in.
+        disabled={!consent.mayStart}
+        onClick={beginSession}
+        className="w-full"
+      >
+        {consent.phase === "checking"
+          ? "Checking privacy settings…"
+          : consent.phase === "needed"
+            ? "Confirm privacy to continue"
+            : source === "demo"
+              ? "Run demo"
+              : "Start live interpreting"}
       </Button>
 
       {/* --- Everything optional ------------------------------------------ */}
@@ -267,6 +331,27 @@ export function StartScreen() {
       <p className="mt-auto pt-3 text-xs text-[var(--fg-dim)]">
         In session: Space freeze · T teleprompter · K Korean · G glossary · +/− text size
       </p>
+
+      {/* Shown BEFORE anything opens. Accepting is the user gesture that
+          starts the session, so consent and Safari's permission model are
+          satisfied by the same tap. */}
+      {consent.phase === "needed" && (
+        <PrivacyDisclosure
+          providers={consent.providers}
+          onAccept={() => {
+            consent.grant();
+            // Not `beginSession()`: `consent` is the value captured by this
+            // render, where the phase is still "needed", so the guard inside
+            // it would refuse. Acknowledging IS the gesture, so start here.
+            setScreen("live");
+            void session.start();
+          }}
+          onUseLocalOnly={() => {
+            consent.decline();
+            setSourceOverride("demo");
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -292,7 +377,7 @@ function ControlRow({ label, children }: { label: string; children: React.ReactN
 export function readinessRows(input: {
   config: AppConfig | null;
   source: SttProviderId;
-  browserSttAvailable: boolean;
+  consent?: string;
 }): ReadinessRow[] {
   const { config, source } = input;
   const demo = source === "demo";
@@ -346,9 +431,9 @@ export function readinessRows(input: {
 
   const privacy: ReadinessRow = demo
     ? { label: "Privacy", value: "Nothing leaves this device", level: "ready" }
-    : !config
+    : !config || input.consent === "checking"
       ? { label: "Privacy", value: "Checking…", level: "limited" }
-      : config.llm.freeTierDisclosure.length > 0
+      : config.llm.freeTierDisclosure.length > 0 && input.consent !== "granted"
         ? {
             label: "Privacy",
             value: "Confirmation needed before starting",

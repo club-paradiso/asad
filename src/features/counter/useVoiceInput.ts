@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * Push-to-talk voice input for the counter.
+ * Tap-to-talk voice input for Counter Mode.
  *
- * Deliberately push-to-talk rather than continuous: at a counter there is
- * background noise, a queue behind the visitor, and two people talking. Holding
- * a button while you speak is unambiguous about whose turn it is and what is
- * being captured.
+ * One tap starts the browser recogniser. The recogniser finishes the utterance
+ * automatically after the speaker pauses; tapping the microphone again ends it
+ * early. The resolved transcript is then sent by the composer, so nobody has to
+ * keep a finger pressed down while talking.
  *
  * Uses the browser's own recognition, so it costs nothing and needs no key. It
- * is not available everywhere — the caller checks `supported` and falls back to
- * typing, which always works.
+ * is not available everywhere — the caller checks `supported` and keeps typing
+ * available at all times.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCapability } from "@/hooks/useCapability";
@@ -57,6 +57,7 @@ export function useVoiceInput(lang: string) {
 
   const recognition = useRef<RecognitionLike | null>(null);
   const finalText = useRef("");
+  const lastHeard = useRef("");
   const resolver = useRef<((text: string) => void) | null>(null);
 
   const stop = useCallback(() => {
@@ -67,7 +68,7 @@ export function useVoiceInput(lang: string) {
     }
   }, []);
 
-  /** Start listening; resolves with the final transcript when `stop` is called. */
+  /** Start one utterance; resolves when speech ends naturally or is stopped. */
   const start = useCallback(async (): Promise<string> => {
     const Ctor = getCtor();
     if (!Ctor) {
@@ -75,7 +76,15 @@ export function useVoiceInput(lang: string) {
       return "";
     }
 
+    // A fast double-tap should stop the current utterance, not create two
+    // recognisers racing to own the same microphone.
+    if (recognition.current) {
+      stop();
+      return "";
+    }
+
     finalText.current = "";
+    lastHeard.current = "";
     setPartial("");
     setError(null);
 
@@ -83,7 +92,8 @@ export function useVoiceInput(lang: string) {
       resolver.current = resolve;
       const instance = new Ctor();
       instance.lang = lang;
-      // Push-to-talk: one utterance, ended by releasing the button.
+      // One natural utterance. Browser Speech ends this automatically after a
+      // short pause, which is the behaviour Counter Mode wants.
       instance.continuous = false;
       instance.interimResults = true;
 
@@ -95,19 +105,25 @@ export function useVoiceInput(lang: string) {
           if (result.isFinal) finalText.current += text;
           else interim += text;
         }
-        setPartial(finalText.current + interim);
+        const heard = `${finalText.current}${interim}`.trim();
+        lastHeard.current = heard;
+        setPartial(heard);
       };
 
       instance.onerror = (event) => {
         const code = event.error ?? "unknown";
         if (code === "no-speech") setError("Nothing was heard. Try again, or type.");
         else if (code === "not-allowed") setError("Microphone permission was denied.");
+        else if (code === "aborted") return;
         else setError("Could not hear that. Please type instead.");
       };
 
       instance.onend = () => {
         setListening(false);
-        const text = finalText.current.trim();
+        // Some browser implementations leave the last words as interim when
+        // stop() is called. Keep that transcript rather than silently dropping
+        // what the speaker just said.
+        const text = (finalText.current.trim() || lastHeard.current.trim()).trim();
         setPartial("");
         resolver.current?.(text);
         resolver.current = null;
@@ -119,16 +135,21 @@ export function useVoiceInput(lang: string) {
       try {
         instance.start();
       } catch {
+        recognition.current = null;
+        resolver.current = null;
         setListening(false);
         setError("Could not start listening.");
         resolve("");
       }
     });
-  }, [lang]);
+  }, [lang, stop]);
 
   useEffect(
     () => () => {
       recognition.current?.abort();
+      recognition.current = null;
+      resolver.current?.("");
+      resolver.current = null;
     },
     [],
   );

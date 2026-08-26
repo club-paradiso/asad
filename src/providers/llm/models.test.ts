@@ -72,3 +72,24 @@ describe("unknown slugs", () => {
     expect(capabilitiesForModel("").maxOutputTokens).toBeGreaterThan(0);
   });
 });
+
+describe("OpenRouter pool routers", () => {
+  it("recognises the free pool and marks it unfit for a live session", () => {
+    // Not a capability judgement — a consistency one. The pool picks a
+    // different model per call, so terminology and register drift mid-sermon
+    // and the interpreter is the one who absorbs it.
+    const caps = capabilitiesForModel("openrouter/free");
+    expect(caps.source).toBe("registry");
+    expect(caps.liveSuitable).toBe(false);
+    expect(caps.note).toContain("pin a model");
+  });
+
+  it("still claims schema support, because require_parameters enforces it", () => {
+    expect(capabilitiesForModel("openrouter/free").structuredOutput).toBe("json_schema");
+    expect(capabilitiesForModel("openrouter/auto").structuredOutput).toBe("json_schema");
+  });
+
+  it("does not mistake a vendor-prefixed model for the pool", () => {
+    expect(capabilitiesForModel("openrouter/some-real-model").family).not.toBe("OpenRouter pool");
+  });
+});

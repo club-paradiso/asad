@@ -15,10 +15,11 @@
  * because a correct state machine wired up wrongly is the same bug again.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { phasePermitsStart, resolvePhase } from "./useCloudConsent";
-import { LiveConsole } from "./LiveConsole";
-import { emptyPrepSheet, type SessionSettings } from "@/types";
+import { StartScreen } from "./StartScreen";
+import type { DisclosureProvider } from "./PrivacyDisclosure";
+import { WebSpeechProvider } from "@/providers/stt";
 
 const PROVIDER = [{ label: "Google Gemini", note: "Free tier may train." }];
 
@@ -73,37 +74,62 @@ describe("the consent state machine", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* The console itself                                                          */
+/* The launcher                                                                */
 /* -------------------------------------------------------------------------- */
 
-const settings: SessionSettings = {
-  mode: "sermon",
-  lag: "balanced",
-  view: "console",
-  fontScale: 1,
-  showKorean: true,
-  showGlossary: true,
-  showScripture: true,
-  saveHistory: false,
-};
-
-/** Requests the console made, so the assertion can name the offending one. */
+/**
+ * The gate lives on the LAUNCHER, not the console, and that placement is the
+ * fix rather than an implementation detail.
+ *
+ * Two constraints meet here. `start()` has to run inside a click handler or
+ * Safari's recogniser silently never begins — deferring it to a mounted effect
+ * loses the tap's transient user activation. And nothing may reach a cloud
+ * provider before the disclosure is acknowledged.
+ *
+ * Resolving consent before the tap satisfies both: when a disclosure is
+ * outstanding, the interpreter's "I understand" is itself the user gesture
+ * that starts the session.
+ */
+/** Requests the launcher made, so an assertion can name the offending one. */
 let calls: string[] = [];
-
-const renderConsole = () =>
-  render(
-    <LiveConsole
-      settings={settings}
-      onSettingsChange={() => {}}
-      prep={emptyPrepSheet()}
-      source="deepgram"
-      onEnd={() => {}}
-    />,
-  );
 
 /** Anything that would put transcript-derived content on the network. */
 const cloudCalls = () =>
   calls.filter((url) => url.includes("/api/interpret") || url.includes("/api/stt/token"));
+
+/** A deployment with a cloud recogniser and a training-capable model. */
+const stubFetch = (disclosure: DisclosureProvider[], configBehaviour: "ok" | "hang" | "fail" = "ok") =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("/api/config")) {
+        if (configBehaviour === "hang") return new Promise<Response>(() => {});
+        if (configBehaviour === "fail") throw new Error("offline");
+        return json({
+          stt: { configured: "deepgram", cloudAvailable: true },
+          llm: {
+            configured: "Google Gemini",
+            modelAvailable: true,
+            routingMode: "auto-free",
+            sustainsLiveSermon: true,
+            freeTierDisclosure: disclosure,
+          },
+          bible: { configured: "reference-only", textAvailable: false, translation: "WEB" },
+          counter: { provider: null, mayTrain: false, note: "", openWeightModel: false },
+        });
+      }
+      if (url.includes("/api/session")) return json({ gated: false, authorised: true });
+      return json({ provider: "demo" });
+    }),
+  );
+
+const json = (value: unknown) =>
+  new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 
 beforeEach(() => {
   calls = [];
@@ -113,96 +139,95 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
-describe("the live console", () => {
-  it("sends nothing while the disclosure is outstanding", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        calls.push(String(input));
-        if (String(input).includes("/api/config")) {
-          return new Response(JSON.stringify({ llm: { freeTierDisclosure: PROVIDER } }), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          });
-        }
-        return new Response("{}", { status: 200 });
-      }),
-    );
-
-    renderConsole();
+describe("the launcher", () => {
+  it("sends nothing from load until the disclosure is acknowledged", async () => {
+    stubFetch(PROVIDER);
+    render(<StartScreen />);
 
     // The disclosure is showing…
-    await waitFor(() =>
-      expect(screen.getByRole("dialog")).toBeTruthy(),
-    );
-
-    // …and NOTHING derived from the microphone has been sent. This is the
-    // whole test. `/api/config` and `/api/session` are fine — they carry no
-    // transcript and are what decide whether to proceed.
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    // …and nothing derived from the microphone has been sent. `/api/config`
+    // and `/api/session` are fine: they carry no transcript and are what
+    // decide whether to proceed.
     expect(cloudCalls()).toEqual([]);
   });
 
-  it("holds even before the config answers, not just after", async () => {
-    // The original race lived in this window: a start that fires while the
-    // disclosure request is still open has already leaked by the time the
-    // answer arrives.
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        calls.push(String(input));
-        // Never resolves — the config request stays in flight.
-        return new Promise<Response>(() => {});
-      }),
-    );
+  it("refuses to start while the disclosure is outstanding", async () => {
+    stubFetch(PROVIDER);
+    render(<StartScreen />);
 
-    renderConsole();
-    await waitFor(() => expect(screen.getByText(/checking privacy settings/i)).toBeTruthy());
+    const start = await screen.findByRole("button", { name: /confirm privacy to continue/i });
+    expect(start.hasAttribute("disabled")).toBe(true);
+    // Even forced, it must not start. The button being disabled is the
+    // affordance; the guard inside beginSession is the guarantee.
+    fireEvent.click(start);
+    expect(cloudCalls()).toEqual([]);
+  });
+
+  it("sends nothing while the config request is still open", async () => {
+    // The original race lived in exactly this window. With no answer yet the
+    // launcher has no cloud recogniser to offer, so it stays on demo — which
+    // is safe precisely because demo reaches nothing.
+    stubFetch(PROVIDER, "hang");
+    render(<StartScreen />);
+
+    const start = await screen.findByRole("button", { name: /run demo/i });
+    fireEvent.click(start);
     expect(cloudCalls()).toEqual([]);
   });
 
   it("treats an unreachable config as needing disclosure, not as permission", async () => {
-    // Failing open here would start a cloud session under an unknown privacy
-    // posture, which is exactly what this gate exists to prevent.
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        calls.push(String(input));
-        if (String(input).includes("/api/config")) throw new Error("offline");
-        return new Response("{}", { status: 200 });
-      }),
-    );
+    // The case that matters: a live recogniser is available on-device, so the
+    // launcher is NOT on demo, and the transcript would still reach
+    // /api/interpret. Failing open here would start a cloud session under an
+    // unknown privacy posture — exactly what the gate exists to prevent.
+    vi.spyOn(WebSpeechProvider, "isSupported").mockReturnValue(true);
+    stubFetch(PROVIDER, "fail");
+    render(<StartScreen />);
 
-    renderConsole();
-    await waitFor(() =>
-      expect(screen.getByRole("dialog")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    expect(screen.getByRole("dialog").textContent).toMatch(/could not be loaded/i);
     expect(cloudCalls()).toEqual([]);
   });
 
-  it("starts once nothing needs disclosing", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        calls.push(String(input));
-        if (String(input).includes("/api/config")) {
-          return new Response(JSON.stringify({ llm: { freeTierDisclosure: [] } }), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({ provider: "demo" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }),
-    );
+  it("starts on the interpreter's acknowledgement, which is itself the gesture", async () => {
+    stubFetch(PROVIDER);
+    render(<StartScreen />);
 
-    renderConsole();
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    expect(cloudCalls()).toEqual([]);
+
+    fireEvent.click(screen.getByRole("button", { name: /i understand/i }));
 
     // The gate must OPEN as well as close: a permanently shut gate passes
-    // every test above and ships a console that never listens.
+    // every test above and ships a launcher that never listens.
+    await waitFor(() => expect(calls.some((url) => url.includes("/api/stt/token"))).toBe(true));
+  });
+
+  it("follows the audio source when it resolves asynchronously", async () => {
+    // The regression this locks down: the launcher renders as `demo` until
+    // /api/config answers, and the gate used to seed itself from that first
+    // value. It latched "demo, nothing to disclose" and never revisited it
+    // when the source became a cloud recogniser — reporting "clear" for a
+    // session about to stream a sermon to a third party.
+    stubFetch(PROVIDER);
+    render(<StartScreen />);
+
+    // Starts on demo…
+    expect(screen.getByRole("button", { name: /run demo/i })).toBeTruthy();
+    // …and once the real source arrives, the gate has followed it.
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    expect(cloudCalls()).toEqual([]);
+  });
+
+  it("starts immediately when nothing needs disclosing", async () => {
+    stubFetch([]);
+    render(<StartScreen />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /start live interpreting/i }));
     await waitFor(() => expect(calls.some((url) => url.includes("/api/stt/token"))).toBe(true));
     expect(screen.queryByRole("dialog")).toBeNull();
   });

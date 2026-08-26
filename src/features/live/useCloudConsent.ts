@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SttProviderId } from "@/providers/stt";
 import { openSession } from "@/lib/session-client";
+import { useCapability } from "@/hooks/useCapability";
 import { hasAcknowledged, type DisclosureProvider } from "./PrivacyDisclosure";
 
 export type ConsentPhase =
@@ -80,16 +81,38 @@ export const phasePermitsStart = (phase: ConsentPhase): boolean =>
   phase === "clear" || phase === "granted";
 
 export function useCloudConsent(source: SttProviderId): CloudConsent {
-  const [disclosure, setDisclosure] = useState<DisclosureProvider[] | undefined>(
-    // Demo mode resolves synchronously rather than through an effect, so it
-    // never spends a render in `checking` and never delays the demo.
-    source === "demo" ? [] : undefined,
-  );
+  // DERIVED, never latched.
+  //
+  // Both of these were previously seeded from `source` on first render, and
+  // that was a hole big enough to drive the original bug back through. The
+  // launcher resolves its audio source asynchronously — it renders as `demo`
+  // until `/api/config` answers — so seeding from the first value locked in
+  // "demo, nothing to disclose" and then never revisited it when the source
+  // became a cloud recogniser. The gate reported "clear" for a session that
+  // was about to stream a sermon to a third party.
+  //
+  // `resolvePhase` already short-circuits demo, so nothing is lost by letting
+  // both of these follow the source rather than lead it.
+  const acknowledged = useCapability(hasAcknowledged, true);
+  const [disclosure, setDisclosure] = useState<DisclosureProvider[] | undefined>(undefined);
   const [decision, setDecision] = useState<"granted" | "declined" | null>(null);
-  const [acknowledged] = useState(() => (source === "demo" ? true : hasAcknowledged()));
+
+  // A decision belongs to the source it was made about. Switching to a
+  // different recogniser after declining must ask again rather than leaving
+  // the interpreter permanently unable to start.
+  // React's documented pattern for adjusting state when an input changes:
+  // set during render, which discards this render and immediately retries
+  // with the corrected value. Cheaper and less error-prone than an effect,
+  // which would render once with the stale decision first.
+  const [decidedFor, setDecidedFor] = useState(source);
+  if (decidedFor !== source) {
+    setDecidedFor(source);
+    setDecision(null);
+  }
 
   useEffect(() => {
     // Demo mode touches nothing, so it needs neither a session nor a check.
+    // `resolvePhase` returns "clear" for it regardless of `disclosure`.
     if (source === "demo") return;
 
     let cancelled = false;

@@ -115,6 +115,37 @@ const CONSERVATIVE: CapabilityShape = {
  * that sampling is legal.
  */
 const PATTERNS: ReadonlyArray<{ match: RegExp; caps: CapabilityShape }> = [
+  /* --- OpenRouter pool routers ------------------------------------------ */
+  {
+    // `openrouter/free` and friends are not models; they select one per call
+    // from a pool, filtered by the capabilities the request requires. That is
+    // genuinely resilient — an individual free model being retired does not
+    // take the deployment with it — and it is the right default for evaluation.
+    //
+    // It is NOT right for a live sermon, and the reason is the one thing a
+    // pool cannot give: model identity varies between calls, so terminology
+    // and register drift mid-session and the interpreter absorbs it. Pin a
+    // model for a service; use the pool to try things out.
+    //
+    // Claiming json_schema here is safe specifically because
+    // `require_parameters: true` makes OpenRouter exclude pool members that
+    // cannot honour it.
+    match: /^openrouter\/(free|auto)$/i,
+    caps: {
+      family: "OpenRouter pool",
+      structuredOutput: "json_schema",
+      sampling: "supported",
+      reasoning: "none",
+      reasoningAlwaysOn: false,
+      maxOutputTokens: 700,
+      latencyClass: "standard",
+      liveSuitable: false,
+      promptCaching: false,
+      openWeights: false,
+      note: "Selects a different model per call, so terminology and register drift within a session. Good for evaluation, wrong for a live service — pin a model instead.",
+    },
+  },
+
   /* --- Reasoning-first models: not for the live path -------------------- */
   {
     // OpenAI o-series and the GPT-5 reasoning tier reject temperature.
