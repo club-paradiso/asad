@@ -7,19 +7,19 @@
  * taking everything left over. That ordering is the product: English dominant,
  * Korean available, context reachable, controls at the thumb.
  *
- *   ┌──────────────────────────────────────────┐  36px   status
+ *   ┌──────────────────────────────────────────┐  status
  *   │                                          │
  *   │            ENGLISH  (1fr)                │         the thing you say
  *   │                                          │
  *   ├──────────────────────────────────────────┤  ≤22%   Korean, checkable
  *   ├──────────────────────────────────────────┤  auto   context rail
- *   └──────────────────────────────────────────┘  56px   FREEZE + toggles
+ *   └──────────────────────────────────────────┘  controls
  *
  * On an iPhone in landscape the whole thing is about 390px tall, which is why
  * the Korean row is capped as a percentage and the context rail scrolls
  * horizontally rather than wrapping.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SessionSettings, StoredSession } from "@/types";
 import { activeChunk } from "@/interpreter/engine/chunks";
 import { LAG_PROFILES } from "@/interpreter/engine/lag";
@@ -30,7 +30,7 @@ import { STT_PROVIDER_INFO, type SttProviderId } from "@/providers/stt";
 import { saveSession } from "@/lib/storage";
 import { downloadSession } from "@/lib/export";
 import { Button } from "@/components/ui/primitives";
-import { useLiveSession } from "./useLiveSession";
+import type { LiveSession } from "./useLiveSession";
 import { ConsoleTopBar } from "./ConsoleTopBar";
 import { ControlBar } from "./ControlBar";
 import { ContextRail } from "./ContextRail";
@@ -50,25 +50,19 @@ export function LiveConsole({
   onSettingsChange,
   prep,
   source,
+  session,
   onEnd,
 }: {
   settings: SessionSettings;
   onSettingsChange: (settings: SessionSettings) => void;
   prep: PrepSheet;
   source: SttProviderId;
+  session: LiveSession;
   onEnd: (session: StoredSession | null) => void;
 }) {
   const [frozen, setFrozen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const startedRef = useRef(false);
-
-  const session = useLiveSession({
-    mode: settings.mode,
-    lag: settings.lag,
-    prep,
-    source,
-  });
 
   const { snapshot, phase, error, demoBeat, startedAt, lastProvider, start, stop, correct } =
     session;
@@ -94,14 +88,6 @@ export function LiveConsole({
   }, [source]);
 
   const wakeLock = useWakeLock(phase === "running");
-
-  // One start per mount. Getting to live in as few taps as possible is the
-  // product requirement; the console starts itself.
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-    void start();
-  }, [start]);
 
   useEffect(() => {
     if (phase !== "running" || !startedAt) return;
@@ -252,10 +238,12 @@ export function LiveConsole({
             activeRef={autoScroll.activeRef}
             emptyMessage={
               phase === "starting"
-                ? "Connecting…"
-                : source === "demo"
-                  ? "Starting the scripted session…"
-                  : "English assistance will appear here as the speaker begins."
+                ? "Connecting to the microphone…"
+                : phase === "idle" && source !== "demo"
+                  ? "Microphone is not listening. Use Try again below."
+                  : source === "demo"
+                    ? "Starting the scripted session…"
+                    : "English assistance will appear here as the speaker begins."
             }
           />
         )}
@@ -272,9 +260,21 @@ export function LiveConsole({
         )}
 
         {error && (
-          <div className="absolute inset-x-3 bottom-3 flex items-start gap-3 rounded-md border border-[color-mix(in_srgb,var(--danger)_50%,transparent)] bg-[var(--bg-overlay)] px-3 py-2">
-            <p className="flex-1 text-xs leading-relaxed text-[var(--danger)]">{error}</p>
-            <Button size="sm" tone="quiet" onClick={session.dismissError}>
+          <div className="absolute inset-x-3 bottom-3 z-20 flex flex-wrap items-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_50%,transparent)] bg-[var(--bg-overlay)] px-3 py-2 shadow-lg">
+            <p className="min-w-48 flex-1 text-xs leading-relaxed text-[var(--danger)]">{error}</p>
+            {phase === "idle" && (
+              <Button
+                size="md"
+                tone="primary"
+                onClick={() => {
+                  session.dismissError();
+                  void start();
+                }}
+              >
+                Try again
+              </Button>
+            )}
+            <Button size="md" tone="quiet" onClick={session.dismissError}>
               Dismiss
             </Button>
           </div>
