@@ -13,7 +13,7 @@ import { appEnv } from "@/lib/env";
 import { capabilitiesFor, assessFreeTierViability, LIVE_WORKLOAD } from "@/providers/llm/capabilities";
 import { llmRouter } from "@/providers/llm";
 import { OPEN_WEIGHT } from "@/providers/llm/router";
-import { counterStore } from "@/counter/store";
+import { counterStore, counterStoreInfo } from "@/counter/store";
 import { COUNTER_LANGUAGES } from "@/counter/languages";
 import { QUICK_PHRASES, quickPhraseCoverage } from "@/counter/quick-phrases";
 import { hasStrings } from "@/counter/ui-strings";
@@ -35,12 +35,13 @@ export async function GET() {
   const env = appEnv();
   const router = llmRouter();
   const plan = router.plan();
+  const store = counterStore();
+  const [counterSessions] = await Promise.all([store.stats()]);
+  const storage = counterStoreInfo();
 
   // Vercel can retain an optional variable with an empty-string value. The
   // parser deliberately rejects an empty model id, but for an optional model
   // override an empty value semantically means "use the provider default".
-  // Suppress only that deployment-noise case. A non-empty malformed model id
-  // still appears as a real configuration error.
   const configProblems = env.problems.filter((problem) => {
     if (!OPTIONAL_MODEL_FIELDS.has(problem.field)) return true;
     return process.env[problem.field]?.trim() !== "";
@@ -80,7 +81,6 @@ export async function GET() {
           id,
           label: caps.label,
           model: env.llm.providers[id].model,
-          // Boolean only. The key itself never leaves the server.
           configured: env.llm.providers[id].configured,
           eligible: health.eligible,
           ineligibleReason: health.ineligibleReason,
@@ -116,19 +116,22 @@ export async function GET() {
     counter: (() => {
       const openWeight = router.matching(OPEN_WEIGHT);
       return {
-        // Live counts only — never a code, a language pair or a word of text.
-        sessions: counterStore().stats(),
+        sessions: counterSessions,
+        storage: {
+          kind: store.kind,
+          shared: store.shared,
+          configured: storage.configured,
+          source: storage.source,
+          warning: storage.warning,
+        },
         preferOpenWeightModels: env.llm.counterPreferOpen,
         openWeightProviders: openWeight,
-        // The honest headline: the preference is set but nothing satisfies it.
         openWeightAvailable: openWeight.length > 0,
         translationProvider: router.preferred(
           env.llm.counterPreferOpen ? OPEN_WEIGHT : undefined,
         ),
         languages: COUNTER_LANGUAGES.length,
         quickPhrases: QUICK_PHRASES.length,
-        // Where a visitor gets the full experience, and where they get
-        // English chrome and model-translated phrases instead.
         coverage: COUNTER_LANGUAGES.map((language) => ({
           code: language.code,
           label: language.en,
@@ -136,9 +139,9 @@ export async function GET() {
           interfaceTranslated: hasStrings(language.code),
           speechInput: language.speechSupported,
         })),
-        // Stated, not discovered in front of a visitor. See docs/counter-mode.md.
-        storeLimitation:
-          "Sessions live in the memory of one process. Multi-instance or serverless deployments will lose them between requests.",
+        storeLimitation: store.shared
+          ? null
+          : "Sessions live in the memory of one process. Configure Upstash Redis for reliable multi-instance/serverless Counter Mode.",
       };
     })(),
 
