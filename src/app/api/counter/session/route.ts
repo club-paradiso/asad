@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unsupported language." }, { status: 400 });
   }
 
-  const session = counterStore().create(parsed.data);
+  const session = await counterStore().create(parsed.data);
   return NextResponse.json({ session: toView(session) }, { status: 201 });
 }
 
@@ -49,7 +49,7 @@ export async function PATCH(request: Request) {
   }
 
   const store = counterStore();
-  const existing = store.get(code);
+  const existing = await store.get(code);
   if (!existing) {
     return NextResponse.json(
       { error: "That code is not active. Ask the staff member for a new one." },
@@ -69,13 +69,19 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const session = store.update(code, (s) => {
+  const session = await store.update(code, (s) => {
     s.guestLang = parsed.data.guestLang;
     s.guestJoinedAt ??= Date.now();
     s.state = "active";
   });
+  if (!session) {
+    return NextResponse.json(
+      { error: "That code is not active. Ask the staff member for a new one." },
+      { status: 404 },
+    );
+  }
 
-  return NextResponse.json({ session: toView(session!) });
+  return NextResponse.json({ session: toView(session) });
 }
 
 export async function GET(request: Request) {
@@ -84,7 +90,7 @@ export async function GET(request: Request) {
   if (!code) return NextResponse.json({ error: "Invalid code." }, { status: 400 });
 
   const since = Number(url.searchParams.get("since") ?? "0");
-  const session = counterStore().get(code);
+  const session = await counterStore().get(code);
   if (!session) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
@@ -102,7 +108,7 @@ export async function DELETE(request: Request) {
   if (!code) return NextResponse.json({ error: "Invalid code." }, { status: 400 });
 
   // Deleted outright, not marked ended — nothing about a counter conversation
-  // should outlive it on the server.
-  const existed = counterStore().end(code);
+  // should outlive it on the server beyond the store's delete/TTL semantics.
+  const existed = await counterStore().end(code);
   return NextResponse.json({ ended: existed });
 }
