@@ -11,6 +11,7 @@
  * asleep on a desk and there is no reason to keep hammering the server.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { guardedFetch, useSessionToken } from "@/lib/session-client";
 import type { CounterMessage, Participant, SessionView } from "@/counter/types";
 
 const POLL_ACTIVE_MS = 1200;
@@ -23,6 +24,9 @@ export interface SendInput {
 }
 
 export function useCounterSession(code: string | null, role: Participant) {
+  // Both sides reach a model, so both need authorising before they type.
+  useSessionToken();
+
   const [session, setSession] = useState<SessionView | null>(null);
   const [messages, setMessages] = useState<CounterMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +110,7 @@ export function useCounterSession(code: string | null, role: Participant) {
       setSending(true);
       setError(null);
       try {
-        const response = await fetch("/api/counter/message", {
+        const response = await guardedFetch("/api/counter/message", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ code, from: role, ...input }),

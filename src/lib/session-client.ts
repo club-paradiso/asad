@@ -14,6 +14,8 @@
  * finds out.
  */
 
+import { useEffect } from "react";
+
 export interface SessionState {
   /** Whether this deployment requires an access key. */
   gated: boolean;
@@ -50,6 +52,20 @@ export async function openSession(accessKey?: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Mint a session token once, when a screen that will need one mounts.
+ *
+ * `guardedFetch` recovers from a missing token on its own, so this is not
+ * required for correctness — it is required for the first action not to cost
+ * two round trips and log a 401 on the way. A visitor at a counter typing
+ * their first message should not pay for our bookkeeping.
+ */
+export function useSessionToken(): void {
+  useEffect(() => {
+    void openSession();
+  }, []);
 }
 
 /**

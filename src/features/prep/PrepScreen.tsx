@@ -18,10 +18,14 @@ import Link from "next/link";
 import type { GlossaryItem, PrepBrief, PrepSheet } from "@/types";
 import { loadSettings, prepStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
+import { guardedFetch, useSessionToken } from "@/lib/session-client";
 import { romaniseName } from "@/lib/romanise";
 import { Button, Field, Label, TextArea, TextInput } from "@/components/ui/primitives";
 
 export function PrepScreen() {
+  // The brief is generated server-side by a model; authorise before asking.
+  useSessionToken();
+
   const [prep, setPrep] = useLocalStore(prepStore);
   const [brief, setBrief] = useState<PrepBrief | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -40,7 +44,7 @@ export function PrepScreen() {
     setStatus("loading");
     setNotice(null);
     try {
-      const response = await fetch("/api/prep", {
+      const response = await guardedFetch("/api/prep", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
