@@ -39,6 +39,15 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
+const BENIGN_ERRORS = new Set(["no-speech", "aborted"]);
+const FATAL_ERRORS = new Set([
+  "not-allowed",
+  "service-not-allowed",
+  "audio-capture",
+  "language-not-supported",
+  "language-unavailable",
+]);
+
 function getConstructor(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
   const w = window as unknown as {
@@ -76,47 +85,91 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => this.emitStatus("listening");
-
-    recognition.onresult = (event) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const text = result[0]?.transcript ?? "";
-        if (result.isFinal) this.emitStable(text);
-        else interim += text;
-      }
-      if (interim) this.emitPartial(interim);
-    };
-
-    recognition.onerror = (event) => {
-      const code = event.error ?? "unknown";
-      // `no-speech` and `aborted` are routine during a service; do not surface
-      // them as failures or the interpreter learns to ignore the status light.
-      if (code === "no-speech" || code === "aborted") return;
-      this.emitError(new Error(`Speech recognition error: ${code}`));
-      this.emitStatus(code === "not-allowed" ? "error" : "reconnecting", code);
-    };
-
-    // Browsers stop recognition on silence; restart it for a long session.
-    recognition.onend = () => {
-      if (!this.wantRunning) {
-        this.emitStatus("closed");
-        return;
-      }
-      this.emitStatus("reconnecting");
-      this.restartTimer = setTimeout(() => {
-        try {
-          recognition.start();
-        } catch {
-          // Already starting — harmless.
-        }
-      }, 250);
-    };
-
     this.recognition = recognition;
-    recognition.start();
+
+    await new Promise<void>((resolve, reject) => {
+      let connected = false;
+      let settled = false;
+
+      recognition.onstart = () => {
+        connected = true;
+        this.emitStatus("listening");
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+
+      recognition.onresult = (event) => {
+        // Web Speech may update only one result while older interim results are
+        // still present. Rebuilding the visible partial from every non-final
+        // result prevents words from disappearing between result events.
+        let interim = "";
+        for (let i = 0; i < event.results.length; i += 1) {
+          const result = event.results[i];
+          const text = result[0]?.transcript ?? "";
+          if (result.isFinal) {
+            // Final results before resultIndex were already emitted on an
+            // earlier event; emitting them again duplicates the transcript.
+            if (i >= event.resultIndex) this.emitStable(text);
+          } else {
+            interim += text;
+          }
+        }
+        if (interim) this.emitPartial(interim);
+      };
+
+      recognition.onerror = (event) => {
+        const code = event.error ?? "unknown";
+        if (BENIGN_ERRORS.has(code)) return;
+
+        const error = new Error(`Speech recognition error: ${code}`);
+        const fatal = FATAL_ERRORS.has(code);
+
+        // Permission and hardware errors do not heal by calling start() every
+        // 250 ms. Stop the restart loop and give the UI a real retry action.
+        if (fatal) this.wantRunning = false;
+
+        this.emitError(error);
+        this.emitStatus(fatal ? "error" : "reconnecting", code);
+
+        // A connection that never reached onstart should fail its start()
+        // promise. This keeps the session out of the dishonest "running"
+        // phase and makes the retry button available immediately.
+        if (!connected && !settled) {
+          settled = true;
+          this.wantRunning = false;
+          reject(error);
+        }
+      };
+
+      // Browsers stop recognition on silence; restart it for a long session.
+      recognition.onend = () => {
+        if (!this.wantRunning) {
+          this.emitStatus("closed");
+          return;
+        }
+        this.emitStatus("reconnecting");
+        if (this.restartTimer) clearTimeout(this.restartTimer);
+        this.restartTimer = setTimeout(() => {
+          if (!this.wantRunning) return;
+          try {
+            recognition.start();
+          } catch {
+            // Already starting — harmless. The pending start event remains the
+            // authority on whether listening actually resumed.
+          }
+        }, 350);
+      };
+
+      try {
+        recognition.start();
+      } catch (error) {
+        this.wantRunning = false;
+        settled = true;
+        reject(error);
+      }
+    });
   }
 
   sendAudio(): void {
@@ -127,12 +180,13 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     this.wantRunning = false;
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
-    try {
-      this.recognition?.stop();
-    } catch {
-      this.recognition?.abort();
-    }
+    const recognition = this.recognition;
     this.recognition = null;
+    try {
+      recognition?.stop();
+    } catch {
+      recognition?.abort();
+    }
     this.emitStatus("closed");
   }
 }

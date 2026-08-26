@@ -3,9 +3,11 @@
 /**
  * The status strip.
  *
- * One line, 36px tall, carrying only what the interpreter would want to know
+ * One compact line carrying only what the interpreter would want to know
  * without looking for it: is it connected, what mode is it in, how long have
- * we been going, and is anything degraded.
+ * we been going, and is anything degraded. Interactive controls still keep a
+ * 44px touch target; shaving eight pixels off a button is not worth missed taps
+ * in the middle of a sentence.
  *
  * Everything adjustable lives behind the settings button, because §40 is
  * right: controls exposed during live interpretation are controls the eye has
@@ -76,7 +78,7 @@ export function ConsoleTopBar({
   const state = effectiveState(connection, health);
 
   return (
-    <header className="flex h-8 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--bg-raised)] pl-3 pr-1 text-[0.7rem] sm:pl-4 tall:h-9 tall:text-[0.75rem]">
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--bg-raised)] pl-3 pr-1 text-[0.7rem] sm:pl-4 tall:h-12 tall:text-[0.75rem]">
       <span className="flex items-center gap-1.5" title={degradedReason}>
         <StatusDot state={state} />
         <span
@@ -119,13 +121,19 @@ export function ConsoleTopBar({
       <Button
         size="sm"
         tone="quiet"
-        className="h-7 min-w-9 tall:h-9"
+        className="min-w-11 px-2"
         onClick={onOpenSettings}
         ariaLabel="Session settings"
       >
         <span aria-hidden className="text-base leading-none">⋯</span>
       </Button>
-      <Button size="sm" tone="quiet" className="h-7 text-[var(--danger)] tall:h-9" onClick={onEnd}>
+      <Button
+        size="sm"
+        tone="quiet"
+        className="min-w-12 px-2 text-[var(--danger)]"
+        onClick={onEnd}
+        ariaLabel="End session"
+      >
         End
       </Button>
     </header>
