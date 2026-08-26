@@ -84,12 +84,11 @@ export class CircuitBreaker {
   /**
    * Record a failure.
    *
-   * Authentication failures really are configuration failures and remain
-   * disabled until a deploy resets the process. HTTP 400/404/422 responses are
-   * different: providers also use them for request-shape and model-capability
-   * mismatches. Permanently disabling an otherwise healthy provider after one
-   * such response made a single incompatible turn take Counter Mode offline.
-   * Those errors now open the breaker temporarily and are probed again later.
+   * Authentication and known deployment-level model/configuration failures do
+   * not heal while the process keeps the same environment, so they are disabled
+   * immediately. Request-specific rejections are classified separately as
+   * `request_rejected`; those count as ordinary transient failures instead of
+   * benching the provider forever after one incompatible turn.
    */
   recordFailure(
     kind: LlmFailureKind,
@@ -100,8 +99,7 @@ export class CircuitBreaker {
     this.consecutiveFailures += 1;
     this.lastFailure = { kind, message, at: this.now() };
 
-    // A bad credential cannot heal while this process keeps the same env.
-    if (kind === "auth") {
+    if (kind === "auth" || kind === "bad_request") {
       this.permanent = true;
       this.openUntil = Number.POSITIVE_INFINITY;
       return;
