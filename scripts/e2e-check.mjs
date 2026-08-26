@@ -146,7 +146,7 @@ await guest.addInitScript(() => {
           },
         });
         window.setTimeout(() => this.onend?.(), 120);
-      }, 300);
+      }, 700);
     }
 
     stop() {
@@ -294,13 +294,14 @@ await guest.route("**/api/counter/message", async (route) => {
 const guestInput = guest.getByPlaceholder("Type your message");
 const guestMic = guest.getByRole("button", { name: "Voice input" });
 await guestMic.click();
-await guestInput.fill("typed while listening");
-await guest.waitForTimeout(150);
+await guest.waitForTimeout(50);
 
 check(
   "one mic tap starts listening",
   (await guestMic.getAttribute("aria-pressed")) === "true",
 );
+
+await guestInput.fill("typed while listening");
 check(
   "typing remains editable while listening",
   (await guestInput.inputValue()) === "typed while listening",
@@ -308,7 +309,7 @@ check(
 
 // The mock utterance ends naturally and auto-submits the voice message. Its
 // translation is intentionally delayed so we can submit typed text meanwhile.
-await guest.waitForTimeout(500);
+await guest.waitForTimeout(850);
 check(
   "speech auto-submits after the utterance ends",
   queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
