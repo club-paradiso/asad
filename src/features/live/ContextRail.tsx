@@ -48,7 +48,7 @@ export function ContextRail({
         className,
       )}
     >
-      <div className="scroll-x flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
+      <div className="scroll-x fade-right flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
         {empty && (
           <span className="type-context self-center text-[var(--fg-dim)]">
             Scripture, terminology and cultural notes appear here.

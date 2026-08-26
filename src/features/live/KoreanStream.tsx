@@ -43,7 +43,7 @@ export function KoreanStream({
     <div
       ref={ref}
       className={cn(
-        "scroll-y font-korean type-korean h-full overflow-x-hidden px-4 pt-2 pb-3 sm:px-8 lg:px-12",
+        "scroll-y fade-top font-korean type-korean h-full overflow-x-hidden px-4 pt-2 pb-3 sm:px-8 lg:px-12",
         compact && "py-1",
       )}
       aria-label="Korean transcript"

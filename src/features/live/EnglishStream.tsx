@@ -118,7 +118,7 @@ export function EnglishStream({
   return (
     <div
       ref={containerRef}
-      className="scroll-y h-full px-4 sm:px-8 lg:px-12"
+      className="scroll-y fade-top h-full px-4 sm:px-8 lg:px-12"
       // `container-type: size` (not Tailwind's inline-size `@container`, which
       // only exposes cqw) so the tail spacer below can be a fraction of THIS
       // region — what is left after the Korean panel and context rail have

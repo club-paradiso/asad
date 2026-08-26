@@ -19,6 +19,9 @@ import { QUICK_PHRASES, quickPhraseCoverage } from "@/counter/quick-phrases";
 import { hasStrings } from "@/counter/ui-strings";
 import { LLM_PROVIDER_IDS } from "@/providers/llm/types";
 import { telemetry } from "@/lib/telemetry";
+import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
+import { describePolicy } from "@/providers/llm/openrouter";
+import { RATE_RULES } from "@/lib/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +54,42 @@ export async function GET() {
       active: plan.active,
       chain: plan.chain,
       warnings: plan.warnings,
+
+      // The gateway's own configuration. Reported whether or not OpenRouter is
+      // currently serving turns: a deployer needs to see the policy they set,
+      // not only the policy that happens to be in use.
+      openrouter: (() => {
+        const { openrouter } = env.llm;
+        const caps = capabilitiesForModel(openrouter.primaryModel);
+        return {
+          primaryModel: openrouter.primaryModel,
+          qualityModel: openrouter.qualityEscalation ? openrouter.qualityModel : null,
+          qualityEscalation: openrouter.qualityEscalation,
+          policy: {
+            sort: openrouter.policy.sort,
+            dataCollection: openrouter.policy.dataCollection,
+            zdr: openrouter.policy.zdr,
+            allowFallbacks: openrouter.policy.allowFallbacks,
+            requireParameters: openrouter.policy.requireParameters,
+            only: openrouter.policy.only ?? null,
+            ignore: openrouter.policy.ignore ?? null,
+            summary: describePolicy(openrouter.policy),
+          },
+          // What the request builder will actually emit for this model.
+          modelCapabilities: {
+            family: caps.family,
+            structuredOutput: caps.structuredOutput,
+            sampling: caps.sampling,
+            reasoning: caps.reasoning,
+            maxOutputTokens: caps.maxOutputTokens,
+            latencyClass: caps.latencyClass,
+            liveSuitable: caps.liveSuitable,
+            liveWarning: liveSuitabilityProblem(caps),
+            promptCaching: caps.promptCaching,
+            source: caps.source,
+          },
+        };
+      })(),
       providers: LLM_PROVIDER_IDS.map((id) => {
         const caps = capabilitiesFor(id);
         const health = router.health().find((h) => h.provider === id)!;
@@ -128,6 +167,16 @@ export async function GET() {
       provider: env.bible.provider,
       translation: env.bible.translation,
       textAvailable: env.bible.provider !== "reference-only",
+    },
+
+    // What stands between a public URL and the deployer's provider balance.
+    // The per-instance caveat is stated here rather than implied, because a
+    // limit that claims to be global and is not is worse than no limit.
+    protection: {
+      accessGate: env.access.enabled,
+      rateLimits: RATE_RULES,
+      scope: "per-instance",
+      note: "Rate limits are held in the memory of one server instance. On a multi-instance or serverless deployment the effective ceiling is the limit multiplied by the number of warm instances. For a hard global ceiling, set a spend limit on the provider key.",
     },
 
     workload: LIVE_WORKLOAD,
