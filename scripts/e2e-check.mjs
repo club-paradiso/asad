@@ -55,10 +55,12 @@ await page.screenshot({ path: join(outDir, "prep.png") });
 
 // --- Live session ---------------------------------------------------------
 await page.goto(base, { waitUntil: "networkidle" });
-// The launcher names the action honestly: Demo when there is no recogniser,
-// live interpretation when one is configured. CI intentionally runs with no
-// microphone/provider, so it normally takes the Demo branch.
-await page.getByRole("button", { name: /Run demo|Start live interpreting/ }).click();
+// Chromium exposes the Web Speech constructor even on a headless CI runner,
+// so the production launcher correctly prefers it. The E2E transcript checks,
+// however, need deterministic audio. Explicitly choose Demo rather than
+// pretending a microphone is absent and accidentally testing silence.
+await page.getByRole("button", { name: /^Demo/ }).click();
+await page.getByRole("button", { name: "Run demo" }).click();
 await page.waitForTimeout(3000);
 
 await page.getByLabel("Session settings").click();

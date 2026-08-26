@@ -23,10 +23,28 @@ import { telemetry } from "@/lib/telemetry";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const OPTIONAL_MODEL_FIELDS = new Set([
+  "GEMINI_LLM_MODEL",
+  "GROQ_LLM_MODEL",
+  "OPENROUTER_LLM_MODEL",
+  "OPENAI_LLM_MODEL",
+  "ANTHROPIC_LLM_MODEL",
+]);
+
 export async function GET() {
   const env = appEnv();
   const router = llmRouter();
   const plan = router.plan();
+
+  // Vercel can retain an optional variable with an empty-string value. The
+  // parser deliberately rejects an empty model id, but for an optional model
+  // override an empty value semantically means "use the provider default".
+  // Suppress only that deployment-noise case. A non-empty malformed model id
+  // still appears as a real configuration error.
+  const configProblems = env.problems.filter((problem) => {
+    if (!OPTIONAL_MODEL_FIELDS.has(problem.field)) return true;
+    return process.env[problem.field]?.trim() !== "";
+  });
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
@@ -132,7 +150,7 @@ export async function GET() {
 
     workload: LIVE_WORKLOAD,
     telemetry: telemetry.snapshot(),
-    configProblems: env.problems,
+    configProblems,
   });
 }
 
