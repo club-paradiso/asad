@@ -32,19 +32,11 @@ export function StartScreen() {
   const [screen, setScreen] = useState<Screen>("start");
   const [settings, updateSettings] = useLocalStore(settingsStore);
   const [prep] = useLocalStore(prepStore);
-  const [source, setSource] = useState<SttProviderId>("demo");
-  const [sourceTouched, setSourceTouched] = useState(false);
+  const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
 
   const browserSttAvailable = useCapability(() => WebSpeechProvider.isSupported());
-
-  const session = useLiveSession({
-    mode: settings.mode,
-    lag: settings.lag,
-    prep,
-    source,
-  });
 
   // Ask the server once what it can actually do, so the launcher never offers
   // a provider that will fail the moment the interpreter presses Start.
@@ -62,21 +54,25 @@ export function StartScreen() {
     };
   }, []);
 
-  // Honour the deployment's configured recogniser, including browser speech.
-  // The old launcher only auto-selected cloud providers, so a deployment with
-  // STT_PROVIDER=webspeech still opened on Demo and looked as if the microphone
-  // did not work. Never override a source the interpreter picked themselves.
-  useEffect(() => {
-    if (!config || sourceTouched || screen !== "start") return;
+  // Derive the deployment preference instead of mirroring it into state. The
+  // previous launcher only treated cloud STT as configurable, so even
+  // STT_PROVIDER=webspeech opened on Demo. A manual choice always wins.
+  const configuredSource = useMemo<SttProviderId>(() => {
+    if (!config) return "demo";
     const configured = config.stt.configured as SttProviderId;
+    if (configured === "webspeech") return browserSttAvailable ? "webspeech" : "demo";
+    if (config.stt.cloudAvailable) return configured;
+    return "demo";
+  }, [browserSttAvailable, config]);
 
-    if (configured === "webspeech") {
-      if (browserSttAvailable) setSource("webspeech");
-      return;
-    }
+  const source = sourceOverride ?? configuredSource;
 
-    if (config.stt.cloudAvailable) setSource(configured);
-  }, [browserSttAvailable, config, screen, sourceTouched]);
+  const session = useLiveSession({
+    mode: settings.mode,
+    lag: settings.lag,
+    prep,
+    source,
+  });
 
   const sources = useMemo(() => {
     const list: SttProviderId[] = ["demo"];
@@ -172,10 +168,7 @@ export function StartScreen() {
               <button
                 key={id}
                 type="button"
-                onClick={() => {
-                  setSourceTouched(true);
-                  setSource(id);
-                }}
+                onClick={() => setSourceOverride(id)}
                 aria-pressed={selected}
                 className={cn(
                   "touch-manipulation min-h-12 flex-1 basis-56 rounded-md border px-3.5 py-2.5 text-left transition-[color,background-color,border-color,transform] active:scale-[0.99]",
