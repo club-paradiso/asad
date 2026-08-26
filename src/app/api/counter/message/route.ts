@@ -1,10 +1,9 @@
 /**
  * POST /api/counter/message — send one utterance and get it translated.
  *
- * Synchronous: the message is stored complete, with its translation, or stored
- * as `failed`. There is deliberately no "pending" write-then-update dance —
- * a counter exchange is one turn at a time, and a half-written bubble that
- * later changes is worse than a short wait.
+ * Synchronous from the user's point of view: the message is stored complete,
+ * with its translation, or stored as `failed`. The backing session store may be
+ * shared Redis, so every read/write is awaited and atomic at the store layer.
  *
  * Quick phrases short-circuit the model entirely.
  */
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
   if (!code) return NextResponse.json({ error: "Invalid code." }, { status: 400 });
 
   const store = counterStore();
-  const session = store.get(code);
+  const session = await store.get(code);
   if (!session) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
@@ -65,11 +64,14 @@ export async function POST(request: Request) {
         status: "done",
         confidence: "high",
       };
-      const stored = store.update(code, (s) => {
+      const stored = await store.update(code, (s) => {
         appendMessage(s, message);
       });
+      if (!stored) {
+        return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
+      }
       return NextResponse.json({
-        message: stored!.messages[stored!.messages.length - 1],
+        message: stored.messages[stored.messages.length - 1],
         viaModel: false,
       });
     }
@@ -78,8 +80,6 @@ export async function POST(request: Request) {
   }
 
   /* --- Confirmation read-back ------------------------------------------- */
-  // A confirm message is already just the values in question. Echo them
-  // verbatim: re-translating "3:00 · Kim Min-su" can only make it worse.
   if (source === "confirm") {
     const message: Omit<CounterMessage, "seq"> = {
       id: nextId(),
@@ -94,11 +94,14 @@ export async function POST(request: Request) {
       confidence: "high",
       risks: detectRisks(text),
     };
-    const stored = store.update(code, (s) => {
+    const stored = await store.update(code, (s) => {
       appendMessage(s, message);
     });
+    if (!stored) {
+      return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
+    }
     return NextResponse.json({
-      message: stored!.messages[stored!.messages.length - 1],
+      message: stored.messages[stored.messages.length - 1],
       viaModel: false,
     });
   }
@@ -136,7 +139,6 @@ export async function POST(request: Request) {
         status: "done",
         confidence: result.output!.confidence,
         note: result.output!.note,
-        // Detected on the TRANSLATED text: what the other party will act on.
         risks: detectRisks(result.output!.translation),
       }
     : {
@@ -146,12 +148,15 @@ export async function POST(request: Request) {
         error: result.error,
       };
 
-  const stored = store.update(code, (s) => {
+  const stored = await store.update(code, (s) => {
     appendMessage(s, message);
   });
+  if (!stored) {
+    return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
+  }
 
   return NextResponse.json({
-    message: stored!.messages[stored!.messages.length - 1],
+    message: stored.messages[stored.messages.length - 1],
     viaModel: true,
     provider: result.provider,
     latencyMs: result.latencyMs,
