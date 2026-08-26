@@ -32,7 +32,28 @@ export type BenchCategory =
   | "ambiguous-pronoun"
   | "context-dependent-term"
   | "early-restructuring"
-  | "anticipation-hazard";
+  | "anticipation-hazard"
+  /* --- Adversarial additions -------------------------------------------
+   * The first twenty cases cover the interpretation problems a working
+   * interpreter names when asked. These cover the ones they only mention
+   * afterwards, because they are so routine that nobody thinks to list them:
+   * the recogniser mangling a name, the speaker abandoning a sentence, a date
+   * that a congregation will act on, a place name that has no business being
+   * translated. */
+  | "quoted-casual"
+  | "date-and-time"
+  | "place-name"
+  | "loanword"
+  | "disfluency"
+  | "mid-sentence-cancel"
+  | "dropped-subject"
+  | "long-modifier"
+  | "proverb"
+  | "lecture-register"
+  | "public-notice"
+  | "code-mixed"
+  | "stt-error"
+  | "abandoned-number";
 
 export interface BenchCase {
   id: string;
@@ -59,6 +80,18 @@ export interface BenchCase {
     maxWordsPerChunk?: number;
     /** Anticipation would be dangerous here; there must be none. */
     forbidAnticipation?: boolean;
+  };
+  /**
+   * Extra rolling context this case needs.
+   *
+   * Most cases are context-free by design. A few are not, and they are the
+   * realistic ones: an interpreter twenty minutes into a service has already
+   * corrected the pastor's name once, and what the model does with that
+   * correction is the whole question.
+   */
+  context?: {
+    entities?: Array<{ korean: string; english: string }>;
+    corrections?: Array<{ from: string; to: string; english?: string }>;
   };
   /** What a good rendering looks like, for the human review sheet. */
   reference?: string;
@@ -285,6 +318,185 @@ export const BENCH_CASES: BenchCase[] = [
       forbidden: ["do you love god", "are you saved", "what is your purpose"],
     },
     reference: "So the question I want to put to you is this...",
+  },
+
+  /* --- Adversarial additions --------------------------------------------- */
+
+  {
+    id: "b21",
+    category: "quoted-casual",
+    mode: "sermon",
+    korean: "그때 그 친구가 저한테 이러는 거예요. \"야, 진짜 괜찮겠어?\"",
+    challenge:
+      "반말 quoted inside polite narration. The quote has to sound like a friend talking; the narration around it has to stay polite. Flattening both to one register loses the story.",
+    expect: {
+      maxWordsPerChunk: 14,
+      forbidden: ["would you be so kind", "are you quite certain", "art thou"],
+    },
+    reference: 'And my friend turned to me and said, / "Hey — are you sure about this?"',
+  },
+  {
+    id: "b22",
+    category: "date-and-time",
+    mode: "general",
+    korean: "다음 주 화요일, 그러니까 시월 이십삼일 오후 세 시에 모이겠습니다.",
+    challenge:
+      "A date and a time, both of which the room will act on. 시월 is October, not the tenth month read aloud, and a wrong month sends people to an empty building.",
+    expect: { required: ["october", "23"], forbidden: ["november", "december", "september"] },
+    reference: "We'll meet next Tuesday — / that's October 23rd — / at three in the afternoon.",
+  },
+  {
+    id: "b23",
+    category: "place-name",
+    mode: "sermon",
+    korean: "이번 수련회는 제주도 서귀포시 성산일출봉 근처에서 열립니다.",
+    challenge:
+      "Jeju place names. Every one of them has a literal meaning, and translating rather than romanising them produces confident nonsense nobody can navigate by.",
+    expect: {
+      required: ["seogwipo"],
+      forbidden: ["west return port", "sunrise peak castle", "castle mountain sunrise"],
+    },
+    reference:
+      "This year's retreat is on Jeju Island, / near Seongsan Ilchulbong, / in Seogwipo.",
+  },
+  {
+    id: "b24",
+    category: "loanword",
+    mode: "general",
+    korean: "오늘 스케줄은 오리엔테이션 먼저 하고, 그 다음에 워크숍 세션이 있습니다.",
+    challenge:
+      "Korean loanwords that are already English. Re-romanising them, or reaching for a synonym because they look foreign, is a self-inflicted wound.",
+    expect: { required: ["orientation", "workshop"], forbidden: ["oriente", "wokeu", "seukejul"] },
+    reference: "Today's schedule: / orientation first, / then the workshop session.",
+  },
+  {
+    id: "b25",
+    category: "disfluency",
+    mode: "sermon",
+    korean: "그, 그러니까 제 말은... 어... 우리가, 우리가 좀 더 진지해져야 한다는 거예요.",
+    challenge:
+      "Stutters and fillers. They carry no meaning, and reproducing them makes the interpreter sound like the one who is struggling.",
+    expect: { forbidden: [" uh ", " um ", "th-th", "we, we"], maxChunks: 3 },
+    reference: "What I'm saying is — / we need to take this more seriously.",
+  },
+  {
+    id: "b26",
+    category: "mid-sentence-cancel",
+    mode: "general",
+    korean: "저희가 작년에 그 프로그램을... 아니, 재작년에 시작했습니다.",
+    challenge:
+      "The speaker abandons a wrong year mid-sentence and supplies the right one. Only the corrected figure may reach the English.",
+    expect: { required: ["two years ago"] },
+    reference: "We started that programme two years ago — / not last year.",
+  },
+  {
+    id: "b27",
+    category: "dropped-subject",
+    mode: "sermon",
+    korean: "어제 만났어요. 많이 좋아졌더라고요. 다음 주에 퇴원한대요.",
+    priorKorean: ["김 집사님이 병원에 입원하셨습니다."],
+    priorEnglish: ["Deacon Kim has been admitted to hospital."],
+    challenge:
+      "Three consecutive sentences with no subject at all — ordinary Korean, impossible English. The subject must be recovered from context rather than invented, and it must not silently become 'I'.",
+    expect: { required: ["kim"], forbidden: ["i was discharged", "i met", "we were discharged"] },
+    reference:
+      "I saw Deacon Kim yesterday. / He's doing much better. / They say he'll be discharged next week.",
+  },
+  {
+    id: "b28",
+    category: "long-modifier",
+    mode: "sermon",
+    korean:
+      "지난 삼십 년 동안 이 교회를 묵묵히 섬겨 오신, 그리고 한 번도 자기 이름을 드러내지 않으신 권사님을 오늘 소개하고 싶습니다.",
+    challenge:
+      "A long pre-nominal modifier chain arriving entirely before the noun it modifies. Rendered in order it is unsayable in one breath; it has to be restructured into a lead plus two clauses.",
+    expect: { maxWordsPerChunk: 16, required: ["thirty years"] },
+    reference:
+      "I'd like to introduce someone today. / She has served this church quietly for thirty years, / and never once put her own name forward.",
+  },
+  {
+    id: "b29",
+    category: "proverb",
+    mode: "sermon",
+    korean: "여러분, 소 잃고 외양간 고친다는 말이 있지 않습니까?",
+    challenge:
+      "A proverb with a direct English equivalent. The literal version is comprehensible and still lands as a translation rather than as a saying.",
+    expect: {
+      culturalKinds: ["idiom"],
+      forbidden: ["losing the cow", "lost the cow", "repair the barn"],
+      maxWordsPerChunk: 14,
+    },
+    reference:
+      "You know the saying — / shutting the barn door after the horse has bolted.",
+  },
+  {
+    id: "b30",
+    category: "lecture-register",
+    mode: "general",
+    korean:
+      "자, 그러면 다음 장으로 넘어가겠습니다. 이 부분은 시험에 나올 가능성이 높으니까 집중해 주시기 바랍니다.",
+    challenge:
+      "Lecture register in GENERAL mode. Plain instructional English — not sermon cadence, and not the stiff formality that 주시기 바랍니다 invites.",
+    expect: {
+      maxWordsPerChunk: 14,
+      forbidden: ["brothers and sisters", "beloved", "it is requested that"],
+    },
+    reference:
+      "Right, let's move on to the next chapter. / This part is likely to be on the exam, / so please pay attention.",
+  },
+  {
+    id: "b31",
+    category: "public-notice",
+    mode: "general",
+    korean: "민원 접수는 오후 여섯 시까지이며, 신분증을 반드시 지참하셔야 합니다.",
+    challenge:
+      "A public-service announcement a visitor will act on. 반드시 is not a suggestion, and softening it into one sends someone home for their ID a second time.",
+    expect: { required: ["six"], forbidden: ["might want to", "perhaps", "if possible"] },
+    reference: "Applications are accepted until six p.m. / You must bring photo ID.",
+  },
+  {
+    id: "b32",
+    category: "code-mixed",
+    mode: "general",
+    korean:
+      "이번 분기 KPI는 달성했는데, 다음 스프린트에서 리소스가 좀 타이트할 것 같아요.",
+    challenge:
+      "Korean carrying English business vocabulary. Those words are already the audience's words; expanding the acronym costs breath and sounds like an explanation nobody asked for.",
+    expect: { required: ["kpi"], forbidden: ["key performance indicator"] },
+    reference:
+      "We hit this quarter's KPIs, / but resources look a bit tight for the next sprint.",
+  },
+  {
+    id: "b33",
+    category: "stt-error",
+    mode: "sermon",
+    korean: "오늘 말씀은 유정기 목사님께서 전해 주시겠습니다.",
+    // The interpreter has already overruled the recogniser once. That
+    // correction is absolute, and this case exists to check it actually wins.
+    context: {
+      corrections: [{ from: "유정기", to: "류정길", english: "Ryu Jeong-gil" }],
+    },
+    challenge:
+      "The recogniser mangled the pastor's name and the interpreter corrected it earlier in the session. Reproducing the recogniser's version instead is the failure that gets noticed from the platform.",
+    expect: {
+      required: ["ryu jeong-gil"],
+      forbidden: ["yu jeong-gi", "yoo jung-ki", "yu jeonggi"],
+    },
+    reference: "Today's message will be brought to us / by Pastor Ryu Jeong-gil.",
+  },
+  {
+    id: "b34",
+    category: "abandoned-number",
+    mode: "sermon",
+    korean: "헌금은 총 삼백... 아니 잠시만요, 확인해 보겠습니다.",
+    challenge:
+      "A figure is started and abandoned with nothing put in its place. There is no correct number to give, so any number is invented — and this one is about money.",
+    expect: {
+      forbidden: ["three hundred", "300", "3,000", "three thousand"],
+      maxChunks: 3,
+      forbidAnticipation: true,
+    },
+    reference: "The offering came to— / sorry, let me check that.",
   },
 ];
 

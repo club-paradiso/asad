@@ -116,8 +116,9 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
       recentKorean: benchCase.priorKorean ?? [],
       recentEnglish: benchCase.priorEnglish ?? [],
       glossary: [],
-      entities:
-        benchCase.category === "wordplay"
+      entities: benchCase.context?.entities
+        ? benchCase.context.entities.map((e) => ({ ...e, kind: "person" as const }))
+        : benchCase.category === "wordplay"
           ? [
               {
                 korean: "류정길",
@@ -127,7 +128,10 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
             ]
           : [],
       scripture: [],
-      corrections: [],
+      // A case that ships corrections needs them delivered, or it is testing
+      // nothing: "does an interpreter's correction win?" cannot be answered
+      // by a request that does not carry one.
+      corrections: benchCase.context?.corrections ?? [],
     },
     allowAnticipation: !benchCase.expect.forbidAnticipation,
   };
