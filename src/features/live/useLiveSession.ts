@@ -163,6 +163,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     setError(null);
     setPhase("starting");
     setDemoBeat(null);
+    setLastProvider(undefined);
+    setSnapshot(emptySnapshot());
 
     const current = optionsRef.current;
     const engine = new InterpretationEngine({
@@ -229,6 +231,13 @@ export function useLiveSession(options: LiveSessionOptions) {
           "stt",
           status === "error" ? "down" : status === "reconnecting" ? "degraded" : "ok",
         );
+
+        // A recogniser that reports a terminal error is no longer listening.
+        // Tear it down and expose the direct-interaction retry button instead
+        // of leaving the UI saying "running" while the microphone is dead.
+        if (status === "error") {
+          void teardown().finally(() => setPhase("idle"));
+        }
       });
 
       await provider.connect();
@@ -251,7 +260,7 @@ export function useLiveSession(options: LiveSessionOptions) {
       const message =
         err instanceof Error
           ? err.name === "NotAllowedError"
-            ? "Microphone permission was denied. Grant access, or switch to Demo."
+            ? "Microphone permission was denied. Grant access, then tap Try again."
             : err.message
           : "Could not start the session.";
       setError(message);
@@ -295,6 +304,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     dismissError: useCallback(() => setError(null), []),
   };
 }
+
+export type LiveSession = ReturnType<typeof useLiveSession>;
 
 const mapStatus = (status: SttStatus): ConnectionState => {
   switch (status) {
