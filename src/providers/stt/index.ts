@@ -9,6 +9,7 @@ import { DemoSpeechProvider, type DemoSpeechOptions } from "./demo";
 import { DeepgramSpeechProvider } from "./deepgram";
 import { OpenAiSpeechProvider } from "./openai";
 import { WebSpeechProvider } from "./webspeech";
+import { guardedFetch } from "@/lib/session-client";
 import type { SpeechProvider, SttCredentials, SttProviderId, SttProviderOptions } from "./types";
 
 export * from "./types";
@@ -72,11 +73,21 @@ export const STT_PROVIDER_INFO: Record<
   },
 };
 
-/** Fetch short-lived connection details. Returns `null` when unconfigured. */
+/**
+ * Fetch short-lived connection details. Returns `null` when unconfigured.
+ *
+ * Guarded, because this route mints credentials against a billed recogniser
+ * account and the credential outlives the request that obtained it.
+ */
 export async function fetchSttCredentials(
   signal?: AbortSignal,
 ): Promise<SttCredentials | null> {
-  const response = await fetch("/api/stt/token", { method: "POST", signal });
+  const response = await guardedFetch("/api/stt/token", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+    signal,
+  });
   if (!response.ok) return null;
   const data = (await response.json()) as Partial<SttCredentials> & { provider?: string };
   if (!data?.provider) return null;

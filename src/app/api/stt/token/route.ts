@@ -7,9 +7,16 @@
  *
  * When nothing is configured it answers `demo` rather than erroring — an
  * unconfigured deployment still opens straight into a working console.
+ *
+ * GUARDED, and not optionally: this route mints credentials against a billed
+ * Deepgram or OpenAI account. Unprotected it is a free key dispenser for
+ * anyone who finds the URL, which is a worse hole than the interpretation
+ * route — the credential outlives the request.
  */
 import { NextResponse } from "next/server";
-import type { SttCredentials, SttProviderId } from "@/providers/stt/types";
+import { appEnv } from "@/lib/env";
+import { guardInferenceRoute } from "@/lib/guard";
+import type { SttCredentials } from "@/providers/stt/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,22 +24,30 @@ export const dynamic = "force-dynamic";
 /** Deepgram temporary keys are minted per session and expire quickly. */
 const TEMP_KEY_TTL_SECONDS = 60 * 90; // one long service
 
-const isProviderId = (value: string): value is SttProviderId =>
-  value === "demo" || value === "webspeech" || value === "deepgram" || value === "openai";
+export async function POST(request: Request) {
+  const guarded = await guardInferenceRoute(request, {
+    requireSession: true,
+    maxBodyBytes: 1024,
+    limits: [{ rule: "sttToken", by: "session" }, { rule: "sttToken", by: "address" }],
+  });
+  if (!guarded.ok) return guarded.response;
 
-export async function POST() {
-  const requested = (process.env.STT_PROVIDER ?? "demo").trim().toLowerCase();
-  const provider: SttProviderId = isProviderId(requested) ? requested : "demo";
+  // Read the PARSED environment. The raw values were read here directly, which
+  // meant this route and the rest of the application could disagree about
+  // which recogniser was configured — the launcher offering one the token
+  // endpoint would not mint for.
+  const env = appEnv();
+  const provider = env.stt.provider;
 
   if (provider === "demo" || provider === "webspeech") {
     return NextResponse.json({ provider } satisfies SttCredentials);
   }
 
   if (provider === "deepgram") {
-    const key = process.env.DEEPGRAM_API_KEY?.trim();
+    const key = env.stt.deepgramKey;
     if (!key) return fallback("DEEPGRAM_API_KEY is not set.");
 
-    const model = process.env.DEEPGRAM_STT_MODEL?.trim() || "nova-3";
+    const model = env.stt.deepgramModel;
     const temporary = await mintDeepgramKey(key);
 
     // A project without key-management scope can still stream; fall back to the
@@ -46,10 +61,10 @@ export async function POST() {
     });
   }
 
-  const key = process.env.OPENAI_API_KEY?.trim();
+  const key = env.stt.openaiKey;
   if (!key) return fallback("OPENAI_API_KEY is not set.");
 
-  const model = process.env.OPENAI_STT_MODEL?.trim() || "gpt-live-transcribe";
+  const model = env.stt.openaiModel;
   const session = await mintOpenAiSession(key, model);
 
   return NextResponse.json({
@@ -66,7 +81,7 @@ function fallback(reason: string) {
 
 /** Ask Deepgram for a scoped, expiring key for this session. */
 async function mintDeepgramKey(accountKey: string): Promise<string | null> {
-  const projectId = process.env.DEEPGRAM_PROJECT_ID?.trim();
+  const projectId = appEnv().stt.deepgramProjectId;
   if (!projectId) return null;
   try {
     const response = await fetch(

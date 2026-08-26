@@ -61,11 +61,48 @@ describe("routing modes", () => {
         LLM_PRIVACY_MODE: "strict",
         GEMINI_API_KEY: KEY,
         GROQ_API_KEY: KEY,
+      }),
+    );
+    // Groq states it does not train on either tier; Gemini's free tier may.
+    expect(router.plan().chain).toEqual(["groq", "local"]);
+  });
+
+  it("strict privacy mode admits OpenRouter, because its policy denies collection", () => {
+    const router = new LlmRouter(
+      env({
+        LLM_ROUTING_MODE: "auto-free",
+        LLM_PRIVACY_MODE: "strict",
         OPENROUTER_API_KEY: KEY,
       }),
     );
-    // Groq is the only one of the three that states it does not train.
-    expect(router.plan().chain).toEqual(["groq", "local"]);
+    // OpenRouter's posture is "varies" only in its DEFAULT configuration. This
+    // deployment sends `data_collection: deny` on every request, which is the
+    // instruction to exclude upstreams that may retain or train. Benching the
+    // one provider configured to satisfy strict mode was the bug.
+    expect(router.plan().chain).toEqual(["openrouter", "local"]);
+  });
+
+  it("strict privacy mode still excludes OpenRouter when collection is allowed", () => {
+    const router = new LlmRouter(
+      env({
+        LLM_ROUTING_MODE: "auto-free",
+        LLM_PRIVACY_MODE: "strict",
+        OPENROUTER_DATA_COLLECTION: "allow",
+        OPENROUTER_API_KEY: KEY,
+      }),
+    );
+    // Strict mode forces the policy back to deny and says so, so OpenRouter
+    // stays eligible — what it must never do is honour `allow` silently.
+    const parsed = env({
+      LLM_PRIVACY_MODE: "strict",
+      OPENROUTER_DATA_COLLECTION: "allow",
+      OPENROUTER_API_KEY: KEY,
+    });
+    expect(parsed.llm.openrouter.policy.dataCollection).toBe("deny");
+    expect(
+      parsed.problems.some((p) => p.field === "OPENROUTER_DATA_COLLECTION"),
+    ).toBe(true);
+    expect(router.plan().chain).toEqual(["openrouter", "local"]);
   });
 
   it("pinned uses exactly the named provider, then local", () => {

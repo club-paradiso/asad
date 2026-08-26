@@ -1,9 +1,15 @@
 /**
  * Vendor configuration for the OpenAI-compatible providers.
  *
- * Groq, OpenRouter and OpenAI differ by base URL, default model, structured
- * output support and a couple of headers. That is genuinely all — so it lives
- * here as data rather than as three classes.
+ * Groq and OpenAI differ by base URL, default model, structured output support
+ * and a couple of headers. That is genuinely all — so it lives here as data
+ * rather than as two classes.
+ *
+ * OpenRouter used to be in this table and no longer is. It speaks the same
+ * wire format, but it is a router rather than a vendor: provider selection,
+ * data-collection policy, zero-data-retention and parameter-support
+ * requirements have no analogue here and are not optional extras for a live
+ * interpretation deployment. It has its own adapter in `openrouter.ts`.
  *
  * Model ids are DEFAULTS ONLY and every one is overrideable by environment
  * variable. Models get deprecated on their own schedule; that must never
@@ -23,10 +29,7 @@ export interface VendorSpec {
   headers?: Record<string, string>;
 }
 
-export const OPENAI_COMPATIBLE_VENDORS: Record<
-  "groq" | "openrouter" | "openai",
-  VendorSpec
-> = {
+export const OPENAI_COMPATIBLE_VENDORS: Record<"groq" | "openai", VendorSpec> = {
   groq: {
     id: "groq",
     label: "Groq",
@@ -36,19 +39,6 @@ export const OPENAI_COMPATIBLE_VENDORS: Record<
     defaultModel: "openai/gpt-oss-120b",
     structuredOutput: "json_schema",
     reasoningField: "reasoning_effort",
-  },
-  openrouter: {
-    id: "openrouter",
-    label: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    // A pinned free model rather than a random router: consistency within one
-    // sermon matters more than squeezing out marginal quality.
-    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
-    structuredOutput: "json_schema",
-    headers: {
-      "HTTP-Referer": "https://github.com/lucanomics/tong-yuck",
-      "X-Title": "tong-yuck",
-    },
   },
   openai: {
     id: "openai",

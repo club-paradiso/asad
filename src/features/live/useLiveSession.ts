@@ -34,6 +34,7 @@ import {
 } from "@/providers/stt";
 import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
+import { guardedFetch } from "@/lib/session-client";
 
 /** How often the engine's clock advances. 200ms is well inside human latency. */
 const TICK_MS = 200;
@@ -110,7 +111,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         };
       }
 
-      const response = await fetch("/api/interpret", {
+      const response = await guardedFetch("/api/interpret", {
         method: "POST",
         signal,
         headers: { "content-type": "application/json" },
@@ -118,7 +119,13 @@ export function useLiveSession(options: LiveSessionOptions) {
       });
 
       if (!response.ok) {
-        throw new Error(`Interpretation request failed (${response.status}).`);
+        // 429 is the one status worth naming: it is the deployment protecting
+        // itself, not a fault, and the console recovers on the next turn.
+        throw new Error(
+          response.status === 429
+            ? "Interpretation is being rate limited — slowing down."
+            : `Interpretation request failed (${response.status}).`,
+        );
       }
 
       const data = (await response.json()) as {
