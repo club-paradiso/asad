@@ -44,10 +44,15 @@ const TONE_ACTIVE: Record<ButtonTone, string> = {
 };
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: "h-9 px-3 text-[0.8125rem]",
+  sm: "min-h-11 px-3 text-[0.8125rem]",
   md: "min-h-11 px-4 text-sm",
   lg: "min-h-14 px-6 text-base",
 };
+
+const INTERACTIVE =
+  "touch-manipulation select-none cursor-pointer transition-[color,background-color,border-color,filter,transform] " +
+  "active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] " +
+  "focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
 
 export function Button({
   children,
@@ -81,8 +86,9 @@ export function Button({
       aria-label={ariaLabel}
       aria-pressed={active || undefined}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-md border transition-colors select-none",
-        "disabled:opacity-40 disabled:pointer-events-none",
+        "inline-flex items-center justify-center gap-2 rounded-md border",
+        INTERACTIVE,
+        "disabled:cursor-not-allowed disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100",
         SIZE[size],
         active ? TONE_ACTIVE[tone] : TONE[tone],
         className,
@@ -156,7 +162,7 @@ export function Chip({
       title={title}
       className={cn(
         "shrink-0 rounded border px-2.5 py-1.5 type-context whitespace-nowrap text-left",
-        onClick && "cursor-pointer hover:brightness-125",
+        onClick && `${INTERACTIVE} hover:brightness-125`,
         styles,
         className,
       )}
@@ -197,8 +203,9 @@ export function Segmented<T extends string>({
             title={option.title}
             onClick={() => onChange(option.value)}
             className={cn(
-              "rounded transition-colors",
-              size === "sm" ? "h-8 px-2.5 text-[0.75rem]" : "min-h-10 px-3.5 text-sm",
+              "rounded",
+              INTERACTIVE,
+              size === "sm" ? "min-h-11 px-2.5 text-[0.75rem]" : "min-h-11 px-3.5 text-sm",
               selected
                 ? "bg-[var(--accent)] text-[#141007] font-semibold"
                 : "text-[var(--fg-muted)] hover:text-[var(--fg)]",
@@ -300,7 +307,10 @@ export function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-4 rounded-md border border-[var(--line)] bg-[var(--bg-raised)] px-3 py-3 text-left min-h-12"
+      className={cn(
+        "flex w-full min-h-12 items-center justify-between gap-4 rounded-md border border-[var(--line)] bg-[var(--bg-raised)] px-3 py-3 text-left",
+        INTERACTIVE,
+      )}
     >
       <span className="flex flex-col gap-0.5">
         <span className="text-sm text-[var(--fg)]">{label}</span>
