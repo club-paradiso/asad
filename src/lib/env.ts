@@ -123,6 +123,9 @@ const rawEnvSchema = z.object({
 
   // Optional gate for a private deployment. Absent means no gate.
   APP_ACCESS_KEY: z.string().trim().min(8, "too short to be a useful access key").optional(),
+  // Signing key for session tokens. Only matters on a multi-instance
+  // deployment; see `sessionEnforcement` in src/lib/guard.ts.
+  SESSION_SECRET: z.string().trim().min(16, "too short to sign session tokens").optional(),
 
   BIBLE_PROVIDER: z.string().trim().toLowerCase().optional(),
   BIBLE_API_KEY: optionalKey,
@@ -214,7 +217,18 @@ export interface AppEnv {
    * Not an identity system. It exists so that a deployment carrying a billed
    * OpenRouter key is not a public endpoint anyone can drain.
    */
-  access: { key?: string; enabled: boolean };
+  access: {
+    key?: string;
+    enabled: boolean;
+    /**
+     * A secret that is identical on every instance of this deployment.
+     *
+     * Session tokens are signed with it. Without one they are signed with a
+     * per-process random key, which works on a single server and fails on
+     * anything that scales out — see `sessionEnforcement`.
+     */
+    sessionSecret?: string;
+  };
   bible: {
     provider: "reference-only" | "public-domain" | "api-bible";
     apiKey?: string;
@@ -528,7 +542,13 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
         policy: openrouterPolicy,
       },
     },
-    access: { key: raw.APP_ACCESS_KEY, enabled: !!raw.APP_ACCESS_KEY },
+    access: {
+      key: raw.APP_ACCESS_KEY,
+      enabled: !!raw.APP_ACCESS_KEY,
+      // APP_ACCESS_KEY doubles as the signing key when it is set, so a gated
+      // deployment needs nothing further.
+      sessionSecret: raw.SESSION_SECRET ?? raw.APP_ACCESS_KEY,
+    },
     bible: {
       provider: bibleProvider,
       apiKey: raw.BIBLE_API_KEY,

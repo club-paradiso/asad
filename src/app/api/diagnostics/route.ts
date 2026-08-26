@@ -21,7 +21,7 @@ import { LLM_PROVIDER_IDS } from "@/providers/llm/types";
 import { telemetry } from "@/lib/telemetry";
 import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
 import { describePolicy } from "@/providers/llm/openrouter";
-import { RATE_RULES } from "@/lib/guard";
+import { RATE_RULES, sessionEnforcement } from "@/lib/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -174,6 +174,10 @@ export async function GET() {
     // limit that claims to be global and is not is worse than no limit.
     protection: {
       accessGate: env.access.enabled,
+      // "enforced" needs a secret that is identical on every instance. Without
+      // one, session tokens key rate limits but cannot refuse a request — see
+      // sessionEnforcement in src/lib/guard.ts.
+      sessionEnforcement: sessionEnforcement(),
       rateLimits: RATE_RULES,
       scope: "per-instance",
       note: "Rate limits are held in the memory of one server instance. On a multi-instance or serverless deployment the effective ceiling is the limit multiplied by the number of warm instances. For a hard global ceiling, set a spend limit on the provider key.",

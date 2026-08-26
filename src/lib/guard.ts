@@ -39,22 +39,46 @@ export const ACCESS_COOKIE = "tong-yuck-access";
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
 /**
- * Signing secret.
+ * Signing secret, and what its absence costs.
  *
- * Derived from `APP_ACCESS_KEY` when there is one, so tokens survive a restart
- * on a gated deployment. Otherwise random per process: tokens then die with the
- * instance, which is harmless because the client re-mints on the first 401 and
- * a serverless instance is short-lived anyway.
+ * Derived from `SESSION_SECRET` (or `APP_ACCESS_KEY`, which doubles as one)
+ * when either is set. Otherwise it is random per process.
+ *
+ * THAT DISTINCTION IS LOAD-BEARING ON SERVERLESS. A per-process secret is fine
+ * on a single server. On Vercel — the deployment target this project
+ * documents — requests are spread across instances, so a token minted by one
+ * instance fails verification on the next. Enforcing sessions under those
+ * conditions does not make the deployment stricter; it breaks it, continuously
+ * and invisibly, with the console re-minting a token that the following
+ * request rejects again.
+ *
+ * So enforcement is conditional. With a stable secret, a valid session is
+ * REQUIRED on the paid routes. Without one, sessions are still issued and
+ * still used to key rate limits per browser — which is strictly better than
+ * keying on an address shared by everyone behind one NAT — but a verification
+ * failure does not refuse the request. Same-origin and per-address limits
+ * still apply, and `/diagnostics` says which mode is in force rather than
+ * letting a deployer assume the stronger one.
  */
 let signingSecret: Buffer | null = null;
 function secret(): Buffer {
   if (signingSecret) return signingSecret;
-  const configured = appEnv().access.key;
+  const configured = appEnv().access.sessionSecret;
   signingSecret = configured
     ? createHmac("sha256", "tong-yuck/session").update(configured).digest()
     : randomBytes(32);
   return signingSecret;
 }
+
+export type SessionEnforcement =
+  /** A stable secret exists; an invalid session token is refused. */
+  | "enforced"
+  /** No stable secret; tokens key rate limits but cannot gate a request. */
+  | "best-effort";
+
+/** Whether session tokens can be trusted across instances. */
+export const sessionEnforcement = (): SessionEnforcement =>
+  appEnv().access.sessionSecret ? "enforced" : "best-effort";
 
 const sign = (payload: string): string =>
   createHmac("sha256", secret()).update(payload).digest("base64url");
@@ -340,7 +364,11 @@ export async function guardInferenceRoute(
   }
 
   const session = readCookie(request, SESSION_COOKIE);
-  if (options.requireSession && !verifySessionToken(session)) {
+  if (
+    options.requireSession &&
+    sessionEnforcement() === "enforced" &&
+    !verifySessionToken(session)
+  ) {
     // 401 rather than 403: the client's correct response is to mint a token
     // and retry once, which the console does automatically.
     return deny(401, "Session authorisation required.");

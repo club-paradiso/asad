@@ -15,6 +15,7 @@ import {
   issueSessionToken,
   readJsonBody,
   secretsMatch,
+  sessionEnforcement,
   verifySessionToken,
 } from "./guard";
 import { RequestRateLimiter } from "./rate-limit";
@@ -50,8 +51,60 @@ const guard = (request: Request) =>
 
 beforeEach(() => {
   delete process.env.APP_ACCESS_KEY;
+  delete process.env.SESSION_SECRET;
   __resetEnvCache();
   __resetGuards();
+});
+
+/**
+ * Session enforcement on a deployment that scales out.
+ *
+ * The bug these exist to prevent is not a weakness, it is an outage. With a
+ * per-process signing key and more than one instance, a token minted by one
+ * instance fails on the next — so enforcing sessions would 401 every request
+ * in a loop, with the console re-minting a token the following request
+ * rejects again. Interpretation would fail continuously on the exact platform
+ * this project documents deploying to.
+ */
+describe("session enforcement", () => {
+  it("is best-effort when no secret is stable across instances", () => {
+    expect(sessionEnforcement()).toBe("best-effort");
+  });
+
+  it("does not refuse a request it cannot verify, in best-effort mode", async () => {
+    // Same-origin and rate limits still apply; the token just cannot gate.
+    const result = await guard(req());
+    expect(result.ok).toBe(true);
+  });
+
+  it("still refuses cross-origin in best-effort mode", async () => {
+    // Degrading session enforcement must not degrade anything else.
+    const result = await guard(req({ origin: "https://attacker.example" }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.response.status).toBe(403);
+  });
+
+  it("enforces once SESSION_SECRET makes tokens portable", async () => {
+    process.env.SESSION_SECRET = "a-secret-shared-by-every-instance";
+    __resetEnvCache();
+    __resetGuards();
+
+    expect(sessionEnforcement()).toBe("enforced");
+    const without = await guard(req());
+    expect(without.ok).toBe(false);
+    if (!without.ok) expect(without.response.status).toBe(401);
+
+    const withToken = await guard(req({ cookie: withSession() }));
+    expect(withToken.ok).toBe(true);
+  });
+
+  it("treats APP_ACCESS_KEY as a stable secret too", () => {
+    process.env.APP_ACCESS_KEY = "a-private-deployment-key";
+    __resetEnvCache();
+    __resetGuards();
+    // A gated deployment needs no second variable to get full strength.
+    expect(sessionEnforcement()).toBe("enforced");
+  });
 });
 
 describe("session tokens", () => {
@@ -147,7 +200,10 @@ describe("the guard as a whole", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("refuses a request with no session token", async () => {
+  it("refuses a request with no session token, when tokens are enforceable", async () => {
+    process.env.SESSION_SECRET = "a-secret-shared-by-every-instance";
+    __resetEnvCache();
+    __resetGuards();
     const result = await guard(req());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.response.status).toBe(401);

@@ -118,6 +118,13 @@ interface Payload {
     storeLimitation: string;
   };
   bible: { provider: string; translation: string; textAvailable: boolean };
+  protection: {
+    accessGate: boolean;
+    sessionEnforcement: "enforced" | "best-effort";
+    rateLimits: Record<string, { limit: number; windowMs: number }>;
+    scope: string;
+    note: string;
+  };
   workload: Record<string, number | string>;
   telemetry: {
     latency: Record<string, { count: number; p50: number; p90: number; p95: number; max: number }>;
@@ -583,6 +590,39 @@ export function DiagnosticsScreen() {
             </table>
           </div>
         </details>
+      </Section>
+
+      {/* What stands between a public URL and the provider balance. Stated
+          with its limits, because a limit that claims to be global and is not
+          is worse than no limit — it gets trusted. */}
+      <Section title="Abuse protection">
+        <Row
+          k="Access gate"
+          v={data.protection.accessGate ? "APP_ACCESS_KEY set" : "open to anyone with the URL"}
+          tone={data.protection.accessGate ? "ok" : "warn"}
+        />
+        <Row
+          k="Session tokens"
+          v={
+            data.protection.sessionEnforcement === "enforced"
+              ? "enforced"
+              : "best-effort (no stable secret)"
+          }
+          tone={data.protection.sessionEnforcement === "enforced" ? "ok" : "warn"}
+        />
+        <Row k="Live turns" v={`${data.protection.rateLimits.interpretSession.limit}/min per session`} />
+        <Row k="Prep briefs" v={`${data.protection.rateLimits.prep.limit}/min`} />
+        <Row k="Counter messages" v={`${data.protection.rateLimits.counter.limit}/min`} />
+        <p className="text-sm leading-relaxed text-[var(--fg-muted)]">
+          {data.protection.note}
+        </p>
+        {data.protection.sessionEnforcement !== "enforced" && (
+          <p className="text-sm leading-relaxed text-[var(--warn)]">
+            Set SESSION_SECRET (or APP_ACCESS_KEY) to a value identical on every
+            instance to enforce session tokens. Without it they still key rate
+            limits per browser, but cannot refuse a request.
+          </p>
+        )}
       </Section>
 
       <Section title="Browser capability">

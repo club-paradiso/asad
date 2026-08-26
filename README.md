@@ -188,6 +188,7 @@ OPENROUTER_DATA_COLLECTION=deny
 OPENROUTER_REQUIRE_PARAMETERS=true
 
 APP_ACCESS_KEY=...           # see "Protecting a deployed app"
+SESSION_SECRET=...           # required on Vercel; see the same section
 
 BIBLE_PROVIDER=reference-only
 ```
@@ -239,6 +240,15 @@ Always on, no configuration needed:
 
 Set `APP_ACCESS_KEY` and nothing paid answers without it. Any non-empty value
 works; it is a shared secret, not an account system.
+
+**On Vercel, also set `SESSION_SECRET`** (`APP_ACCESS_KEY` doubles as one). It
+must be identical on every instance. Without it the signing key is random per
+process, so a token minted by one instance fails on the next — and enforcing
+sessions under those conditions would not make the deployment stricter, it
+would break it continuously, with the console re-minting a token the following
+request rejects again. So without a stable secret, session tokens degrade to
+keying rate limits per browser and stop gating requests. `/diagnostics` reports
+which mode is in force rather than letting you assume the stronger one.
 
 **The honest caveat:** rate limits live in the memory of one server instance.
 On Vercel, or anywhere running more than one, the effective ceiling is the limit
