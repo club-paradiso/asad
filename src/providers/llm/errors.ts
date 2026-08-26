@@ -25,7 +25,7 @@ export type LlmFailureKind =
   | "malformed_output"
   /** 401/403. Permanent until configuration changes — never retry. */
   | "auth"
-  /** 400 or a model id the provider rejects. Permanent until config changes. */
+  /** 400/404/422. Often request/model capability mismatch; cool down and retry later. */
   | "bad_request"
   /** Anything unclassified. */
   | "unknown";
@@ -33,7 +33,6 @@ export type LlmFailureKind =
 /** Failures that must never be retried against the same provider config. */
 const PERMANENT: ReadonlySet<LlmFailureKind> = new Set<LlmFailureKind>([
   "auth",
-  "bad_request",
 ]);
 
 /** Failures that should open the circuit quickly rather than after N strikes. */
