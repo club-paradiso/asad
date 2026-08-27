@@ -14,6 +14,49 @@ import { Button, Label, StatusDot } from "@/components/ui/primitives";
 import { useCapability } from "@/hooks/useCapability";
 import { cn } from "@/lib/cn";
 
+interface OpenRouterConfigRow {
+  primaryModel: string;
+  qualityModel: string | null;
+  qualityEscalation: boolean;
+  policy: {
+    sort: string;
+    dataCollection: string;
+    zdr: boolean;
+    allowFallbacks: boolean;
+    requireParameters: boolean;
+    only: string[] | null;
+    ignore: string[] | null;
+    summary: string;
+  };
+  modelCapabilities: {
+    family: string;
+    structuredOutput: string;
+    sampling: string;
+    reasoning: string;
+    maxOutputTokens: number;
+    latencyClass: string;
+    liveSuitable: boolean;
+    liveWarning: string | null;
+    promptCaching: boolean;
+    source: string;
+  };
+}
+
+/** Result of the on-demand health probe. Never carries a key. */
+interface HealthResult {
+  configured: boolean;
+  model: string;
+  probe: {
+    ok: boolean;
+    latencyMs?: number;
+    servedModel?: string;
+    upstream?: string;
+    schemaValid?: boolean;
+    error?: string;
+    failureKind?: string;
+  } | null;
+}
+
 interface ProviderRow {
   id: string;
   label: string;
@@ -55,6 +98,7 @@ interface Payload {
     chain: string[];
     warnings: string[];
     providers: ProviderRow[];
+    openrouter: OpenRouterConfigRow;
   };
   counter: {
     sessions: { active: number; waiting: number; totalMessages: number };
@@ -74,6 +118,13 @@ interface Payload {
     storeLimitation: string;
   };
   bible: { provider: string; translation: string; textAvailable: boolean };
+  protection: {
+    accessGate: boolean;
+    sessionEnforcement: "enforced" | "best-effort";
+    rateLimits: Record<string, { limit: number; windowMs: number }>;
+    scope: string;
+    note: string;
+  };
   workload: Record<string, number | string>;
   telemetry: {
     latency: Record<string, { count: number; p50: number; p90: number; p95: number; max: number }>;
@@ -118,6 +169,7 @@ const Row = ({ k, v, tone }: { k: string; v: React.ReactNode; tone?: "warn" | "o
 
 export function DiagnosticsScreen() {
   const [data, setData] = useState<Payload | null>(null);
+  const [health, setHealth] = useState<HealthResult | "running" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Browser capabilities are static facts, not state. Reading them through the
@@ -144,6 +196,28 @@ export function DiagnosticsScreen() {
       available: useCapability(() => typeof AudioWorklet !== "undefined"),
     },
   ];
+
+  const runHealth = useCallback(() => {
+    setHealth("running");
+    fetch("/api/health/openrouter", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result: HealthResult | null) =>
+        setHealth(
+          result ?? {
+            configured: true,
+            model: "",
+            probe: { ok: false, error: "The health endpoint refused the request." },
+          },
+        ),
+      )
+      .catch(() =>
+        setHealth({
+          configured: true,
+          model: "",
+          probe: { ok: false, error: "The health endpoint could not be reached." },
+        }),
+      );
+  }, []);
 
   const load = useCallback(() => {
     fetch("/api/diagnostics")
@@ -235,6 +309,95 @@ export function DiagnosticsScreen() {
           </ul>
         </Section>
       )}
+
+      {/* The gateway's configuration and a way to prove it works.
+          The probe is behind a button and rate limited: it makes a real billed
+          request, and a health check that runs on every page load is a bill
+          rather than a signal. */}
+      <Section title="OpenRouter gateway">
+        <Row k="Primary model" v={<code className="text-xs">{data.llm.openrouter.primaryModel}</code>} />
+        <Row
+          k="Quality escalation"
+          v={
+            data.llm.openrouter.qualityEscalation
+              ? <code className="text-xs">{data.llm.openrouter.qualityModel}</code>
+              : "off"
+          }
+        />
+        <Row k="Provider routing" v={<code className="text-xs">sort={data.llm.openrouter.policy.sort}</code>} />
+        <Row
+          k="Data collection"
+          v={data.llm.openrouter.policy.dataCollection}
+          tone={data.llm.openrouter.policy.dataCollection === "deny" ? "ok" : "warn"}
+        />
+        <Row
+          k="Zero data retention"
+          v={data.llm.openrouter.policy.zdr ? "required" : "not required"}
+          tone={data.llm.openrouter.policy.zdr ? "ok" : undefined}
+        />
+        <Row
+          k="Require parameter support"
+          v={data.llm.openrouter.policy.requireParameters ? "yes" : "no"}
+          tone={data.llm.openrouter.policy.requireParameters ? "ok" : "warn"}
+        />
+        <Row
+          k="Upstream fallbacks"
+          v={data.llm.openrouter.policy.allowFallbacks ? "allowed (same model)" : "off"}
+        />
+        <Row
+          k="Model capability"
+          v={
+            <span className="text-xs">
+              {data.llm.openrouter.modelCapabilities.family} · {data.llm.openrouter.modelCapabilities.structuredOutput} ·
+              sampling {data.llm.openrouter.modelCapabilities.sampling} ·{" "}
+              {data.llm.openrouter.modelCapabilities.source}
+            </span>
+          }
+        />
+        {data.llm.openrouter.modelCapabilities.liveWarning && (
+          <p className="text-sm leading-relaxed text-[var(--warn)]">
+            {data.llm.openrouter.modelCapabilities.liveWarning}
+          </p>
+        )}
+
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={runHealth} disabled={health === "running"}>
+            {health === "running" ? "Checking…" : "Run health check"}
+          </Button>
+          <span className="text-xs text-[var(--fg-dim)]">
+            Makes one real, billed request. Rate limited.
+          </span>
+        </div>
+
+        {typeof health === "object" && health !== null && (
+          <div
+            className={cn(
+              "rounded-md border px-3 py-2.5 text-sm leading-relaxed",
+              health.probe?.ok
+                ? "border-[color-mix(in_srgb,var(--ok)_40%,transparent)] text-[var(--ok)]"
+                : "border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-[var(--danger)]",
+            )}
+          >
+            {!health.configured ? (
+              <>No OPENROUTER_API_KEY is set, so nothing was checked.</>
+            ) : health.probe?.ok ? (
+              <>
+                Healthy — structured output validated in {health.probe.latencyMs}ms
+                {health.probe.upstream ? ` via ${health.probe.upstream}` : ""}
+                {health.probe.servedModel && health.probe.servedModel !== health.model
+                  ? ` (served ${health.probe.servedModel})`
+                  : ""}
+                .
+              </>
+            ) : (
+              <>
+                {health.probe?.failureKind ? `${health.probe.failureKind}: ` : ""}
+                {health.probe?.error ?? "The check did not complete."}
+              </>
+            )}
+          </div>
+        )}
+      </Section>
 
       <Section title="Providers">
         <div className="flex flex-col gap-3">
@@ -427,6 +590,39 @@ export function DiagnosticsScreen() {
             </table>
           </div>
         </details>
+      </Section>
+
+      {/* What stands between a public URL and the provider balance. Stated
+          with its limits, because a limit that claims to be global and is not
+          is worse than no limit — it gets trusted. */}
+      <Section title="Abuse protection">
+        <Row
+          k="Access gate"
+          v={data.protection.accessGate ? "APP_ACCESS_KEY set" : "open to anyone with the URL"}
+          tone={data.protection.accessGate ? "ok" : "warn"}
+        />
+        <Row
+          k="Session tokens"
+          v={
+            data.protection.sessionEnforcement === "enforced"
+              ? "enforced"
+              : "best-effort (no stable secret)"
+          }
+          tone={data.protection.sessionEnforcement === "enforced" ? "ok" : "warn"}
+        />
+        <Row k="Live turns" v={`${data.protection.rateLimits.interpretSession.limit}/min per session`} />
+        <Row k="Prep briefs" v={`${data.protection.rateLimits.prep.limit}/min`} />
+        <Row k="Counter messages" v={`${data.protection.rateLimits.counter.limit}/min`} />
+        <p className="text-sm leading-relaxed text-[var(--fg-muted)]">
+          {data.protection.note}
+        </p>
+        {data.protection.sessionEnforcement !== "enforced" && (
+          <p className="text-sm leading-relaxed text-[var(--warn)]">
+            Set SESSION_SECRET (or APP_ACCESS_KEY) to a value identical on every
+            instance to enforce session tokens. Without it they still key rate
+            limits per browser, but cannot refuse a request.
+          </p>
+        )}
       </Section>
 
       <Section title="Browser capability">

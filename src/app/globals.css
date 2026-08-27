@@ -255,6 +255,36 @@ body {
   display: none;
 }
 
+/* Edge fades.
+
+   A line of text sliced in half by the hard edge of a scroll container reads
+   as a rendering fault, not as "there is more above". Both live panes sit
+   pinned to the bottom of their scroll, so their top edge is exactly where a
+   half-line appears — a short fade turns the defect into the affordance it
+   should have been, and says "history recedes" while it is at it.
+
+   The context rail has the same problem sideways: its last chip is cut mid-
+   word with nothing to suggest the row scrolls. */
+.fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.5rem);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.5rem);
+}
+
+.fade-right {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent 100%);
+}
+
+/* A mask is decoration, and decoration that hides content is a bug. Anyone who
+   has asked for less motion has usually also asked for plainer rendering. */
+@media (prefers-reduced-motion: reduce) {
+  .fade-top,
+  .fade-right {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
 /* --- Controls ------------------------------------------------------------ */
 
 .focus-ring {

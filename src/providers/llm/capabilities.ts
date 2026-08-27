@@ -273,12 +273,33 @@ export const trainsOnFreeTier = (id: LlmProviderId): boolean =>
  * before this existed — meant a deployer paying specifically for that
  * guarantee had it discarded by `LLM_PRIVACY_MODE=strict`.
  */
-export const trainsOnSubmissions = (id: LlmProviderId, paidTier: boolean): boolean =>
-  MAY_TRAIN.has(
+export const trainsOnSubmissions = (
+  id: LlmProviderId,
+  paidTier: boolean,
+  options: {
+    /**
+     * Whether OpenRouter's routing policy sets `data_collection: "deny"`.
+     *
+     * OpenRouter's posture is recorded as "varies" because it genuinely does —
+     * it forwards to whichever upstream it selects, and that upstream's policy
+     * applies. But "varies" is an answer about the DEFAULT configuration, and
+     * this deployment does not have to accept the default: denying data
+     * collection instructs OpenRouter to exclude upstreams that may retain or
+     * train on what is sent.
+     *
+     * Judging OpenRouter by "varies" regardless meant `LLM_PRIVACY_MODE=strict`
+     * excluded the one provider configured specifically to satisfy it.
+     */
+    openRouterDeniesCollection?: boolean;
+  } = {},
+): boolean => {
+  if (id === "openrouter" && options.openRouterDeniesCollection) return false;
+  return MAY_TRAIN.has(
     paidTier
       ? PROVIDER_CAPABILITIES[id].paidTierPrivacy
       : PROVIDER_CAPABILITIES[id].freeTierPrivacy,
   );
+};
 
 export interface QuotaVerdict {
   viable: boolean;

@@ -1,13 +1,14 @@
 {
-  "startedAt": "2026-08-24T08:26:11.199Z",
-  "finishedAt": "2026-08-24T08:26:11.223Z",
+  "startedAt": "2026-08-26T06:11:46.800Z",
+  "finishedAt": "2026-08-26T06:11:46.833Z",
   "deadlineMs": 12000,
   "repeats": 1,
-  "cases": 20,
+  "cases": 34,
   "scores": [
     {
       "provider": "local",
       "model": "deterministic",
+      "tier": "free-or-unknown",
       "cases": [
         {
           "caseId": "b01",
@@ -74,7 +75,7 @@
           "caseId": "b03",
           "category": "fast-rhetorical",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -134,7 +135,7 @@
           "caseId": "b05",
           "category": "self-correction",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -193,7 +194,7 @@
           "caseId": "b07",
           "category": "scripture-paraphrase",
           "ok": false,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -225,7 +226,7 @@
           "caseId": "b08",
           "category": "terminology",
           "ok": false,
-          "latencyMs": 1,
+          "latencyMs": 0,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -288,7 +289,7 @@
           "caseId": "b10",
           "category": "proper-noun",
           "ok": false,
-          "latencyMs": 1,
+          "latencyMs": 0,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -320,7 +321,7 @@
           "caseId": "b11",
           "category": "wordplay",
           "ok": true,
-          "latencyMs": 0,
+          "latencyMs": 1,
           "safeChunks": [
             "So we need to find the right way.",
             "And speaking of \"the way,\" it's even in my name."
@@ -408,7 +409,7 @@
           "caseId": "b14",
           "category": "humour",
           "ok": true,
-          "latencyMs": 1,
+          "latencyMs": 0,
           "safeChunks": [
             "I'll be honest —",
             "last night I fell asleep preparing this sermon.",
@@ -586,7 +587,445 @@
           "caseId": "b20",
           "category": "anticipation-hazard",
           "ok": false,
-          "latencyMs": 2,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b21",
+          "category": "quoted-casual",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b22",
+          "category": "date-and-time",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "october",
+              "23"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b23",
+          "category": "place-name",
+          "ok": false,
+          "latencyMs": 1,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "seogwipo"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b24",
+          "category": "loanword",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "orientation",
+              "workshop"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b25",
+          "category": "disfluency",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b26",
+          "category": "mid-sentence-cancel",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "two years ago"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b27",
+          "category": "dropped-subject",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "kim"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b28",
+          "category": "long-modifier",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "thirty years"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b29",
+          "category": "proverb",
+          "ok": true,
+          "latencyMs": 1,
+          "safeChunks": [
+            "Shutting the barn door after the horse is gone."
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 1,
+              "meanWordsPerChunk": 9,
+              "maxWordsPerChunk": 9
+            }
+          },
+          "fidelity": {
+            "score": 1,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": []
+        },
+        {
+          "caseId": "b30",
+          "category": "lecture-register",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b31",
+          "category": "public-notice",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "six"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b32",
+          "category": "code-mixed",
+          "ok": false,
+          "latencyMs": 1,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "kpi"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b33",
+          "category": "stt-error",
+          "ok": false,
+          "latencyMs": 0,
+          "safeChunks": [
+            "[no interpretation model configured — Korean transcript only]"
+          ],
+          "anticipatedChunks": [],
+          "schemaValid": true,
+          "speakability": {
+            "score": 1,
+            "issues": [],
+            "stats": {
+              "chunks": 0,
+              "meanWordsPerChunk": 0,
+              "maxWordsPerChunk": 0
+            }
+          },
+          "fidelity": {
+            "score": 0,
+            "missingRequired": [
+              "ryu jeong-gil"
+            ],
+            "forbiddenHit": [],
+            "scriptureMissing": [],
+            "culturalMissing": []
+          },
+          "hardFailures": [
+            "no_output"
+          ]
+        },
+        {
+          "caseId": "b34",
+          "category": "abandoned-number",
+          "ok": false,
+          "latencyMs": 1,
           "safeChunks": [
             "[no interpretation model configured — Korean transcript only]"
           ],
@@ -614,22 +1053,30 @@
         }
       ],
       "latency": {
-        "count": 20,
+        "count": 34,
         "p50": 0,
         "p90": 1,
-        "p95": 2,
+        "p95": 1,
         "max": 3,
-        "mean": 1
+        "mean": 0
       },
       "components": {
-        "fidelity": 0.5,
+        "fidelity": 0.3235294117647059,
         "speakability": 1,
         "latency": 1,
         "schema": 1,
         "sustainability": 1,
         "privacy": 1
       },
-      "total": 0.85,
+      "total": 0.7971,
+      "usage": {
+        "requestsWithUsage": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "cacheHitRate": null
+      },
       "hardFailures": [
         "no_output"
       ],

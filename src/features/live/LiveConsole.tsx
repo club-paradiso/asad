@@ -40,7 +40,6 @@ import { SettingsSheet } from "./SettingsSheet";
 import { Teleprompter } from "./Teleprompter";
 import { DemoRibbon } from "./DemoRibbon";
 import { aiStateFrom } from "./AiStatus";
-import { PrivacyDisclosure, type DisclosureProvider } from "./PrivacyDisclosure";
 import type { PrepSheet } from "@/types";
 
 const FONT_SCALE_RANGE = { min: 0.7, max: 1.9 } as const;
@@ -67,25 +66,16 @@ export function LiveConsole({
   const { snapshot, phase, error, demoBeat, startedAt, lastProvider, start, stop, correct } =
     session;
 
-  // Providers whose free tier may use submitted content to improve products.
-  // Fetched once so the disclosure names the actual configured provider rather
-  // than a generic warning.
-  const [disclosureProviders, setDisclosureProviders] = useState<DisclosureProvider[]>([]);
-  useEffect(() => {
-    if (source === "demo") return;
-    let cancelled = false;
-    fetch("/api/config")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((config: { llm?: { freeTierDisclosure?: DisclosureProvider[] } } | null) => {
-        if (!cancelled && config?.llm?.freeTierDisclosure) {
-          setDisclosureProviders(config.llm.freeTierDisclosure);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [source]);
+  // NO DISCLOSURE FETCH HERE, deliberately.
+  //
+  // It used to live in this component, and by the time it resolved the session
+  // had already started — the microphone was open and the first Korean had
+  // reached a cloud provider before the interpreter was told it would. A
+  // dialog that appears after the data has left is not consent.
+  //
+  // The gate is on the start screen now, where it runs BEFORE the tap that
+  // opens anything, and where the interpreter's acknowledgement is itself the
+  // user gesture that starts the session. See `useCloudConsent`.
 
   const wakeLock = useWakeLock(phase === "running");
 
@@ -327,16 +317,6 @@ export function LiveConsole({
           onSettingsChange({ ...settings, showGlossary: !settings.showGlossary })
         }
         onFontScale={adjustFontScale}
-      />
-
-      {/* Shown once per browser, before the first live cloud session. */}
-      <PrivacyDisclosure
-        providers={disclosureProviders}
-        onAccept={() => setDisclosureProviders([])}
-        onUseLocalOnly={() => {
-          setDisclosureProviders([]);
-          void handleEnd();
-        }}
       />
 
       <SettingsSheet

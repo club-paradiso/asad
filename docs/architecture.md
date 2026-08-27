@@ -326,3 +326,75 @@ from `.env.example` in the project settings.
 Nothing about local development requires deployment, and nothing about the MVP
 requires any key — `npm install && npm run dev` opens a fully working console
 in demo mode.
+
+## The LLM gateway
+
+`src/providers/llm/` is layered so that a vendor change never reaches the
+console:
+
+| Module | Responsibility |
+| --- | --- |
+| `models.ts` | What a given model id can be *asked* for — structured output mode, whether sampling parameters are legal, which reasoning control exists, output ceiling, latency class, live suitability |
+| `openrouter.ts` | The gateway adapter and its typed routing policy. Builds a request body from resolved capabilities |
+| `factory.ts` | The single place that constructs a provider. Shared with the benchmark so it cannot drift |
+| `router.ts` | Candidate selection, stickiness, circuit breaking, quota pressure, fallback to local |
+| `escalation.ts` | Whether a second opinion is worth the remaining turn budget |
+
+### Why OpenRouter is not in the generic vendor table
+
+It speaks the OpenAI chat-completions wire format, which is the least
+interesting thing about it. It is a *router*: which upstream serves the request,
+whether that upstream may retain the sermon, and whether it supports the
+parameters the turn depends on are all decisions expressed in a `provider`
+block that the generic adapter had no way to send.
+
+### Why the model capability registry exists
+
+The assumption it replaces was that every OpenAI-compatible model accepts the
+same generation parameters. It does not — reasoning-first models reject
+`temperature` outright, not every model knows `json_schema`, and an output
+ceiling above what a model produces truncates mid-JSON in a way that reads as a
+hallucination.
+
+This matters more on OpenRouter than anywhere else. `require_parameters: true`
+asks OpenRouter to exclude upstreams that do not support what was sent, so an
+illegal parameter does not merely 400 — it can empty the candidate pool and take
+the turn with it.
+
+Resolution is two-layer: explicit entries for the families actually deployed
+against, and conservative pattern inference for anything else, because a
+deployer may pin any slug and that must never require a code change. Inference
+deliberately claims *less* capability when unsure. Under-claiming costs a
+slightly larger prompt; over-claiming costs a live turn.
+
+Zod remains the trust boundary regardless. Native schema enforcement makes valid
+output likelier, not validation unnecessary.
+
+### Quality escalation
+
+Escalation is not "try harder". It is a bounded, opt-in second opinion, and its
+governing rule is that a late perfect translation is worse than a timely good
+one — an interpreter who has already said the sentence cannot use a better
+version of it, and showing them one invites a retraction in front of a room.
+
+So it is attempted only with measured turn budget remaining, has its own hard
+deadline, and its result is discarded rather than waited for. It also only
+replaces the primary answer on a genuine confidence improvement: swapping a
+usable answer for a differently-worded one of the same confidence is churn the
+interpreter has to read through.
+
+## Route protection
+
+`src/lib/guard.ts` sits in front of every route that spends money, in cost
+order so abuse is refused before it reaches a provider: access gate,
+same-origin, body ceiling, rate limits, then parse.
+
+It is deliberately not an identity system. There are no users and no accounts,
+because neither would make the bill smaller and both would make the product
+worse. What it establishes is that a request came from a browser that loaded
+this application, and that it is arriving at a human rate.
+
+The rate limiter is in-process and therefore per-instance. Documented as such in
+the module, on `/diagnostics`, and in the README. A limit that claims to be
+global and is not is worse than no limit, because it is trusted.
+

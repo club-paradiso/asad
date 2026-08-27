@@ -12,13 +12,8 @@ import {
   systemPromptFor,
 } from "@/interpreter/prompts/live";
 import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
-import { GeminiLlmProvider } from "@/providers/llm/gemini";
-import { AnthropicLlmProvider } from "@/providers/llm/anthropic";
 import { LocalLlmProvider } from "@/providers/llm/mock";
-import {
-  OPENAI_COMPATIBLE_VENDORS,
-  createOpenAiCompatible,
-} from "@/providers/llm/vendors";
+import { createProvider } from "@/providers/llm/factory";
 import { toLlmError } from "@/providers/llm/errors";
 import type {
   LlmProvider,
@@ -93,23 +88,12 @@ export function availableProviders(env = parseEnv()): {
       });
       continue;
     }
-    let provider: LlmProvider;
-    if (id === "gemini") {
-      provider = new GeminiLlmProvider({
-        apiKey: config.apiKey,
-        model: config.model,
-      });
-    } else if (id === "anthropic") {
-      provider = new AnthropicLlmProvider({
-        apiKey: config.apiKey,
-        model: config.model,
-      });
-    } else {
-      provider = createOpenAiCompatible(
-        OPENAI_COMPATIBLE_VENDORS[id],
-        config.apiKey,
-        config.model,
-      );
+    // The same factory the live router uses. A benchmark that builds its own
+    // provider is measuring a request production does not send.
+    const provider = createProvider(id, env);
+    if (!provider) {
+      skipped.push({ provider: id, reason: "provider could not be constructed" });
+      continue;
     }
     // OpenAI and Anthropic have no free API tier. The other providers must be
     // explicitly declared paid; otherwise the benchmark must not award paid
@@ -132,8 +116,9 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
       recentKorean: benchCase.priorKorean ?? [],
       recentEnglish: benchCase.priorEnglish ?? [],
       glossary: [],
-      entities:
-        benchCase.category === "wordplay"
+      entities: benchCase.context?.entities
+        ? benchCase.context.entities.map((e) => ({ ...e, kind: "person" as const }))
+        : benchCase.category === "wordplay"
           ? [
               {
                 korean: "류정길",
@@ -143,7 +128,10 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
             ]
           : [],
       scripture: [],
-      corrections: [],
+      // A case that ships corrections needs them delivered, or it is testing
+      // nothing: "does an interpreter's correction win?" cannot be answered
+      // by a request that does not carry one.
+      corrections: benchCase.context?.corrections ?? [],
     },
     allowAnticipation: !benchCase.expect.forbidAnticipation,
   };

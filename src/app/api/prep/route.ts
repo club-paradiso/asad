@@ -11,21 +11,28 @@ import { prepBriefSchema, prepRequestSchema, extractJsonObject } from "@/lib/sch
 import { buildPrepUserPrompt, PREP_SYSTEM_PROMPT } from "@/interpreter/prompts/prep";
 import { deadlineFor, llmRouter } from "@/providers/llm";
 import { localPrepBrief } from "@/interpreter/prep/local-brief";
+import { guardInferenceRoute } from "@/lib/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TIMEOUT_MS = 45_000;
 
-export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+/** A prep sheet carries an outline, so it is allowed to be larger than a turn. */
+const MAX_BODY_BYTES = 64 * 1024;
 
-  const parsed = prepRequestSchema.safeParse(body);
+export async function POST(request: Request) {
+  // Prep runs a long, expensive generation. It is the single most attractive
+  // route on this deployment to abuse, and the least latency-sensitive to
+  // guard.
+  const guarded = await guardInferenceRoute(request, {
+    requireSession: true,
+    maxBodyBytes: MAX_BODY_BYTES,
+    limits: [{ rule: "prep", by: "session" }, { rule: "prep", by: "address" }],
+  });
+  if (!guarded.ok) return guarded.response;
+
+  const parsed = prepRequestSchema.safeParse(guarded.body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request.", issues: parsed.error.issues.slice(0, 5) },

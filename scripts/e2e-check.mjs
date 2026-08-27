@@ -59,7 +59,11 @@ await page.goto(base, { waitUntil: "networkidle" });
 // so the production launcher correctly prefers it. The E2E transcript checks,
 // however, need deterministic audio. Explicitly choose Demo rather than
 // pretending a microphone is absent and accidentally testing silence.
-await page.getByRole("button", { name: /^Demo/ }).click();
+//
+// The audio picker is a radiogroup, not a row of buttons: it is a choice
+// between mutually exclusive options, and saying so is what lets a screen
+// reader announce "2 of 3" instead of reading three unrelated buttons.
+await page.getByRole("radio", { name: /^Demo/ }).click();
 await page.getByRole("button", { name: "Run demo" }).click();
 await page.waitForTimeout(3000);
 

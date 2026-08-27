@@ -95,8 +95,18 @@ export async function GET() {
       : undefined;
 
   const textAvailable = env.bible.provider !== "reference-only";
+  // OpenRouter with `data_collection: deny` is not a provider that may train on
+  // this sermon, and disclosing it as one would be crying wolf — the whole
+  // value of this notice is that it only appears when it is true.
+  const denies = env.llm.openrouter.policy.dataCollection === "deny";
   const freeTierDisclosure = plan.chain
-    .filter((id) => id !== "local" && trainsOnSubmissions(id, env.llm.paidTier.has(id)))
+    .filter(
+      (id) =>
+        id !== "local" &&
+        trainsOnSubmissions(id, env.llm.paidTier.has(id), {
+          openRouterDeniesCollection: denies,
+        }),
+    )
     .map((id) => ({ label: capabilitiesFor(id).label, note: capabilitiesFor(id).privacyNote }));
 
   // The provider a counter turn would actually reach, which is not necessarily
@@ -126,7 +136,9 @@ export async function GET() {
     counter: {
       provider: counterCaps?.label ?? null,
       mayTrain: counterProvider
-        ? trainsOnSubmissions(counterProvider, env.llm.paidTier.has(counterProvider))
+        ? trainsOnSubmissions(counterProvider, env.llm.paidTier.has(counterProvider), {
+            openRouterDeniesCollection: denies,
+          })
         : false,
       note: counterCaps?.privacyNote ?? "",
       openWeightModel: counterProvider

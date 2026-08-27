@@ -26,11 +26,8 @@ import {
 } from "./capabilities";
 import { CircuitBreaker, type BreakerSnapshot } from "./circuit-breaker";
 import { LlmError, toLlmError } from "./errors";
-import { GeminiLlmProvider } from "./gemini";
-import { AnthropicLlmProvider } from "./anthropic";
-import { LocalLlmProvider } from "./mock";
+import { createProvider } from "./factory";
 import { PRESSURE_ABANDON, RateLimitTracker } from "./rate-limit";
-import { OPENAI_COMPATIBLE_VENDORS, createOpenAiCompatible } from "./vendors";
 import type { LlmProvider, LlmProviderId, LlmRequest, LlmResponse } from "./types";
 import type { AppEnv, PrivacyMode, RoutingMode } from "@/lib/env";
 
@@ -109,7 +106,7 @@ export class LlmRouter {
 
     const configured = (id: LlmProviderId) => this.env.llm.providers[id].configured;
     const privacyOk = (id: LlmProviderId) =>
-      privacyMode !== "strict" || !trainsOnSubmissions(id, this.isPaid(id));
+      privacyMode !== "strict" || !this.mayTrain(id);
 
     switch (mode) {
       case "local":
@@ -149,6 +146,18 @@ export class LlmRouter {
     return this.env.llm.paidTier.has(id);
   }
 
+  /**
+   * Whether this provider may train on what is sent to it, as configured.
+   *
+   * Not a property of the provider alone: OpenRouter's answer depends on the
+   * routing policy this deployment sends with every request.
+   */
+  private mayTrain(id: LlmProviderId): boolean {
+    return trainsOnSubmissions(id, this.isPaid(id), {
+      openRouterDeniesCollection: this.env.llm.openrouter.policy.dataCollection === "deny",
+    });
+  }
+
   private limiterFor(id: LlmProviderId): RateLimitTracker {
     let tracker = this.limits.get(id);
     if (!tracker) {
@@ -167,32 +176,10 @@ export class LlmRouter {
   private instanceFor(id: LlmProviderId): LlmProvider | null {
     const cached = this.instances.get(id);
     if (cached) return cached;
-
-    const config = this.env.llm.providers[id];
-    let provider: LlmProvider | null = null;
-
-    if (id === "local") {
-      provider = new LocalLlmProvider();
-    } else if (config.apiKey) {
-      switch (id) {
-        case "gemini":
-          provider = new GeminiLlmProvider({ apiKey: config.apiKey, model: config.model });
-          break;
-        case "anthropic":
-          provider = new AnthropicLlmProvider({ apiKey: config.apiKey, model: config.model });
-          break;
-        case "groq":
-        case "openrouter":
-        case "openai":
-          provider = createOpenAiCompatible(
-            OPENAI_COMPATIBLE_VENDORS[id],
-            config.apiKey,
-            config.model,
-          );
-          break;
-      }
-    }
-
+    // Cached for the life of the process, which is what pins the model for the
+    // session: the instance carries its model id, so nothing re-reads
+    // configuration mid-sermon and quietly changes register.
+    const provider = createProvider(id, this.env);
     if (provider) this.instances.set(id, provider);
     return provider;
   }
@@ -416,7 +403,7 @@ export class LlmRouter {
           warnings.push(`${caps.label} free tier: ${verdict.detail}`);
         }
       }
-      if (trainsOnSubmissions(id, paid) && this.env.llm.privacyMode !== "strict") {
+      if (this.mayTrain(id) && this.env.llm.privacyMode !== "strict") {
         warnings.push(`${caps.label}: ${caps.privacyNote}`);
       }
     }

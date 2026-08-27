@@ -260,3 +260,64 @@ one.
 3. Leave **"Save this session" off**.
 4. Tell the people in the room. An interpreter using an AI aid should say so —
    that is a professional obligation this software cannot discharge for you.
+
+## Consent before cloud processing
+
+**Invariant: no cloud speech recognition and no cloud interpretation request
+may occur before the required disclosure has been acknowledged.**
+
+This was previously violated by a race. The console started itself on mount in
+one effect while a second effect fetched the disclosure, so cloud recognition
+connected and `/api/interpret` began dispatching while the disclosure was still
+in flight. The dialog still appeared — it simply appeared after the first Korean
+of the sermon had already been sent. A consent dialog that appears after the
+data has left is not consent.
+
+A single state machine (`src/features/live/useCloudConsent.ts`) now owns the
+decision, and nothing else authorises a start. Three properties matter:
+
+- **It holds while the answer is unknown**, not merely when the answer is
+  "disclosure needed". The original race lived entirely in that window.
+- **An unreachable `/api/config` resolves to "needs disclosure", not to
+  permission.** Failing open would start a cloud session under an unknown
+  privacy posture, which is the exact thing the gate exists to prevent.
+- **Demo mode resolves synchronously** and pays no round trip, because nothing
+  it does leaves the machine.
+
+Tested at both layers — the state machine exhaustively over every input
+combination, and the rendered console asserting that no transcript-derived
+request is made while a disclosure is outstanding. Removing the gate fails
+three of those tests.
+
+## OpenRouter and the routing policy
+
+OpenRouter's data-use posture is recorded as `varies` because, in its default
+configuration, it genuinely does: it forwards to whichever upstream it selects
+and that upstream's policy applies.
+
+This deployment does not accept the default. Every request carries
+`data_collection: "deny"`, which instructs OpenRouter to exclude upstreams that
+may retain or train on what is sent, and `OPENROUTER_ZDR=true` additionally
+excludes those that retain content transiently for abuse monitoring.
+
+Two consequences:
+
+- `LLM_PRIVACY_MODE=strict` **admits** OpenRouter when the policy denies
+  collection. Judging it by `varies` regardless meant strict mode excluded the
+  one provider configured specifically to satisfy it.
+- If a strict policy leaves **no** eligible upstream, the turn fails and the
+  error names the constraint. It is never satisfied by relaxing the policy. The
+  deterministic local interpreter remains the floor, so the console does not go
+  silent.
+
+`LLM_PRIVACY_MODE=strict` also overrides `OPENROUTER_DATA_COLLECTION=allow` and
+reports the override on `/diagnostics`. A privacy setting can be tightened by
+another setting; it is never loosened by one.
+
+## What the abuse protections see
+
+The route guard reads request headers, cookies and body size. It records
+counters keyed by session token or source address. It never inspects, stores or
+logs transcript content, and the rate-limit state holds integers and timestamps
+only.
+

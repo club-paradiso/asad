@@ -19,7 +19,21 @@ vi.mock("@/counter/translate", () => ({
 import { DELETE, GET, PATCH, POST } from "./session/route";
 import { POST as SEND } from "./message/route";
 import { __setCounterStore, createMemoryStore } from "@/counter/store";
+import { SESSION_COOKIE, issueSessionToken } from "@/lib/guard";
 import type { SessionView } from "@/counter/types";
+
+/**
+ * A browser that has loaded the application.
+ *
+ * `/api/counter/message` reaches a model, so it is guarded like every other
+ * paid route: same-origin, session-bound, body-capped and rate limited. These
+ * tests send what a real visitor's phone sends.
+ */
+const authorised = () => ({
+  origin: "http://localhost",
+  cookie: `${SESSION_COOKIE}=${issueSessionToken()}`,
+  "content-type": "application/json",
+});
 
 const post = (body: unknown) =>
   new Request("http://localhost/api/counter/session", {
@@ -36,6 +50,7 @@ const patch = (body: unknown) =>
 const send = (body: unknown) =>
   new Request("http://localhost/api/counter/message", {
     method: "POST",
+    headers: authorised(),
     body: JSON.stringify(body),
   });
 

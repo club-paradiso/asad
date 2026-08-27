@@ -1,47 +1,31 @@
 /**
- * GENERAL mode prompt — the domain-neutral interpretation engine.
+ * GENERAL mode — the domain-neutral path.
  *
- * Nothing here assumes a religious setting. This is the path used for
- * meetings, lectures, interviews, public-service counters and conferences,
- * and it is also the base that sermon mode layers on top of.
+ * Meetings, lectures, interviews, public-service counters and conferences.
+ * Nothing here assumes a religious setting.
+ *
+ * A small delta on top of `CORE_CONTRACT`, not a second engine. Everything
+ * about chunking, delayed predicates, uncertainty and anticipation is shared,
+ * and the only thing that genuinely differs between domains is register.
  */
 import {
-  ANTICIPATION_RULES,
-  CHUNKING_RULES,
-  COMPRESSION_RULES,
-  CORE_PRIORITIES,
+  CORE_CONTRACT,
   OUTPUT_CONTRACT,
   OUTPUT_CONTRACT_SCHEMA_ENFORCED,
-  RESTRUCTURING_RULES,
-  ROLE,
-  UNCERTAINTY_RULES,
 } from "./shared";
 
-const GENERAL_BODY = [
-  ROLE,
-  CORE_PRIORITIES,
-  CHUNKING_RULES,
-  RESTRUCTURING_RULES,
-  COMPRESSION_RULES,
-  `REGISTER
-Match the speaker's register. A board meeting is not a lecture and neither is a
-counter at an immigration office. Korean honorific levels rarely survive into
-English — carry the RESPECT, not the grammar. 하십시오체 does not become archaic
-English; it becomes ordinary polite English.
+const GENERAL_DELTA = `DOMAIN: GENERAL
+Meetings, lectures, interviews, public-service counters, conferences. Assume nothing religious.
 
-Korean 우리 is collective: "our team", "our company" — not "my".`,
-  UNCERTAINTY_RULES,
-  ANTICIPATION_RULES,
-  `NAMES AND NUMBERS
-- Reuse an English form once it is settled. Consistency matters more than
-  elegance; the audience is tracking one person across an hour.
-- Romanise a new Korean name using Revised Romanisation: 류정길 → "Ryu Jeong-gil".
-- Numbers, dates and amounts are high-risk. If the recognition is unclear, mark
-  the chunk "low" and leave the number out rather than guessing it.`,
-].join("\n\n");
+REGISTER
+Match the speaker's. A board meeting is not a lecture and neither is an immigration counter. Korean honorific levels rarely survive into English — carry the RESPECT, not the grammar. 하십시오체 becomes ordinary polite English, never archaic English.`;
 
 export const generalSystemPrompt = (schemaEnforced: boolean): string =>
-  [GENERAL_BODY, schemaEnforced ? OUTPUT_CONTRACT_SCHEMA_ENFORCED : OUTPUT_CONTRACT].join("\n\n");
+  [
+    CORE_CONTRACT,
+    GENERAL_DELTA,
+    schemaEnforced ? OUTPUT_CONTRACT_SCHEMA_ENFORCED : OUTPUT_CONTRACT,
+  ].join("\n\n");
 
-/** Phase 1 export, kept for tests and any caller that wants the full contract. */
+/** Kept for tests and any caller that wants the full contract. */
 export const GENERAL_SYSTEM_PROMPT = generalSystemPrompt(false);

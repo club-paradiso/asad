@@ -11,6 +11,9 @@
  *  3. **Zod is the trust boundary.** A provider's JSON mode is a hint; schema
  *     validation is the contract, and failing it is a provider failure that
  *     moves the router on to the next candidate.
+ *  4. **It is not free to abuse.** This route spends the deployer's money on
+ *     every call. It is same-origin, session-bound, body-capped and rate
+ *     limited before a provider is ever reached. See `src/lib/guard.ts`.
  */
 import { NextResponse } from "next/server";
 import { interpretRequestSchema, interpreterOutputSchema, parseInterpreterOutput } from "@/lib/schema";
@@ -20,21 +23,37 @@ import { applyProfile, chooseProfile } from "@/interpreter/context/profiles";
 import { capabilitiesFor, deadlineFor, llmRouter, turnBudgetFor } from "@/providers/llm";
 import { interpretLocally } from "@/providers/llm/mock";
 import { estimateTokens, telemetry } from "@/lib/telemetry";
+import { guardInferenceRoute } from "@/lib/guard";
+import { escalationDecision, escalationImproves } from "@/providers/llm/escalation";
+import { createQualityProvider } from "@/providers/llm/factory";
+import { appEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Ceiling on one live request body.
+ *
+ * The schema already bounds every field; this bounds the bytes before parsing,
+ * so an oversized payload is refused without being read into memory or
+ * validated.
+ */
+const MAX_BODY_BYTES = 32 * 1024;
+
 export async function POST(request: Request) {
   const receivedAt = Date.now();
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const guarded = await guardInferenceRoute(request, {
+    requireSession: true,
+    maxBodyBytes: MAX_BODY_BYTES,
+    limits: [
+      { rule: "interpretSession", by: "session" },
+      { rule: "interpretAddress", by: "address" },
+    ],
+  });
+  if (!guarded.ok) return guarded.response;
 
-  const parsed = interpretRequestSchema.safeParse(body);
+  const parsed = interpretRequestSchema.safeParse(guarded.body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request.", issues: parsed.error.issues.slice(0, 5) },
@@ -139,6 +158,35 @@ export async function POST(request: Request) {
       });
     }
 
+    /* --- Quality escalation ---------------------------------------------
+     * Only ever attempted with measured budget left in the turn, and its
+     * result is dropped rather than waited for. The interpreter's answer is
+     * the primary one unless a better one arrived in time to still be useful.
+     */
+    const escalation = escalationDecision({
+      enabled: appEnv().llm.openrouter.qualityEscalation,
+      lag: input.lag,
+      detectedKinds: (input.detected?.culturalNotes ?? []).map((note) => note.kind),
+      primary: output,
+      elapsedMs: Date.now() - receivedAt,
+      turnBudgetMs: turnDeadline,
+    });
+
+    let finalOutput = output;
+    let escalatedTo: string | undefined;
+    if (escalation.escalate) {
+      const better = await tryEscalate({
+        system,
+        user,
+        deadlineMs: escalation.deadlineMs,
+        signal: turnController.signal,
+      });
+      if (better && escalationImproves(output, better.output)) {
+        finalOutput = better.output;
+        escalatedTo = better.model;
+      }
+    }
+
     telemetry.recordLatency({
       stage: "provider_response",
       ms: result.response.latencyMs,
@@ -157,9 +205,13 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      output,
+      output: finalOutput,
       provider: result.provider,
-      model: result.model,
+      // The model that actually produced what is on screen. When escalation
+      // replaced the answer, saying the primary model produced it would make
+      // the diagnostics page lie about a mid-session model change.
+      model: escalatedTo ?? result.model,
+      escalated: !!escalatedTo,
       degraded: result.degraded,
       reason: result.reason,
       profile: decision.profile,
@@ -182,6 +234,54 @@ export async function POST(request: Request) {
     });
   } finally {
     clearTimeout(turnTimer);
+  }
+}
+
+/**
+ * One escalation attempt against the OpenRouter quality model.
+ *
+ * Every failure path returns null. Escalation is a bonus, so a timeout, a 429
+ * or a malformed answer costs nothing but the attempt — the primary answer is
+ * already in hand and is what the interpreter gets.
+ */
+async function tryEscalate(input: {
+  system: string;
+  user: string;
+  deadlineMs: number;
+  signal: AbortSignal;
+}): Promise<{ output: NonNullable<ReturnType<typeof parseInterpreterOutput>>; model: string } | null> {
+  const provider = createQualityProvider(appEnv());
+  if (!provider) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), input.deadlineMs);
+  const onAbort = () => controller.abort();
+  input.signal.addEventListener("abort", onAbort, { once: true });
+
+  try {
+    const response = await provider.complete({
+      system: input.system,
+      user: input.user,
+      maxOutputTokens: 700,
+      temperature: 0.2,
+      jsonSchema: INTERPRETER_JSON_SCHEMA,
+      thinking: "none",
+      signal: controller.signal,
+    });
+    const output = parseInterpreterOutput(response.text);
+    if (!output) return null;
+    telemetry.recordLatency({
+      stage: "provider_response",
+      ms: response.latencyMs,
+      provider: "openrouter",
+      model: response.model ?? provider.model,
+    });
+    return { output, model: response.model ?? provider.model };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    input.signal.removeEventListener("abort", onAbort);
   }
 }
 

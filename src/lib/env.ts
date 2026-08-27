@@ -19,6 +19,24 @@ import {
   type LlmProviderId,
 } from "@/providers/llm/types";
 import { NATIVE_DEFAULT_MODELS, OPENAI_COMPATIBLE_VENDORS } from "@/providers/llm/vendors";
+import {
+  DEFAULT_ROUTING_POLICY,
+  OPENROUTER_DEFAULT_PRIMARY_MODEL,
+  type DataCollectionPolicy,
+  type OpenRouterRoutingPolicy,
+  type ProviderSort,
+} from "@/providers/llm/openrouter";
+import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
+
+/**
+ * Default quality-escalation model.
+ *
+ * Never used unless `OPENROUTER_QUALITY_ESCALATION` is explicitly on, because
+ * escalation costs latency and money and neither should start by surprise.
+ */
+const DEFAULT_QUALITY_MODEL = "anthropic/claude-sonnet-5";
+
+const PROVIDER_SORTS = ["latency", "throughput", "price"] as const;
 
 /* -------------------------------------------------------------------------- */
 /* Routing                                                                     */
@@ -88,6 +106,27 @@ const rawEnvSchema = z.object({
   OPENAI_LLM_MODEL: modelId.optional(),
   ANTHROPIC_LLM_MODEL: modelId.optional(),
 
+  // OpenRouter as the production gateway. `OPENROUTER_PRIMARY_MODEL` is the
+  // name the deployment documentation uses; `OPENROUTER_LLM_MODEL` is the
+  // Phase 2 spelling and still wins nothing — whichever is set is used, with
+  // the newer name taking precedence when both are.
+  OPENROUTER_PRIMARY_MODEL: modelId.optional(),
+  OPENROUTER_QUALITY_MODEL: modelId.optional(),
+  OPENROUTER_QUALITY_ESCALATION: z.string().trim().toLowerCase().optional(),
+  OPENROUTER_PROVIDER_SORT: z.string().trim().toLowerCase().optional(),
+  OPENROUTER_DATA_COLLECTION: z.string().trim().toLowerCase().optional(),
+  OPENROUTER_ZDR: z.string().trim().toLowerCase().optional(),
+  OPENROUTER_ALLOW_PROVIDER_FALLBACKS: z.string().trim().toLowerCase().optional(),
+  OPENROUTER_REQUIRE_PARAMETERS: z.string().trim().toLowerCase().optional(),
+  OPENROUTER_PROVIDER_ONLY: z.string().trim().optional(),
+  OPENROUTER_PROVIDER_IGNORE: z.string().trim().optional(),
+
+  // Optional gate for a private deployment. Absent means no gate.
+  APP_ACCESS_KEY: z.string().trim().min(8, "too short to be a useful access key").optional(),
+  // Signing key for session tokens. Only matters on a multi-instance
+  // deployment; see `sessionEnforcement` in src/lib/guard.ts.
+  SESSION_SECRET: z.string().trim().min(16, "too short to sign session tokens").optional(),
+
   BIBLE_PROVIDER: z.string().trim().toLowerCase().optional(),
   BIBLE_API_KEY: optionalKey,
   BIBLE_ID: z.string().trim().optional(),
@@ -155,6 +194,40 @@ export interface AppEnv {
     /** Explicit provider for `pinned` / `reliable`. */
     pinned?: LlmProviderId;
     providers: Record<LlmProviderId, ProviderConfig>;
+    /**
+     * OpenRouter-specific configuration.
+     *
+     * Present whether or not OpenRouter is the active provider — the
+     * diagnostics page reports the policy a deployer configured even when
+     * something else is currently serving turns.
+     */
+    openrouter: {
+      /** Pinned for the session. Model roulette costs terminology consistency. */
+      primaryModel: string;
+      /** Reached only on explicit escalation, never by default. */
+      qualityModel: string;
+      /** Whether escalation is permitted at all. */
+      qualityEscalation: boolean;
+      policy: OpenRouterRoutingPolicy;
+    };
+  };
+  /**
+   * Optional shared-secret gate for a private deployment.
+   *
+   * Not an identity system. It exists so that a deployment carrying a billed
+   * OpenRouter key is not a public endpoint anyone can drain.
+   */
+  access: {
+    key?: string;
+    enabled: boolean;
+    /**
+     * A secret that is identical on every instance of this deployment.
+     *
+     * Session tokens are signed with it. Without one they are signed with a
+     * per-process random key, which works on a single server and fails on
+     * anything that scales out — see `sessionEnforcement`.
+     */
+    sessionSecret?: string;
   };
   bible: {
     provider: "reference-only" | "public-domain" | "api-bible";
@@ -334,7 +407,11 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       case "groq":
         return raw.GROQ_LLM_MODEL ?? OPENAI_COMPATIBLE_VENDORS.groq.defaultModel;
       case "openrouter":
-        return raw.OPENROUTER_LLM_MODEL ?? OPENAI_COMPATIBLE_VENDORS.openrouter.defaultModel;
+        return (
+          raw.OPENROUTER_PRIMARY_MODEL ??
+          raw.OPENROUTER_LLM_MODEL ??
+          OPENROUTER_DEFAULT_PRIMARY_MODEL
+        );
       case "openai":
         return raw.OPENAI_LLM_MODEL ?? OPENAI_COMPATIBLE_VENDORS.openai.defaultModel;
       case "local":
@@ -388,6 +465,37 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     }
   }
 
+  /* --- OpenRouter gateway ----------------------------------------------- */
+  const openrouterPolicy = parseRoutingPolicy(raw, privacyMode, problems);
+
+  const primaryModel =
+    raw.OPENROUTER_PRIMARY_MODEL ??
+    raw.OPENROUTER_LLM_MODEL ??
+    OPENROUTER_DEFAULT_PRIMARY_MODEL;
+  const qualityModel = raw.OPENROUTER_QUALITY_MODEL ?? DEFAULT_QUALITY_MODEL;
+  const qualityEscalation = BOOLEAN_TRUE.has(raw.OPENROUTER_QUALITY_ESCALATION ?? "");
+
+  if (qualityEscalation && !providers.openrouter.configured) {
+    problems.push({
+      level: "warning",
+      field: "OPENROUTER_QUALITY_ESCALATION",
+      message: "Quality escalation is on but no OPENROUTER_API_KEY is set, so it can never fire.",
+    });
+  }
+
+  // A model that reasons before answering cannot serve a live turn, and
+  // discovering that from timeouts during a service is the wrong way to learn
+  // it. Say so at configuration time.
+  const primaryCaps = capabilitiesForModel(primaryModel);
+  const primaryProblem = liveSuitabilityProblem(primaryCaps);
+  if (providers.openrouter.configured && primaryProblem) {
+    problems.push({
+      level: "warning",
+      field: "OPENROUTER_PRIMARY_MODEL",
+      message: `${primaryModel} is a poor fit for the live path: ${primaryProblem}`,
+    });
+  }
+
   /* --- Bible ------------------------------------------------------------ */
   const bibleRequested = raw.BIBLE_PROVIDER ?? "reference-only";
   const bibleValid = ["reference-only", "public-domain", "api-bible"] as const;
@@ -427,6 +535,19 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       paidTier,
       pinned,
       providers,
+      openrouter: {
+        primaryModel,
+        qualityModel,
+        qualityEscalation,
+        policy: openrouterPolicy,
+      },
+    },
+    access: {
+      key: raw.APP_ACCESS_KEY,
+      enabled: !!raw.APP_ACCESS_KEY,
+      // APP_ACCESS_KEY doubles as the signing key when it is set, so a gated
+      // deployment needs nothing further.
+      sessionSecret: raw.SESSION_SECRET ?? raw.APP_ACCESS_KEY,
     },
     bible: {
       provider: bibleProvider,
@@ -435,6 +556,76 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       translation: raw.BIBLE_TRANSLATION ?? "WEB",
     },
     problems,
+  };
+}
+
+/**
+ * Parse the OpenRouter provider-routing policy.
+ *
+ * The one rule that matters: `LLM_PRIVACY_MODE=strict` is a floor, not a
+ * suggestion. It forces `data_collection: deny`, and a deployment that tried
+ * to set `allow` alongside it is told that the stricter value won rather than
+ * being quietly given the looser one. Nothing here can relax a constraint the
+ * deployer asked for.
+ */
+function parseRoutingPolicy(
+  raw: z.infer<typeof rawEnvSchema>,
+  privacyMode: PrivacyMode,
+  problems: EnvProblem[],
+): OpenRouterRoutingPolicy {
+  let sort: ProviderSort = DEFAULT_ROUTING_POLICY.sort;
+  if (raw.OPENROUTER_PROVIDER_SORT) {
+    if ((PROVIDER_SORTS as readonly string[]).includes(raw.OPENROUTER_PROVIDER_SORT)) {
+      sort = raw.OPENROUTER_PROVIDER_SORT as ProviderSort;
+    } else {
+      problems.push({
+        level: "error",
+        field: "OPENROUTER_PROVIDER_SORT",
+        message: `Unknown value "${raw.OPENROUTER_PROVIDER_SORT}". Using ${sort}. Valid: ${PROVIDER_SORTS.join(", ")}.`,
+      });
+    }
+  }
+
+  let dataCollection: DataCollectionPolicy = DEFAULT_ROUTING_POLICY.dataCollection;
+  if (raw.OPENROUTER_DATA_COLLECTION) {
+    if (raw.OPENROUTER_DATA_COLLECTION === "deny" || raw.OPENROUTER_DATA_COLLECTION === "allow") {
+      dataCollection = raw.OPENROUTER_DATA_COLLECTION;
+    } else {
+      problems.push({
+        level: "error",
+        field: "OPENROUTER_DATA_COLLECTION",
+        message: `Unknown value "${raw.OPENROUTER_DATA_COLLECTION}". Using deny. Valid: deny, allow.`,
+      });
+    }
+  }
+
+  // Strict privacy outranks a looser explicit setting, and says so.
+  if (privacyMode === "strict" && dataCollection !== "deny") {
+    problems.push({
+      level: "warning",
+      field: "OPENROUTER_DATA_COLLECTION",
+      message:
+        "LLM_PRIVACY_MODE=strict overrides OPENROUTER_DATA_COLLECTION=allow — routing will deny data collection.",
+    });
+    dataCollection = "deny";
+  }
+
+  const list = (value: string | undefined): string[] | undefined => {
+    const items = (value ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    return items.length ? items : undefined;
+  };
+
+  return {
+    sort,
+    dataCollection,
+    zdr: BOOLEAN_TRUE.has(raw.OPENROUTER_ZDR ?? ""),
+    allowFallbacks: !BOOLEAN_FALSE.has(raw.OPENROUTER_ALLOW_PROVIDER_FALLBACKS ?? ""),
+    requireParameters: !BOOLEAN_FALSE.has(raw.OPENROUTER_REQUIRE_PARAMETERS ?? ""),
+    only: list(raw.OPENROUTER_PROVIDER_ONLY),
+    ignore: list(raw.OPENROUTER_PROVIDER_IGNORE),
   };
 }
 

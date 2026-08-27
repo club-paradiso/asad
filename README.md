@@ -160,14 +160,106 @@ Full detail: [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md).
 
 ## Going live
 
-Copy `.env.example` to `.env.local` and fill in what you need. Every value is
-optional; each subsystem degrades independently.
+Three tiers, and they are not equivalent. Demo mode is a demonstration, not a
+rehearsal.
+
+| | Keys needed | What you get |
+| --- | --- | --- |
+| **Demo** | none | The full pipeline on a recorded Korean sermon. No microphone, no network. For seeing what the console does |
+| **Browser** | one LLM key | On-device recognition plus real interpretation. Free, Chrome-dependent, stops on long silences |
+| **Production** | Deepgram + OpenRouter | Streaming recognition and a pinned live model with latency-oriented routing. What to use for a service you intend to trust |
+
+### Recommended production setup
+
+Copy `.env.example` to `.env.local`. Two keys:
 
 ```bash
-STT_PROVIDER=deepgram        # demo | webspeech | deepgram | openai
+STT_PROVIDER=deepgram
 DEEPGRAM_API_KEY=...
 DEEPGRAM_PROJECT_ID=...      # needed to mint short-lived browser keys
 
+LLM_ROUTING_MODE=pinned
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=...
+OPENROUTER_PRIMARY_MODEL=google/gemini-3.7-flash
+
+OPENROUTER_PROVIDER_SORT=latency
+OPENROUTER_DATA_COLLECTION=deny
+OPENROUTER_REQUIRE_PARAMETERS=true
+
+APP_ACCESS_KEY=...           # see "Protecting a deployed app"
+SESSION_SECRET=...           # required on Vercel; see the same section
+
+BIBLE_PROVIDER=reference-only
+```
+
+Then, before the service:
+
+```bash
+npm run health:openrouter
+```
+
+That makes one real request and reports whether the key works, the model slug
+resolves, the routing policy leaves an upstream eligible, and structured output
+validates. Configuration alone cannot tell you any of those.
+
+### Why OpenRouter is configured this way
+
+It is a router, not a vendor, and the `provider` block sent with every request
+is what makes it fit for live work:
+
+| Setting | Why |
+| --- | --- |
+| `sort=latency` | A perfect answer that arrives after the moment has passed is worth nothing |
+| `data_collection=deny` | Excludes upstreams that may retain or train on what is sent |
+| `require_parameters=true` | Excludes upstreams that would silently drop `response_format` and answer in prose |
+| `allow_fallbacks=true` | Retries on another upstream serving the *same* model. Not model roulette — the model stays pinned so terminology and register hold |
+| `zdr` | Stricter still. If it leaves no eligible upstream the turn fails **visibly** and names the constraint, rather than quietly widening the policy |
+
+The model is pinned for the session on purpose. Switching model families between
+sentences drifts terminology and register, and the interpreter is the one who
+absorbs it mid-sentence.
+
+Model ids are configuration, never code. Set `OPENROUTER_PRIMARY_MODEL` to
+whatever is current and run the health check.
+
+### Protecting a deployed app
+
+`/api/interpret`, `/api/prep`, `/api/counter/message` and `/api/stt/token` all
+spend money. Deployed without a gate they are public endpoints, and
+`/api/stt/token` is the worst of them — it mints recogniser credentials that
+outlive the request.
+
+Always on, no configuration needed:
+
+- same-origin enforcement
+- request body ceilings
+- server-issued session tokens in HttpOnly cookies
+- per-session and per-address rate limits, sized from the measured live
+  workload of ~11 calls a minute
+
+Set `APP_ACCESS_KEY` and nothing paid answers without it. Any non-empty value
+works; it is a shared secret, not an account system.
+
+**On Vercel, also set `SESSION_SECRET`** (`APP_ACCESS_KEY` doubles as one). It
+must be identical on every instance. Without it the signing key is random per
+process, so a token minted by one instance fails on the next — and enforcing
+sessions under those conditions would not make the deployment stricter, it
+would break it continuously, with the console re-minting a token the following
+request rejects again. So without a stable secret, session tokens degrade to
+keying rate limits per browser and stop gating requests. `/diagnostics` reports
+which mode is in force rather than letting you assume the stronger one.
+
+**The honest caveat:** rate limits live in the memory of one server instance.
+On Vercel, or anywhere running more than one, the effective ceiling is the limit
+multiplied by the number of warm instances. That is a real bound and it is not a
+global guarantee. For a hard ceiling, set a spend limit on the OpenRouter key.
+
+### Everything else
+
+Every value is optional; each subsystem degrades independently.
+
+```bash
 # local | auto-free | pinned | reliable
 LLM_ROUTING_MODE=auto-free
 LLM_PRIVACY_MODE=standard    # strict excludes providers that may train on you
@@ -175,11 +267,8 @@ LLM_ALLOW_PAID_FALLBACK=false
 
 GEMINI_API_KEY=...           # free tier
 GROQ_API_KEY=...             # free tier, does not train on your data
-OPENROUTER_API_KEY=...       # free tier, experimental
 ANTHROPIC_API_KEY=...        # paid
 OPENAI_API_KEY=...           # paid
-
-BIBLE_PROVIDER=reference-only  # reference-only | public-domain | api-bible
 ```
 
 Phase 1's `LLM_PROVIDER` / `LLM_API_KEY` still work and report their migration
@@ -297,8 +386,11 @@ npm run icons      # regenerate PWA icons
 npm run shot       # device screenshots, for the design pass
 npm run e2e        # end-to-end flow check against a running server
 
+npm run health:openrouter  # prove the gateway works: key, model, policy, schema
+npm run measure:prompt     # size of every live system prompt
+
 npm run smoke:llm  # one fixture per configured provider; skips cleanly
-npm run bench:llm  # 20-case interpretation benchmark, JSON + Markdown reports
+npm run bench:llm  # 34-case interpretation benchmark, JSON + Markdown reports
                    # (or run it in CI, with no key on your machine — see below)
 npm run bench:live # replay real transcript timing, measure latency
 npm run soak       # 45-minute session: bounded memory, context, no backlog
@@ -393,8 +485,19 @@ Stated plainly, because a tool used live should not surprise you.
 - **Romanisation does not implement inter-syllable liaison** (종로 → Jongno).
   Personal names are correct; place names are an approximation you can
   overwrite.
-- **No prompt caching yet.** The system prompt is constant per session and is
-  the largest fixed input — caching it would cut cost materially.
+- **Prompt caching is requested but unverified.** The system prompt is constant
+  per session and byte-identical across modes, which is what a provider cache
+  needs, and usage accounting asks for `cached_tokens` back. Whether a given
+  upstream actually serves it from cache has not been measured against a real
+  key.
+- **The live model default has not been verified against the live catalogue.**
+  `google/gemini-3.7-flash` is what `.env.example` and the code default to, but
+  network policy in the build environment blocked `openrouter.ai`, so the slug
+  was never confirmed to exist. That is exactly what `npm run health:openrouter`
+  is for — run it before trusting the deployment.
+- **OpenRouter integration is tested against mocks, not a live key.** Request
+  construction, routing policy, capability negotiation and strict-routing
+  failure are unit-tested; no credentialed end-to-end run has happened.
 - **Counter Mode sessions do not survive a restart or span instances.** They
   are held in one process's memory. That is correct for a venue running this as
   a single Node process, and wrong for a multi-instance or serverless

@@ -15,16 +15,29 @@ import { resolveQuickPhrase } from "@/counter/quick-phrases";
 import { detectRisks } from "@/counter/risks";
 import { translateForCounter } from "@/counter/translate";
 import type { CounterMessage } from "@/counter/types";
+import { guardInferenceRoute } from "@/lib/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** One counter utterance. Generous for a typed paragraph, useless for a flood. */
+const MAX_BODY_BYTES = 16 * 1024;
 
 let counter = 0;
 const nextId = () => `m${Date.now().toString(36)}${(counter += 1).toString(36)}`;
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
-  const parsed = counterMessageSchema.safeParse(body);
+  // The counter reaches a model too, so it is guarded on the same terms. A
+  // visitor's phone loads the app before it can post, so it holds a session
+  // token like any other client.
+  const guarded = await guardInferenceRoute(request, {
+    requireSession: true,
+    maxBodyBytes: MAX_BODY_BYTES,
+    limits: [{ rule: "counter", by: "session" }, { rule: "counter", by: "address" }],
+  });
+  if (!guarded.ok) return guarded.response;
+
+  const parsed = counterMessageSchema.safeParse(guarded.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
