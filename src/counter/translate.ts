@@ -53,8 +53,11 @@ export async function translateForCounter(
 
   // No cloud provider at all. The local interpreter cannot translate arbitrary
   // language pairs, so say so rather than emit something useless.
-  const preferred = router.preferred();
-  if (!preferred || preferred === "local") {
+  //
+  // Asked of the same chain `complete` will walk, `prefer` included, so this
+  // check and the request that follows can never disagree about whether a
+  // translation was possible.
+  if (!router.wouldReach(prefer)) {
     return {
       ok: false,
       latencyMs: Date.now() - started,

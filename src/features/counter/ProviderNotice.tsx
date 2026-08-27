@@ -51,6 +51,11 @@ export function ProviderNotice({
   // Still loading: say nothing rather than flash a claim and correct it.
   if (!disclosure) return null;
 
+  // Nothing can translate. The visitor is owed that fact before they type a
+  // symptom into it — in their own language, and without the deployment detail
+  // they can do nothing with. "no translation provider is configured" is a
+  // sentence for whoever holds the API keys; it reached the visitor's phone
+  // instead, half-translated, next to a Start button that still worked.
   if (!disclosure.provider) {
     return (
       <p
@@ -59,7 +64,7 @@ export function ProviderNotice({
           className,
         )}
       >
-        {strings.translationFailed} — no translation provider is configured.
+        {strings.translationUnavailable}
       </p>
     );
   }

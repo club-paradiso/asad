@@ -218,6 +218,27 @@ export class LlmRouter {
     return next ?? null;
   }
 
+  /**
+   * The provider a turn carrying this preference would actually reach.
+   *
+   * Deliberately not `preferred`, and the difference is the whole point: there
+   * a filter is a *hard* filter, which answers "is the open-weight preference
+   * satisfiable?". Here it is only an ordering, exactly as `complete` treats
+   * it — which answers the question the visitor's disclosure and the
+   * diagnostics page are actually asking: whose servers would see this?
+   *
+   * Reading `preferred(OPEN_WEIGHT)` as the answer to that question told every
+   * deployment without an open-weight key — the documented OpenRouter and
+   * Gemini setups among them — that nothing could translate, in red, on the
+   * visitor's phone, while the counter went on translating perfectly well.
+   */
+  wouldReach(prefer?: ProviderFilter): LlmProviderId | null {
+    const reached = this.buildChain(prefer).find(
+      (id) => id !== "local" && this.eligibility(id).ok,
+    );
+    return reached ?? null;
+  }
+
   /** The configured providers whose model matches a filter. Diagnostics. */
   matching(prefer: ProviderFilter): LlmProviderId[] {
     return this.candidates().filter((id) =>

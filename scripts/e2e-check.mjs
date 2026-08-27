@@ -201,10 +201,11 @@ await guest.goto(`${base}/c/${code}`, { waitUntil: "networkidle" });
 const pickerText = await guest.locator("body").innerText();
 check("visitor picks a language written in their own script", /한국어/.test(pickerText) && /Tiếng Việt/.test(pickerText));
 // With no key configured there is no company to name, and saying so plainly is
-// the correct disclosure. Silence is not.
+// the correct disclosure. Silence is not — and neither is naming an
+// environment variable at someone holding a phone they did not choose.
 check(
   "visitor is told who will see their words, or that nobody can translate",
-  /Translated by/.test(pickerText) || /no translation provider is configured/i.test(pickerText),
+  /Translated by/.test(pickerText) || /Translation is not working right now/i.test(pickerText),
   /Translated by/.test(pickerText) ? "provider named" : "no provider configured",
 );
 await guest.screenshot({ path: join(outDir, "counter-guest-languages.png") });

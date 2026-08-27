@@ -458,6 +458,37 @@ describe("open-weight preference — Counter Mode", () => {
   });
 });
 
+describe("what a preference-carrying turn would actually reach", () => {
+  it("falls past an unsatisfiable preference to the provider that answers", () => {
+    // The defect this exists to prevent: `preferred(OPEN_WEIGHT)` is null on a
+    // Gemini-only deployment, which the counter disclosure read as "nothing
+    // can translate" and printed in red on the visitor's phone — while every
+    // message went to Gemini and came back translated.
+    const router = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", GEMINI_API_KEY: KEY }),
+    );
+    expect(router.preferred(OPEN_WEIGHT)).toBeNull();
+    expect(router.wouldReach(OPEN_WEIGHT)).toBe("gemini");
+  });
+
+  it("still honours the preference as an ordering when it can be met", () => {
+    const router = new LlmRouter(
+      env({ LLM_ROUTING_MODE: "auto-free", GEMINI_API_KEY: KEY, GROQ_API_KEY: KEY }),
+    );
+    expect(router.wouldReach(OPEN_WEIGHT)).toBe("groq");
+    expect(router.wouldReach()).toBe("gemini");
+  });
+
+  it("reports nothing only when nothing cloud-side can answer", () => {
+    // `local` is always in the chain and cannot translate, so it must never
+    // count as a translation provider.
+    expect(new LlmRouter(env({})).wouldReach(OPEN_WEIGHT)).toBeNull();
+    expect(
+      new LlmRouter(env({ LLM_ROUTING_MODE: "local", GROQ_API_KEY: KEY })).wouldReach(),
+    ).toBeNull();
+  });
+});
+
 describe("counter open-weight configuration", () => {
   it("defaults on, because the counter asked for open weights by name", () => {
     expect(env({}).llm.counterPreferOpen).toBe(true);

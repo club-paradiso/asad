@@ -166,7 +166,9 @@ export async function GET() {
         preferOpenWeightModels: env.llm.counterPreferOpen,
         openWeightProviders: openWeight,
         openWeightAvailable: openWeight.length > 0,
-        translationProvider: router.preferred(
+        // What a counter turn would actually reach. The open-weight setting
+        // reorders the chain; it never empties it.
+        translationProvider: router.wouldReach(
           env.llm.counterPreferOpen ? OPEN_WEIGHT : undefined,
         ),
         languages: COUNTER_LANGUAGES.length,
