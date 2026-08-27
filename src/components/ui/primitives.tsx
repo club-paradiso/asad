@@ -22,7 +22,7 @@ const TONE: Record<ButtonTone, string> = {
   neutral:
     "bg-[var(--bg-overlay)] text-[var(--fg)] border-[var(--line-strong)] hover:border-[var(--fg-dim)]",
   primary:
-    "bg-[var(--accent)] text-[#141007] border-[var(--accent)] hover:brightness-110 font-semibold",
+    "bg-[var(--accent)] text-[var(--accent-contrast)] border-[var(--accent)] hover:brightness-110 font-semibold",
   quiet:
     "bg-transparent text-[var(--fg-muted)] border-transparent hover:text-[var(--fg)] hover:bg-[var(--bg-overlay)]",
   danger:
@@ -38,7 +38,8 @@ const TONE: Record<ButtonTone, string> = {
  */
 const TONE_ACTIVE: Record<ButtonTone, string> = {
   neutral: "bg-[var(--accent-dim)] text-[var(--accent)] border-[var(--accent)]",
-  primary: "bg-[var(--accent)] text-[#141007] border-[var(--accent)] font-semibold",
+  primary:
+    "bg-[var(--accent)] text-[var(--accent-contrast)] border-[var(--accent)] font-semibold",
   quiet: "bg-[var(--accent-dim)] text-[var(--accent)] border-[color-mix(in_srgb,var(--accent)_35%,transparent)]",
   danger: "bg-[color-mix(in_srgb,var(--danger)_16%,transparent)] text-[var(--danger)] border-[var(--danger)]",
 };
@@ -179,12 +180,14 @@ export function Segmented<T extends string>({
   onChange,
   size = "md",
   label,
+  indicator = false,
 }: {
   options: Array<{ value: T; label: string; title?: string }>;
   value: T;
   onChange: (value: T) => void;
   size?: "sm" | "md";
   label?: string;
+  indicator?: boolean;
 }) {
   return (
     <div
@@ -207,10 +210,21 @@ export function Segmented<T extends string>({
               INTERACTIVE,
               size === "sm" ? "min-h-11 px-2.5 text-[0.75rem]" : "min-h-11 px-3.5 text-sm",
               selected
-                ? "bg-[var(--accent)] text-[#141007] font-semibold"
+                ? "bg-[var(--accent)] text-[var(--accent-contrast)] font-semibold"
                 : "text-[var(--fg-muted)] hover:text-[var(--fg)]",
             )}
           >
+            {indicator ? (
+              <span
+                aria-hidden
+                className={cn(
+                  "grid size-5 shrink-0 place-items-center rounded-full border-2",
+                  selected ? "border-current" : "border-[var(--fg-dim)]",
+                )}
+              >
+                {selected ? <span className="size-2 rounded-full bg-current" /> : null}
+              </span>
+            ) : null}
             {option.label}
           </button>
         );

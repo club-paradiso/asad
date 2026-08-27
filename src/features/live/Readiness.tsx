@@ -77,15 +77,15 @@ export function Readiness({
   return (
     <section
       aria-label="Session readiness"
-      className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)]"
+      className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--bg-raised)] lg:h-full lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l"
     >
-      <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-[var(--line)] px-4 py-2.5">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--line)] px-5 py-4 lg:px-8 lg:py-5">
         <span
           aria-hidden
-          className="size-2 rounded-full"
+          className="size-2.5 rounded-full"
           style={{ background: LEVEL_COLOUR[worst] }}
         />
-        <h2 className="text-sm font-semibold tracking-tight">
+        <h2 className="text-base font-semibold tracking-tight">
           {worst === "ready"
             ? "Ready to interpret"
             : worst === "limited"
@@ -93,7 +93,7 @@ export function Readiness({
               : "Not ready yet"}
         </h2>
         {demo && (
-          <span className="rounded-sm border border-[var(--line-strong)] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--fg-muted)]">
+          <span className="ml-auto rounded-sm border border-[color-mix(in_srgb,var(--accent)_55%,var(--line))] px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--accent)]">
             Demo · not a live session
           </span>
         )}
@@ -103,15 +103,15 @@ export function Readiness({
         {rows.map((row) => (
           <div
             key={row.label}
-            className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5"
+            className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-5 py-4 lg:block lg:px-8 lg:py-7"
           >
-            <dt className="w-32 shrink-0 text-xs font-medium uppercase tracking-wider text-[var(--fg-dim)]">
+            <dt className="w-32 shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--fg-dim)] lg:mb-2 lg:w-auto">
               {row.label}
             </dt>
             <dd className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
               <span
                 className={cn(
-                  "text-sm",
+                  "text-sm leading-relaxed lg:text-base",
                   row.level === "ready" ? "text-[var(--fg)]" : "font-medium",
                 )}
                 style={
@@ -126,7 +126,7 @@ export function Readiness({
                   paragraph is four lines of reassurance nobody asked for, and
                   on a phone it was what pushed Start below the fold. */}
               {row.detail && row.level !== "ready" && (
-                <span className="w-full text-xs leading-relaxed text-[var(--fg-muted)]">
+                <span className="mt-1 w-full text-xs leading-relaxed text-[var(--fg-muted)] lg:text-sm">
                   {row.detail}
                 </span>
               )}

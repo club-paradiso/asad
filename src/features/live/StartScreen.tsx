@@ -199,138 +199,181 @@ export function StartScreen() {
   };
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-5 px-5 py-7 sm:py-10">
-      <header className="flex items-baseline justify-between gap-4">
+    <div
+      data-surface="launcher"
+      className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10"
+    >
+      <header className="flex items-center justify-between gap-4 border-b border-[var(--line)] pb-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">tong-yuck</h1>
-          <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+          <h1 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">tong-yuck</h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)] sm:text-base">
             Korean → English interpretation copilot
           </p>
         </div>
         <Link
           href="/diagnostics"
-          className="shrink-0 text-xs text-[var(--fg-dim)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
+          className="inline-flex min-h-11 shrink-0 items-center gap-2 px-2 text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
         >
           Diagnostics
+          <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
+            <path
+              d="m7.5 4.5 5.5 5.5-5.5 5.5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </Link>
       </header>
 
-      <Readiness rows={rows} demo={source === "demo"} />
+      <main className="grid flex-1 gap-8 py-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(22rem,1fr)] lg:gap-10 lg:py-0">
+        <div className="flex min-w-0 flex-col gap-5 lg:py-8">
+          {/* --- Session configuration ----------------------------------------
+              Segmented rows rather than description cards: the descriptions were
+              prep-time reading occupying launch-time space, and they were what
+              pushed Start below the fold on a phone. */}
+          <section className="flex flex-col gap-4">
+            <ControlRow label="Mode">
+              <Segmented
+                label="Interpretation mode"
+                indicator
+                value={settings.mode}
+                onChange={(mode) => updateSettings({ ...settings, mode })}
+                options={(["sermon", "general"] as InterpretationMode[]).map((mode) => ({
+                  value: mode,
+                  label: mode === "sermon" ? "Sermon" : "General",
+                  title:
+                    mode === "sermon"
+                      ? "Scripture detection, theological terminology, church register, wordplay."
+                      : "Meetings, lectures, interviews. No theological assumptions.",
+                }))}
+              />
+            </ControlRow>
 
-      {/* --- Session configuration ----------------------------------------
-          Segmented rows rather than description cards: the descriptions were
-          prep-time reading occupying launch-time space, and they were what
-          pushed Start below the fold on a phone. */}
-      <section className="flex flex-col gap-3">
-        <ControlRow label="Mode">
-          <Segmented
-            label="Interpretation mode"
-            value={settings.mode}
-            onChange={(mode) => updateSettings({ ...settings, mode })}
-            options={(["sermon", "general"] as InterpretationMode[]).map((mode) => ({
-              value: mode,
-              label: mode === "sermon" ? "Sermon" : "General",
-              title:
-                mode === "sermon"
-                  ? "Scripture detection, theological terminology, church register, wordplay."
-                  : "Meetings, lectures, interviews. No theological assumptions.",
-            }))}
-          />
-        </ControlRow>
+            <ControlRow label="Audio">
+              <Segmented
+                label="Audio source"
+                indicator
+                value={source}
+                onChange={setSourceOverride}
+                options={sources.map((id) => ({
+                  value: id,
+                  label: STT_PROVIDER_INFO[id].label,
+                  title: STT_PROVIDER_INFO[id].detail,
+                }))}
+              />
+            </ControlRow>
 
-        <ControlRow label="Audio">
-          <Segmented
-            label="Audio source"
-            value={source}
-            onChange={setSourceOverride}
-            options={sources.map((id) => ({
-              value: id,
-              label: STT_PROVIDER_INFO[id].label,
-              title: STT_PROVIDER_INFO[id].detail,
-            }))}
-          />
-        </ControlRow>
-
-        <ControlRow label="Lag">
-          <Segmented
-            label="Interpreter lag"
-            value={settings.lag}
-            onChange={(lag) => updateSettings({ ...settings, lag })}
-            options={(["fast", "balanced", "safe"] as const).map((lag) => ({
-              value: lag,
-              label: LAG_PROFILES[lag].label,
-              title: LAG_PROFILES[lag].description,
-            }))}
-          />
-        </ControlRow>
-        <p className="text-xs text-[var(--fg-muted)]">{LAG_PROFILES[settings.lag].description}</p>
-      </section>
-
-      <Button
-        tone="primary"
-        size="lg"
-        // Disabled only while we genuinely do not yet know what starting would
-        // send. That window is short and it is the one the old race lived in.
-        disabled={!consent.mayStart}
-        onClick={beginSession}
-        className="w-full"
-      >
-        {consent.phase === "checking"
-          ? "Checking privacy settings…"
-          : consent.phase === "needed"
-            ? "Confirm privacy to continue"
-            : source === "demo"
-              ? "Run demo"
-              : "Start live interpreting"}
-      </Button>
-
-      {/* --- Everything optional ------------------------------------------ */}
-      <details
-        open={advanced}
-        onToggle={(event) => setAdvanced((event.target as HTMLDetailsElement).open)}
-        className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)]"
-      >
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium marker:content-none">
-          <span className="text-[var(--fg-muted)]">More</span>
-          <span className="ml-2 text-xs text-[var(--fg-dim)]">
-            prep sheet · saved sessions · counter mode
-          </span>
-        </summary>
-        <div className="flex flex-col gap-3 border-t border-[var(--line)] px-4 py-3.5">
-          <Link
-            href="/prep"
-            className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
-          >
-            Prepare a session
-            {prep.speaker || prep.title ? (
-              <span className="ml-1.5 text-[var(--accent)]">· ready</span>
-            ) : null}
-          </Link>
-          <Link
-            href="/sessions"
-            className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
-          >
-            Saved sessions
-          </Link>
-          {/* A different job on the same footing, not a sub-feature: the
-              console is for an interpreter working a room, the counter is for
-              staff at a desk with a stranger in front of them. */}
-          <Link
-            href="/counter"
-            className="rounded-md border border-[var(--line)] p-3 transition-colors hover:border-[var(--line-strong)]"
-          >
-            <p className="text-sm font-semibold">현장 응대 · Counter Mode</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-[var(--fg-muted)]">
-              Show a QR code; the visitor joins on their own phone in their own language.
-              24 languages, no install.
+            <ControlRow label="Lag">
+              <Segmented
+                label="Interpreter lag"
+                indicator
+                value={settings.lag}
+                onChange={(lag) => updateSettings({ ...settings, lag })}
+                options={(["fast", "balanced", "safe"] as const).map((lag) => ({
+                  value: lag,
+                  label: LAG_PROFILES[lag].label,
+                  title: LAG_PROFILES[lag].description,
+                }))}
+              />
+            </ControlRow>
+            <p className="text-sm text-[var(--fg-muted)] sm:pl-28">
+              {LAG_PROFILES[settings.lag].description}
             </p>
-          </Link>
-        </div>
-      </details>
+          </section>
 
-      <p className="mt-auto pt-3 text-xs text-[var(--fg-dim)]">
-        In session: Space freeze · T teleprompter · K Korean · G glossary · +/− text size
-      </p>
+          <Button
+            tone="primary"
+            size="lg"
+            // Disabled only while we genuinely do not yet know what starting would
+            // send. That window is short and it is the one the old race lived in.
+            disabled={!consent.mayStart}
+            onClick={beginSession}
+            className="w-full"
+          >
+            {consent.phase === "checking"
+              ? "Checking privacy settings…"
+              : consent.phase === "needed"
+                ? "Confirm privacy to continue"
+                : source === "demo"
+                  ? "Run demo"
+                  : "Start live interpreting"}
+          </Button>
+
+          {/* --- Everything optional ------------------------------------------ */}
+          <details
+            open={advanced}
+            onToggle={(event) => setAdvanced((event.target as HTMLDetailsElement).open)}
+            className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)]"
+          >
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium marker:content-none">
+              <span>
+                <span className="font-semibold text-[var(--accent)]">More</span>
+                <span className="ml-2 text-sm text-[var(--fg-muted)]">
+                  prep sheet · saved sessions · counter mode
+                </span>
+              </span>
+              <svg
+                aria-hidden
+                viewBox="0 0 20 20"
+                className="size-4 shrink-0 text-[var(--accent)]"
+                fill="none"
+              >
+                <path
+                  d="m7.5 4.5 5.5 5.5-5.5 5.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </summary>
+            <div className="flex flex-col gap-3 border-t border-[var(--line)] px-4 py-3.5">
+              <Link
+                href="/prep"
+                className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
+              >
+                Prepare a session
+                {prep.speaker || prep.title ? (
+                  <span className="ml-1.5 text-[var(--accent)]">· ready</span>
+                ) : null}
+              </Link>
+              <Link
+                href="/sessions"
+                className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
+              >
+                Saved sessions
+              </Link>
+              {/* A different job on the same footing, not a sub-feature: the
+                  console is for an interpreter working a room, the counter is for
+                  staff at a desk with a stranger in front of them. */}
+              <Link
+                href="/counter"
+                className="rounded-md border border-[var(--line)] p-3 transition-colors hover:border-[var(--line-strong)]"
+              >
+                <p className="text-sm font-semibold">현장 응대 · Counter Mode</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-[var(--fg-muted)]">
+                  Show a QR code; the visitor joins on their own phone in their own language.
+                  24 languages, no install.
+                </p>
+              </Link>
+            </div>
+          </details>
+
+          <p className="mt-auto border-t border-[var(--line)] pt-5 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
+            In session: <strong className="font-semibold text-[var(--fg)]">Space</strong>{" "}
+            freeze · <strong className="font-semibold text-[var(--fg)]">T</strong> teleprompter ·{" "}
+            <strong className="font-semibold text-[var(--fg)]">K</strong> Korean ·{" "}
+            <strong className="font-semibold text-[var(--fg)]">G</strong> glossary ·{" "}
+            <strong className="font-semibold text-[var(--fg)]">+/−</strong> text size
+          </p>
+        </div>
+
+        <aside className="min-w-0 lg:py-8">
+          <Readiness rows={rows} demo={source === "demo"} />
+        </aside>
+      </main>
 
       {/* Shown BEFORE anything opens. Accepting is the user gesture that
           starts the session, so consent and Safari's permission model are
@@ -358,11 +401,13 @@ export function StartScreen() {
 
 function ControlRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wider text-[var(--fg-dim)]">
+    <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-2 sm:grid-cols-[6rem_minmax(0,1fr)]">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--fg-dim)]">
         {label}
       </span>
-      {children}
+      <div className="min-w-0 [&_[role=radio]]:flex-1 [&_[role=radiogroup]]:flex [&_[role=radiogroup]]:w-full">
+        {children}
+      </div>
     </div>
   );
 }

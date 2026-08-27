@@ -52,6 +52,7 @@
   --fg-dim: #5d6874;
 
   --accent: #f0b429;
+  --accent-contrast: #141007;
   --accent-dim: rgba(240, 180, 41, 0.16);
   --info: #5ec8d8;
   --info-dim: rgba(94, 200, 216, 0.14);
@@ -90,6 +91,7 @@
     --fg-muted: #4d5866;
     --fg-dim: #7c8794;
     --accent: #a9761a;
+    --accent-contrast: #141007;
     --accent-dim: rgba(169, 118, 26, 0.12);
     --info: #1a7f91;
     --info-dim: rgba(26, 127, 145, 0.1);
@@ -109,9 +111,34 @@
   --fg-muted: #97a2b0;
   --fg-dim: #5d6874;
   --accent: #f0b429;
+  --accent-contrast: #141007;
   --accent-dim: rgba(240, 180, 41, 0.16);
   --info: #5ec8d8;
   --info-dim: rgba(94, 200, 216, 0.14);
+}
+
+/* The launcher is a preparation surface, not the live reading surface. It is
+   deliberately light and operational even when the OS is in dark mode; the
+   live console keeps its auditorium-safe dark palette above. */
+[data-surface="launcher"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-overlay: #f6f8fc;
+  --line: #dfe5ef;
+  --line-strong: #c7d1e0;
+  --fg: #0b1739;
+  --fg-muted: #5f6d88;
+  --fg-dim: #7b879d;
+  --accent: #144ddd;
+  --accent-contrast: #ffffff;
+  --accent-dim: rgba(20, 77, 221, 0.1);
+  --info: #156f86;
+  --info-dim: rgba(21, 111, 134, 0.09);
+  --ok: #18a664;
+  --warn: #a76416;
+  --danger: #c63c3c;
+  background: var(--bg);
 }
 
 html,
