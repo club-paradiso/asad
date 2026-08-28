@@ -463,7 +463,7 @@ function SetupScreen({
 
       <footer className="mt-auto flex items-center justify-between pt-4 text-xs text-[var(--fg-dim)]">
         <Link href="/" className="hover:text-[var(--fg)]">
-          ← 통역 콘솔
+          ← 모드 선택
         </Link>
         <span>대화 내용은 저장되지 않습니다.</span>
       </footer>
