@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: `${BRAND.name} (${BRAND.shortName})`,
     short_name: BRAND.shortName,
-    description: `${BRAND.tagline} ${BRAND.englishDescriptor}.`,
+    description: BRAND.description,
     start_url: "/",
     scope: "/",
     display: "standalone",
