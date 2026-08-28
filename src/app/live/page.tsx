@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { StartScreen } from "@/features/live/StartScreen";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "라이브 통역 · tong-yuck",
+  title: `라이브 통역 · ${BRAND.name}`,
   description:
     "Korean → English live interpretation console. Readiness, audio source and lag are settled here, before the first word.",
 };
