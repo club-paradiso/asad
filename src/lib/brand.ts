@@ -6,4 +6,4 @@ export const BRAND = {
   englishDescriptor: "AI-assisted interpretation",
 } as const;
 
-export const BRAND_TITLE = `${BRAND.shortName} — ${BRAND.name}`;
+export const BRAND_TITLE = BRAND.name;
