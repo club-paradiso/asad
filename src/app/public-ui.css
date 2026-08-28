@@ -1,0 +1,6 @@
+/* Diagnostics remains directly accessible for maintenance, but it is not part
+   of the general-user launcher flow. Keep public launch surfaces focused on
+   starting an interpretation session. */
+[data-surface="launcher"] a[href="/diagnostics"] {
+  display: none;
+}
