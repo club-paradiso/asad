@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * Who will see what the visitor is about to say.
+ * Public counter screens should not expose infrastructure/provider details.
  *
- * A stranger at a counter is asked to type medical symptoms, immigration
- * status or money problems into a device they did not choose. Naming the
- * company that receives it — and saying plainly when a free tier may keep it —
- * belongs on the join screen, before the first word, in the visitor's own
- * language. Not in a policy page they cannot read.
+ * We still query the server for one operational reason: if no translation
+ * provider is configured at all, users need a clear failure message instead of
+ * discovering it only after they try to send something. A healthy configured
+ * provider is intentionally represented as `null` here so neither the visitor
+ * nor staff setup screen renders vendor, model-weight, training, retention or
+ * logging details.
  */
 import { useEffect, useState } from "react";
 import type { AppConfig } from "@/app/api/config/route";
@@ -16,7 +17,11 @@ import { cn } from "@/lib/cn";
 
 export type CounterDisclosure = AppConfig["counter"];
 
-/** Ask the server once what a counter turn would reach. */
+/**
+ * Return disclosure data only when translation is unavailable.
+ * Provider details remain available to diagnostics/internal tooling through the
+ * config API, but are not promoted on general-user counter surfaces.
+ */
 export function useCounterDisclosure(): CounterDisclosure | null {
   const [disclosure, setDisclosure] = useState<CounterDisclosure | null>(null);
 
@@ -25,7 +30,8 @@ export function useCounterDisclosure(): CounterDisclosure | null {
     fetch("/api/config")
       .then((response) => (response.ok ? response.json() : null))
       .then((value: AppConfig | null) => {
-        if (!cancelled && value) setDisclosure(value.counter);
+        if (cancelled || !value) return;
+        setDisclosure(value.counter.provider ? null : value.counter);
       })
       .catch(() => {});
     return () => {
@@ -36,9 +42,6 @@ export function useCounterDisclosure(): CounterDisclosure | null {
   return disclosure;
 }
 
-const fill = (template: string, provider: string) =>
-  template.replace("{provider}", provider);
-
 export function ProviderNotice({
   disclosure,
   strings,
@@ -48,14 +51,10 @@ export function ProviderNotice({
   strings: CounterStrings;
   className?: string;
 }) {
-  // Still loading: say nothing rather than flash a claim and correct it.
+  // Healthy provider details are deliberately hidden from public UI.
   if (!disclosure) return null;
 
-  // Nothing can translate. The visitor is owed that fact before they type a
-  // symptom into it — in their own language, and without the deployment detail
-  // they can do nothing with. "no translation provider is configured" is a
-  // sentence for whoever holds the API keys; it reached the visitor's phone
-  // instead, half-translated, next to a Start button that still worked.
+  // Only an actionable outage remains visible.
   if (!disclosure.provider) {
     return (
       <p
@@ -69,16 +68,5 @@ export function ProviderNotice({
     );
   }
 
-  return (
-    <div className={cn("text-center text-xs leading-relaxed", className)}>
-      <p className="text-[var(--fg-dim)]">
-        {fill(strings.sentTo, disclosure.provider)}
-      </p>
-      {disclosure.mayTrain && (
-        <p className="mt-1 text-[var(--warn)]">
-          {fill(strings.mayTrain, disclosure.provider)}
-        </p>
-      )}
-    </div>
-  );
+  return null;
 }
