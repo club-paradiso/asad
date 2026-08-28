@@ -43,6 +43,19 @@ interface OpenRouterConfigRow {
 }
 
 /** Result of the on-demand health probe. Never carries a key. */
+/** The subset of /api/models/open-weight this screen renders. */
+interface OpenWeightResult {
+  source: "openrouter" | "fallback";
+  reason?: string;
+  suggestions: Array<{
+    id: string;
+    name: string;
+    family: string;
+    contextTokens?: number;
+  }>;
+  envHint: string;
+}
+
 interface HealthResult {
   configured: boolean;
   model: string;
@@ -170,6 +183,7 @@ const Row = ({ k, v, tone }: { k: string; v: React.ReactNode; tone?: "warn" | "o
 export function DiagnosticsScreen() {
   const [data, setData] = useState<Payload | null>(null);
   const [health, setHealth] = useState<HealthResult | "running" | null>(null);
+  const [openWeight, setOpenWeight] = useState<OpenWeightResult | "running" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Browser capabilities are static facts, not state. Reading them through the
@@ -196,6 +210,25 @@ export function DiagnosticsScreen() {
       available: useCapability(() => typeof AudioWorklet !== "undefined"),
     },
   ];
+
+  const findOpenWeight = useCallback(() => {
+    setOpenWeight("running");
+    fetch("/api/models/open-weight", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result: OpenWeightResult | null) =>
+        setOpenWeight(
+          result ?? { source: "fallback", reason: "The catalogue endpoint refused the request.", suggestions: [], envHint: "" },
+        ),
+      )
+      .catch(() =>
+        setOpenWeight({
+          source: "fallback",
+          reason: "The catalogue endpoint could not be reached.",
+          suggestions: [],
+          envHint: "",
+        }),
+      );
+  }, []);
 
   const runHealth = useCallback(() => {
     setHealth("running");
@@ -368,6 +401,53 @@ export function DiagnosticsScreen() {
             Makes one real, billed request. Rate limited.
           </span>
         </div>
+
+        {/* Which open-weight models are actually available cannot be written
+            down — the free set rotates — so it is asked for rather than
+            listed. Costs nothing: the catalogue is public. */}
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={findOpenWeight} disabled={openWeight === "running"}>
+            {openWeight === "running" ? "Looking…" : "Find free open-weight models"}
+          </Button>
+          <span className="text-xs text-[var(--fg-dim)]">
+            Reads OpenRouter&rsquo;s public catalogue. No key, no cost.
+          </span>
+        </div>
+
+        {typeof openWeight === "object" && openWeight !== null && (
+          <div className="rounded-md border border-[var(--line)] px-3 py-2.5 text-sm leading-relaxed">
+            {openWeight.source === "fallback" && openWeight.reason && (
+              <p className="mb-2 text-[var(--warn)]">
+                {openWeight.reason} Showing models verified for this repository instead.
+              </p>
+            )}
+            {openWeight.suggestions.length === 0 ? (
+              <p className="text-[var(--fg-muted)]">Nothing to suggest.</p>
+            ) : (
+              <>
+                <ul className="flex flex-col gap-1.5">
+                  {openWeight.suggestions.map((model) => (
+                    <li key={model.id} className="flex flex-wrap items-baseline gap-x-2">
+                      <code className="text-xs text-[var(--fg)]">{model.id}</code>
+                      <span className="text-xs text-[var(--fg-dim)]">
+                        {model.family}
+                        {model.contextTokens
+                          ? ` · ${Math.round(model.contextTokens / 1000)}k context`
+                          : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {openWeight.envHint && (
+                  <p className="mt-2.5 text-xs text-[var(--fg-muted)]">
+                    Widest context first. To use the top one:{" "}
+                    <code className="text-[var(--fg)]">{openWeight.envHint}</code>
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {typeof health === "object" && health !== null && (
           <div

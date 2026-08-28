@@ -134,4 +134,101 @@ describe("WebSpeechProvider", () => {
     await vi.advanceTimersByTimeAsync(350);
     expect(recognition.start).toHaveBeenCalledTimes(2);
   });
+
+  /**
+   * The reported defect: one recognition error ended the whole session.
+   *
+   * `audio-capture` and `service-not-allowed` were classified fatal, so a
+   * headset switching or the platform speech service hiccupping once tore the
+   * session down mid-sermon with no retry.
+   */
+  describe("recovering from a transient recogniser failure", () => {
+    it("keeps listening after a single audio-capture blip", async () => {
+      vi.useFakeTimers();
+      const provider = new WebSpeechProvider();
+      const statuses: string[] = [];
+      const errors: string[] = [];
+      provider.onStatus((status) => statuses.push(status));
+      provider.onError((error) => errors.push(error.message));
+
+      const connected = provider.connect();
+      const recognition = FakeRecognition.last!;
+      recognition.onstart?.();
+      await connected;
+
+      recognition.onerror?.({ error: "audio-capture" });
+      await vi.advanceTimersByTimeAsync(400);
+
+      // It retried rather than giving up…
+      expect(recognition.start).toHaveBeenCalledTimes(2);
+      expect(statuses).not.toContain("error");
+      // …and said nothing to an interpreter who is mid-sentence.
+      expect(errors).toEqual([]);
+    });
+
+    it("gives up only once the retry budget is spent", async () => {
+      vi.useFakeTimers();
+      const provider = new WebSpeechProvider();
+      const statuses: string[] = [];
+      const errors: string[] = [];
+      provider.onStatus((status) => statuses.push(status));
+      provider.onError((error) => errors.push(error.message));
+
+      const connected = provider.connect();
+      const recognition = FakeRecognition.last!;
+      recognition.onstart?.();
+      await connected;
+
+      // Four failures are forgiven; the fifth is real.
+      for (const delay of [400, 1200, 3000, 6000]) {
+        recognition.onerror?.({ error: "audio-capture" });
+        await vi.advanceTimersByTimeAsync(delay);
+      }
+      expect(statuses).not.toContain("error");
+
+      recognition.onerror?.({ error: "audio-capture" });
+      expect(statuses).toContain("error");
+      expect(errors[0]).toMatch(/after 4 attempts/);
+    });
+
+    it("forgives afresh once listening resumes", async () => {
+      vi.useFakeTimers();
+      const provider = new WebSpeechProvider();
+      const statuses: string[] = [];
+      provider.onStatus((status) => statuses.push(status));
+
+      const connected = provider.connect();
+      const recognition = FakeRecognition.last!;
+      recognition.onstart?.();
+      await connected;
+
+      // A blip an hour into the service must not be judged against failures
+      // that already healed — otherwise a long session dies of old news.
+      for (let i = 0; i < 8; i += 1) {
+        recognition.onerror?.({ error: "service-not-allowed" });
+        await vi.advanceTimersByTimeAsync(400);
+        recognition.onstart?.();
+      }
+
+      expect(statuses).not.toContain("error");
+    });
+
+    it("still refuses to retry a denied microphone", async () => {
+      vi.useFakeTimers();
+      const provider = new WebSpeechProvider();
+      const statuses: string[] = [];
+      provider.onStatus((status) => statuses.push(status));
+
+      const connected = provider.connect();
+      const recognition = FakeRecognition.last!;
+      recognition.onerror?.({ error: "not-allowed" });
+
+      await expect(connected).rejects.toThrow("not-allowed");
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      // Permission is a decision, not a blip: no retry, ever.
+      expect(recognition.start).toHaveBeenCalledTimes(1);
+      expect(statuses).toContain("error");
+    });
+  });
 });
