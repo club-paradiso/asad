@@ -1,6 +1,34 @@
 import type { Metadata, Viewport } from "next";
+import { Bricolage_Grotesque, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
+
+/**
+ * Two faces, self-hosted.
+ *
+ * `next/font` downloads these at BUILD time and serves them from this origin,
+ * which is the point: a booth on church wifi cannot afford a blocking request
+ * to fonts.gstatic.com ninety seconds before a service, and the service worker
+ * can only cache what this origin serves.
+ *
+ * Latin only, deliberately. Hangul stays on the system stack below — Apple SD
+ * Gothic Neo and Pretendard are better Korean faces than anything worth
+ * shipping a megabyte for, and the original metrics tuning was done against
+ * them.
+ */
+const display = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: ["500", "700", "800"],
+  variable: "--ff-display",
+  display: "swap",
+});
+
+const body = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--ff-body",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "tong-yuck — interpreter copilot",
@@ -37,7 +65,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-[100dvh] antialiased">
         {children}
         <ServiceWorker />

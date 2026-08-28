@@ -33,7 +33,11 @@ import type { InterpretationMode, StoredSession } from "@/types";
 import { prepStore, settingsStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { useCapability } from "@/hooks/useCapability";
-import { STT_PROVIDER_INFO, WebSpeechProvider, type SttProviderId } from "@/providers/stt";
+import {
+  STT_PROVIDER_INFO,
+  WebSpeechProvider,
+  type SttProviderId,
+} from "@/providers/stt";
 import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { Button, Segmented } from "@/components/ui/primitives";
 import { openSession, readSessionState } from "@/lib/session-client";
@@ -52,17 +56,24 @@ export function StartScreen() {
   const [screen, setScreen] = useState<Screen>("start");
   const [settings, updateSettings] = useLocalStore(settingsStore);
   const [prep] = useLocalStore(prepStore);
-  const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(null);
+  const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(
+    null,
+  );
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
   const [advanced, setAdvanced] = useState(false);
 
   /** Private-deployment gate, when one is configured. */
-  const [gate, setGate] = useState<{ gated: boolean; authorised: boolean } | null>(null);
+  const [gate, setGate] = useState<{
+    gated: boolean;
+    authorised: boolean;
+  } | null>(null);
   const [accessKey, setAccessKey] = useState("");
   const [gateError, setGateError] = useState<string | null>(null);
 
-  const browserSttAvailable = useCapability(() => WebSpeechProvider.isSupported());
+  const browserSttAvailable = useCapability(() =>
+    WebSpeechProvider.isSupported(),
+  );
 
   // Ask the server once what it can actually do, so the launcher never offers
   // a cloud provider that will fail the moment the interpreter presses Start.
@@ -108,7 +119,8 @@ export function StartScreen() {
   const sources = useMemo(() => {
     const list: SttProviderId[] = ["demo"];
     if (browserSttAvailable) list.push("webspeech");
-    if (config?.stt.cloudAvailable) list.push(config.stt.configured as SttProviderId);
+    if (config?.stt.cloudAvailable)
+      list.push(config.stt.configured as SttProviderId);
     return [...new Set(list)];
   }, [browserSttAvailable, config]);
 
@@ -134,7 +146,9 @@ export function StartScreen() {
   }
 
   if (screen === "review" && finished) {
-    return <SessionSummary session={finished} onClose={() => setScreen("start")} />;
+    return (
+      <SessionSummary session={finished} onClose={() => setScreen("start")} />
+    );
   }
 
   /* --- Private deployment gate ------------------------------------------ */
@@ -199,207 +213,234 @@ export function StartScreen() {
   };
 
   return (
-    <div
-      data-surface="launcher"
-      className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10"
-    >
-      <header className="flex items-center justify-between gap-4 border-b border-[var(--line)] pb-6">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">tong-yuck</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)] sm:text-base">
-            Korean → English interpretation copilot
-          </p>
-        </div>
-        <Link
-          href="/diagnostics"
-          className="inline-flex min-h-11 shrink-0 items-center gap-2 px-2 text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
-        >
-          Diagnostics
-          <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
-            <path
-              d="m7.5 4.5 5.5 5.5-5.5 5.5"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Link>
-      </header>
+    <div data-surface="launcher" className="min-h-[100dvh] w-full">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)] pb-6">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+              tong-yuck
+            </h1>
+            <p className="mt-1 text-sm text-[var(--fg-muted)] sm:text-base">
+              Korean → English interpretation copilot
+            </p>
+          </div>
+          <Link
+            href="/"
+            className="ms-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
+          >
+            <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
+              <path
+                d="M12.5 4.5 7 10l5.5 5.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            모드 선택
+          </Link>
+          <Link
+            href="/diagnostics"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 px-2 text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+          >
+            Diagnostics
+            <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
+              <path
+                d="m7.5 4.5 5.5 5.5-5.5 5.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Link>
+        </header>
 
-      <main className="grid flex-1 gap-8 py-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(22rem,1fr)] lg:gap-10 lg:py-0">
-        <div className="flex min-w-0 flex-col gap-5 lg:py-8">
-          {/* --- Session configuration ----------------------------------------
+        <main className="grid flex-1 gap-8 py-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(22rem,1fr)] lg:gap-10 lg:py-0">
+          <div className="flex min-w-0 flex-col gap-5 lg:py-8">
+            {/* --- Session configuration ----------------------------------------
               Segmented rows rather than description cards: the descriptions were
               prep-time reading occupying launch-time space, and they were what
               pushed Start below the fold on a phone. */}
-          <section className="flex flex-col gap-4">
-            <ControlRow label="Mode">
-              <Segmented
-                label="Interpretation mode"
-                indicator
-                value={settings.mode}
-                onChange={(mode) => updateSettings({ ...settings, mode })}
-                options={(["sermon", "general"] as InterpretationMode[]).map((mode) => ({
-                  value: mode,
-                  label: mode === "sermon" ? "Sermon" : "General",
-                  title:
-                    mode === "sermon"
-                      ? "Scripture detection, theological terminology, church register, wordplay."
-                      : "Meetings, lectures, interviews. No theological assumptions.",
-                }))}
-              />
-            </ControlRow>
-
-            <ControlRow label="Audio">
-              <Segmented
-                label="Audio source"
-                indicator
-                value={source}
-                onChange={setSourceOverride}
-                options={sources.map((id) => ({
-                  value: id,
-                  label: STT_PROVIDER_INFO[id].label,
-                  title: STT_PROVIDER_INFO[id].detail,
-                }))}
-              />
-            </ControlRow>
-
-            <ControlRow label="Lag">
-              <Segmented
-                label="Interpreter lag"
-                indicator
-                value={settings.lag}
-                onChange={(lag) => updateSettings({ ...settings, lag })}
-                options={(["fast", "balanced", "safe"] as const).map((lag) => ({
-                  value: lag,
-                  label: LAG_PROFILES[lag].label,
-                  title: LAG_PROFILES[lag].description,
-                }))}
-              />
-            </ControlRow>
-            <p className="text-sm text-[var(--fg-muted)] sm:pl-28">
-              {LAG_PROFILES[settings.lag].description}
-            </p>
-          </section>
-
-          <Button
-            tone="primary"
-            size="lg"
-            // Disabled only while we genuinely do not yet know what starting would
-            // send. That window is short and it is the one the old race lived in.
-            disabled={!consent.mayStart}
-            onClick={beginSession}
-            className="w-full"
-          >
-            {consent.phase === "checking"
-              ? "Checking privacy settings…"
-              : consent.phase === "needed"
-                ? "Confirm privacy to continue"
-                : source === "demo"
-                  ? "Run demo"
-                  : "Start live interpreting"}
-          </Button>
-
-          {/* --- Everything optional ------------------------------------------ */}
-          <details
-            open={advanced}
-            onToggle={(event) => setAdvanced((event.target as HTMLDetailsElement).open)}
-            className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)]"
-          >
-            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium marker:content-none">
-              <span>
-                <span className="font-semibold text-[var(--accent)]">More</span>
-                <span className="ml-2 text-sm text-[var(--fg-muted)]">
-                  prep sheet · saved sessions · counter mode
-                </span>
-              </span>
-              <svg
-                aria-hidden
-                viewBox="0 0 20 20"
-                className="size-4 shrink-0 text-[var(--accent)]"
-                fill="none"
-              >
-                <path
-                  d="m7.5 4.5 5.5 5.5-5.5 5.5"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+            <section className="flex flex-col gap-4">
+              <ControlRow label="Mode">
+                <Segmented
+                  label="Interpretation mode"
+                  indicator
+                  value={settings.mode}
+                  onChange={(mode) => updateSettings({ ...settings, mode })}
+                  options={(["sermon", "general"] as InterpretationMode[]).map(
+                    (mode) => ({
+                      value: mode,
+                      label: mode === "sermon" ? "Sermon" : "General",
+                      title:
+                        mode === "sermon"
+                          ? "Scripture detection, theological terminology, church register, wordplay."
+                          : "Meetings, lectures, interviews. No theological assumptions.",
+                    }),
+                  )}
                 />
-              </svg>
-            </summary>
-            <div className="flex flex-col gap-3 border-t border-[var(--line)] px-4 py-3.5">
-              <Link
-                href="/prep"
-                className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
-              >
-                Prepare a session
-                {prep.speaker || prep.title ? (
-                  <span className="ml-1.5 text-[var(--accent)]">· ready</span>
-                ) : null}
-              </Link>
-              <Link
-                href="/sessions"
-                className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
-              >
-                Saved sessions
-              </Link>
-              {/* A different job on the same footing, not a sub-feature: the
-                  console is for an interpreter working a room, the counter is for
-                  staff at a desk with a stranger in front of them. */}
-              <Link
-                href="/counter"
-                className="rounded-md border border-[var(--line)] p-3 transition-colors hover:border-[var(--line-strong)]"
-              >
-                <p className="text-sm font-semibold">현장 응대 · Counter Mode</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-[var(--fg-muted)]">
-                  Show a QR code; the visitor joins on their own phone in their own language.
-                  24 languages, no install.
-                </p>
-              </Link>
-            </div>
-          </details>
+              </ControlRow>
 
-          <p className="mt-auto border-t border-[var(--line)] pt-5 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
-            In session: <strong className="font-semibold text-[var(--fg)]">Space</strong>{" "}
-            freeze · <strong className="font-semibold text-[var(--fg)]">T</strong> teleprompter ·{" "}
-            <strong className="font-semibold text-[var(--fg)]">K</strong> Korean ·{" "}
-            <strong className="font-semibold text-[var(--fg)]">G</strong> glossary ·{" "}
-            <strong className="font-semibold text-[var(--fg)]">+/−</strong> text size
-          </p>
-        </div>
+              <ControlRow label="Audio">
+                <Segmented
+                  label="Audio source"
+                  indicator
+                  value={source}
+                  onChange={setSourceOverride}
+                  options={sources.map((id) => ({
+                    value: id,
+                    label: STT_PROVIDER_INFO[id].label,
+                    title: STT_PROVIDER_INFO[id].detail,
+                  }))}
+                />
+              </ControlRow>
 
-        <aside className="min-w-0 lg:py-8">
-          <Readiness rows={rows} demo={source === "demo"} />
-        </aside>
-      </main>
+              <ControlRow label="Lag">
+                <Segmented
+                  label="Interpreter lag"
+                  indicator
+                  value={settings.lag}
+                  onChange={(lag) => updateSettings({ ...settings, lag })}
+                  options={(["fast", "balanced", "safe"] as const).map(
+                    (lag) => ({
+                      value: lag,
+                      label: LAG_PROFILES[lag].label,
+                      title: LAG_PROFILES[lag].description,
+                    }),
+                  )}
+                />
+              </ControlRow>
+              <p className="text-sm text-[var(--fg-muted)] sm:pl-28">
+                {LAG_PROFILES[settings.lag].description}
+              </p>
+            </section>
 
-      {/* Shown BEFORE anything opens. Accepting is the user gesture that
+            <Button
+              tone="primary"
+              size="lg"
+              // Disabled only while we genuinely do not yet know what starting would
+              // send. That window is short and it is the one the old race lived in.
+              disabled={!consent.mayStart}
+              onClick={beginSession}
+              className="w-full"
+            >
+              {consent.phase === "checking"
+                ? "Checking privacy settings…"
+                : consent.phase === "needed"
+                  ? "Confirm privacy to continue"
+                  : source === "demo"
+                    ? "Run demo"
+                    : "Start live interpreting"}
+            </Button>
+
+            {/* --- Everything optional ------------------------------------------ */}
+            <details
+              open={advanced}
+              onToggle={(event) =>
+                setAdvanced((event.target as HTMLDetailsElement).open)
+              }
+              className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)]"
+            >
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium marker:content-none">
+                <span>
+                  <span className="font-semibold text-[var(--accent)]">
+                    More
+                  </span>
+                  <span className="ml-2 text-sm text-[var(--fg-muted)]">
+                    prep sheet · saved sessions · counter mode
+                  </span>
+                </span>
+                <svg
+                  aria-hidden
+                  viewBox="0 0 20 20"
+                  className="size-4 shrink-0 text-[var(--accent)]"
+                  fill="none"
+                >
+                  <path
+                    d="m7.5 4.5 5.5 5.5-5.5 5.5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </summary>
+              <div className="flex flex-col gap-3 border-t border-[var(--line)] px-4 py-3.5">
+                <Link
+                  href="/prep"
+                  className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
+                >
+                  Prepare a session
+                  {prep.speaker || prep.title ? (
+                    <span className="ml-1.5 text-[var(--accent)]">· ready</span>
+                  ) : null}
+                </Link>
+                <Link
+                  href="/sessions"
+                  className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
+                >
+                  Saved sessions
+                </Link>
+                {/* Counter Mode is no longer buried here. It is a different job
+                  on the same footing, and it now has its own entry alongside
+                  this one on the home screen — which is what the comment that
+                  used to sit above this link already claimed. */}
+              </div>
+            </details>
+
+            <p className="mt-auto border-t border-[var(--line)] pt-5 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
+              In session:{" "}
+              <strong className="font-semibold text-[var(--fg)]">Space</strong>{" "}
+              freeze ·{" "}
+              <strong className="font-semibold text-[var(--fg)]">T</strong>{" "}
+              teleprompter ·{" "}
+              <strong className="font-semibold text-[var(--fg)]">K</strong>{" "}
+              Korean ·{" "}
+              <strong className="font-semibold text-[var(--fg)]">G</strong>{" "}
+              glossary ·{" "}
+              <strong className="font-semibold text-[var(--fg)]">+/−</strong>{" "}
+              text size
+            </p>
+          </div>
+
+          <aside className="min-w-0 lg:py-8">
+            <Readiness rows={rows} demo={source === "demo"} />
+          </aside>
+        </main>
+
+        {/* Shown BEFORE anything opens. Accepting is the user gesture that
           starts the session, so consent and Safari's permission model are
           satisfied by the same tap. */}
-      {consent.phase === "needed" && (
-        <PrivacyDisclosure
-          providers={consent.providers}
-          onAccept={() => {
-            consent.grant();
-            // Not `beginSession()`: `consent` is the value captured by this
-            // render, where the phase is still "needed", so the guard inside
-            // it would refuse. Acknowledging IS the gesture, so start here.
-            setScreen("live");
-            void session.start();
-          }}
-          onUseLocalOnly={() => {
-            consent.decline();
-            setSourceOverride("demo");
-          }}
-        />
-      )}
+        {consent.phase === "needed" && (
+          <PrivacyDisclosure
+            providers={consent.providers}
+            onAccept={() => {
+              consent.grant();
+              // Not `beginSession()`: `consent` is the value captured by this
+              // render, where the phase is still "needed", so the guard inside
+              // it would refuse. Acknowledging IS the gesture, so start here.
+              setScreen("live");
+              void session.start();
+            }}
+            onUseLocalOnly={() => {
+              consent.decline();
+              setSourceOverride("demo");
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
-function ControlRow({ label, children }: { label: string; children: React.ReactNode }) {
+function ControlRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-2 sm:grid-cols-[6rem_minmax(0,1fr)]">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--fg-dim)]">
@@ -441,7 +482,11 @@ export function readinessRows(input: {
       };
 
   const recognition: ReadinessRow = demo
-    ? { label: "Recognition", value: "Built into the recording", level: "ready" }
+    ? {
+        label: "Recognition",
+        value: "Built into the recording",
+        level: "ready",
+      }
     : source === "webspeech"
       ? {
           label: "Recognition",
@@ -449,9 +494,14 @@ export function readinessRows(input: {
           // Genuinely a limitation, and one that bites mid-service: Safari's
           // recogniser stops on a long silence and has to be restarted.
           level: "limited",
-          detail: "Best in Chrome. Safari support is partial and can stop on long silences.",
+          detail:
+            "Best in Chrome. Safari support is partial and can stop on long silences.",
         }
-      : { label: "Recognition", value: `${info.label} streaming`, level: "ready" };
+      : {
+          label: "Recognition",
+          value: `${info.label} streaming`,
+          level: "ready",
+        };
 
   // The line that used to name environment variables. It now describes what
   // the interpreter will see on screen.
@@ -470,7 +520,8 @@ export function readinessRows(input: {
             label: "AI",
             value: `${config.llm.configured} — limited capacity`,
             level: "limited",
-            detail: `${config.llm.capacityNote ?? ""} After that the console keeps running on the local interpreter.`.trim(),
+            detail:
+              `${config.llm.capacityNote ?? ""} After that the console keeps running on the local interpreter.`.trim(),
           }
         : { label: "AI", value: config.llm.configured, level: "ready" };
 
@@ -485,7 +536,9 @@ export function readinessRows(input: {
             level: "limited",
             detail: `What is said will be sent to ${config.llm.freeTierDisclosure
               .map((p) => p.label)
-              .join(", ")}, which may use it to improve their products. You will be asked to confirm.`,
+              .join(
+                ", ",
+              )}, which may use it to improve their products. You will be asked to confirm.`,
           }
         : {
             label: "Privacy",

@@ -53,8 +53,19 @@ check("prep resolves the main passage", /1 Peter 2:9/.test(brief));
 check("prep names real difficulties", /predicate/i.test(brief));
 await page.screenshot({ path: join(outDir, "prep.png") });
 
-// --- Live session ---------------------------------------------------------
+// --- The fork -------------------------------------------------------------
+// The home screen is a mode chooser, not the launcher: the two jobs have
+// separate entry routes, which is the thing worth asserting here.
 await page.goto(base, { waitUntil: "networkidle" });
+const homeText = await page.locator("body").innerText();
+check(
+  "home offers both modes as peers",
+  /라이브 통역/.test(homeText) && /현장 응대/.test(homeText),
+);
+await page.screenshot({ path: join(outDir, "home.png") });
+
+// --- Live session ---------------------------------------------------------
+await page.goto(`${base}/live`, { waitUntil: "networkidle" });
 // Chromium exposes the Web Speech constructor even on a headless CI runner,
 // so the production launcher correctly prefers it. The E2E transcript checks,
 // however, need deterministic audio. Explicitly choose Demo rather than

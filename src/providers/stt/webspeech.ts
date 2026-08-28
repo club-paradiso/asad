@@ -39,14 +39,48 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
+/** Routine during any pause in speech. Not worth a word to the interpreter. */
 const BENIGN_ERRORS = new Set(["no-speech", "aborted"]);
-const FATAL_ERRORS = new Set([
+
+/**
+ * Conditions that genuinely do not heal by trying again.
+ *
+ * Deliberately short. Everything here is a decision someone made — the visitor
+ * denied the microphone, the deployment asked for a language this browser does
+ * not have — and no amount of retrying changes it.
+ */
+const PERMANENT_ERRORS = new Set([
   "not-allowed",
-  "service-not-allowed",
-  "audio-capture",
   "language-not-supported",
   "language-unavailable",
 ]);
+
+/**
+ * Serious, but temporary.
+ *
+ * These used to be classified fatal, and that was the bug: ONE of them ended
+ * the session outright, mid-sermon, with no retry. They are exactly the
+ * failures that heal on their own — a Bluetooth headset taking the input
+ * device, another app grabbing the microphone for a moment, the platform
+ * speech service hiccupping. An interpreter working a room cannot have the
+ * console give up the first time a headset switches.
+ */
+const RECOVERABLE_ERRORS = new Set([
+  "service-not-allowed",
+  "audio-capture",
+  "network",
+]);
+
+/**
+ * How many times a serious-but-temporary failure is forgiven before the
+ * console admits the microphone is not coming back.
+ *
+ * Bounded on purpose: retrying forever leaves the UI claiming to listen to a
+ * microphone that is dead, which is the failure this budget replaced.
+ */
+const RECOVERY_ATTEMPTS = 4;
+/** Backoff per attempt. Long enough for a device switch to settle. */
+const RECOVERY_BACKOFF_MS = [400, 1200, 3000, 6000];
 
 function getConstructor(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
@@ -64,6 +98,8 @@ export class WebSpeechProvider extends BaseSpeechProvider {
   private recognition: SpeechRecognitionLike | null = null;
   private wantRunning = false;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Recoverable failures spent so far. Reset by any successful listen. */
+  private recoveryUsed = 0;
 
   constructor(private readonly options: SttProviderOptions = {}) {
     super();
@@ -78,6 +114,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     if (!Ctor) throw new Error("This browser has no built-in speech recognition.");
 
     this.wantRunning = true;
+    this.recoveryUsed = 0;
     this.emitStatus("connecting");
 
     const recognition = new Ctor();
@@ -93,6 +130,9 @@ export class WebSpeechProvider extends BaseSpeechProvider {
 
       recognition.onstart = () => {
         connected = true;
+        // Listening again means the trouble passed. Spend the budget on the
+        // NEXT run of failures, not on a tally accumulated across the hour.
+        this.recoveryUsed = 0;
         this.emitStatus("listening");
         if (!settled) {
           settled = true;
@@ -123,20 +163,47 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         const code = event.error ?? "unknown";
         if (BENIGN_ERRORS.has(code)) return;
 
-        const error = new Error(`Speech recognition error: ${code}`);
-        const fatal = FATAL_ERRORS.has(code);
+        // A recoverable failure is only fatal once the budget is spent. This is
+        // the difference between "the headset switched" and "the microphone is
+        // gone", and nothing in the error code itself distinguishes them —
+        // only whether trying again works.
+        const recoverable = RECOVERABLE_ERRORS.has(code);
+        const budgetLeft = recoverable && this.recoveryUsed < RECOVERY_ATTEMPTS;
+        const fatal = PERMANENT_ERRORS.has(code) || (recoverable && !budgetLeft);
+
+        const error = new Error(
+          fatal && recoverable
+            ? `Speech recognition stopped after ${RECOVERY_ATTEMPTS} attempts to recover: ${code}`
+            : `Speech recognition error: ${code}`,
+        );
 
         // Permission and hardware errors do not heal by calling start() every
         // 250 ms. Stop the restart loop and give the UI a real retry action.
         if (fatal) this.wantRunning = false;
 
-        this.emitError(error);
+        // A recoverable failure the interpreter never sees is the point: they
+        // are mid-sentence. Report it as a health blip, not as an error banner
+        // over the English they are reading.
+        if (!fatal) this.recoveryUsed += 1;
+        else this.emitError(error);
+
         this.emitStatus(fatal ? "error" : "reconnecting", code);
+
+        // `onend` normally drives the restart, but a recogniser that errored
+        // without ever starting may never fire it. Schedule the retry here so
+        // the budget is actually spent trying rather than waiting.
+        if (!fatal && recoverable) {
+          this.scheduleRestart(recognition, RECOVERY_BACKOFF_MS[this.recoveryUsed - 1] ?? 6000);
+        }
 
         // A connection that never reached onstart should fail its start()
         // promise. This keeps the session out of the dishonest "running"
         // phase and makes the retry button available immediately.
-        if (!connected && !settled) {
+        //
+        // Only once the failure is final, though: rejecting while a retry is
+        // still scheduled would end the session on the first blip, which is
+        // the whole behaviour the recovery budget exists to prevent.
+        if (fatal && !connected && !settled) {
           settled = true;
           this.wantRunning = false;
           reject(error);
@@ -150,16 +217,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           return;
         }
         this.emitStatus("reconnecting");
-        if (this.restartTimer) clearTimeout(this.restartTimer);
-        this.restartTimer = setTimeout(() => {
-          if (!this.wantRunning) return;
-          try {
-            recognition.start();
-          } catch {
-            // Already starting — harmless. The pending start event remains the
-            // authority on whether listening actually resumed.
-          }
-        }, 350);
+        this.scheduleRestart(recognition, 350);
       };
 
       try {
@@ -172,12 +230,34 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     });
   }
 
+  /**
+   * Bring the recogniser back after it stopped.
+   *
+   * One place, because two callers need it and they must not disagree: the
+   * routine silence restart (`onend`) and the recovery retry after a serious
+   * failure. A second scheduled restart always replaces the first, so a burst
+   * of errors produces one pending attempt rather than a pile-up.
+   */
+  private scheduleRestart(recognition: SpeechRecognitionLike, delayMs: number): void {
+    if (this.restartTimer) clearTimeout(this.restartTimer);
+    this.restartTimer = setTimeout(() => {
+      if (!this.wantRunning || this.recognition !== recognition) return;
+      try {
+        recognition.start();
+      } catch {
+        // Already starting — harmless. The pending start event remains the
+        // authority on whether listening actually resumed.
+      }
+    }, delayMs);
+  }
+
   sendAudio(): void {
     // The browser owns the microphone for this provider.
   }
 
   async disconnect(): Promise<void> {
     this.wantRunning = false;
+    this.recoveryUsed = 0;
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
     const recognition = this.recognition;
