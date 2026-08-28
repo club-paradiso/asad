@@ -79,28 +79,22 @@ export type CatalogueResult =
   | { ok: false; source: "fallback"; models: OpenWeightSuggestion[]; reason: string };
 
 /**
- * Slugs this repository has actually verified, as a floor when the catalogue
- * is unreachable.
+ * Slugs verified ON OPENROUTER, as a floor when the catalogue is unreachable.
  *
- * Short on purpose, and every entry is one already documented in
- * `docs/counter-mode.md` rather than remembered. A fallback that invents slugs
- * would reintroduce exactly the failure this module exists to prevent.
+ * The provider qualifier is the whole point, and getting it wrong is how this
+ * list first shipped. `docs/counter-mode.md` lists three open-weight options,
+ * but two of them — `openai/gpt-oss-120b` and `qwen/qwen3-32b` — are verified
+ * via **Groq**, not OpenRouter. Carrying them here made this endpoint hand back
+ * `OPENROUTER_PRIMARY_MODEL=openai/gpt-oss-120b`: a slug from another
+ * provider's namespace, offered as fact. That is precisely the
+ * plausible-looking-id failure this module exists to prevent, so the floor is
+ * now only what the repository has verified against OpenRouter itself.
+ *
+ * One entry is the honest length of that list. A short floor plus a stated
+ * reason beats a longer one that might be wrong — the live catalogue is the
+ * real answer, and this only exists for when it cannot be read.
  */
 export const VERIFIED_FALLBACK: OpenWeightSuggestion[] = [
-  {
-    id: "openai/gpt-oss-120b",
-    name: "GPT-OSS 120B",
-    contextTokens: 131_072,
-    structuredOutput: true,
-    family: "GPT-OSS",
-  },
-  {
-    id: "qwen/qwen3-32b",
-    name: "Qwen3 32B",
-    contextTokens: 131_072,
-    structuredOutput: true,
-    family: "Open weights",
-  },
   {
     id: "meta-llama/llama-3.3-70b-instruct:free",
     name: "Llama 3.3 70B Instruct (free)",

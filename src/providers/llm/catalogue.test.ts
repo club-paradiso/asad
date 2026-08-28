@@ -112,6 +112,19 @@ describe("reading the catalogue", () => {
     if (!result.ok) expect(result.reason).toMatch(/no free open-weight/i);
   });
 
+  it("falls back only to slugs verified on OPENROUTER", async () => {
+    // The defect this locks down: the floor originally carried
+    // `openai/gpt-oss-120b` and `qwen/qwen3-32b`, which docs/counter-mode.md
+    // verifies via GROQ. This endpoint answers "what do I put in
+    // OPENROUTER_PRIMARY_MODEL", so shipping another provider's namespace as
+    // the top suggestion was the exact plausible-slug failure the module is
+    // meant to prevent.
+    const groqOnly = ["openai/gpt-oss-120b", "qwen/qwen3-32b"];
+    for (const model of VERIFIED_FALLBACK) {
+      expect(groqOnly).not.toContain(model.id);
+    }
+  });
+
   it("never suggests a slug it has not seen or verified", async () => {
     // The failure this module exists to prevent: a plausible-looking model id
     // that 404s the first time a service starts.
