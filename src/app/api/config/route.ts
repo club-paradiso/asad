@@ -72,7 +72,8 @@ export async function GET() {
   // this route used to check, so a correctly connected deployment reported
   // itself as having no model at all while the router was happily using one.
   const env = appEnv();
-  const plan = llmRouter().plan();
+  const router = llmRouter();
+  const plan = router.plan();
 
   const stt = env.stt.provider;
   const bible = env.bible.provider;
@@ -111,7 +112,15 @@ export async function GET() {
 
   // The provider a counter turn would actually reach, which is not necessarily
   // the one the live console prefers.
-  const counterProvider = llmRouter().preferred(
+  //
+  // `wouldReach`, not `preferred`: the open-weight setting is an ordering, not
+  // a requirement, so a deployment with only a proprietary key still
+  // translates — and must be disclosed as translating, by name. Asking
+  // `preferred(OPEN_WEIGHT)` instead asked whether the *preference* was
+  // satisfiable, and answered `null` for every deployment without an
+  // open-weight key, which the join screen then reported to the visitor as
+  // "no translation provider is configured".
+  const counterProvider = router.wouldReach(
     env.llm.counterPreferOpen ? OPEN_WEIGHT : undefined,
   );
   const counterCaps = counterProvider ? capabilitiesFor(counterProvider) : null;

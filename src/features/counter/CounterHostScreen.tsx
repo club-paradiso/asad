@@ -422,6 +422,21 @@ function SetupScreen({
         </p>
       )}
 
+      {/* The deployment detail belongs here, not on the visitor's phone: the
+          staff member is the only one who can act on a missing key, and the
+          only one who reads this language. */}
+      {disclosure && !disclosure.provider && (
+        <div className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3.5 py-3 text-xs leading-relaxed">
+          <p className="text-[var(--danger)]">
+            번역 제공자가 설정되지 않아 지금은 번역이 되지 않습니다.
+          </p>
+          <p className="mt-1 text-[var(--fg-dim)]">
+            LLM API 키를 설정하세요 — docs/counter-mode.md 참고. 자주 쓰는 문구는
+            모델 없이도 그대로 작동합니다.
+          </p>
+        </div>
+      )}
+
       {/* The staff member is the one who can act on this — they choose whether
           to use the counter for a sensitive case at all. */}
       {disclosure?.provider && (

@@ -90,6 +90,27 @@ describe("GET /api/config — the LLM state the launcher shows", () => {
     expect(counter.openWeightModel).toBe(true);
   });
 
+  it("names the provider even when it does not serve open weights", async () => {
+    // The counter prefers open weights; it does not require them. Reporting
+    // `provider: null` here put "no translation provider is configured" in red
+    // on the visitor's join screen for every OpenRouter- or Gemini-only
+    // deployment — the two the deployment docs recommend — while the counter
+    // translated every message without complaint.
+    const { counter } = await config({ GEMINI_API_KEY: KEY });
+    expect(counter.provider).toBe("Google Gemini");
+    expect(counter.openWeightModel).toBe(false);
+    expect(counter.note).not.toBe("");
+  });
+
+  it("reports no counter provider only when nothing can translate", async () => {
+    expect((await config({})).counter.provider).toBeNull();
+    // Configured to send nothing is not the same as misconfigured, but the
+    // visitor still cannot be translated, so the notice is honest either way.
+    expect(
+      (await config({ LLM_ROUTING_MODE: "local", GROQ_API_KEY: KEY })).counter.provider,
+    ).toBeNull();
+  });
+
   it("never exposes a key, in any field", async () => {
     const payload = await config({ GROQ_API_KEY: KEY, GEMINI_API_KEY: KEY });
     expect(JSON.stringify(payload)).not.toContain(KEY);
