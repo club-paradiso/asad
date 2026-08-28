@@ -1,59 +1,17 @@
 "use client";
 
 /**
- * The fork.
+ * Public mode launcher.
  *
- * tong-yuck does two jobs for two different people, and until now the second
- * one was a link inside a collapsed "More" panel on the first one's launcher.
- * The code said as much and then did the opposite: "a different job on the
- * same footing, not a sub-feature", above a `<details>`.
- *
- * They are genuinely different work:
- *
- *   Live interpreting — one person speaks to a room, an interpreter carries
- *   it. The reader is mid-performance and the console is austere for reasons
- *   that are documented at length in globals.css.
- *
- *   Counter Mode — two people face each other across a desk, taking turns.
- *   The reader is a member of staff, and the other reader is a stranger
- *   holding their own phone.
- *
- * So each gets its own route. This screen exists to make that choice in one
- * glance and then get out of the way — every deeper decision (which
- * microphone, which lag, is the model ready) belongs on the route it affects,
- * not here.
- *
- * Korean-primary, unlike the console: both operators are Korean speakers. The
- * console stays English because English is its OUTPUT.
+ * The home screen stays intentionally simple: pick the job you need and move
+ * on. Operator diagnostics, provider status and live-console keyboard hints
+ * belong inside the relevant tools, not on the public landing surface.
  */
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { AppConfig } from "@/app/api/config/route";
 import { BRAND } from "@/lib/brand";
 
 export function HomeScreen() {
-  const [config, setConfig] = useState<AppConfig | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/config")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((value: AppConfig | null) => {
-        if (!cancelled && value) setConfig(value);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
-    // Same surface as the launcher it leads to. The two screens are one
-    // preparation flow, and the live console is the only thing that stays
-    // dark — that is a reading requirement, not a theme preference.
-    // The surface paints the whole viewport; the CONTENT is what is centred.
-    // Constraining the surface itself let the root dark background show as
-    // bars down both edges of a light screen.
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
         <header className="flex flex-wrap items-start gap-x-4 gap-y-3">
@@ -62,17 +20,8 @@ export function HomeScreen() {
               {BRAND.name}
             </h1>
             <p className="text-xs text-[var(--fg-dim)] sm:text-[0.8rem]">
-              {BRAND.shortName} · {BRAND.descriptor} · Korean → English
+              {BRAND.shortName} · {BRAND.descriptor}
             </p>
-          </div>
-          <div className="ms-auto flex items-center gap-2">
-            <ProviderPill config={config} />
-            <Link
-              href="/diagnostics"
-              className="inline-flex min-h-11 items-center rounded-full border border-[var(--line)] px-3.5 text-xs text-[var(--fg-muted)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--fg)]"
-            >
-              진단
-            </Link>
           </div>
         </header>
 
@@ -86,9 +35,6 @@ export function HomeScreen() {
             </p>
           </div>
 
-          {/* Equal footing, unequal weight: live interpreting is the primary job,
-          and pretending otherwise with two identical tiles would make the
-          choice slower rather than fairer. */}
           <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <ModeCard
               href="/live"
@@ -129,7 +75,7 @@ export function HomeScreen() {
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <SecondaryLink
               href="/prep"
               title="준비 시트"
@@ -140,57 +86,14 @@ export function HomeScreen() {
               title="지난 세션"
               detail="복기 · 내보내기"
             />
-            <SecondaryLink
-              href="/diagnostics"
-              title="진단"
-              detail="제공자 · 할당량 · 저장소"
-            />
           </div>
         </div>
 
-        <footer className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-4 text-xs text-[var(--fg-dim)]">
-          <p>
-            세션 중 · <Key>Space</Key> 정지 · <Key>T</Key> 텔레프롬프터 ·{" "}
-            <Key>K</Key> 한국어 · <Key>G</Key> 용어 · <Key>+/−</Key> 글자 크기
-          </p>
-          <p className="ms-auto">대화 내용은 저장되지 않습니다</p>
+        <footer className="mt-auto pt-4 text-right text-xs text-[var(--fg-dim)]">
+          대화 내용은 저장되지 않습니다
         </footer>
       </div>
     </div>
-  );
-}
-
-const Key = ({ children }: { children: React.ReactNode }) => (
-  <span className="text-[var(--fg-muted)]">{children}</span>
-);
-
-/**
- * What a turn would reach, named.
- *
- * The same disclosure principle the counter applies to visitors: the operator
- * is told which company sees this before they start, not after.
- */
-function ProviderPill({ config }: { config: AppConfig | null }) {
-  if (!config) return null;
-  const ready = config.llm.modelAvailable;
-  const colour = ready ? "var(--ok)" : "var(--fg-dim)";
-
-  return (
-    <span
-      className="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-xs"
-      style={{
-        borderColor: `color-mix(in srgb, ${colour} 32%, transparent)`,
-        background: `color-mix(in srgb, ${colour} 9%, transparent)`,
-        color: ready ? "var(--ok)" : "var(--fg-muted)",
-      }}
-    >
-      <span
-        aria-hidden
-        className="size-1.5 shrink-0 rounded-full"
-        style={{ background: colour }}
-      />
-      {config.llm.configured}
-    </span>
   );
 }
 
@@ -226,8 +129,6 @@ function ModeCard({
             : "var(--line)",
       }}
     >
-      {/* Wraps on a phone: pinned right, the badge squeezed the summary into a
-          two-word column beside it. */}
       <div className="flex flex-wrap items-start gap-x-3.5 gap-y-2">
         <span
           aria-hidden
