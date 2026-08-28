@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
+import "./public-ui.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { BRAND, BRAND_TITLE } from "@/lib/brand";
 
