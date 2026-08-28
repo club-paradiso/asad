@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { normaliseCode } from "@/counter/codes";
 import { CounterGuestScreen } from "@/features/counter/CounterGuestScreen";
+import { BRAND } from "@/lib/brand";
 
 /**
  * The address behind the QR code. Deliberately short — `/c/AC34` — because QR
  * density is what decides whether a code scans across a counter in bad light.
  */
 export const metadata: Metadata = {
-  title: "tong-yuck",
+  title: BRAND.name,
   description: "Talk to the staff member in your own language.",
   // A join link is a private conversation; it should not be indexed.
   robots: { index: false, follow: false },

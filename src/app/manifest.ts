@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
+import { BRAND } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "tong-yuck — interpreter copilot",
-    short_name: "tong-yuck",
-    description:
-      "A real-time AI copilot for human interpreters. Korean → English, built for the booth.",
+    name: `${BRAND.name} (${BRAND.shortName})`,
+    short_name: BRAND.shortName,
+    description: `${BRAND.tagline} ${BRAND.englishDescriptor}.`,
     start_url: "/",
     scope: "/",
     display: "standalone",
