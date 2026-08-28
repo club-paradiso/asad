@@ -117,6 +117,35 @@ export interface RedisConfig {
   source: "upstash" | "vercel-kv";
 }
 
+const REDIS_CREDENTIAL_PAIRS = [
+  {
+    urlSuffix: "UPSTASH_REDIS_REST_URL",
+    tokenSuffix: "UPSTASH_REDIS_REST_TOKEN",
+    source: "upstash" as const,
+  },
+  {
+    urlSuffix: "KV_REST_API_URL",
+    tokenSuffix: "KV_REST_API_TOKEN",
+    source: "vercel-kv" as const,
+  },
+] as const;
+
+const redisConfigFromKeys = (
+  env: NodeJS.ProcessEnv,
+  urlKey: string,
+  tokenKey: string,
+  source: RedisConfig["source"],
+): RedisConfig | null => {
+  const url = env[urlKey]?.trim() ?? "";
+  const token = env[tokenKey]?.trim() ?? "";
+  return url && token ? { url, token, source } : null;
+};
+
+const isRedisCredentialKey = (key: string): boolean =>
+  REDIS_CREDENTIAL_PAIRS.some(
+    ({ urlSuffix, tokenSuffix }) => key.endsWith(urlSuffix) || key.endsWith(tokenSuffix),
+  );
+
 interface RedisEnvelope {
   rev: number;
   session: CounterSession;
@@ -318,29 +347,34 @@ const parseEnvelope = (raw: string): RedisEnvelope => {
 export function resolveCounterRedisConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): RedisConfig | null {
-  const candidates: RedisConfig[] = [
-    {
-      url: env.UPSTASH_REDIS_REST_URL?.trim() ?? "",
-      token: env.UPSTASH_REDIS_REST_TOKEN?.trim() ?? "",
-      source: "upstash",
-    },
-    {
-      url: env.KV_REST_API_URL?.trim() ?? "",
-      token: env.KV_REST_API_TOKEN?.trim() ?? "",
-      source: "vercel-kv",
-    },
-  ];
-  return candidates.find((candidate) => candidate.url && candidate.token) ?? null;
+  // First honour the canonical names. This keeps existing deployments stable
+  // and makes the intended configuration unambiguous.
+  for (const { urlSuffix, tokenSuffix, source } of REDIS_CREDENTIAL_PAIRS) {
+    const exact = redisConfigFromKeys(env, urlSuffix, tokenSuffix, source);
+    if (exact) return exact;
+  }
+
+  // Vercel Marketplace resources may be connected with a custom environment
+  // variable prefix. For example, COUNTER_UPSTASH_REDIS_REST_URL is the same
+  // credential as UPSTASH_REDIS_REST_URL. Match URL/token pairs by their shared
+  // prefix so a perfectly valid linked resource does not silently fall back to
+  // per-instance memory.
+  const keys = Object.keys(env).sort();
+  for (const { urlSuffix, tokenSuffix, source } of REDIS_CREDENTIAL_PAIRS) {
+    for (const urlKey of keys) {
+      if (urlKey === urlSuffix || !urlKey.endsWith(urlSuffix)) continue;
+      const prefix = urlKey.slice(0, -urlSuffix.length);
+      const prefixed = redisConfigFromKeys(env, urlKey, `${prefix}${tokenSuffix}`, source);
+      if (prefixed) return prefixed;
+    }
+  }
+
+  return null;
 }
 
 export function counterStoreInfo(env: NodeJS.ProcessEnv = process.env) {
   const redis = resolveCounterRedisConfig(env);
-  const hasPartialRedisConfig = !!(
-    env.UPSTASH_REDIS_REST_URL ||
-    env.UPSTASH_REDIS_REST_TOKEN ||
-    env.KV_REST_API_URL ||
-    env.KV_REST_API_TOKEN
-  );
+  const hasPartialRedisConfig = Object.keys(env).some(isRedisCredentialKey);
   return {
     kind: redis ? ("redis" as const) : ("memory" as const),
     shared: !!redis,
@@ -349,7 +383,7 @@ export function counterStoreInfo(env: NodeJS.ProcessEnv = process.env) {
     warning:
       redis || !hasPartialRedisConfig
         ? null
-        : "Redis session storage is only partially configured; both URL and token are required.",
+        : "Redis session storage is only partially configured; matching URL and token credentials are required.",
   };
 }
 

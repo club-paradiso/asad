@@ -38,12 +38,44 @@ describe("counter Redis configuration", () => {
     ).toEqual({ url: "https://kv.example", token: "kv-token", source: "vercel-kv" });
   });
 
+  it("accepts Vercel Marketplace credentials with a custom prefix", () => {
+    expect(
+      resolveCounterRedisConfig({
+        NODE_ENV: "test",
+        COUNTER_UPSTASH_REDIS_REST_URL: " https://prefixed-upstash.example ",
+        COUNTER_UPSTASH_REDIS_REST_TOKEN: " prefixed-token ",
+      }),
+    ).toEqual({
+      url: "https://prefixed-upstash.example",
+      token: "prefixed-token",
+      source: "upstash",
+    });
+
+    expect(
+      resolveCounterRedisConfig({
+        NODE_ENV: "test",
+        TONG_YUCK_KV_REST_API_URL: "https://prefixed-kv.example",
+        TONG_YUCK_KV_REST_API_TOKEN: "prefixed-kv-token",
+      }),
+    ).toEqual({
+      url: "https://prefixed-kv.example",
+      token: "prefixed-kv-token",
+      source: "vercel-kv",
+    });
+  });
+
   it("does not enable Redis from a half-configured credential pair", () => {
     expect(
       resolveCounterRedisConfig({ NODE_ENV: "test", UPSTASH_REDIS_REST_URL: "https://x" }),
     ).toBeNull();
     expect(
       resolveCounterRedisConfig({ NODE_ENV: "test", KV_REST_API_TOKEN: "token" }),
+    ).toBeNull();
+    expect(
+      resolveCounterRedisConfig({
+        NODE_ENV: "test",
+        COUNTER_UPSTASH_REDIS_REST_URL: "https://prefixed-only.example",
+      }),
     ).toBeNull();
   });
 });
