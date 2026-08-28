@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { BRAND, BRAND_TITLE } from "@/lib/brand";
 
 /**
  * Two faces, self-hosted.
@@ -31,14 +32,13 @@ const body = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "tong-yuck — interpreter copilot",
-  description:
-    "A real-time AI copilot for human interpreters. Korean → English, built around the temporal and cognitive realities of simultaneous interpretation.",
-  applicationName: "tong-yuck",
+  title: BRAND_TITLE,
+  description: `${BRAND.tagline} ${BRAND.englishDescriptor} for live and counter conversations.`,
+  applicationName: BRAND.shortName,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "tong-yuck",
+    title: BRAND.shortName,
     statusBarStyle: "black-translucent",
   },
   icons: {
