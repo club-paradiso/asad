@@ -224,7 +224,7 @@ export function StartScreen() {
               {BRAND.name}
             </h1>
             <p className="mt-1 text-sm text-[var(--fg-muted)] sm:text-base">
-              {BRAND.shortName} · Korean → English interpretation copilot
+              {BRAND.shortName} · {BRAND.liveTagline}
             </p>
           </div>
           <Link
