@@ -29,6 +29,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { AppConfig } from "@/app/api/config/route";
+import { BRAND } from "@/lib/brand";
 
 export function HomeScreen() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -55,14 +56,19 @@ export function HomeScreen() {
     // bars down both edges of a light screen.
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
-        <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <div className="flex items-baseline gap-3">
-            <span className="type-display text-2xl text-[var(--fg)] sm:text-[1.7rem]">
-              tong&#8209;yuck
-            </span>
-            <span className="text-xs text-[var(--fg-dim)] sm:text-[0.8rem]">
-              통역 보조 · Korean → English
-            </span>
+        <header className="flex flex-wrap items-start gap-x-4 gap-y-3">
+          <div className="min-w-0 flex flex-col gap-0.5">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="type-display text-2xl text-[var(--fg)] sm:text-[1.7rem]">
+                {BRAND.shortName}
+              </span>
+              <span className="text-xs text-[var(--fg-dim)] sm:text-[0.8rem]">
+                {BRAND.descriptor} · Korean → English
+              </span>
+            </div>
+            <p className="max-w-2xl break-keep text-[0.7rem] leading-relaxed text-[var(--fg-dim)] sm:text-xs">
+              {BRAND.name}
+            </p>
           </div>
           <div className="ms-auto flex items-center gap-2">
             <ProviderPill config={config} />
@@ -78,11 +84,10 @@ export function HomeScreen() {
         <div className="my-auto flex flex-col gap-8">
           <div className="flex flex-col gap-1.5">
             <h1 className="type-display text-3xl leading-[1.08] text-[var(--fg)] sm:text-[2.5rem]">
-              오늘은 어느 쪽인가요
+              {BRAND.tagline}
             </h1>
             <p className="text-sm text-[var(--fg-muted)]">
-              두 모드는 서로 다른 일입니다. 하나를 고르면 그 일에 필요한 것만
-              보입니다.
+              라이브 통역과 현장 응대 중 지금 필요한 방식만 고르면 됩니다.
             </p>
           </div>
 
