@@ -32,10 +32,24 @@ const body = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://tong-yuck.vercel.app"),
   title: BRAND_TITLE,
-  description: `${BRAND.tagline} ${BRAND.englishDescriptor} for live and counter conversations.`,
+  description: BRAND.description,
   applicationName: BRAND.shortName,
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: BRAND_TITLE,
+    description: BRAND.description,
+    url: "/",
+    siteName: BRAND.name,
+    locale: "ko_KR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: BRAND_TITLE,
+    description: BRAND.description,
+  },
   appleWebApp: {
     capable: true,
     title: BRAND.shortName,
