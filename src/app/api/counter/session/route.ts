@@ -30,7 +30,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unsupported language." }, { status: 400 });
   }
 
-  const session = await counterStore().create(parsed.data);
+  const store = counterStore();
+
+  // Never hand a staff member a QR code that only exists inside one Vercel
+  // function instance. A guest request can land on another instance seconds
+  // later and legitimately see no session at all. Local/single-process use may
+  // keep the memory store, but Vercel Counter Mode requires shared storage.
+  if (process.env.VERCEL === "1" && !store.shared) {
+    return NextResponse.json(
+      {
+        error:
+          "QR 세션용 공유 저장소가 연결되지 않았습니다. Vercel 프로젝트에 Upstash Redis를 연결한 뒤 다시 배포해 주세요.",
+        errorCode: "COUNTER_SHARED_STORE_REQUIRED",
+      },
+      { status: 503, headers: { "cache-control": "no-store" } },
+    );
+  }
+
+  const session = await store.create(parsed.data);
   return NextResponse.json({ session: toView(session) }, { status: 201 });
 }
 
