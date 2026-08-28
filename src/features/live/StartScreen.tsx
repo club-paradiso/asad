@@ -42,6 +42,7 @@ import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { Button, Segmented } from "@/components/ui/primitives";
 import { openSession, readSessionState } from "@/lib/session-client";
 import type { AppConfig } from "@/app/api/config/route";
+import { BRAND } from "@/lib/brand";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
 import { preferredSttSource } from "./sourcePreference";
@@ -156,7 +157,9 @@ export function StartScreen() {
     return (
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-sm flex-col justify-center gap-5 px-5 py-10">
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight">tong-yuck</h1>
+          <h1 className="break-all text-xl font-semibold tracking-tight">
+            {BRAND.name}
+          </h1>
           <p className="mt-1.5 text-sm text-[var(--fg-muted)]">
             This deployment is private. Enter its access key to continue.
           </p>
@@ -216,12 +219,12 @@ export function StartScreen() {
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
         <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)] pb-6">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-              tong-yuck
+          <div className="min-w-0">
+            <h1 className="max-w-3xl break-all text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
+              {BRAND.name}
             </h1>
             <p className="mt-1 text-sm text-[var(--fg-muted)] sm:text-base">
-              Korean → English interpretation copilot
+              {BRAND.shortName} · Korean → English interpretation copilot
             </p>
           </div>
           <Link
