@@ -174,7 +174,7 @@ describe("the launcher", () => {
     stubFetch(PROVIDER, "hang");
     render(<StartScreen />);
 
-    const start = await screen.findByRole("button", { name: /run demo/i });
+    const start = await screen.findByRole("button", { name: /데모 실행/ });
     fireEvent.click(start);
     expect(cloudCalls()).toEqual([]);
   });
@@ -217,7 +217,7 @@ describe("the launcher", () => {
     render(<StartScreen />);
 
     // Starts on demo…
-    expect(screen.getByRole("button", { name: /run demo/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /데모 실행/ })).toBeTruthy();
     // …and once the real source arrives, the gate has followed it.
     await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
     expect(cloudCalls()).toEqual([]);

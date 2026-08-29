@@ -14,13 +14,13 @@
  * should wait on a parser.
  */
 import { useCallback, useState } from "react";
-import Link from "next/link";
 import type { GlossaryItem, PrepBrief, PrepSheet } from "@/types";
 import { loadSettings, prepStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
 import { romaniseName } from "@/lib/romanise";
 import { Button, Field, Label, TextArea, TextInput } from "@/components/ui/primitives";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export function PrepScreen() {
   // The brief is generated server-side by a model; authorise before asking.
@@ -82,28 +82,22 @@ export function PrepScreen() {
       });
     } catch (error) {
       setStatus("error");
-      setNotice(error instanceof Error ? error.message : "Could not build the brief.");
+      setNotice(error instanceof Error ? error.message : "브리프를 만들지 못했습니다.");
     }
   }, [prep, patch]);
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-6 px-5 py-8">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Prepare</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            All optional. Anything you enter carries into the live session.
-          </p>
-        </div>
-        <Link href="/" className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:underline">
-          ← Console
-        </Link>
-      </header>
+    <div data-surface="launcher" className="min-h-[100dvh] w-full">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-6 px-5 py-8">
+      <PageHeader
+        title="준비 시트"
+        detail="전부 선택 사항입니다. 여기 적어둔 건 통역 세션으로 그대로 넘어갑니다."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
-          label="Speaker"
-          hint={prep.speaker ? `English: ${romaniseName(prep.speaker)}` : "Korean name"}
+          label="설교자 · 발표자"
+          hint={prep.speaker ? `영문 표기: ${romaniseName(prep.speaker)}` : "한글 이름"}
         >
           <TextInput
             korean
@@ -113,7 +107,7 @@ export function PrepScreen() {
           />
         </Field>
 
-        <Field label="Church / organisation">
+        <Field label="교회 · 소속">
           <TextInput
             korean
             value={prep.organisation ?? ""}
@@ -122,15 +116,15 @@ export function PrepScreen() {
           />
         </Field>
 
-        <Field label="Title">
+        <Field label="제목">
           <TextInput
             value={prep.title ?? ""}
             onChange={(title) => patch({ title })}
-            placeholder="Our Identity in Christ"
+            placeholder="그리스도 안에서 우리는 누구인가"
           />
         </Field>
 
-        <Field label="Main passage" hint="English reference, e.g. 1 Peter 2:9">
+        <Field label="본문" hint="영문 표기로, 예: 1 Peter 2:9">
           <TextInput
             value={prep.scripture ?? ""}
             onChange={(scripture) => patch({ scripture })}
@@ -139,16 +133,16 @@ export function PrepScreen() {
         </Field>
       </div>
 
-      <Field label="Notes" hint="Anything you want the engine to know going in.">
+      <Field label="메모" hint="통역기가 미리 알고 있으면 좋을 내용을 자유롭게 적어주세요.">
         <TextArea
           value={prep.notes ?? ""}
           onChange={(notes) => patch({ notes })}
-          placeholder="Visiting preacher. Uses a lot of illustrations from his army days."
+          placeholder="초청 설교자. 군대 이야기로 예화를 자주 드는 편."
           rows={3}
         />
       </Field>
 
-      <Field label="Outline or script" hint="Paste whatever you were given.">
+      <Field label="개요 · 원고" hint="받은 자료를 그대로 붙여넣어도 됩니다.">
         <TextArea
           korean
           value={prep.outline ?? ""}
@@ -160,9 +154,9 @@ export function PrepScreen() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Button tone="primary" onClick={() => void generate()} disabled={status === "loading"}>
-          {status === "loading" ? "Building brief…" : "Build interpretation brief"}
+          {status === "loading" ? "브리프 만드는 중…" : "통역 브리프 만들기"}
         </Button>
-        {saved && <span className="text-xs text-[var(--fg-dim)]">Saved to this browser</span>}
+        {saved && <span className="brand-caption normal-case">이 브라우저에 저장됨</span>}
       </div>
 
       {notice && (
@@ -175,7 +169,7 @@ export function PrepScreen() {
 
       {prep.glossary.length > 0 && (
         <section className="flex flex-col gap-2 border-t border-[var(--line)] pt-5">
-          <Label>Session glossary ({prep.glossary.length})</Label>
+          <Label>세션 용어집 ({prep.glossary.length})</Label>
           <ul className="flex flex-wrap gap-1.5 text-xs">
             {prep.glossary.map((term) => (
               <li
@@ -195,10 +189,11 @@ export function PrepScreen() {
             onClick={() => patch({ glossary: [] })}
             className="self-start"
           >
-            Clear glossary
+            용어집 비우기
           </Button>
         </section>
       )}
+      </div>
     </div>
   );
 }
@@ -207,13 +202,13 @@ function BriefView({ brief }: { brief: PrepBrief }) {
   return (
     <div className="flex flex-col gap-5 border-t border-[var(--line)] pt-5">
       <section>
-        <Label>Overview</Label>
+        <Label>개요</Label>
         <p className="mt-1.5 text-sm leading-relaxed text-[var(--fg-muted)]">{brief.overview}</p>
       </section>
 
       {brief.likelyStructure.length > 0 && (
         <section>
-          <Label>Likely structure</Label>
+          <Label>예상 흐름</Label>
           <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-sm text-[var(--fg-muted)]">
             {brief.likelyStructure.map((step) => (
               <li key={step}>{step}</li>
@@ -224,7 +219,7 @@ function BriefView({ brief }: { brief: PrepBrief }) {
 
       {brief.scripture.length > 0 && (
         <section>
-          <Label>Scripture</Label>
+          <Label>성경 구절</Label>
           <ul className="mt-1.5 flex flex-wrap gap-2 text-sm">
             {brief.scripture.map((reference) => (
               <li
@@ -240,7 +235,7 @@ function BriefView({ brief }: { brief: PrepBrief }) {
 
       {brief.keyTerms.length > 0 && (
         <section>
-          <Label>Key terms</Label>
+          <Label>핵심 용어</Label>
           <ul className="mt-1.5 grid gap-1.5 text-sm sm:grid-cols-2">
             {brief.keyTerms.map((term) => (
               <li key={term.korean} className="flex flex-wrap items-baseline gap-2">
@@ -258,7 +253,7 @@ function BriefView({ brief }: { brief: PrepBrief }) {
 
       {brief.properNouns.length > 0 && (
         <section>
-          <Label>Proper nouns · pronunciation</Label>
+          <Label>고유명사 · 발음</Label>
           <ul className="mt-1.5 space-y-1 text-sm">
             {brief.properNouns.map((noun) => (
               <li key={noun.korean}>
@@ -274,7 +269,7 @@ function BriefView({ brief }: { brief: PrepBrief }) {
 
       {brief.difficultPoints.length > 0 && (
         <section>
-          <Label>Difficult interpretation points</Label>
+          <Label>통역이 까다로운 지점</Label>
           <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-[var(--fg-muted)]">
             {brief.difficultPoints.map((point) => (
               <li key={point}>{point}</li>
@@ -285,7 +280,7 @@ function BriefView({ brief }: { brief: PrepBrief }) {
 
       {brief.anticipatedPhrases.length > 0 && (
         <section>
-          <Label>Anticipated phrases</Label>
+          <Label>미리 준비해둘 표현</Label>
           <ul className="mt-1.5 space-y-1.5 text-sm">
             {brief.anticipatedPhrases.map((phrase) => (
               <li key={phrase.korean}>

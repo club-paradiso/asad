@@ -14,7 +14,18 @@
 const ALPHABET = "ACDEFGHJKMNPQRTUVWXY34679";
 
 export const CODE_LENGTH = 4;
-export const CODE_PREFIX = "TY";
+export const CODE_PREFIX = "AS";
+
+/**
+ * The prefix this product used to print, kept only for reading.
+ *
+ * `TY` was tong-yuck, a name no user has seen since the rebrand — but it was
+ * printed on QR posters and read aloud across counters, and a visitor holding
+ * one of those is exactly the person least able to recover from "invalid
+ * code". Accepting it costs two lines; refusing it costs somebody their turn
+ * in the queue.
+ */
+const LEGACY_PREFIXES = ["TY"] as const;
 
 /** Cryptographically random where available; `Math.random` is not good enough
  *  for something that gates access to a conversation. */
@@ -41,7 +52,7 @@ export function generateCode(): string {
     .join("");
 }
 
-/** `TY-4821` — the form shown on screen and spoken aloud. */
+/** `AS-4821` — the form shown on screen and spoken aloud. */
 export const formatCode = (code: string): string => `${CODE_PREFIX}-${code}`;
 
 const isCode = (value: string): boolean =>
@@ -51,19 +62,22 @@ const isCode = (value: string): boolean =>
  * Accept anything a human might type: with or without the prefix, any case,
  * with or without the hyphen or spaces.
  *
- * The bare form is tested BEFORE the prefix is stripped, because `T` and `Y`
- * are both in the alphabet and a generated code can therefore begin with `TY`.
- * Stripping first would mangle roughly one code in 625 into two characters and
- * reject it — a visitor holding a perfectly valid code, unable to get in.
+ * The bare form is tested BEFORE any prefix is stripped, because the prefix
+ * letters are also in the alphabet and a generated code can therefore begin
+ * with them. Stripping first would mangle roughly one code in 625 into two
+ * characters and reject it — a visitor holding a perfectly valid code, unable
+ * to get in.
  */
 export function normaliseCode(input: string): string | null {
   const cleaned = input.toUpperCase().replace(/[\s-]+/g, "");
   if (isCode(cleaned)) return cleaned;
 
-  const unprefixed = cleaned.startsWith(CODE_PREFIX)
-    ? cleaned.slice(CODE_PREFIX.length)
-    : cleaned;
-  return isCode(unprefixed) ? unprefixed : null;
+  for (const prefix of [CODE_PREFIX, ...LEGACY_PREFIXES]) {
+    if (!cleaned.startsWith(prefix)) continue;
+    const unprefixed = cleaned.slice(prefix.length);
+    if (isCode(unprefixed)) return unprefixed;
+  }
+  return null;
 }
 
 /** The URL a QR code encodes. Short, because QR density matters at a distance. */

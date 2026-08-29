@@ -29,7 +29,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { InterpretationMode, StoredSession } from "@/types";
+import type { InterpretationMode, LagProfile, StoredSession } from "@/types";
 import { prepStore, settingsStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { useCapability } from "@/hooks/useCapability";
@@ -38,11 +38,11 @@ import {
   WebSpeechProvider,
   type SttProviderId,
 } from "@/providers/stt";
-import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { Button, Segmented } from "@/components/ui/primitives";
 import { openSession, readSessionState } from "@/lib/session-client";
 import type { AppConfig } from "@/app/api/config/route";
 import { BRAND } from "@/lib/brand";
+import { Wordmark } from "@/components/brand/Wordmark";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
 import { preferredSttSource } from "./sourcePreference";
@@ -52,6 +52,47 @@ import { Readiness, type ReadinessRow } from "./Readiness";
 import { SessionSummary } from "@/features/sessions/SessionSummary";
 
 type Screen = "start" | "live" | "review";
+
+/**
+ * Korean labels for the launcher.
+ *
+ * They live here rather than in `lag.ts` / `providers/stt` on purpose: those
+ * modules are shared with the live console, which stays English because its
+ * CONTENT is English. The interpreter reading the console is looking for the
+ * next line they have to say; a Korean word in that chrome is a word in the
+ * wrong language sitting next to the one thing they are reading at speed.
+ *
+ * The launcher is the opposite — nothing is being read aloud yet, the reader
+ * is Korean, and the old screen mixed the two in a way that belonged to
+ * neither. So: chrome follows the reader, content follows the work.
+ *
+ * Provider names stay Latin. "Deepgram" is a proper noun and transliterating
+ * it helps nobody.
+ */
+const LAG_LABEL_KO: Record<LagProfile, string> = {
+  fast: "빠르게",
+  balanced: "기본",
+  safe: "안전하게",
+};
+
+const LAG_DETAIL_KO: Record<LagProfile, string> = {
+  fast: "약 1초 뒤따라갑니다 — 예측이 가장 많고, 고칠 일도 가장 많습니다",
+  balanced: "약 2–3초 뒤따라갑니다 — 평소 작업용 기본값",
+  safe: "약 4–6초 뒤따라갑니다 — 문장이 끝나길 기다리고, 예측하지 않습니다",
+};
+
+const SOURCE_LABEL_KO: Partial<Record<SttProviderId, string>> = {
+  demo: "데모",
+  webspeech: "브라우저",
+};
+
+const SOURCE_DETAIL_KO: Partial<Record<SttProviderId, string>> = {
+  demo: "미리 녹음된 설교 — 마이크도 키도 필요 없고, 오프라인에서도 됩니다",
+  webspeech:
+    "기기 안에서 인식합니다 — 키 불필요. 크롬에서 가장 정확하고, 사파리는 일부만 됩니다",
+  deepgram: "한국어 스트리밍 — 중간 결과와 용어 힌트를 지원합니다",
+  openai: "웹소켓 기반 실시간 인식",
+};
 
 export function StartScreen() {
   const [screen, setScreen] = useState<Screen>("start");
@@ -220,11 +261,13 @@ export function StartScreen() {
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
         <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)] pb-6">
           <div className="min-w-0">
-            <h1 className="max-w-3xl break-all text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
-              {BRAND.name}
+            <h1 className="flex items-center gap-2.5 text-lg font-semibold tracking-[-0.02em]">
+              <Wordmark variant="compact" />
+              <span className="text-[var(--line-strong)]">/</span>
+              <span>라이브 통역</span>
             </h1>
-            <p className="mt-1 text-sm text-[var(--fg-muted)] sm:text-base">
-              {BRAND.shortName} · {BRAND.liveTagline}
+            <p className="mt-1 text-sm text-[var(--fg-muted)]">
+              {BRAND.liveTagline}
             </p>
           </div>
           <Link
@@ -246,7 +289,7 @@ export function StartScreen() {
             href="/diagnostics"
             className="inline-flex min-h-11 shrink-0 items-center gap-2 px-2 text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
           >
-            Diagnostics
+            진단
             <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
               <path
                 d="m7.5 4.5 5.5 5.5-5.5 5.5"
@@ -266,56 +309,56 @@ export function StartScreen() {
               prep-time reading occupying launch-time space, and they were what
               pushed Start below the fold on a phone. */}
             <section className="flex flex-col gap-4">
-              <ControlRow label="Mode">
+              <ControlRow label="모드">
                 <Segmented
-                  label="Interpretation mode"
+                  label="통역 모드"
                   indicator
                   value={settings.mode}
                   onChange={(mode) => updateSettings({ ...settings, mode })}
                   options={(["sermon", "general"] as InterpretationMode[]).map(
                     (mode) => ({
                       value: mode,
-                      label: mode === "sermon" ? "Sermon" : "General",
+                      label: mode === "sermon" ? "설교" : "일반",
                       title:
                         mode === "sermon"
-                          ? "Scripture detection, theological terminology, church register, wordplay."
-                          : "Meetings, lectures, interviews. No theological assumptions.",
+                          ? "성경 구절 인식, 신학 용어, 교회 말투, 말놀이까지 살핍니다."
+                          : "회의 · 강연 · 인터뷰. 신학적 전제 없이 옮깁니다.",
                     }),
                   )}
                 />
               </ControlRow>
 
-              <ControlRow label="Audio">
+              <ControlRow label="소리">
                 <Segmented
-                  label="Audio source"
+                  label="소리 입력"
                   indicator
                   value={source}
                   onChange={setSourceOverride}
                   options={sources.map((id) => ({
                     value: id,
-                    label: STT_PROVIDER_INFO[id].label,
-                    title: STT_PROVIDER_INFO[id].detail,
+                    label: SOURCE_LABEL_KO[id] ?? STT_PROVIDER_INFO[id].label,
+                    title: SOURCE_DETAIL_KO[id] ?? STT_PROVIDER_INFO[id].detail,
                   }))}
                 />
               </ControlRow>
 
-              <ControlRow label="Lag">
+              <ControlRow label="지연">
                 <Segmented
-                  label="Interpreter lag"
+                  label="통역 지연"
                   indicator
                   value={settings.lag}
                   onChange={(lag) => updateSettings({ ...settings, lag })}
                   options={(["fast", "balanced", "safe"] as const).map(
                     (lag) => ({
                       value: lag,
-                      label: LAG_PROFILES[lag].label,
-                      title: LAG_PROFILES[lag].description,
+                      label: LAG_LABEL_KO[lag],
+                      title: LAG_DETAIL_KO[lag],
                     }),
                   )}
                 />
               </ControlRow>
               <p className="text-sm text-[var(--fg-muted)] sm:pl-28">
-                {LAG_PROFILES[settings.lag].description}
+                {LAG_DETAIL_KO[settings.lag]}
               </p>
             </section>
 
@@ -329,12 +372,12 @@ export function StartScreen() {
               className="w-full"
             >
               {consent.phase === "checking"
-                ? "Checking privacy settings…"
+                ? "개인정보 설정 확인 중…"
                 : consent.phase === "needed"
-                  ? "Confirm privacy to continue"
+                  ? "개인정보 확인하고 시작"
                   : source === "demo"
-                    ? "Run demo"
-                    : "Start live interpreting"}
+                    ? "데모 실행"
+                    : "통역 시작"}
             </Button>
 
             {/* --- Everything optional ------------------------------------------ */}
@@ -347,11 +390,11 @@ export function StartScreen() {
             >
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium marker:content-none">
                 <span>
-                  <span className="font-semibold text-[var(--accent)]">
-                    More
+                  <span className="font-semibold text-[var(--fg)]">
+                    시작 전에 챙길 것
                   </span>
                   <span className="ml-2 text-sm text-[var(--fg-muted)]">
-                    prep sheet · saved sessions · counter mode
+                    준비 시트 · 지난 세션
                   </span>
                 </span>
                 <svg
@@ -374,16 +417,18 @@ export function StartScreen() {
                   href="/prep"
                   className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
                 >
-                  Prepare a session
+                  준비 시트 작성
                   {prep.speaker || prep.title ? (
-                    <span className="ml-1.5 text-[var(--accent)]">· ready</span>
+                    <span className="ml-1.5 font-semibold text-[var(--ok)]">
+                      · 입력됨
+                    </span>
                   ) : null}
                 </Link>
                 <Link
                   href="/sessions"
                   className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
                 >
-                  Saved sessions
+                  지난 세션 보기
                 </Link>
                 {/* Counter Mode is no longer buried here. It is a different job
                   on the same footing, and it now has its own entry alongside
@@ -393,17 +438,17 @@ export function StartScreen() {
             </details>
 
             <p className="mt-auto border-t border-[var(--line)] pt-5 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
-              In session:{" "}
+              통역 중 단축키 ·{" "}
               <strong className="font-semibold text-[var(--fg)]">Space</strong>{" "}
-              freeze ·{" "}
+              멈춤 ·{" "}
               <strong className="font-semibold text-[var(--fg)]">T</strong>{" "}
-              teleprompter ·{" "}
+              프롬프터 ·{" "}
               <strong className="font-semibold text-[var(--fg)]">K</strong>{" "}
-              Korean ·{" "}
+              한국어 ·{" "}
               <strong className="font-semibold text-[var(--fg)]">G</strong>{" "}
-              glossary ·{" "}
+              용어 ·{" "}
               <strong className="font-semibold text-[var(--fg)]">+/−</strong>{" "}
-              text size
+              글자 크기
             </p>
           </div>
 
@@ -446,9 +491,7 @@ function ControlRow({
 }) {
   return (
     <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-2 sm:grid-cols-[6rem_minmax(0,1fr)]">
-      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--fg-dim)]">
-        {label}
-      </span>
+      <span className="brand-caption">{label}</span>
       <div className="min-w-0 [&_[role=radio]]:flex-1 [&_[role=radiogroup]]:flex [&_[role=radiogroup]]:w-full">
         {children}
       </div>
@@ -474,80 +517,80 @@ export function readinessRows(input: {
 
   const audio: ReadinessRow = demo
     ? {
-        label: "Audio",
-        value: "Recorded Korean sermon — no microphone",
+        label: "소리",
+        value: "녹음된 한국어 설교 — 마이크 없음",
         level: "ready",
       }
     : {
-        label: "Audio",
-        value: info.label,
+        label: "소리",
+        value: SOURCE_LABEL_KO[source] ?? info.label,
         level: "ready",
       };
 
   const recognition: ReadinessRow = demo
     ? {
-        label: "Recognition",
-        value: "Built into the recording",
+        label: "인식",
+        value: "녹음에 포함되어 있습니다",
         level: "ready",
       }
     : source === "webspeech"
       ? {
-          label: "Recognition",
-          value: "On-device, in your browser",
+          label: "인식",
+          value: "브라우저 안에서 인식합니다",
           // Genuinely a limitation, and one that bites mid-service: Safari's
           // recogniser stops on a long silence and has to be restarted.
           level: "limited",
           detail:
-            "Best in Chrome. Safari support is partial and can stop on long silences.",
+            "크롬에서 가장 정확합니다. 사파리는 일부만 지원하고, 오래 조용하면 멈출 수 있습니다.",
         }
       : {
-          label: "Recognition",
-          value: `${info.label} streaming`,
+          label: "인식",
+          value: `${info.label} 스트리밍`,
           level: "ready",
         };
 
   // The line that used to name environment variables. It now describes what
   // the interpreter will see on screen.
   const interpretation: ReadinessRow = !config
-    ? { label: "AI", value: "Checking…", level: "limited" }
+    ? { label: "AI", value: "확인 중…", level: "limited" }
     : !config.llm.modelAvailable
       ? {
           label: "AI",
-          value: "Rule-based only",
+          value: "규칙 기반만 사용",
           level: "limited",
           detail:
-            "Scripture, terminology and wordplay are still detected; the English is built from rules rather than translated.",
+            "성경 구절 · 용어 · 말놀이는 그대로 짚어줍니다. 다만 영어 문장은 번역이 아니라 규칙으로 만들어집니다.",
         }
       : !config.llm.sustainsLiveSermon
         ? {
             label: "AI",
-            value: `${config.llm.configured} — limited capacity`,
+            value: `${config.llm.configured} — 용량 제한`,
             level: "limited",
             detail:
-              `${config.llm.capacityNote ?? ""} After that the console keeps running on the local interpreter.`.trim(),
+              `${config.llm.capacityNote ?? ""} 그 뒤로는 기기 안의 통역기로 이어서 돌아갑니다.`.trim(),
           }
         : { label: "AI", value: config.llm.configured, level: "ready" };
 
   const privacy: ReadinessRow = demo
-    ? { label: "Privacy", value: "Nothing leaves this device", level: "ready" }
+    ? { label: "개인정보", value: "이 기기 밖으로 나가지 않습니다", level: "ready" }
     : !config || input.consent === "checking"
-      ? { label: "Privacy", value: "Checking…", level: "limited" }
+      ? { label: "개인정보", value: "확인 중…", level: "limited" }
       : config.llm.freeTierDisclosure.length > 0 && input.consent !== "granted"
         ? {
-            label: "Privacy",
-            value: "Confirmation needed before starting",
+            label: "개인정보",
+            value: "시작 전에 확인이 필요합니다",
             level: "limited",
-            detail: `What is said will be sent to ${config.llm.freeTierDisclosure
+            detail: `말한 내용이 ${config.llm.freeTierDisclosure
               .map((p) => p.label)
               .join(
                 ", ",
-              )}, which may use it to improve their products. You will be asked to confirm.`,
+              )}(으)로 전송되고, 해당 업체가 제품 개선에 활용할 수 있습니다. 시작 전에 다시 한 번 확인을 받습니다.`,
           }
         : {
-            label: "Privacy",
+            label: "개인정보",
             value: config.llm.modelAvailable
-              ? "Provider does not train on this session"
-              : "Nothing leaves this device",
+              ? "제공자가 이 세션으로 학습하지 않습니다"
+              : "이 기기 밖으로 나가지 않습니다",
             level: "ready",
           };
 

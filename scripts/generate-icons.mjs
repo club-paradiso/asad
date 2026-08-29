@@ -1,150 +1,79 @@
 /**
- * Generates the PWA icons.
+ * Generates the PWA icons and the square brand icon.
  *
- * Written as a raw PNG encoder rather than pulling in a rasteriser: the mark
- * is three stacked bars — the committed / current / anticipated chunk states
- * that the whole product is built around — and drawing that needs a pixel
- * buffer, not a canvas library.
+ * This used to be a hand-written PNG encoder drawing three stacked bars — the
+ * committed / current / anticipated chunk states. That mark described the
+ * console's mechanism; it did not describe the product, and it could not draw
+ * the one the brand now has (a question mark whose dot is a check), because a
+ * pixel-buffer encoder cannot draw a curve.
+ *
+ * So it rasterises the real SVG in the browser that is already a dev
+ * dependency, which also means the icon and the in-app `<Mark>` can never
+ * drift: both are the same path data.
  *
  * Run with `npm run icons`.
  */
-import { deflateSync } from "node:zlib";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
+import { chromiumLaunchOptions } from "./browser.mjs";
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "icons");
 
-const BG = [0x06, 0x08, 0x0b];
-const COMMITTED = [0x5d, 0x68, 0x74];
-const CURRENT = [0xf0, 0xb4, 0x29];
-const ANTICIPATED = [0x33, 0x3c, 0x47];
-
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n += 1) {
-    let c = n;
-    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
-
-const crc32 = (buffer) => {
-  let c = 0xffffffff;
-  for (const byte of buffer) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-};
-
-const chunk = (type, data) => {
-  const length = Buffer.alloc(4);
-  length.writeUInt32BE(data.length);
-  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(body));
-  return Buffer.concat([length, body, crc]);
-};
-
-function encodePng(width, height, rgba) {
-  const stride = width * 4;
-  const raw = Buffer.alloc((stride + 1) * height);
-  for (let y = 0; y < height; y += 1) {
-    raw[y * (stride + 1)] = 0; // filter: none
-    rgba.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
-  }
-
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // colour type: RGBA
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk("IHDR", ihdr),
-    chunk("IDAT", deflateSync(raw, { level: 9 })),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
-}
+const PAPER = "#faf7f2";
+const INK = "#12100e";
+const RED = "#c81e1e";
 
 /**
- * Draw the mark: three horizontal bars of decreasing prominence, the middle
- * one live amber, inside a rounded field.
+ * The mark, at icon scale.
  *
- * `inset` reserves the maskable safe area (icons get cropped to a circle on
- * Android, so the mark has to live inside the middle 80%).
+ * Two departures from the in-app component, both because an icon is read at
+ * 40px on a home screen rather than at 24px in a header:
+ *   - the strokes are heavier, so the hook survives downscaling;
+ *   - the tick is drawn on ink, not paper, because a launcher grid puts this
+ *     next to other icons and the dark field is what separates it from them.
  */
-function drawIcon(size, { maskable = false } = {}) {
-  const rgba = Buffer.alloc(size * size * 4);
-  const radius = maskable ? 0 : size * 0.22;
+const mark = (bg, hook, tick, inset) => `
+  <rect width="512" height="512" fill="${bg}"/>
+  <g transform="translate(${inset}, ${inset}) scale(${(512 - inset * 2) / 32})"
+     fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9.5 10.6c0-3.5 2.9-6.1 6.6-6.1 3.8 0 6.5 2.4 6.5 5.8 0 2.8-1.5 4.3-3.9 5.9-2 1.3-2.7 2.3-2.7 4.1v.8"
+          stroke="${hook}" stroke-width="4"/>
+    <path d="m11.9 27.1 2.7 2.6 5.5-6.2" stroke="${tick}" stroke-width="4"/>
+  </g>`;
 
-  const put = (x, y, [r, g, b], a = 255) => {
-    const i = (y * size + x) * 4;
-    rgba[i] = r;
-    rgba[i + 1] = g;
-    rgba[i + 2] = b;
-    rgba[i + 3] = a;
-  };
-
-  const insideRounded = (x, y) => {
-    if (radius <= 0) return true;
-    const cx = Math.min(Math.max(x, radius), size - radius);
-    const cy = Math.min(Math.max(y, radius), size - radius);
-    const dx = x - cx;
-    const dy = y - cy;
-    return dx * dx + dy * dy <= radius * radius;
-  };
-
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      if (insideRounded(x + 0.5, y + 0.5)) put(x, y, BG);
-      else put(x, y, BG, 0);
-    }
-  }
-
-  // Safe area: maskable icons keep the mark inside the middle 80%.
-  const pad = maskable ? size * 0.26 : size * 0.2;
-  const inner = size - pad * 2;
-  const barHeight = inner * 0.15;
-  const gap = inner * 0.115;
-  const totalHeight = barHeight * 3 + gap * 2;
-  const top = (size - totalHeight) / 2;
-  const corner = barHeight / 2;
-
-  const bars = [
-    { colour: COMMITTED, width: inner * 0.62 },
-    { colour: CURRENT, width: inner },
-    { colour: ANTICIPATED, width: inner * 0.44 },
-  ];
-
-  bars.forEach((bar, index) => {
-    const y0 = top + index * (barHeight + gap);
-    const x0 = pad;
-    for (let y = Math.floor(y0); y < Math.ceil(y0 + barHeight); y += 1) {
-      for (let x = Math.floor(x0); x < Math.ceil(x0 + bar.width); x += 1) {
-        if (x < 0 || y < 0 || x >= size || y >= size) continue;
-        // Round the bar ends.
-        const localX = x + 0.5 - x0;
-        const localY = y + 0.5 - y0;
-        const cx = Math.min(Math.max(localX, corner), bar.width - corner);
-        const cy = Math.min(Math.max(localY, corner), barHeight - corner);
-        const dx = localX - cx;
-        const dy = localY - cy;
-        if (dx * dx + dy * dy > corner * corner) continue;
-        put(x, y, bar.colour);
-      }
-    }
-  });
-
-  return encodePng(size, size, rgba);
-}
+/**
+ * `maskable` gets a much larger inset: Android crops a maskable icon to
+ * whatever shape the launcher likes, and anything outside the safe circle
+ * (80% of the width) can be cut. The hook's tail is the first thing to go.
+ */
+const ICONS = [
+  { file: "icon-192.png", size: 192, svg: mark(INK, PAPER, RED, 96) },
+  { file: "icon-512.png", size: 512, svg: mark(INK, PAPER, RED, 96) },
+  { file: "icon-maskable-512.png", size: 512, svg: mark(INK, PAPER, RED, 136) },
+  { file: "favicon.png", size: 64, svg: mark(INK, PAPER, RED, 88) },
+  // The square brand icon an embed host or store listing asks for. Paper
+  // ground: it is shown on the host's own chrome, which is usually light, and
+  // a black tile there reads as a missing image.
+  { file: "brand-600.png", size: 600, svg: mark(PAPER, INK, RED, 108) },
+];
 
 mkdirSync(OUT, { recursive: true });
-writeFileSync(join(OUT, "icon-192.png"), drawIcon(192));
-writeFileSync(join(OUT, "icon-512.png"), drawIcon(512));
-writeFileSync(join(OUT, "icon-maskable-512.png"), drawIcon(512, { maskable: true }));
-writeFileSync(join(OUT, "favicon.png"), drawIcon(64));
-console.log("Wrote icons to public/icons");
+
+const browser = await chromium.launch(chromiumLaunchOptions());
+const page = await browser.newPage();
+
+for (const icon of ICONS) {
+  await page.setViewportSize({ width: icon.size, height: icon.size });
+  await page.setContent(
+    `<style>html,body{margin:0;padding:0}svg{display:block}</style>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" ` +
+      `width="${icon.size}" height="${icon.size}">${icon.svg}</svg>`,
+  );
+  const buffer = await page.locator("svg").screenshot({ omitBackground: false });
+  writeFileSync(join(OUT, icon.file), buffer);
+  console.log(`wrote ${icon.file} (${icon.size}px)`);
+}
+
+await browser.close();

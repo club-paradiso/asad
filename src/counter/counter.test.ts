@@ -52,7 +52,7 @@ describe("room codes", () => {
 
   it("builds a short join URL for the QR", () => {
     expect(joinUrl("https://x.dev/", "AC34")).toBe("https://x.dev/c/AC34");
-    expect(formatCode("AC34")).toBe("TY-AC34");
+    expect(formatCode("AC34")).toBe("AS-AC34");
   });
 });
 
