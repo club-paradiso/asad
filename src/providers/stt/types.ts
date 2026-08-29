@@ -39,6 +39,11 @@ export interface SpeechProvider {
 export interface SttProviderOptions {
   /** BCP-47 language tag; Korean throughout the MVP. */
   language?: string;
+  /**
+   * Stop after one natural utterance instead of continuously restarting.
+   * Counter Mode uses this while Live Mode keeps the continuous default.
+   */
+  utterance?: boolean;
   /** Terminology hints, where the provider supports custom vocabulary. */
   hints?: string[];
   /** Signed connection details fetched from `/api/stt/token`. */

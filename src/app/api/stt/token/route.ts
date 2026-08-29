@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { appEnv } from "@/lib/env";
 import { guardInferenceRoute } from "@/lib/guard";
+import { findLanguage } from "@/counter/languages";
 import type { SttCredentials } from "@/providers/stt/types";
 
 export const runtime = "nodejs";
@@ -31,6 +32,13 @@ export async function POST(request: Request) {
     limits: [{ rule: "sttToken", by: "session" }, { rule: "sttToken", by: "address" }],
   });
   if (!guarded.ok) return guarded.response;
+
+  const body = (guarded.body ?? {}) as { language?: unknown; usage?: unknown };
+  const requestedLanguage =
+    typeof body.language === "string" && findLanguage(body.language)
+      ? body.language
+      : "ko-KR";
+  const counterTurn = body.usage === "counter";
 
   // Read the PARSED environment. The raw values were read here directly, which
   // meant this route and the rest of the application could disagree about
@@ -50,6 +58,12 @@ export async function POST(request: Request) {
     const model = env.stt.deepgramModel;
     const temporary = await mintDeepgramKey(key);
 
+    // Counter is a public, turn-based surface. Never send an account key to a
+    // visitor's browser when a scoped temporary credential cannot be minted.
+    if (counterTurn && !temporary) {
+      return fallback("A short-lived Deepgram credential could not be issued.");
+    }
+
     // A project without key-management scope can still stream; fall back to the
     // configured key rather than blocking the service. Documented in privacy.md.
     return NextResponse.json({
@@ -65,7 +79,11 @@ export async function POST(request: Request) {
   if (!key) return fallback("OPENAI_API_KEY is not set.");
 
   const model = env.stt.openaiModel;
-  const session = await mintOpenAiSession(key, model);
+  const session = await mintOpenAiSession(key, model, requestedLanguage);
+
+  if (counterTurn && !session) {
+    return fallback("An ephemeral OpenAI transcription session could not be issued.");
+  }
 
   return NextResponse.json({
     provider: "openai",
@@ -105,7 +123,11 @@ async function mintDeepgramKey(accountKey: string): Promise<string | null> {
 }
 
 /** Ask OpenAI for an ephemeral realtime transcription session token. */
-async function mintOpenAiSession(apiKey: string, model: string): Promise<string | null> {
+async function mintOpenAiSession(
+  apiKey: string,
+  model: string,
+  language: string,
+): Promise<string | null> {
   try {
     const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
       method: "POST",
@@ -116,7 +138,7 @@ async function mintOpenAiSession(apiKey: string, model: string): Promise<string 
       },
       body: JSON.stringify({
         input_audio_format: "pcm16",
-        input_audio_transcription: { model, language: "ko" },
+        input_audio_transcription: { model, language: language.split("-")[0] },
       }),
     });
     if (!response.ok) return null;

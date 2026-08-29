@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useVoiceInput } from "./useVoiceInput";
 
@@ -20,15 +20,19 @@ class MockRecognition {
   lang = "";
   continuous = false;
   interimResults = false;
+  maxAlternatives = 1;
   onresult: ((event: ResultEvent) => void) | null = null;
   onerror: ((event: { error?: string }) => void) | null = null;
   onend: (() => void) | null = null;
+  onstart: (() => void) | null = null;
 
   constructor() {
     MockRecognition.current = this;
   }
 
-  start() {}
+  start() {
+    this.onstart?.();
+  }
 
   stop() {
     this.onend?.();
@@ -81,6 +85,8 @@ describe("useVoiceInput", () => {
       spoken = result.current.start();
     });
 
+    await waitFor(() => expect(MockRecognition.current).not.toBeNull());
+
     expect(result.current.listening).toBe(true);
     expect(MockRecognition.current?.lang).toBe("ko-KR");
     expect(MockRecognition.current?.continuous).toBe(false);
@@ -100,6 +106,10 @@ describe("useVoiceInput", () => {
     let spoken!: Promise<string>;
     await act(async () => {
       spoken = result.current.start();
+    });
+
+    await waitFor(() => expect(MockRecognition.current).not.toBeNull());
+    await act(async () => {
       MockRecognition.current?.emit("I need help with my visa", false);
     });
 
