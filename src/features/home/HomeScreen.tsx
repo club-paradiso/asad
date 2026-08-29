@@ -61,7 +61,7 @@ export function HomeScreen() {
               points={[
                 "QR을 찍으면 손님 폰에서 바로 열립니다",
                 "화면 전체가 손님의 모국어로 바뀝니다",
-                "설치 없음 · 계정 없음 · 기록 남지 않음",
+                "설치 없음 · 계정 없음 · 세션 종료 시 삭제",
               ]}
               action="QR 코드 띄우기"
               icon={
@@ -90,7 +90,7 @@ export function HomeScreen() {
         </div>
 
         <footer className="mt-auto pt-4 text-right text-xs text-[var(--fg-dim)]">
-          대화 내용은 저장되지 않습니다
+          현장 응대 기록은 세션 동안만 임시 보관됩니다
         </footer>
       </div>
     </div>

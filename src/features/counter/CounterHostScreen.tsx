@@ -19,6 +19,7 @@ import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
 import { Label } from "@/components/ui/primitives";
 import { useClientValue } from "@/hooks/useClientValue";
+import { useLocalStore } from "@/lib/local-store";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
@@ -26,24 +27,25 @@ import { QuickPhraseBar } from "./QuickPhraseBar";
 import { QrCode } from "./QrCode";
 import { useCounterDisclosure } from "./ProviderNotice";
 import { cn } from "@/lib/cn";
-
-/** The desk's own language. Korean staff, Korean counter — but not assumed. */
-const DEFAULT_HOST_LANG = "ko-KR";
+import { counterPreferencesStore } from "./preferences";
 
 export function CounterHostScreen() {
   const [code, setCode] = useState<string | null>(null);
-  const [hostLang, setHostLang] = useState(DEFAULT_HOST_LANG);
-  const [deskLabel, setDeskLabel] = useState("");
+  const [preferences, setPreferences] = useLocalStore(counterPreferencesStore);
+  const [editingPreferences, setEditingPreferences] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
 
   const session = useCounterSession(code, "host");
+  const hostLang = preferences.hostLang;
+  const deskLabel = preferences.deskLabel;
   const t = stringsFor(hostLang);
 
   const start = useCallback(async () => {
     setStarting(true);
     setStartError(null);
+    setPreferences({ ...preferences, configured: true });
     try {
       const response = await fetch("/api/counter/session", {
         method: "POST",
@@ -55,16 +57,17 @@ export function CounterHostScreen() {
       });
       const data = (await response.json()) as { session?: SessionView; error?: string };
       if (!response.ok || !data.session) {
-        setStartError(data.error ?? "세션을 만들지 못했습니다.");
+        setStartError("현장응대를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
       setCode(data.session.code);
+      setEditingPreferences(false);
     } catch {
-      setStartError("서버에 연결하지 못했습니다.");
+      setStartError("연결할 수 없습니다. 네트워크를 확인하고 다시 시도해 주세요.");
     } finally {
       setStarting(false);
     }
-  }, [hostLang, deskLabel]);
+  }, [hostLang, deskLabel, preferences, setPreferences]);
 
   /** End this visitor's conversation and open a fresh one for the next. */
   const next = useCallback(async () => {
@@ -84,12 +87,15 @@ export function CounterHostScreen() {
     return (
       <SetupScreen
         hostLang={hostLang}
-        onHostLang={setHostLang}
+        onHostLang={(value) => setPreferences({ ...preferences, hostLang: value })}
         deskLabel={deskLabel}
-        onDeskLabel={setDeskLabel}
+        onDeskLabel={(value) => setPreferences({ ...preferences, deskLabel: value })}
         onStart={start}
         starting={starting}
         error={startError}
+        configured={preferences.configured}
+        editing={editingPreferences}
+        onEdit={() => setEditingPreferences(true)}
       />
     );
   }
@@ -346,6 +352,9 @@ function SetupScreen({
   onStart,
   starting,
   error,
+  configured,
+  editing,
+  onEdit,
 }: {
   hostLang: string;
   onHostLang: (code: string) => void;
@@ -354,6 +363,9 @@ function SetupScreen({
   onStart: () => void;
   starting: boolean;
   error: string | null;
+  configured: boolean;
+  editing: boolean;
+  onEdit: () => void;
 }) {
   const disclosure = useCounterDisclosure();
   // Korean and English first: between them they cover almost every desk that
@@ -362,6 +374,57 @@ function SetupScreen({
     () => [...COUNTER_LANGUAGES].sort((a, b) => rank(a.code) - rank(b.code)),
     [],
   );
+
+  if (configured && !editing) {
+    const language = findLanguage(hostLang);
+    return (
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-7 px-5 py-8 sm:py-12">
+        <header>
+          <p className="text-sm font-semibold text-[var(--accent)]">현장 응대</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">바로 시작할까요?</h1>
+          <p className="mt-2 text-sm text-[var(--fg-muted)]">
+            지난번 설정으로 QR을 바로 만들 수 있습니다.
+          </p>
+        </header>
+
+        <section className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-5">
+          <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "현장 응대"}</p>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">
+            {language?.ko ?? hostLang} · {language?.endonym ?? hostLang}
+          </p>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="mt-4 min-h-11 rounded-lg border border-[var(--line-strong)] px-4 text-sm text-[var(--fg-muted)]"
+          >
+            설정 변경
+          </button>
+        </section>
+
+        {error && (
+          <p className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-sm text-[var(--danger)]">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={starting}
+          className="min-h-16 rounded-xl border border-[var(--accent)] bg-[var(--accent)] px-5 text-lg font-semibold text-[var(--accent-contrast)] disabled:pointer-events-none disabled:opacity-40"
+        >
+          {starting ? "준비 중…" : "새 민원 시작"}
+        </button>
+
+        <footer className="mt-auto flex items-center justify-between pt-4 text-xs text-[var(--fg-dim)]">
+          <Link href="/" className="hover:text-[var(--fg)]">
+            ← 모드 선택
+          </Link>
+          <span>대화 기록은 세션 동안만 임시 보관됩니다.</span>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-7 px-5 py-8 sm:py-12">
@@ -422,32 +485,14 @@ function SetupScreen({
         </p>
       )}
 
-      {/* The deployment detail belongs here, not on the visitor's phone: the
-          staff member is the only one who can act on a missing key, and the
-          only one who reads this language. */}
       {disclosure && !disclosure.provider && (
         <div className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3.5 py-3 text-xs leading-relaxed">
           <p className="text-[var(--danger)]">
-            번역 제공자가 설정되지 않아 지금은 번역이 되지 않습니다.
+            지금은 새 문장을 번역할 수 없습니다.
           </p>
           <p className="mt-1 text-[var(--fg-dim)]">
-            LLM API 키를 설정하세요 — docs/counter-mode.md 참고. 자주 쓰는 문구는
-            모델 없이도 그대로 작동합니다.
-          </p>
-        </div>
-      )}
-
-      {/* The staff member is the one who can act on this — they choose whether
-          to use the counter for a sensitive case at all. */}
-      {disclosure?.provider && (
-        <div className="rounded-md border border-[var(--line)] bg-[var(--bg-raised)] px-3.5 py-3 text-xs leading-relaxed">
-          <p className="text-[var(--fg-muted)]">
-            번역은 <span className="text-[var(--fg)]">{disclosure.provider}</span>
-            에서 처리합니다
-            {disclosure.openWeightModel && " · 오픈 웨이트 모델"}.
-          </p>
-          <p className={cn("mt-1", disclosure.mayTrain ? "text-[var(--warn)]" : "text-[var(--fg-dim)]")}>
-            {disclosure.note}
+            관리자에게 설정을 확인해 달라고 요청해 주세요. 자주 쓰는 문구는 계속
+            사용할 수 있습니다.
           </p>
         </div>
       )}
@@ -465,7 +510,7 @@ function SetupScreen({
         <Link href="/" className="hover:text-[var(--fg)]">
           ← 모드 선택
         </Link>
-        <span>대화 내용은 저장되지 않습니다.</span>
+        <span>대화 기록은 세션 동안만 임시 보관됩니다.</span>
       </footer>
     </div>
   );

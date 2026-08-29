@@ -80,12 +80,14 @@ export const STT_PROVIDER_INFO: Record<
  * account and the credential outlives the request that obtained it.
  */
 export async function fetchSttCredentials(
+  language?: string,
   signal?: AbortSignal,
+  usage: "live" | "counter" = "live",
 ): Promise<SttCredentials | null> {
   const response = await guardedFetch("/api/stt/token", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: "{}",
+    body: JSON.stringify({ language, usage }),
     signal,
   });
   if (!response.ok) return null;

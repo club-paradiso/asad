@@ -119,7 +119,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
 
     const recognition = new Ctor();
     recognition.lang = this.options.language ?? "ko-KR";
-    recognition.continuous = true;
+    recognition.continuous = !this.options.utterance;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     this.recognition = recognition;
@@ -213,6 +213,14 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       // Browsers stop recognition on silence; restart it for a long session.
       recognition.onend = () => {
         if (!this.wantRunning) {
+          this.emitStatus("closed");
+          return;
+        }
+
+        // A Counter turn is one utterance. Natural silence is completion, not
+        // a reason to restart the recogniser as Live Mode does.
+        if (this.options.utterance) {
+          this.wantRunning = false;
           this.emitStatus("closed");
           return;
         }

@@ -148,6 +148,7 @@ await guest.addInitScript(() => {
     timer = null;
 
     start() {
+      this.onstart?.();
       this.timer = window.setTimeout(() => {
         this.onresult?.({
           resultIndex: 0,
@@ -156,7 +157,7 @@ await guest.addInitScript(() => {
             0: {
               isFinal: true,
               length: 1,
-              0: { transcript: "I need help with my visa" },
+              0: { transcript: "My visa number is 123456" },
             },
           },
         });
@@ -211,13 +212,12 @@ await guest.setViewportSize({ width: 390, height: 844 });
 await guest.goto(`${base}/c/${code}`, { waitUntil: "networkidle" });
 const pickerText = await guest.locator("body").innerText();
 check("visitor picks a language written in their own script", /한국어/.test(pickerText) && /Tiếng Việt/.test(pickerText));
-// With no key configured there is no company to name, and saying so plainly is
-// the correct disclosure. Silence is not — and neither is naming an
-// environment variable at someone holding a phone they did not choose.
+// The public screen explains the outcome without naming internal vendors,
+// credentials, or environment variables.
 check(
-  "visitor is told who will see their words, or that nobody can translate",
-  /Translated by/.test(pickerText) || /Translation is not working right now/i.test(pickerText),
-  /Translated by/.test(pickerText) ? "provider named" : "no provider configured",
+  "visitor gets a provider-neutral translation notice",
+  /Everything you write is translated for the staff member/.test(pickerText) &&
+    /Translation is not working right now/i.test(pickerText),
 );
 await guest.screenshot({ path: join(outDir, "counter-guest-languages.png") });
 
@@ -294,7 +294,7 @@ await guest.route("**/api/counter/message", async (route) => {
         originalText: body.text,
         originalLang: "en-US",
         translatedText:
-          body.source === "voice" ? "비자 관련 도움이 필요합니다" : "입력도 동시에 가능합니다",
+          body.source === "voice" ? "비자 번호는 123456입니다" : "입력도 동시에 가능합니다",
         targetLang: "ko-KR",
         at: Date.now(),
         status: "done",
@@ -308,13 +308,13 @@ await guest.route("**/api/counter/message", async (route) => {
 });
 
 const guestInput = guest.getByPlaceholder("Type your message");
-const guestMic = guest.getByRole("button", { name: "Voice input" });
+const guestMic = guest.getByRole("button", { name: "Speak", exact: true });
 await guestMic.click();
 await guest.waitForTimeout(50);
 
 check(
   "one mic tap starts listening",
-  (await guestMic.getAttribute("aria-pressed")) === "true",
+  (await guest.locator('button[aria-pressed="true"]').count()) === 1,
 );
 
 await guestInput.fill("typed while listening");
@@ -323,11 +323,17 @@ check(
   (await guestInput.inputValue()) === "typed while listening",
 );
 
-// The mock utterance ends naturally and auto-submits the voice message. Its
-// translation is intentionally delayed so we can submit typed text meanwhile.
+// The mock utterance contains a document term, so it must pause for risk-based
+// transcript confirmation instead of auto-submitting every voice message.
 await guest.waitForTimeout(850);
 check(
-  "speech auto-submits after the utterance ends",
+  "critical voice transcript waits for confirmation",
+  queuedRequests.length === 0 && (await guest.getByRole("button", { name: "Yes" }).isVisible()),
+);
+await guest.getByRole("button", { name: "Yes" }).click();
+await guest.waitForTimeout(50);
+check(
+  "confirmed speech submits after the utterance ends",
   queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
 );
 
@@ -352,7 +358,7 @@ check(
 
 await guest.waitForTimeout(250);
 const afterTapToTalk = await guest.locator("body").innerText();
-check("voice transcript appears in the chat", /I need help with my visa/.test(afterTapToTalk));
+check("voice transcript appears in the chat", /My visa number is 123456/.test(afterTapToTalk));
 check("queued typed message also appears in the chat", /typed while listening/.test(afterTapToTalk));
 await guest.screenshot({ path: join(outDir, "counter-guest-tap-to-talk.png") });
 await guest.unroute("**/api/counter/message");
