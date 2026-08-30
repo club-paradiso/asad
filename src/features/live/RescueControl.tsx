@@ -69,7 +69,7 @@ export function RescueControl({
         size="sm"
         disabled={disabled || state.phase === "loading"}
         onClick={onTrigger}
-        aria-keyshortcuts="R"
+        title="Emergency catch-up (R)"
         className="min-w-24"
       >
         {state.phase === "loading" ? "Rescuing…" : "Rescue · R"}
