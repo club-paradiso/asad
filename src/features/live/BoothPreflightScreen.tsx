@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { BoothPreflight } from "./BoothPreflight";
 import { useBoothAudioInput } from "./useBoothAudioInput";
@@ -7,6 +8,7 @@ import { useBoothAudioInput } from "./useBoothAudioInput";
 /** Dedicated hardware check that can be opened before the live console. */
 export function BoothPreflightScreen() {
   const audioInput = useBoothAudioInput(true);
+  const [preflightReady, setPreflightReady] = useState(false);
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-6 px-5 py-8 sm:px-8">
@@ -24,7 +26,7 @@ export function BoothPreflightScreen() {
           href="/live"
           className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
         >
-          Back to live
+          {preflightReady ? "Continue to live" : "Back to live"}
         </Link>
       </header>
 
@@ -36,7 +38,10 @@ export function BoothPreflightScreen() {
           <select
             aria-label="Booth preflight audio input"
             value={audioInput.deviceId}
-            onChange={(event) => audioInput.setDeviceId(event.target.value)}
+            onChange={(event) => {
+              setPreflightReady(false);
+              audioInput.setDeviceId(event.target.value);
+            }}
             disabled={!audioInput.supported}
             className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)] disabled:opacity-50"
           >
@@ -60,6 +65,7 @@ export function BoothPreflightScreen() {
         inputLabel={audioInput.selectedLabel}
         deviceId={audioInput.deviceId || undefined}
         onPermissionGranted={() => void audioInput.refresh()}
+        onReadyChange={setPreflightReady}
       />
 
       <section className="rounded-lg border border-[var(--line)] px-4 py-4 text-sm leading-relaxed text-[var(--fg-muted)]">
