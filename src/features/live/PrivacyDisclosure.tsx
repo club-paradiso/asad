@@ -60,6 +60,7 @@ const COPY: Record<
     sensitivity: string;
     accept: string;
     localOnly: string;
+    detailsDoc: string;
   }
 > = {
   live: {
@@ -71,6 +72,7 @@ const COPY: Record<
       "Sermons often include testimonies, prayer requests and names. If this session is sensitive, use local-only mode — it sends nothing anywhere, and Scripture, terminology and wordplay detection all still work.",
     accept: "I understand — continue",
     localOnly: "Use local-only mode",
+    detailsDoc: "docs/privacy.md",
   },
   prep: {
     label: "Before using AI preparation",
@@ -81,6 +83,7 @@ const COPY: Record<
       "Prep material can contain names, testimonies, pastoral notes or an unpublished sermon manuscript. If you do not want that material sent to an AI provider, build the local-only brief instead.",
     accept: "I understand — build brief",
     localOnly: "Build local-only brief",
+    detailsDoc: "docs/prep-privacy.md",
   },
 };
 
@@ -167,7 +170,7 @@ export function PrivacyDisclosure({
         </div>
 
         <p className="mt-3 text-xs text-[var(--fg-dim)]">
-          Cloud acceptance is remembered once per browser for this workflow. Choosing local-only is not stored as cloud consent. Full details in docs/privacy.md.
+          Cloud acceptance is remembered once per browser for this workflow. Choosing local-only is not stored as cloud consent. Full details in {copy.detailsDoc}.
         </p>
       </div>
     </div>
