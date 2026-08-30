@@ -46,6 +46,7 @@ import { BRAND } from "@/lib/brand";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
 import { useBoothAudioInput } from "./useBoothAudioInput";
+import { isBoothPreflightAcknowledged } from "./booth-preflight-ack";
 import { preferredSttSource } from "./sourcePreference";
 import { useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
@@ -64,6 +65,7 @@ export function StartScreen() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
   const [advanced, setAdvanced] = useState(false);
+  const [boothPreflightVerified, setBoothPreflightVerified] = useState(false);
 
   /** Private-deployment gate, when one is configured. */
   const [gate, setGate] = useState<{
@@ -112,6 +114,22 @@ export function StartScreen() {
   const audioDeviceId = audioInputs.deviceId;
   const selectedAudioLabel = audioInputs.selectedLabel;
 
+  useEffect(() => {
+    const refresh = () =>
+      setBoothPreflightVerified(
+        settings.mode === "sermon" &&
+          canChooseAudioInput &&
+          isBoothPreflightAcknowledged(audioDeviceId || undefined),
+      );
+
+    refresh();
+    // The acknowledgement is intentionally short-lived. Re-check while the
+    // launcher is left open so a four-hour-old sound check cannot remain green
+    // forever just because nobody navigated away.
+    const timer = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(timer);
+  }, [settings.mode, canChooseAudioInput, audioDeviceId]);
+
   const session = useLiveSession({
     mode: settings.mode,
     lag: settings.lag,
@@ -135,17 +153,21 @@ export function StartScreen() {
     () =>
       readinessRows({
         config,
+        mode: settings.mode,
         source,
         consent: consent.phase,
         audioInputLabel: selectedAudioLabel,
         audioInputSupported: audioInputs.supported,
+        boothPreflightVerified,
       }),
     [
       config,
+      settings.mode,
       source,
       consent.phase,
       selectedAudioLabel,
       audioInputs.supported,
+      boothPreflightVerified,
     ],
   );
 
@@ -521,10 +543,12 @@ function ControlRow({
  */
 export function readinessRows(input: {
   config: AppConfig | null;
+  mode?: InterpretationMode;
   source: SttProviderId;
   consent?: string;
   audioInputLabel?: string;
   audioInputSupported?: boolean;
+  boothPreflightVerified?: boolean;
 }): ReadinessRow[] {
   const { config, source } = input;
   const demo = source === "demo";
@@ -549,12 +573,20 @@ export function readinessRows(input: {
             value: "Browser cannot enumerate audio inputs",
             level: "limited",
           }
-        : {
-            label: "Input",
-            value: input.audioInputLabel ?? "System default",
-            level: "ready",
-            detail: "For a booth, prefer the church mixer or USB audio interface feed over room audio.",
-          };
+        : input.mode === "sermon" && input.boothPreflightVerified !== true
+          ? {
+              label: "Input",
+              value: `${input.audioInputLabel ?? "System default"} · not preflight-verified`,
+              level: "limited",
+              detail:
+                "Run Booth preflight to verify a usable Korean program feed and mix-minus. You can still start if the booth must operate immediately.",
+            }
+          : {
+              label: "Input",
+              value: input.audioInputLabel ?? "System default",
+              level: "ready",
+              detail: "For a booth, prefer the church mixer or USB audio interface feed over room audio.",
+            };
 
   const recognition: ReadinessRow = demo
     ? {
