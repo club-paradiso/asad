@@ -25,6 +25,7 @@ import { PrivacyDisclosure } from "@/features/live/PrivacyDisclosure";
 import { Button, Field, Label, TextArea, TextInput } from "@/components/ui/primitives";
 import { SessionGlossaryEditor } from "./SessionGlossaryEditor";
 import { usePrepCloudConsent } from "./usePrepCloudConsent";
+import { freshPrepSheet, hasPrepContent } from "./prep-reset";
 
 export function PrepScreen() {
   // The cloud brief route is guarded. Minting a session token sends no Prep
@@ -38,6 +39,7 @@ export function PrepScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [buildRequested, setBuildRequested] = useState(false);
+  const [resetArmed, setResetArmed] = useState(false);
   const consent = usePrepCloudConsent();
 
   const patch = useCallback(
@@ -147,19 +149,58 @@ export function PrepScreen() {
     if (consent.mayUseCloud) void generateCloud();
   };
 
+  const resetPrep = () => {
+    setPrep(freshPrepSheet());
+    setBrief(null);
+    setStatus("idle");
+    setBuildRequested(false);
+    setResetArmed(false);
+    setSaved(false);
+    setNotice(
+      "Fresh Prep sheet started. Previous speaker, outline, terminology and generated context were cleared from Prep.",
+    );
+  };
+
   return (
     <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-6 px-5 py-8">
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Prepare</h1>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             All optional. Anything you enter carries into the live session.
           </p>
         </div>
-        <Link href="/" className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:underline">
-          ← Console
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {hasPrepContent(prep) && !resetArmed && (
+            <Button size="sm" tone="quiet" type="button" onClick={() => setResetArmed(true)}>
+              Start fresh
+            </Button>
+          )}
+          <Link href="/" className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:underline">
+            ← Home
+          </Link>
+        </div>
       </header>
+
+      {resetArmed && (
+        <section
+          role="alert"
+          className="rounded-lg border border-[color-mix(in_srgb,var(--warn)_45%,transparent)] bg-[color-mix(in_srgb,var(--warn)_7%,transparent)] px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-[var(--fg)]">Clear this Prep sheet?</p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
+            This removes the current speaker, title, Scripture, notes, outline, session terminology and Prep entities from this browser. App settings and saved past sessions are not touched.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" tone="neutral" type="button" onClick={resetPrep}>
+              Confirm clear prep
+            </Button>
+            <Button size="sm" tone="quiet" type="button" onClick={() => setResetArmed(false)}>
+              Cancel
+            </Button>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
