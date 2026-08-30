@@ -75,7 +75,7 @@ export function BoothPreflight({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          deviceId: deviceId || undefined,
+          deviceId: deviceId ? { exact: deviceId } : undefined,
           channelCount: 1,
           echoCancellation: false,
           noiseSuppression: false,
