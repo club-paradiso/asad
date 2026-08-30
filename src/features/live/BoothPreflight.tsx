@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/primitives";
+import { observeAudioInputEnd } from "@/providers/stt/audio";
 import { classifyInputLevel, rmsOf, type InputLevelReading } from "./audio-level";
 
 interface BoothPreflightProps {
@@ -38,10 +39,15 @@ export function BoothPreflight({
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const frameRef = useRef<number | null>(null);
+  const detachEndObserverRef = useRef<(() => void) | null>(null);
 
   const stopTest = useCallback((updateUi = true) => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
+    // Detach first so stopping the track ourselves never looks like a device
+    // failure. The same invariant is used by the real live capture path.
+    detachEndObserverRef.current?.();
+    detachEndObserverRef.current = null;
     sourceRef.current?.disconnect();
     analyserRef.current?.disconnect();
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -83,6 +89,13 @@ export function BoothPreflight({
         },
       });
       streamRef.current = stream;
+      detachEndObserverRef.current = observeAudioInputEnd(stream, () => {
+        setError(
+          "Audio input disconnected during preflight. Reconnect it or choose another input, then test again.",
+        );
+        setPhase("error");
+        stopTest(false);
+      });
       onPermissionGranted?.();
 
       const AudioContextCtor =
@@ -120,9 +133,12 @@ export function BoothPreflight({
       const message =
         caught instanceof Error && caught.name === "NotAllowedError"
           ? "Microphone permission was denied."
-          : caught instanceof Error
-            ? caught.message
-            : "Could not open this audio input.";
+          : caught instanceof Error &&
+              (caught.name === "OverconstrainedError" || caught.name === "NotFoundError")
+            ? "The selected audio input is unavailable. Reconnect it or choose another input."
+            : caught instanceof Error
+              ? caught.message
+              : "Could not open this audio input.";
       setError(message);
       setPhase("error");
       stopTest(false);
@@ -158,7 +174,9 @@ export function BoothPreflight({
               ? "Opening…"
               : phase === "listening"
                 ? reading.label
-                : "Not tested"}
+                : phase === "error"
+                  ? "Input unavailable"
+                  : "Not tested"}
           </span>
         </div>
         <div
