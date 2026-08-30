@@ -14,7 +14,7 @@
 import { useEffect, useRef } from "react";
 import type { CounterMessage, Participant, RiskSpan } from "@/counter/types";
 import { findLanguage } from "@/counter/languages";
-import { stringsFor, type CounterStrings } from "@/counter/ui-strings";
+import { actionStringsFor, stringsFor, type CounterStrings } from "@/counter/ui-strings";
 import { cn } from "@/lib/cn";
 
 /** Highlight the spans worth reading back, without mangling the text. */
@@ -67,7 +67,8 @@ export function ConversationView({
   messages,
   viewerRole,
   viewerLang,
-  onRephrase,
+  onSimplify,
+  onRetry,
   onConfirm,
   emptyMessage,
   strings,
@@ -75,8 +76,10 @@ export function ConversationView({
   messages: CounterMessage[];
   viewerRole: Participant;
   viewerLang: string;
-  /** Re-run a message with different wording. Own messages only. */
-  onRephrase?: (message: CounterMessage) => void;
+  /** Re-run an own message with simpler wording while preserving facts. */
+  onSimplify?: (message: CounterMessage) => void;
+  /** Retry an own message's translation from its stored original text. */
+  onRetry?: (message: CounterMessage) => void;
   /** Send just the flagged values back for verbal read-back. */
   onConfirm?: (message: CounterMessage) => void;
   emptyMessage?: string;
@@ -90,6 +93,7 @@ export function ConversationView({
 
   const rtl = findLanguage(viewerLang)?.rtl ?? false;
   const t = strings ?? stringsFor(viewerLang);
+  const actions = actionStringsFor(viewerLang);
 
   if (messages.length === 0) {
     return (
@@ -135,8 +139,7 @@ export function ConversationView({
                       {message.originalText}
                     </p>
                     <p className="mt-1.5 text-xs leading-relaxed text-[var(--danger)]">
-                      {t.translationFailed}
-                      {message.error ? ` — ${message.error}` : "."}
+                      {t.translationFailed}.
                     </p>
                   </>
                 ) : (
@@ -164,17 +167,34 @@ export function ConversationView({
                   </>
                 )}
 
+                {message.integrity?.status === "mismatch" && (
+                  <div className="mt-2 rounded-lg border border-[color-mix(in_srgb,var(--warn)_45%,transparent)] bg-[color-mix(in_srgb,var(--warn)_8%,transparent)] p-2 text-xs leading-relaxed text-[var(--warn)]">
+                    <p>{actions.integrityWarning}</p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {message.integrity.issues.slice(0, 4).map((issue, index) => (
+                        <span
+                          key={`${issue.kind}-${index}`}
+                          className="rounded border border-[color-mix(in_srgb,var(--warn)_35%,transparent)] px-1.5 py-0.5 font-mono"
+                        >
+                          {issue.sourceText || "—"}
+                          {issue.targetText ? ` → ${issue.targetText}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Metadata row: only what is actionable. */}
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-[var(--fg-dim)]">
                   {message.source === "quick-phrase" && (
                     <span className="text-[var(--ok)]">{t.fixedPhrase}</span>
                   )}
-                  {message.confidence === "low" && (
-                    <span className="text-[var(--warn)]">{t.checkThis}</span>
+                  {message.confidence === "low" && message.integrity?.status !== "mismatch" && (
+                    <span className="text-[var(--warn)]">{actions.lowConfidence}</span>
                   )}
                   {message.note && <span>{message.note}</span>}
 
-                  {mine && message.risks?.length ? (
+                  {mine && (message.criticalValues?.length || message.risks?.length) ? (
                     <button
                       type="button"
                       onClick={() => onConfirm?.(message)}
@@ -183,16 +203,28 @@ export function ConversationView({
                       {t.confirmNumbers}
                     </button>
                   ) : null}
-                  {mine && message.status === "done" && message.source !== "quick-phrase" && (
+                  {mine && message.status === "done" && message.source !== "quick-phrase" && message.source !== "confirm" && (
                     <button
                       type="button"
-                      onClick={() => onRephrase?.(message)}
+                      onClick={() => onSimplify?.(message)}
                       className={cn(
                         "rounded border border-[var(--line-strong)] px-2 py-0.5 hover:text-[var(--fg)]",
-                        !message.risks?.length && "ml-auto",
+                        !message.criticalValues?.length && !message.risks?.length && "ml-auto",
                       )}
                     >
-                      {t.rephrase}
+                      {actions.simplify}
+                    </button>
+                  )}
+                  {mine && message.source !== "quick-phrase" && message.source !== "confirm" && (
+                    <button
+                      type="button"
+                      onClick={() => onRetry?.(message)}
+                      className={cn(
+                        "rounded border border-[var(--line-strong)] px-2 py-0.5 hover:text-[var(--fg)]",
+                        message.status !== "done" && "ml-auto",
+                      )}
+                    >
+                      {actions.retry}
                     </button>
                   )}
                 </div>

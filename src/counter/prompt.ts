@@ -13,6 +13,7 @@
  *    failure that actually costs someone something.
  */
 import { languageName } from "./languages";
+import { findCounterProfile, type CounterProfileId } from "./profiles";
 
 export const COUNTER_SYSTEM_PROMPT = `You translate a face-to-face conversation at a service counter — a clinic reception, a government office, a help desk. Two people are standing in front of each other and do not share a language.
 
@@ -58,14 +59,27 @@ export interface CounterPromptInput {
   recent?: Array<{ from: "host" | "guest"; text: string }>;
   /** Ask for a different wording than last time. */
   rephrase?: boolean;
+  /** Explicit revision behavior for understandable message actions. */
+  action?: "simplify" | "retry";
   /** Where the counter is, e.g. "병원 접수" — sharpens vocabulary choice. */
   deskLabel?: string;
+  profileId?: CounterProfileId;
 }
 
 export function buildCounterPrompt(input: CounterPromptInput): string {
   const source = languageName(input.sourceLang);
   const target = languageName(input.targetLang);
   const lines: string[] = [];
+  const profile = findCounterProfile(input.profileId);
+
+  if (profile.id !== "general") {
+    lines.push(
+      `COUNTER PROFILE: ${profile.setting}. This is vocabulary context only. Translate what the people say; do not add legal, medical, eligibility, or procedural advice.`,
+    );
+    if (profile.terminology.length) {
+      lines.push(`TERMINOLOGY HINTS: ${profile.terminology.join(", ")}`);
+    }
+  }
 
   if (input.deskLabel) {
     lines.push(`SETTING: ${input.deskLabel}`);
@@ -84,9 +98,13 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
 
   lines.push(`TRANSLATE FROM ${source} INTO ${target}.`);
 
-  if (input.rephrase) {
+  if (input.action === "simplify" || input.rephrase) {
     lines.push(
-      "The previous translation did not land. Say the SAME thing a different way: simpler words, shorter sentence, more concrete. Do not change the meaning or any number.",
+      "SIMPLIFY: Say the SAME factual meaning with simpler vocabulary, shorter sentence structure, and no added explanation. Preserve every number, date, time, amount, name, document, requirement, condition, and negation exactly.",
+    );
+  } else if (input.action === "retry") {
+    lines.push(
+      "RETRY: Produce a fresh translation of the original utterance. Preserve every number, date, time, amount, name, document, requirement, condition, and negation exactly. Do not add or simplify facts.",
     );
   }
 
