@@ -52,6 +52,9 @@ export function useRescueCue(options: UseRescueCueOptions) {
 
   const clear = useCallback(() => {
     clearTimer();
+    generationRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setState(IDLE);
   }, [clearTimer]);
 
