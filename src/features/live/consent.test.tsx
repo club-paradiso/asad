@@ -159,7 +159,7 @@ describe("the launcher", () => {
     stubFetch(PROVIDER);
     render(<StartScreen />);
 
-    const start = await screen.findByRole("button", { name: /confirm privacy to continue/i });
+    const start = await screen.findByRole("button", { name: /개인정보 확인하고 시작/ });
     expect(start.hasAttribute("disabled")).toBe(true);
     // Even forced, it must not start. The button being disabled is the
     // affordance; the guard inside beginSession is the guarantee.
@@ -227,7 +227,7 @@ describe("the launcher", () => {
     stubFetch([]);
     render(<StartScreen />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /start live interpreting/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /통역 시작/ }));
     await waitFor(() => expect(calls.some((url) => url.includes("/api/stt/token"))).toBe(true));
     expect(screen.queryByRole("dialog")).toBeNull();
   });

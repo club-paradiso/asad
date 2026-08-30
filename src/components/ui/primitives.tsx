@@ -206,7 +206,14 @@ export function Segmented<T extends string>({
             title={option.title}
             onClick={() => onChange(option.value)}
             className={cn(
-              "rounded",
+              /* inline-flex, not the default block: the option holds an
+                 optional indicator AND a label, and as a block the indicator
+                 sat hard left while the label centred itself — which on a wide
+                 segmented control (the launcher in landscape, where each option
+                 is ~330px) left a hand-width gap between the dot and the word
+                 it belongs to. Centring the pair together keeps them read as
+                 one control at every width. */
+              "inline-flex items-center justify-center gap-2 rounded",
               INTERACTIVE,
               size === "sm" ? "min-h-11 px-2.5 text-[0.75rem]" : "min-h-11 px-3.5 text-sm",
               selected

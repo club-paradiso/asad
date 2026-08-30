@@ -57,12 +57,32 @@ export function ProviderNotice({
   // Only an actionable outage remains visible.
   if (!disclosure.provider) {
     return (
+      /* Shape and a live region, not just a colour.
+         This line is read by a visitor who shares no language with the staff
+         member in front of them, on their own phone, at a counter — the least
+         forgiving reading conditions in the product. Red alone carries nothing
+         for a colour-blind reader or in direct sunlight, and a plain <p> that
+         appears after the page has loaded is never announced at all. */
       <p
+        role="alert"
         className={cn(
-          "text-center text-xs leading-relaxed text-[var(--danger)]",
+          "flex items-start justify-center gap-1.5 text-center text-[0.8125rem] leading-relaxed text-[var(--danger)]",
           className,
         )}
       >
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          className="mt-0.5 size-4 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        >
+          <path d="M12 3 22 21H2z" />
+          <path d="M12 10v4" strokeLinecap="round" />
+          <path d="M12 17.5h.01" strokeLinecap="round" />
+        </svg>
         {strings.translationUnavailable}
       </p>
     );
