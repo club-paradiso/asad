@@ -46,10 +46,17 @@ export function useAudioInputs(enabled = true) {
 
   useEffect(() => {
     if (!enabled) return;
-    void refresh();
+
+    // Defer the initial external-system read out of the effect body. Besides
+    // satisfying React's effect discipline, this also lets the launcher paint
+    // before a browser with many media devices answers enumerateDevices().
+    const initialRefresh = window.setTimeout(() => void refresh(), 0);
     const mediaDevices = navigator.mediaDevices;
     mediaDevices?.addEventListener?.("devicechange", refresh);
-    return () => mediaDevices?.removeEventListener?.("devicechange", refresh);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      mediaDevices?.removeEventListener?.("devicechange", refresh);
+    };
   }, [enabled, refresh]);
 
   return { devices, supported, refresh };
