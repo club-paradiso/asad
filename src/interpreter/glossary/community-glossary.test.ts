@@ -2,14 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   COMMUNITY_SERMON_GLOSSARY,
   COMMUNITY_SERMON_GLOSSARY_SOURCE_COUNT,
-  COMMUNITY_SERMON_GLOSSARY_UNIQUE_COUNT,
 } from "./community-glossary";
 import { matchGlossary } from "./matcher";
 
 describe("community sermon glossary", () => {
-  it("represents all 500 workbook rows as 447 unique Korean headwords", () => {
+  it("covers all 447 unique Korean headwords from the 500-row workbook", () => {
     expect(COMMUNITY_SERMON_GLOSSARY_SOURCE_COUNT).toBe(500);
-    expect(COMMUNITY_SERMON_GLOSSARY_UNIQUE_COUNT).toBe(447);
     expect(new Set(COMMUNITY_SERMON_GLOSSARY.map((item) => item.korean)).size).toBe(
       447,
     );
