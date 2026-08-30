@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { privacyAcknowledgementKey } from "@/features/live/PrivacyDisclosure";
+import {
+  privacyAcknowledgementKey,
+  privacyChoicePersistsCloudAcceptance,
+} from "@/features/live/PrivacyDisclosure";
 import { localPrepBrief } from "@/interpreter/prep/local-brief";
 import {
   prepPhasePermitsCloud,
@@ -16,6 +19,11 @@ describe("Prep cloud consent", () => {
     expect(privacyAcknowledgementKey("prep")).not.toBe(
       privacyAcknowledgementKey("live"),
     );
+  });
+
+  it("never turns a local-only choice into remembered cloud acceptance", () => {
+    expect(privacyChoicePersistsCloudAcceptance("local-only")).toBe(false);
+    expect(privacyChoicePersistsCloudAcceptance("cloud")).toBe(true);
   });
 
   it("waits while cloud routing is still unknown", () => {
