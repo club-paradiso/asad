@@ -21,6 +21,7 @@ import { useLocalStore } from "@/lib/local-store";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
 import { romaniseName } from "@/lib/romanise";
 import { Button, Field, Label, TextArea, TextInput } from "@/components/ui/primitives";
+import { SessionGlossaryEditor } from "./SessionGlossaryEditor";
 
 export function PrepScreen() {
   // The brief is generated server-side by a model; authorise before asking.
@@ -70,6 +71,8 @@ export function PrepScreen() {
 
       // The brief populates live session context, which is the whole point of
       // preparing: terminology and names carry straight into the console.
+      // Existing Prep terms win here, so a human override is never overwritten
+      // merely because the AI brief was regenerated.
       const merged = mergeGlossary(prep.glossary, data.brief.keyTerms);
       patch({
         glossary: merged,
@@ -173,32 +176,10 @@ export function PrepScreen() {
 
       {brief && <BriefView brief={brief} />}
 
-      {prep.glossary.length > 0 && (
-        <section className="flex flex-col gap-2 border-t border-[var(--line)] pt-5">
-          <Label>Session glossary ({prep.glossary.length})</Label>
-          <ul className="flex flex-wrap gap-1.5 text-xs">
-            {prep.glossary.map((term) => (
-              <li
-                key={term.korean}
-                className="rounded border border-[var(--line)] bg-[var(--bg-raised)] px-2 py-1"
-                title={term.note}
-              >
-                <span className="font-korean">{term.korean}</span>
-                <span className="mx-1.5 text-[var(--fg-dim)]">→</span>
-                {term.english}
-              </li>
-            ))}
-          </ul>
-          <Button
-            size="sm"
-            tone="quiet"
-            onClick={() => patch({ glossary: [] })}
-            className="self-start"
-          >
-            Clear glossary
-          </Button>
-        </section>
-      )}
+      <SessionGlossaryEditor
+        items={prep.glossary}
+        onChange={(glossary) => patch({ glossary })}
+      />
     </div>
   );
 }
