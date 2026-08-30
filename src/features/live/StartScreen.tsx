@@ -6,7 +6,7 @@
  * Requirement: live interpretation in three interactions or fewer, and an
  * honest answer to four questions before any of them —
  *
- *   Am I ready?   What am I interpreting?   Which microphone?   Can I start?
+ *   Am I ready?   What am I interpreting?   Which input?   Can I start?
  *
  * TWO CONSTRAINTS MEET HERE, and they look like they conflict:
  *
@@ -45,6 +45,7 @@ import type { AppConfig } from "@/app/api/config/route";
 import { BRAND } from "@/lib/brand";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
+import { useAudioInputs } from "./useAudioInputs";
 import { preferredSttSource } from "./sourcePreference";
 import { useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
@@ -60,6 +61,7 @@ export function StartScreen() {
   const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(
     null,
   );
+  const [audioDeviceId, setAudioDeviceId] = useState("");
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
   const [advanced, setAdvanced] = useState(false);
@@ -106,12 +108,18 @@ export function StartScreen() {
   );
 
   const source = sourceOverride ?? configuredSource;
+  const canChooseAudioInput = source !== "demo" && source !== "webspeech";
+  const audioInputs = useAudioInputs(canChooseAudioInput);
+  const selectedAudioLabel =
+    audioInputs.devices.find((device) => device.deviceId === audioDeviceId)?.label ??
+    "System default";
 
   const session = useLiveSession({
     mode: settings.mode,
     lag: settings.lag,
     prep,
     source,
+    audioDeviceId: canChooseAudioInput ? audioDeviceId || undefined : undefined,
   });
 
   // Resolved here, before the tap, so pressing Start can never outrun it.
@@ -126,8 +134,21 @@ export function StartScreen() {
   }, [browserSttAvailable, config]);
 
   const rows = useMemo(
-    () => readinessRows({ config, source, consent: consent.phase }),
-    [config, source, consent.phase],
+    () =>
+      readinessRows({
+        config,
+        source,
+        consent: consent.phase,
+        audioInputLabel: selectedAudioLabel,
+        audioInputSupported: audioInputs.supported,
+      }),
+    [
+      config,
+      source,
+      consent.phase,
+      selectedAudioLabel,
+      audioInputs.supported,
+    ],
   );
 
   if (screen === "live") {
@@ -278,16 +299,44 @@ export function StartScreen() {
                       label: mode === "sermon" ? "Sermon" : "General",
                       title:
                         mode === "sermon"
-                          ? "Scripture detection, theological terminology, church register, wordplay."
+                          ? "For a human interpreter working in an existing church interpretation booth."
                           : "Meetings, lectures, interviews. No theological assumptions.",
                     }),
                   )}
                 />
               </ControlRow>
 
-              <ControlRow label="Audio">
+              <ControlRow label="Input">
+                {source === "demo" ? (
+                  <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
+                    Recorded Korean sermon
+                  </p>
+                ) : source === "webspeech" ? (
+                  <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
+                    System default · Browser recognition controls the microphone
+                  </p>
+                ) : (
+                  <select
+                    aria-label="Audio input device"
+                    value={audioDeviceId}
+                    onChange={(event) => setAudioDeviceId(event.target.value)}
+                    className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)]"
+                  >
+                    <option value="">System default</option>
+                    {audioInputs.devices
+                      .filter((device) => device.deviceId !== "default")
+                      .map((device) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label}
+                        </option>
+                      ))}
+                  </select>
+                )}
+              </ControlRow>
+
+              <ControlRow label="Recognition">
                 <Segmented
-                  label="Audio source"
+                  label="Speech recognition"
                   indicator
                   value={source}
                   onChange={setSourceOverride}
@@ -318,6 +367,15 @@ export function StartScreen() {
                 {LAG_PROFILES[settings.lag].description}
               </p>
             </section>
+
+            {settings.mode === "sermon" && (
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] px-4 py-3 text-sm leading-relaxed text-[var(--fg-muted)]">
+                <strong className="font-semibold text-[var(--fg)]">
+                  Booth mode.
+                </strong>{" "}
+                ASAD assumes an existing human interpreter and church simultaneous-interpretation audio system. It supports the interpreter; it does not transmit translation directly to the congregation.
+              </div>
+            )}
 
             <Button
               tone="primary"
@@ -467,6 +525,8 @@ export function readinessRows(input: {
   config: AppConfig | null;
   source: SttProviderId;
   consent?: string;
+  audioInputLabel?: string;
+  audioInputSupported?: boolean;
 }): ReadinessRow[] {
   const { config, source } = input;
   const demo = source === "demo";
@@ -474,15 +534,29 @@ export function readinessRows(input: {
 
   const audio: ReadinessRow = demo
     ? {
-        label: "Audio",
-        value: "Recorded Korean sermon — no microphone",
+        label: "Input",
+        value: "Recorded Korean sermon",
         level: "ready",
       }
-    : {
-        label: "Audio",
-        value: info.label,
-        level: "ready",
-      };
+    : source === "webspeech"
+      ? {
+          label: "Input",
+          value: "System default microphone",
+          level: "limited",
+          detail: "Browser speech recognition chooses the input device. Select the system input before the service if you need the church mixer.",
+        }
+      : input.audioInputSupported === false
+        ? {
+            label: "Input",
+            value: "Browser cannot enumerate audio inputs",
+            level: "limited",
+          }
+        : {
+            label: "Input",
+            value: input.audioInputLabel ?? "System default",
+            level: "ready",
+            detail: "For a booth, prefer the church mixer or USB audio interface feed over room audio.",
+          };
 
   const recognition: ReadinessRow = demo
     ? {
