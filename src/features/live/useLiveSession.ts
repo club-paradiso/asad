@@ -23,6 +23,7 @@ import {
   type EngineSnapshot,
   type InterpretResult,
 } from "@/interpreter/engine/session";
+import { buildSttHints } from "@/interpreter/glossary/stt-hints";
 import { interpretLocally } from "@/providers/llm/mock";
 import {
   MicrophoneCapture,
@@ -47,6 +48,8 @@ export interface LiveSessionOptions {
   prep?: PrepSheet;
   /** `demo` needs no key and no microphone. */
   source: SttProviderId;
+  /** Preferred physical booth input for providers that accept raw audio. */
+  audioDeviceId?: string;
   /** Demo playback rate; 1 is real time. */
   demoSpeed?: number;
   /** Look up Scripture text. Skipped entirely in demo mode. */
@@ -188,12 +191,9 @@ export function useLiveSession(options: LiveSessionOptions) {
     setStartedAt(Date.now());
 
     try {
-      // Terminology hints materially improve proper-noun recognition.
-      const hints = [
-        ...(current.prep?.entities ?? []).map((e) => e.korean),
-        ...(current.prep?.glossary ?? []).map((g) => g.korean),
-        current.prep?.speaker,
-      ].filter((value): value is string => !!value?.trim());
+      // The recogniser gets only the highest-value terms. In sermon mode this
+      // includes community-glossary terms that actually occur in today's prep.
+      const hints = buildSttHints(current.mode, current.prep);
 
       const credentials =
         current.source === "demo" || current.source === "webspeech"
@@ -254,6 +254,7 @@ export function useLiveSession(options: LiveSessionOptions) {
           throw new Error("This browser cannot capture microphone audio.");
         }
         const mic = new MicrophoneCapture({
+          deviceId: current.audioDeviceId || undefined,
           onFrame: (frame) => provider.sendAudio(frame),
           onError: (err) => setError(err.message),
         });
