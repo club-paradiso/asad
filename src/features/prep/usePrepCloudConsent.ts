@@ -21,8 +21,8 @@ export function resolvePrepConsent(input: {
   disclosure: DisclosureProvider[] | undefined;
 }): PrepConsentPhase {
   if (input.acknowledged) return "clear";
-  // No model means /api/prep will use the deterministic local brief. There is
-  // no third-party provider to disclose.
+  // No model means the deterministic local brief can run entirely in the
+  // browser. There is no third-party provider to disclose.
   if (input.modelAvailable === false) return "clear";
   // Unknown routing is not permission. Wait until the deployment tells us
   // where the material would go.
@@ -43,7 +43,7 @@ export function usePrepCloudConsent() {
   const [decision, setDecision] = useState<"granted" | "declined" | null>(null);
 
   useEffect(() => {
-    // Once this workflow's disclosure has been acknowledged, another config
+    // Once this workflow's cloud disclosure has been accepted, another config
     // round-trip is not required merely to decide whether the button may act.
     if (acknowledged) return;
 
@@ -86,6 +86,7 @@ export function usePrepCloudConsent() {
   return {
     phase,
     providers: disclosure ?? [],
+    modelAvailable,
     mayUseCloud: prepPhasePermitsCloud(phase),
     grant: useCallback(() => setDecision("granted"), []),
     decline: useCallback(() => setDecision("declined"), []),
