@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+  <style>
+    :root {
+      --ink: #12100e; --paper: #faf7f2; --cream: #f2ede4; --red: #c81e1e;
+      --muted: #4a4540; --dim: #6b655e; --line: #e4ddd1;
+      --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+      --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); }
+    a { color: var(--red); } a:hover { color: #a51818; }
+    .cap { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dim); }
+    .rule { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 18px; padding: 20px 0; border-bottom: 1px solid var(--line); align-items: start; }
+    .num { font-family: var(--mono); font-size: 12px; color: var(--red); padding-top: 3px; }
+    .rule h3 { margin: 0 0 6px; font-family: var(--display); font-size: 18px; font-weight: 700; letter-spacing: -0.015em; }
+    .rule p { margin: 0; font-size: 14.5px; line-height: 1.62; color: var(--muted); max-width: 74ch; }
+  </style>
+</helmet>
+
+<div style="padding: 72px; max-width: 1000px; box-sizing: border-box; display: flex; flex-direction: column; gap: 34px">
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <p class="cap">The rules — numbered because they are ordered by how often they get broken</p>
+    <h2 style="margin: 0; font-family: var(--display); font-size: 32px; font-weight: 700; letter-spacing: -0.025em">What to check before shipping a screen</h2>
+  </div>
+
+  <div>
+    <div class="rule">
+      <span class="num">01</span>
+      <div>
+        <h3>Red is never a routine button</h3>
+        <p>Ink is the action colour. Signal red is the correction mark — the wordmark's
+        <span style="font-family: var(--display); font-weight: 700; color: var(--ink)">?</span>, an error,
+        a struck word. If a red button appears in this product, something is wrong; that is
+        the whole rule, and it is what lets one value serve both the brand and the error state.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <span class="num">02</span>
+      <div>
+        <h3>Chrome follows the reader; content follows the work</h3>
+        <p>Launcher surfaces are Korean. The console stays English because its content is
+        English — the interpreter is reading the next line they have to say, at speed. What is
+        forbidden is <em>mixing on one screen</em>, which is what the old launcher did: Korean
+        brand, Korean nav, English labels, English options, English CTA.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <span class="num">03</span>
+      <div>
+        <h3>State is never colour alone</h3>
+        <p>Always a word, a shape or a fill as well. The readers here include a colour-blind
+        interpreter in a dark booth and a visitor at a counter who shares no language with the
+        staff — for both, a red line and nothing else carries no information at all.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <span class="num">04</span>
+      <div>
+        <h3>Brand devices are banned from working UI</h3>
+        <p>Struck text, annotation underlines, the ≤3px nudge and the subtitle block belong on
+        hero, onboarding, empty, success and illustration. Never in a live reading area or a
+        form somebody is completing. A device that makes a task harder comes out — the concept
+        survives that fine.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <span class="num">05</span>
+      <div>
+        <h3>Jokes are allowed in empty and success. Nowhere else.</h3>
+        <p>Not in errors, payment, privacy, permissions, or any decision the user cannot undo.
+        <code style="font-family: var(--mono); font-size: 13px; color: var(--ink)">&lt;StateBlock&gt;</code>
+        enforces this structurally: the <code style="font-family: var(--mono); font-size: 13px; color: var(--ink)">error</code>
+        tone is a different rendering, not different copy, so you cannot ship a shrug on an
+        error screen by accident.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <span class="num">06</span>
+      <div>
+        <h3>44px minimum target, every size, including <span style="font-family: var(--mono); font-size: 15px">sm</span></h3>
+        <p>These controls are pressed one-handed, in a hurry, often in low light, sometimes
+        ninety seconds before a service starts. A small button is not a density decision here.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <span class="num">07</span>
+      <div>
+        <h3>No component contains a raw colour</h3>
+        <p>Everything resolves through a working token that a surface rebinds, which is what
+        makes a component correct on paper and on the console without knowing which it is on.
+        It is also what would make a future TDS mapping a token-layer change rather than a
+        rewrite.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <span class="num">08</span>
+      <div>
+        <h3>Korean text never takes Latin tracking</h3>
+        <p>CSS cannot track by script. The <span style="font-family: var(--mono); font-size: 13px">0.08em</span>
+        that makes a Latin caption look considered opens visible holes between Hangul
+        syllables and reads as broken kerning. Captions here use
+        <span style="font-family: var(--mono); font-size: 13px">0.02em</span> and let the mono
+        face carry the voice.</p>
+      </div>
+    </div>
+
+    <div class="rule" style="border-bottom: 0">
+      <span class="num">09</span>
+      <div>
+        <h3>Check it in a browser, not in Figma</h3>
+        <p>Figma has no Korean font fallback chain, no <span style="font-family: var(--mono); font-size: 13px">--font-scale</span>,
+        and no dual-axis type sizing. Every Korean line break, every console type size and
+        anything that depends on viewport height is indicative there and exact only in the
+        product. See <span style="font-family: var(--mono); font-size: 13px">docs/design/figma-code-differences.md</span>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 8px; padding: 22px 26px; background: var(--cream); border-radius: 10px; border: 1px solid var(--line)">
+    <p style="margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--muted)">
+      <strong style="color: var(--ink); font-weight: 600">The test the whole thing has to pass:</strong>
+      someone opening a screen should think “아, 여기서 뭘 하면 되는지 알겠다” first, and
+      “근데 이거 은근 웃기네” a few seconds later. In that order. If the second one arrives
+      first, the brand is in the way and something on the screen has to go.
+    </p>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

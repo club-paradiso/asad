@@ -1,0 +1,51 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1100,
+      "h": 2080
+    },
+    {
+      "file": "Brand.dc.html",
+      "x": 1220,
+      "y": 0,
+      "w": 1100,
+      "h": 2100
+    },
+    {
+      "file": "Screens.dc.html",
+      "x": 0,
+      "y": 2500,
+      "w": 1320,
+      "h": 1420
+    },
+    {
+      "file": "Rules.dc.html",
+      "x": 1440,
+      "y": 2500,
+      "w": 1000,
+      "h": 1780
+    }
+  ],
+  "annotations": [
+    {
+      "id": "start-here",
+      "x": 0,
+      "y": -300,
+      "w": 520,
+      "text": "아무튼서로알아들었으면된거아닌가요 — the design system, as shipped.\n\nFoundations and the brand identity on this row; the screens and the rules below. Everything here matches src/app/globals.css and the Figma file — if the three disagree, the CSS is right."
+    },
+    {
+      "id": "console-note",
+      "x": 0,
+      "y": 4000,
+      "w": 420,
+      "text": "The live console was deliberately NOT redesigned. It was the only surface that had been properly designed, and the rest was made consistent with it."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

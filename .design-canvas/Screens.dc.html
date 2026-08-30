@@ -1,0 +1,243 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+  <style>
+    :root {
+      --ink: #12100e; --paper: #faf7f2; --cream: #f2ede4; --red: #c81e1e;
+      --muted: #4a4540; --dim: #6b655e; --line: #e4ddd1; --strong: #cbc2b3;
+      --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+      --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    body { margin: 0; background: #efeae1; color: var(--ink); font-family: var(--body); }
+    a { color: var(--red); } a:hover { color: #a51818; }
+    .cap { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dim); }
+    /* The phone shell. No fake status bar: on a real device the system draws
+       its own on top, and a painted one reads as doubled-up. */
+    .phone {
+      width: 320px; height: 640px; background: var(--paper); border-radius: 14px;
+      border: 1px solid var(--strong); overflow: hidden; display: flex;
+      flex-direction: column; padding: 22px 18px; box-sizing: border-box; flex: none;
+    }
+    .row { display: flex; align-items: center; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  </style>
+</helmet>
+
+<div style="padding: 64px; box-sizing: border-box; display: flex; flex-direction: column; gap: 32px">
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <p class="cap">04 · Screens — as shipped, 390pt phone</p>
+    <h2 style="margin: 0; font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em">Every surface, one identity</h2>
+    <p style="max-width: 68ch; margin: 0; font-size: 15px; line-height: 1.6; color: var(--muted)">
+      Previously: the launcher was blue, counter mode was dark, prep and sessions were
+      dark <em>and</em> in English. Now one paper surface carries all of them, and the
+      console keeps the dark it needs.
+    </p>
+  </div>
+
+  <div style="display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap">
+
+    <!-- HOME -->
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div class="phone">
+        <div style="display: flex; flex-direction: column">
+          <span style="font-family: var(--display); font-weight: 500; font-size: 21px; line-height: 1; letter-spacing: -0.03em; color: var(--muted)">아무튼서로알아들었으면</span>
+          <span style="display: flex; align-items: flex-end; gap: 3px; font-family: var(--display); font-weight: 800; font-size: 26px; line-height: 1; letter-spacing: -0.045em">
+            된거아닌가요
+            <svg viewBox="0 0 32 32" width="24" height="24" fill="none" style="margin-bottom: 1px; flex: none">
+              <path d="M9.5 10.6c0-3.5 2.9-6.1 6.6-6.1 3.8 0 6.5 2.4 6.5 5.8 0 2.8-1.5 4.3-3.9 5.9-2 1.3-2.7 2.3-2.7 4.1v.8" stroke="var(--ink)" stroke-width="4.4" stroke-linecap="round"/>
+              <path d="m11.9 27.1 2.7 2.6 5.5-6.2" stroke="var(--red)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+        <p style="margin: 14px 0 0; font-size: 13px; line-height: 1.5">
+          <span style="color: var(--dim); text-decoration: line-through; text-decoration-color: var(--red); text-decoration-thickness: 2px">정확한 번역</span>
+          <span style="font-weight: 600">아무튼 알아들었으면 된 거 아닌가요.</span>
+        </p>
+
+        <p class="cap" style="margin: 30px 0 6px">무엇을 하시나요</p>
+        <div style="border-top: 1px solid var(--line)"></div>
+        <div class="row">
+          <span style="display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0">
+            <span style="font-family: var(--display); font-weight: 700; font-size: 19px">라이브 통역</span>
+            <span style="font-size: 12.5px; color: var(--muted)">한 사람이 말하고, 당신이 옮깁니다</span>
+            <span class="cap" style="font-size: 10px">설교 · 강연 · 회의</span>
+          </span>
+          <span style="color: var(--dim)">›</span>
+        </div>
+        <div class="row">
+          <span style="display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0">
+            <span style="font-family: var(--display); font-weight: 700; font-size: 17px">현장 응대</span>
+            <span style="font-size: 12.5px; color: var(--muted)">창구에서 마주 앉아 주고받습니다</span>
+            <span class="cap" style="font-size: 10px">QR · 설치 없음</span>
+          </span>
+          <span style="color: var(--dim)">›</span>
+        </div>
+
+        <p class="cap" style="margin: 26px 0 6px">그 외</p>
+        <div style="border-top: 1px solid var(--line)"></div>
+        <div class="row" style="padding: 11px 0">
+          <span style="font-size: 13px; font-weight: 600">준비 시트</span>
+          <span style="font-size: 11.5px; color: var(--dim); flex: 1">설교자 · 본문 · 용어</span>
+          <span style="color: var(--dim); font-size: 13px">›</span>
+        </div>
+        <div class="row" style="padding: 11px 0">
+          <span style="font-size: 13px; font-weight: 600">지난 세션</span>
+          <span style="font-size: 11.5px; color: var(--dim); flex: 1">복기 · 내보내기</span>
+          <span style="color: var(--dim); font-size: 13px">›</span>
+        </div>
+      </div>
+      <span class="cap">Home · 홈</span>
+    </div>
+
+    <!-- LIVE LAUNCHER -->
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div class="phone">
+        <div style="display: flex; align-items: center; gap: 7px">
+          <svg viewBox="0 0 32 32" width="15" height="15" fill="none" style="flex: none">
+            <path d="M9.5 10.6c0-3.5 2.9-6.1 6.6-6.1 3.8 0 6.5 2.4 6.5 5.8 0 2.8-1.5 4.3-3.9 5.9-2 1.3-2.7 2.3-2.7 4.1v.8" stroke="var(--ink)" stroke-width="4.4" stroke-linecap="round"/>
+            <path d="m11.9 27.1 2.7 2.6 5.5-6.2" stroke="var(--red)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span style="font-family: var(--display); font-weight: 800; font-size: 14px">아서알?</span>
+          <span style="color: var(--strong)">/</span>
+          <span style="font-weight: 600; font-size: 15px">라이브 통역</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 24px">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span class="cap" style="width: 32px; flex: none">모드</span>
+            <span style="display: flex; flex: 1; background: var(--cream); border: 1px solid var(--strong); border-radius: 6px; padding: 2px">
+              <span style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 12.5px; height: 34px; border-radius: 4px">
+                <span style="display: grid; place-items: center; width: 13px; height: 13px; border: 2px solid currentColor; border-radius: 50%"><span style="width: 5px; height: 5px; border-radius: 50%; background: currentColor"></span></span>설교
+              </span>
+              <span style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); font-size: 12.5px; height: 34px">
+                <span style="width: 13px; height: 13px; border: 2px solid var(--dim); border-radius: 50%"></span>일반
+              </span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span class="cap" style="width: 32px; flex: none">소리</span>
+            <span style="display: flex; flex: 1; background: var(--cream); border: 1px solid var(--strong); border-radius: 6px; padding: 2px">
+              <span style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); font-size: 12.5px; height: 34px">
+                <span style="width: 13px; height: 13px; border: 2px solid var(--dim); border-radius: 50%"></span>데모
+              </span>
+              <span style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 12.5px; height: 34px; border-radius: 4px">
+                <span style="display: grid; place-items: center; width: 13px; height: 13px; border: 2px solid currentColor; border-radius: 50%"><span style="width: 5px; height: 5px; border-radius: 50%; background: currentColor"></span></span>브라우저
+              </span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span class="cap" style="width: 32px; flex: none">지연</span>
+            <span style="display: flex; flex: 1; background: var(--cream); border: 1px solid var(--strong); border-radius: 6px; padding: 2px">
+              <span style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11.5px; height: 34px">빠르게</span>
+              <span style="flex: 1; display: flex; align-items: center; justify-content: center; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 11.5px; height: 34px; border-radius: 4px">기본</span>
+              <span style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11.5px; height: 34px">안전하게</span>
+            </span>
+          </div>
+        </div>
+
+        <p style="margin: 12px 0 0; font-size: 12px; color: var(--muted)">약 2–3초 뒤따라갑니다 — 평소 작업용 기본값</p>
+
+        <div style="margin-top: 18px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 15px; height: 50px; border-radius: 6px; display: grid; place-items: center">통역 시작</div>
+
+        <div style="margin-top: 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 9px; padding: 12px 14px">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #96601a; flex: none"></span>
+            <span style="font-weight: 600; font-size: 13px">시작은 되는데, 제한이 있어요</span>
+          </div>
+          <div style="display: flex; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line)">
+            <span class="cap" style="width: 52px; flex: none; font-size: 10px">소리</span>
+            <span style="font-size: 12px">브라우저</span>
+          </div>
+          <div style="display: flex; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line)">
+            <span class="cap" style="width: 52px; flex: none; font-size: 10px">인식</span>
+            <span style="font-size: 12px; color: #96601a">브라우저 안에서 인식합니다</span>
+          </div>
+          <div style="display: flex; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line)">
+            <span class="cap" style="width: 52px; flex: none; font-size: 10px">개인정보</span>
+            <span style="font-size: 12px">학습에 사용되지 않습니다</span>
+          </div>
+        </div>
+      </div>
+      <span class="cap">Live launcher · ready with limits</span>
+    </div>
+
+    <!-- SESSIONS EMPTY -->
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div class="phone">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; color: var(--muted)">‹ 홈</span>
+          <span style="flex: 1"></span>
+          <svg viewBox="0 0 32 32" width="14" height="14" fill="none" style="flex: none">
+            <path d="M9.5 10.6c0-3.5 2.9-6.1 6.6-6.1 3.8 0 6.5 2.4 6.5 5.8 0 2.8-1.5 4.3-3.9 5.9-2 1.3-2.7 2.3-2.7 4.1v.8" stroke="var(--dim)" stroke-width="4.4" stroke-linecap="round"/>
+            <path d="m11.9 27.1 2.7 2.6 5.5-6.2" stroke="var(--red)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span style="font-family: var(--display); font-weight: 800; font-size: 13px; color: var(--dim)">아서알?</span>
+        </div>
+
+        <h3 style="margin: 16px 0 4px; font-family: var(--display); font-size: 22px; font-weight: 700; letter-spacing: -0.02em">지난 세션</h3>
+        <p style="margin: 0 0 16px; font-size: 12.5px; line-height: 1.55; color: var(--muted)">이 브라우저에만 저장됩니다. 업로드하지 않고, 음성은 아예 남기지 않습니다.</p>
+        <div style="border-top: 1px solid var(--line)"></div>
+
+        <div style="margin-top: 56px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+          <svg viewBox="0 0 120 84" width="130" height="91" fill="none" style="color: var(--dim)">
+            <path d="M6 12a6 6 0 0 1 6-6h58a6 6 0 0 1 6 6v28a6 6 0 0 1-6 6H30l-12 10V46h-6a6 6 0 0 1-6-6z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" opacity="0.85"/>
+            <path d="M18 18h46M18 26h46M18 34h28" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.32"/>
+            <path d="M62 40a6 6 0 0 1 6-6h40a6 6 0 0 1 6 6v20a6 6 0 0 1-6 6h-6v10l-12-10H68a6 6 0 0 1-6-6z" fill="var(--paper)" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" opacity="0.85"/>
+            <path d="M76 50h6M90 50h6" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.32"/>
+            <path d="m59.5 42.5 4.5 4.5 9-10" stroke="var(--red)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span style="font-weight: 600; font-size: 15px">아직 저장된 세션이 없어요.</span>
+          <span style="font-size: 12.5px; line-height: 1.55; color: var(--muted); max-width: 240px">통역을 끝내기 전에 콘솔 설정에서 ‘이 세션 저장’을 켜두면 여기에 남습니다.</span>
+          <span style="border: 1px solid var(--strong); border-radius: 6px; padding: 12px 18px; font-size: 12.5px; font-weight: 600">통역 시작하러 가기</span>
+        </div>
+      </div>
+      <span class="cap">Sessions · empty — where the brand may speak</span>
+    </div>
+
+  </div>
+
+  <!-- Console, landscape, on its own row: it is a different shape and a
+       different surface, and putting it in the phone row would imply otherwise. -->
+  <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px">
+    <div style="width: 676px; height: 312px; background: #06080b; border-radius: 12px; border: 1px solid #2b3541; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box">
+      <div style="display: flex; align-items: center; gap: 9px; padding: 11px 18px; color: #f4f7fa">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #4ade80"></span>
+        <span style="font-weight: 600; font-size: 13px">Live</span>
+        <span style="color: #5d6874">/</span>
+        <span style="font-size: 13px; color: #97a2b0">Browser</span>
+        <span style="flex: 1"></span>
+        <span style="font-size: 12px; color: #97a2b0; font-variant-numeric: tabular-nums">Sermon · Balanced · 12:04</span>
+        <span style="font-size: 13px; font-weight: 600">End</span>
+      </div>
+      <div style="padding: 6px 18px 14px; display: flex; flex-direction: column; gap: 9px">
+        <span style="font-size: 25px; color: #f4f7fa; opacity: 0.52">who we actually are.</span>
+        <span style="display: flex; gap: 11px; align-items: stretch">
+          <span style="width: 3px; border-radius: 2px; background: #f0b429; flex: none"></span>
+          <span style="font-size: 29px; font-weight: 500; color: #f4f7fa; line-height: 1.24; letter-spacing: -0.011em">We are people God has called.</span>
+        </span>
+      </div>
+      <div style="border-top: 1px solid #1c232c; padding: 11px 18px; display: flex; flex-direction: column; gap: 5px">
+        <span style="font-size: 14px; color: #97a2b0">우리는 하나님의 부르심을 받은 사람들입니다.</span>
+        <span style="font-size: 14px; color: #5d6874">베드로 사도는 우리를 가리켜서 택하신 족속이요, 왕 같은 제사장들이요</span>
+      </div>
+      <div style="display: flex; gap: 9px; padding: 4px 18px 14px">
+        <span style="background: #10262b; border: 1px solid #1d4750; color: #5ec8d8; border-radius: 4px; padding: 7px 11px; font-size: 11.5px">SCRIPTURE · 1 Peter 2:9</span>
+        <span style="background: #0d1117; border: 1px solid #1c232c; color: #97a2b0; border-radius: 4px; padding: 7px 11px; font-size: 11.5px">하나님 → GOD</span>
+        <span style="background: #0d1117; border: 1px solid #1c232c; color: #97a2b0; border-radius: 4px; padding: 7px 11px; font-size: 11.5px">부르심 → CALLING</span>
+      </div>
+    </div>
+    <span class="cap">Live console · 844×390 · the one dark surface, unchanged</span>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

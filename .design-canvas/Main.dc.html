@@ -1,0 +1,200 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+  <style>
+    :root {
+      --ink: #12100e;
+      --paper: #faf7f2;
+      --cream: #f2ede4;
+      --red: #c81e1e;
+      --navy: #1b2a4a;
+      --muted: #4a4540;
+      --dim: #6b655e;
+      --line: #e4ddd1;
+      --strong: #cbc2b3;
+      --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+      --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); }
+    a { color: var(--red); } a:hover { color: #a51818; }
+    .cap {
+      font-family: var(--mono); font-size: 11px; font-weight: 500;
+      letter-spacing: 0.02em; text-transform: uppercase; color: var(--dim);
+    }
+    h1, h2, h3 { margin: 0; font-family: var(--display); }
+  </style>
+</helmet>
+
+<div style="padding: 72px 72px 88px; max-width: 1100px; box-sizing: border-box">
+
+  <!-- Masthead. The wordmark exactly as the system specifies it: the hedge
+       small, the shrug big, and the mark on the end. -->
+  <div style="display: flex; flex-direction: column; gap: 28px">
+    <p class="cap">아무튼서로알아들었으면된거아닌가요 · Product Design System v1.0</p>
+
+    <div style="display: flex; flex-direction: column">
+      <span style="font-family: var(--display); font-weight: 500; font-size: 46px; line-height: 0.96; letter-spacing: -0.03em; color: var(--muted)">아무튼서로알아들었으면</span>
+      <span style="display: flex; align-items: flex-end; gap: 6px; font-family: var(--display); font-weight: 800; font-size: 58px; line-height: 0.96; letter-spacing: -0.045em">
+        된거아닌가요
+        <svg viewBox="0 0 32 32" width="52" height="52" fill="none" style="margin-bottom: 3px; flex: none">
+          <path d="M9.5 10.6c0-3.5 2.9-6.1 6.6-6.1 3.8 0 6.5 2.4 6.5 5.8 0 2.8-1.5 4.3-3.9 5.9-2 1.3-2.7 2.3-2.7 4.1v.8" stroke="var(--ink)" stroke-width="4.4" stroke-linecap="round"/>
+          <path d="m11.9 27.1 2.7 2.6 5.5-6.2" stroke="var(--red)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </div>
+
+    <p style="max-width: 62ch; margin: 0; font-size: 17px; line-height: 1.65; color: var(--muted)">
+      말은 완벽하지 않아도 소통은 성공할 수 있다. 이 제품은 정확한 언어를 팔지 않는다 —
+      언어가 어긋났는데도 대화가 통한 그 순간을 판다. 그래서 시각 시스템은
+      <strong style="color: var(--ink); font-weight: 600">교정을 본 종이</strong>다:
+      따뜻한 종이 위의 잉크, 그리고 빨간 교정 표시. 틀린 말은 줄 아래에 그대로 읽힌다.
+    </p>
+  </div>
+
+  <hr style="border: 0; border-top: 1px solid var(--line); margin: 56px 0">
+
+  <!-- Colour. Four values do the whole job; the table earns its place by
+       carrying the measured contrast rather than a claim that it passes. -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <h2 style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em">Colour</h2>
+    <p style="max-width: 62ch; margin: 0; font-size: 15px; line-height: 1.6; color: var(--muted)">
+      Ink is the action colour. Signal red is the correction mark — the <span style="font-family: var(--display); font-weight: 700">?</span>,
+      an error, a struck word — and never a routine button, which is what lets one
+      value serve the brand and the error state without ambiguity.
+      <strong style="color: var(--ink); font-weight: 600">A red button in this product always means something is wrong.</strong>
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 4px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 96px; border-radius: 8px; background: #12100e"></div>
+        <span class="cap">brand/ink</span>
+        <span style="font-family: var(--mono); font-size: 11px; color: var(--muted)">#12100E</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 96px; border-radius: 8px; background: #faf7f2; border: 1px solid var(--line)"></div>
+        <span class="cap">brand/paper</span>
+        <span style="font-family: var(--mono); font-size: 11px; color: var(--muted)">#FAF7F2</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 96px; border-radius: 8px; background: #f2ede4; border: 1px solid var(--line)"></div>
+        <span class="cap">brand/cream</span>
+        <span style="font-family: var(--mono); font-size: 11px; color: var(--muted)">#F2EDE4</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 96px; border-radius: 8px; background: #c81e1e"></div>
+        <span class="cap">brand/red</span>
+        <span style="font-family: var(--mono); font-size: 11px; color: var(--muted)">#C81E1E</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 96px; border-radius: 8px; background: #1b2a4a"></div>
+        <span class="cap">brand/navy</span>
+        <span style="font-family: var(--mono); font-size: 11px; color: var(--muted)">#1B2A4A</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 12px; overflow-x: auto">
+      <table style="border-collapse: collapse; font-size: 14px; min-width: 520px">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 0 28px 8px 0; border-bottom: 1px solid var(--line)" class="cap">Pair</th>
+            <th style="text-align: right; padding: 0 28px 8px 0; border-bottom: 1px solid var(--line)" class="cap">Ratio</th>
+            <th style="text-align: left; padding: 0 0 8px 0; border-bottom: 1px solid var(--line)" class="cap">WCAG</th>
+          </tr>
+        </thead>
+        <tbody style="font-variant-numeric: tabular-nums">
+          <tr><td style="padding: 9px 28px 9px 0">ink on paper</td><td style="text-align: right; padding: 9px 28px 9px 0">17.77:1</td><td style="color: var(--muted)">AAA</td></tr>
+          <tr><td style="padding: 9px 28px 9px 0">muted on paper</td><td style="text-align: right; padding: 9px 28px 9px 0">8.87:1</td><td style="color: var(--muted)">AAA</td></tr>
+          <tr><td style="padding: 9px 28px 9px 0">dim on paper</td><td style="text-align: right; padding: 9px 28px 9px 0">5.39:1</td><td style="color: var(--muted)">AA</td></tr>
+          <tr><td style="padding: 9px 28px 9px 0">red on paper</td><td style="text-align: right; padding: 9px 28px 9px 0">5.37:1</td><td style="color: var(--muted)">AA</td></tr>
+          <tr><td style="padding: 9px 28px 9px 0">paper on red</td><td style="text-align: right; padding: 9px 28px 9px 0">5.37:1</td><td style="color: var(--muted)">AA</td></tr>
+          <tr><td style="padding: 9px 28px 9px 0">on-dark red on console ground</td><td style="text-align: right; padding: 9px 28px 9px 0">6.00:1</td><td style="color: var(--muted)">AA</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <hr style="border: 0; border-top: 1px solid var(--line); margin: 56px 0">
+
+  <!-- Two surfaces. This is the structural idea, so it gets shown rather
+       than described: the same tokens, two bindings. -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <h2 style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em">Two surfaces</h2>
+    <p style="max-width: 62ch; margin: 0; font-size: 15px; line-height: 1.6; color: var(--muted)">
+      One dark surface and one paper surface, each locked regardless of the OS theme.
+      Components reference only the working tokens, so the same component is correct
+      on either without knowing which it is on.
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px">
+      <div style="border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+        <div style="background: #faf7f2; padding: 24px; display: flex; flex-direction: column; gap: 14px; min-height: 168px">
+          <span class="cap">[data-surface="launcher"] · paper</span>
+          <span style="font-family: var(--display); font-weight: 700; font-size: 21px">라이브 통역</span>
+          <span style="font-size: 14px; color: #4a4540">한 사람이 말하고, 당신이 옮깁니다</span>
+          <span style="margin-top: auto; align-self: flex-start; background: #12100e; color: #faf7f2; font-weight: 600; font-size: 14px; padding: 12px 22px; border-radius: 6px">통역 시작</span>
+        </div>
+        <p style="margin: 0; padding: 12px 24px; background: var(--cream); font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)">
+          Launcher · prep · sessions · counter · guest join
+        </p>
+      </div>
+
+      <div style="border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+        <div style="background: #06080b; padding: 24px; display: flex; flex-direction: column; gap: 14px; min-height: 168px">
+          <span style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; text-transform: uppercase; color: #5d6874">[data-surface="live"] · console</span>
+          <span style="display: flex; gap: 10px; align-items: stretch">
+            <span style="width: 3px; border-radius: 2px; background: #f0b429; flex: none"></span>
+            <span style="font-size: 22px; font-weight: 500; color: #f4f7fa; line-height: 1.25">We are people God has called.</span>
+          </span>
+          <span style="font-size: 14px; color: #97a2b0">우리는 하나님의 부르심을 받은 사람들입니다.</span>
+        </div>
+        <p style="margin: 0; padding: 12px 24px; background: var(--cream); font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)">
+          Unchanged. It was already right, and the rest was made consistent with it.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border: 0; border-top: 1px solid var(--line); margin: 56px 0">
+
+  <!-- Type. The samples are the product's real strings, not pangrams. -->
+  <div style="display: flex; flex-direction: column; gap: 22px">
+    <h2 style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em">Typography</h2>
+    <p style="max-width: 62ch; margin: 0; font-size: 15px; line-height: 1.6; color: var(--muted)">
+      Both webfonts are Latin-only and self-hosted at build time — Hangul stays on the
+      device's own Korean stack, because a browser resolves fonts per character and
+      the faces already on the phone beat a megabyte of CJK subsets downloaded ninety
+      seconds before a service.
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; flex-direction: column; gap: 5px">
+        <span class="cap">Display · Bricolage Grotesque 800 · wordmark only</span>
+        <span style="font-family: var(--display); font-weight: 800; font-size: 42px; letter-spacing: -0.04em">된거아닌가요</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px">
+        <span class="cap">English — the line being spoken · IBM Plex Sans 500</span>
+        <span style="font-size: 32px; font-weight: 500; letter-spacing: -0.011em">We are people God has called.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px">
+        <span class="cap">Korean — the source, checkable · 400</span>
+        <span style="font-size: 19px; color: var(--muted)">우리는 하나님의 부르심을 받은 사람들입니다.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px">
+        <span class="cap">Caption — the one typographic interruption</span>
+        <span style="font-family: var(--mono); font-size: 13px; color: var(--muted)">무엇을 하시나요 · AS-AC34 · 12:04</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
