@@ -28,7 +28,7 @@ export function privacyAcknowledgementKey(context: PrivacyDisclosureContext): st
   return ACK_KEYS[context];
 }
 
-/** Whether this browser has already seen this workflow's disclosure. */
+/** Whether this browser has already accepted this workflow's cloud disclosure. */
 export function hasAcknowledged(context: PrivacyDisclosureContext = "live"): boolean {
   if (typeof window === "undefined") return true;
   try {
@@ -84,8 +84,8 @@ export function PrivacyDisclosure({
   context?: PrivacyDisclosureContext;
 }) {
   // Derived, not stored: whether the disclosure is due is a function of the
-  // configured providers and what this browser has already seen. Setting it in
-  // an effect would cost an extra render on every session start.
+  // configured providers and what this browser has already accepted. Setting
+  // it in an effect would cost an extra render on every session start.
   const acknowledged = useCapability(() => hasAcknowledged(context), true);
   const [dismissed, setDismissed] = useState(false);
   const visible = providers.length > 0 && !acknowledged && !dismissed;
@@ -142,6 +142,8 @@ export function PrivacyDisclosure({
             tone="primary"
             className="flex-1"
             onClick={() => {
+              // Only the path that actually permits cloud use is persisted as
+              // accepted. Choosing local-only is not consent for a later run.
               acknowledge();
               onAccept();
             }}
@@ -151,7 +153,7 @@ export function PrivacyDisclosure({
           <Button
             className="flex-1"
             onClick={() => {
-              acknowledge();
+              setDismissed(true);
               onUseLocalOnly();
             }}
           >
@@ -160,7 +162,7 @@ export function PrivacyDisclosure({
         </div>
 
         <p className="mt-3 text-xs text-[var(--fg-dim)]">
-          Shown once per browser for this workflow. Full details in docs/privacy.md.
+          Cloud acceptance is remembered once per browser for this workflow. Choosing local-only is not stored as cloud consent. Full details in docs/privacy.md.
         </p>
       </div>
     </div>
