@@ -14,7 +14,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
-import type { CounterMessage, Participant, SessionView } from "@/counter/types";
+import type {
+  CounterMessage,
+  CounterMessageAction,
+  Participant,
+  SessionView,
+} from "@/counter/types";
 
 const POLL_ACTIVE_MS = 1200;
 const POLL_HIDDEN_MS = 8000;
@@ -23,6 +28,8 @@ export interface SendInput {
   text: string;
   source: "voice" | "text" | "quick-phrase" | "confirm";
   rephraseOf?: string;
+  action?: CounterMessageAction;
+  actionOf?: string;
 }
 
 export function useCounterSession(code: string | null, role: Participant) {

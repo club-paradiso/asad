@@ -15,6 +15,7 @@ import Link from "next/link";
 import { COUNTER_LANGUAGES, findLanguage } from "@/counter/languages";
 import { formatCode, joinUrl } from "@/counter/codes";
 import { buildConfirmationText } from "@/counter/risks";
+import { COUNTER_PROFILES, findCounterProfile, type CounterProfileId } from "@/counter/profiles";
 import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
 import { Label } from "@/components/ui/primitives";
@@ -40,6 +41,7 @@ export function CounterHostScreen() {
   const session = useCounterSession(code, "host");
   const hostLang = preferences.hostLang;
   const deskLabel = preferences.deskLabel;
+  const profileId = preferences.profileId;
   const t = stringsFor(hostLang);
 
   const start = useCallback(async () => {
@@ -53,6 +55,7 @@ export function CounterHostScreen() {
         body: JSON.stringify({
           hostLang,
           deskLabel: deskLabel.trim() || undefined,
+          profileId,
         }),
       });
       const data = (await response.json()) as { session?: SessionView; error?: string };
@@ -67,7 +70,7 @@ export function CounterHostScreen() {
     } finally {
       setStarting(false);
     }
-  }, [hostLang, deskLabel, preferences, setPreferences]);
+  }, [hostLang, deskLabel, profileId, preferences, setPreferences]);
 
   /** End this visitor's conversation and open a fresh one for the next. */
   const next = useCallback(async () => {
@@ -90,6 +93,8 @@ export function CounterHostScreen() {
         onHostLang={(value) => setPreferences({ ...preferences, hostLang: value })}
         deskLabel={deskLabel}
         onDeskLabel={(value) => setPreferences({ ...preferences, deskLabel: value })}
+        profileId={profileId}
+        onProfileId={(value) => setPreferences({ ...preferences, profileId: value })}
         onStart={start}
         starting={starting}
         error={startError}
@@ -140,11 +145,20 @@ export function CounterHostScreen() {
               viewerLang={hostLang}
               strings={t}
               onConfirm={(message) => void confirmRisks(session.send, message)}
-              onRephrase={(message) =>
+              onSimplify={(message) =>
                 void session.send({
                   text: message.originalText,
                   source: "text",
-                  rephraseOf: message.id,
+                  action: "simplify",
+                  actionOf: message.id,
+                })
+              }
+              onRetry={(message) =>
+                void session.send({
+                  text: message.originalText,
+                  source: "text",
+                  action: "retry",
+                  actionOf: message.id,
                 })
               }
             />
@@ -174,7 +188,7 @@ function confirmRisks(
   send: ReturnType<typeof useCounterSession>["send"],
   message: CounterMessage,
 ) {
-  const text = buildConfirmationText(message.risks ?? []);
+  const text = buildConfirmationText(message.criticalValues ?? message.risks ?? []);
   if (!text) return;
   return send({ text, source: "confirm" });
 }
@@ -349,6 +363,8 @@ function SetupScreen({
   onHostLang,
   deskLabel,
   onDeskLabel,
+  profileId,
+  onProfileId,
   onStart,
   starting,
   error,
@@ -360,6 +376,8 @@ function SetupScreen({
   onHostLang: (code: string) => void;
   deskLabel: string;
   onDeskLabel: (label: string) => void;
+  profileId: CounterProfileId;
+  onProfileId: (profile: CounterProfileId) => void;
   onStart: () => void;
   starting: boolean;
   error: string | null;
@@ -377,6 +395,7 @@ function SetupScreen({
 
   if (configured && !editing) {
     const language = findLanguage(hostLang);
+    const profile = findCounterProfile(profileId);
     return (
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-7 px-5 py-8 sm:py-12">
         <header>
@@ -392,6 +411,7 @@ function SetupScreen({
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             {language?.ko ?? hostLang} · {language?.endonym ?? hostLang}
           </p>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">{profile.label}</p>
           <button
             type="button"
             onClick={onEdit}
@@ -465,8 +485,36 @@ function SetupScreen({
         </div>
       </section>
 
+      <section className="flex flex-col gap-3">
+        <Label>2 · 현장 유형</Label>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {COUNTER_PROFILES.map((profile) => {
+            const selected = profile.id === profileId;
+            return (
+              <button
+                key={profile.id}
+                type="button"
+                onClick={() => onProfileId(profile.id)}
+                aria-pressed={selected}
+                className={cn(
+                  "min-w-0 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                  selected
+                    ? "border-[var(--accent)] bg-[var(--accent-dim)]"
+                    : "border-[var(--line)] bg-[var(--bg-raised)] hover:border-[var(--line-strong)]",
+                )}
+              >
+                <span className="block text-sm font-medium">{profile.label}</span>
+                <span className="mt-0.5 block text-xs text-[var(--fg-dim)]">
+                  {profile.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="flex flex-col gap-2">
-        <Label>2 · 창구 이름 (선택)</Label>
+        <Label>3 · 창구 이름 (선택)</Label>
         <input
           value={deskLabel}
           onChange={(event) => onDeskLabel(event.target.value)}

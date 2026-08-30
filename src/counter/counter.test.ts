@@ -307,8 +307,27 @@ describe("counter prompt", () => {
       targetLang: "en-US",
       rephrase: true,
     });
-    expect(prompt).toMatch(/simpler words/i);
-    expect(prompt).toMatch(/Do not change the meaning or any number/i);
+    expect(prompt).toMatch(/SIMPLIFY/i);
+    expect(prompt).toMatch(/Preserve every number/i);
+  });
+
+  it("adds immigration terminology as vocabulary, never advice", () => {
+    const prompt = buildCounterPrompt({
+      text: "체류기간 연장을 신청하려고 합니다.",
+      sourceLang: "ko-KR",
+      targetLang: "en-US",
+      profileId: "immigration",
+    });
+    expect(prompt).toContain("체류기간 연장");
+    expect(prompt).toContain("외국인등록증");
+    expect(prompt).toMatch(/vocabulary context only/i);
+    expect(prompt).toMatch(/do not add legal/i);
+  });
+
+  it("keeps retry and simplify as distinct actions", () => {
+    const base = { text: "3번 창구로 가세요.", sourceLang: "ko-KR", targetLang: "en-US" };
+    expect(buildCounterPrompt({ ...base, action: "simplify" })).toMatch(/SIMPLIFY/);
+    expect(buildCounterPrompt({ ...base, action: "retry" })).toMatch(/RETRY/);
   });
 });
 

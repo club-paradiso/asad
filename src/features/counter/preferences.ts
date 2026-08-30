@@ -1,17 +1,20 @@
 /** Safe, non-conversational preferences for repeat Counter use. */
 import { findLanguage } from "@/counter/languages";
+import { isCounterProfileId, type CounterProfileId } from "@/counter/profiles";
 import { createLocalStore } from "@/lib/local-store";
 
 export interface CounterPreferences {
   configured: boolean;
   hostLang: string;
   deskLabel: string;
+  profileId: CounterProfileId;
 }
 
 const FALLBACK: CounterPreferences = {
   configured: false,
   hostLang: "ko-KR",
   deskLabel: "",
+  profileId: "general",
 };
 
 const STORAGE_KEY = "tong-yuck:counter-preferences:v1";
@@ -31,6 +34,10 @@ export const counterPreferencesStore = createLocalStore<CounterPreferences>({
             : FALLBACK.hostLang,
         deskLabel:
           typeof value.deskLabel === "string" ? value.deskLabel.slice(0, 60) : "",
+        profileId:
+          typeof value.profileId === "string" && isCounterProfileId(value.profileId)
+            ? value.profileId
+            : FALLBACK.profileId,
       };
     } catch {
       return FALLBACK;
@@ -46,6 +53,7 @@ export const counterPreferencesStore = createLocalStore<CounterPreferences>({
           configured: value.configured,
           hostLang: value.hostLang,
           deskLabel: value.deskLabel.slice(0, 60),
+          profileId: value.profileId,
         } satisfies CounterPreferences),
       );
     } catch {

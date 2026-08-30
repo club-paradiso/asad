@@ -13,6 +13,7 @@ import { appendMessage, counterStore, sourceLangFor, targetLangFor } from "@/cou
 import { normaliseCode } from "@/counter/codes";
 import { resolveQuickPhrase } from "@/counter/quick-phrases";
 import { detectRisks } from "@/counter/risks";
+import { extractCriticalValues, validateTranslationIntegrity } from "@/counter/integrity";
 import { translateForCounter } from "@/counter/translate";
 import type { CounterMessage } from "@/counter/types";
 import { guardInferenceRoute } from "@/lib/guard";
@@ -57,7 +58,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const { from, source, text, rephraseOf } = parsed.data;
+  const { from, source, rephraseOf, action, actionOf } = parsed.data;
+  let text = parsed.data.text;
+
+  if ((action && !actionOf) || (!action && actionOf) || (action && source !== "text")) {
+    return NextResponse.json({ error: "Invalid message action." }, { status: 400 });
+  }
+  if (action && actionOf) {
+    const original = session.messages.find(
+      (message) => message.id === actionOf && message.from === from,
+    );
+    if (!original || original.source === "quick-phrase" || original.source === "confirm") {
+      return NextResponse.json({ error: "That message cannot be translated again." }, { status: 400 });
+    }
+    // The stored utterance is authoritative. A client cannot alter the facts
+    // while asking the server to simplify or retry an earlier translation.
+    text = original.originalText;
+  }
   const originalLang = sourceLangFor(session, from);
   const targetLang = targetLangFor(session, from);
 
@@ -131,7 +148,9 @@ export async function POST(request: Request) {
     targetLang,
     recent,
     rephrase: !!rephraseOf,
+    action,
     deskLabel: session.deskLabel,
+    profileId: session.profileId,
   });
 
   const base = {
@@ -143,6 +162,8 @@ export async function POST(request: Request) {
     targetLang,
     at: Date.now(),
     rephraseOf,
+    action,
+    actionOf,
   };
 
   const message: Omit<CounterMessage, "seq"> = result.ok
@@ -153,6 +174,8 @@ export async function POST(request: Request) {
         confidence: result.output!.confidence,
         note: result.output!.note,
         risks: detectRisks(result.output!.translation),
+        criticalValues: extractCriticalValues(text),
+        integrity: validateTranslationIntegrity(text, result.output!.translation),
       }
     : {
         ...base,
@@ -160,6 +183,10 @@ export async function POST(request: Request) {
         status: "failed",
         error: result.error,
       };
+
+  if (message.status === "done" && message.integrity?.status === "mismatch") {
+    message.confidence = "low";
+  }
 
   const stored = await store.update(code, (s) => {
     appendMessage(s, message);

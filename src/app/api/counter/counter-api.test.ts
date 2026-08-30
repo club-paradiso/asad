@@ -78,7 +78,9 @@ beforeEach(() => {
 
 describe("POST /api/counter/session", () => {
   it("creates a session waiting for a visitor", async () => {
-    const response = await POST(post({ hostLang: "ko-KR", deskLabel: "접수 창구 2" }));
+    const response = await POST(
+      post({ hostLang: "ko-KR", deskLabel: "접수 창구 2", profileId: "immigration" }),
+    );
     expect(response.status).toBe(201);
 
     const { session } = (await response.json()) as { session: SessionView };
@@ -86,6 +88,7 @@ describe("POST /api/counter/session", () => {
     expect(session.guestLang).toBeNull();
     expect(session.guestPresent).toBe(false);
     expect(session.deskLabel).toBe("접수 창구 2");
+    expect(session.profileId).toBe("immigration");
   });
 
   it("refuses a language it cannot actually serve", async () => {
@@ -248,6 +251,85 @@ describe("POST /api/counter/message", () => {
     expect(body.message.targetLang).toBe("en-US");
     // Risks come off the TRANSLATED text: that is what the other party acts on.
     expect(body.message.risks?.some((r: { kind: string }) => r.kind === "time")).toBe(true);
+    expect(body.message.integrity.status).toBe("verified");
+    expect(body.message.criticalValues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "time" })]),
+    );
+  });
+
+  it("downgrades a translation when a critical date changes", async () => {
+    translateForCounter.mockResolvedValue({
+      ok: true,
+      output: { translation: "The deadline is September 17, 2026.", confidence: "high" },
+      provider: "test",
+      latencyMs: 30,
+    });
+    const code = await openSession();
+    const body = await (
+      await SEND(
+        send({
+          code,
+          from: "host",
+          source: "text",
+          text: "기한은 2026년 9월 7일입니다.",
+        }),
+      )
+    ).json();
+
+    expect(body.message.confidence).toBe("low");
+    expect(body.message.integrity.status).toBe("mismatch");
+    expect(body.message.integrity.issues).toContainEqual(
+      expect.objectContaining({ kind: "date", reason: "changed" }),
+    );
+    expect(body.message.originalText).toContain("9월 7일");
+  });
+
+  it("uses the stored original for explicit simplify and retry actions", async () => {
+    const created = await POST(post({ hostLang: "ko-KR", profileId: "immigration" }));
+    const { session } = (await created.json()) as { session: SessionView };
+    await PATCH(patch({ code: session.code, guestLang: "en-US" }));
+    const first = await (
+      await SEND(
+        send({ code: session.code, from: "host", source: "text", text: "수수료는 50,000원입니다." }),
+      )
+    ).json();
+
+    translateForCounter.mockClear();
+    const response = await SEND(
+      send({
+        code: session.code,
+        from: "host",
+        source: "text",
+        text: "클라이언트가 바꾼 내용",
+        action: "simplify",
+        actionOf: first.message.id,
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(translateForCounter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "수수료는 50,000원입니다.",
+        action: "simplify",
+        profileId: "immigration",
+      }),
+    );
+  });
+
+  it("rejects a translation action that does not reference an owned message", async () => {
+    const code = await openSession();
+    translateForCounter.mockClear();
+    const response = await SEND(
+      send({
+        code,
+        from: "host",
+        source: "text",
+        text: "anything",
+        action: "retry",
+        actionOf: "missing",
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(translateForCounter).not.toHaveBeenCalled();
   });
 
   it("stores a failure as a failure rather than inventing a translation", async () => {

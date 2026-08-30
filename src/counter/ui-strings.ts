@@ -452,3 +452,73 @@ export const hasStrings = (code: string): boolean =>
   Object.keys(STRINGS).some(
     (key) => key === code || key.split("-")[0] === code.split("-")[0].toLowerCase(),
   );
+
+export interface CounterActionStrings {
+  simplify: string;
+  retry: string;
+  integrityWarning: string;
+  lowConfidence: string;
+}
+
+const ACTION_EN: CounterActionStrings = {
+  simplify: "Make simpler",
+  retry: "Translate again",
+  integrityWarning: "An important value may not match the original. Please check it.",
+  lowConfidence: "Some wording is uncertain. Please check it.",
+};
+
+const ACTION_STRINGS: Record<string, CounterActionStrings> = {
+  en: ACTION_EN,
+  ko: {
+    simplify: "더 쉽게",
+    retry: "다시 번역",
+    integrityWarning: "중요한 값이 원문과 다를 수 있어요. 다시 확인해 주세요.",
+    lowConfidence: "일부 내용이 불확실해요. 다시 확인해 주세요.",
+  },
+  zh: {
+    simplify: "说得更简单",
+    retry: "重新翻译",
+    integrityWarning: "重要信息可能与原文不一致，请核对。",
+    lowConfidence: "部分内容不确定，请核对。",
+  },
+  ja: {
+    simplify: "もっと簡単に",
+    retry: "もう一度翻訳",
+    integrityWarning: "重要な値が原文と一致しない可能性があります。確認してください。",
+    lowConfidence: "一部の内容が不確かです。確認してください。",
+  },
+  vi: {
+    simplify: "Nói đơn giản hơn",
+    retry: "Dịch lại",
+    integrityWarning: "Một thông tin quan trọng có thể không khớp bản gốc. Hãy kiểm tra.",
+    lowConfidence: "Một số nội dung chưa chắc chắn. Hãy kiểm tra.",
+  },
+  th: {
+    simplify: "ให้ง่ายขึ้น",
+    retry: "แปลอีกครั้ง",
+    integrityWarning: "ข้อมูลสำคัญอาจไม่ตรงกับต้นฉบับ กรุณาตรวจสอบ",
+    lowConfidence: "เนื้อหาบางส่วนไม่แน่นอน กรุณาตรวจสอบ",
+  },
+  id: {
+    simplify: "Buat lebih sederhana",
+    retry: "Terjemahkan lagi",
+    integrityWarning: "Nilai penting mungkin tidak sama dengan teks asli. Harap periksa.",
+    lowConfidence: "Sebagian isi belum pasti. Harap periksa.",
+  },
+  ru: {
+    simplify: "Сказать проще",
+    retry: "Перевести снова",
+    integrityWarning: "Важное значение может не совпадать с оригиналом. Проверьте его.",
+    lowConfidence: "Часть текста неоднозначна. Проверьте её.",
+  },
+  ar: {
+    simplify: "تبسيط العبارة",
+    retry: "إعادة الترجمة",
+    integrityWarning: "قد لا تتطابق معلومة مهمة مع الأصل. يرجى التحقق منها.",
+    lowConfidence: "بعض المحتوى غير مؤكد. يرجى التحقق منه.",
+  },
+};
+
+export function actionStringsFor(code: string): CounterActionStrings {
+  return ACTION_STRINGS[code.split("-")[0].toLowerCase()] ?? ACTION_EN;
+}
