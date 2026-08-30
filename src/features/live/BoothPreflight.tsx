@@ -9,11 +9,16 @@ interface BoothPreflightProps {
   inputLabel: string;
   deviceId?: string;
   onPermissionGranted?: () => void;
+  onReadyChange?: (ready: boolean) => void;
 }
 
 type TestPhase = "idle" | "requesting" | "listening" | "error";
 
 const EMPTY_READING = classifyInputLevel(0);
+
+export function isBoothPreflightReady(signalVerified: boolean, mixMinusChecked: boolean): boolean {
+  return signalVerified && mixMinusChecked;
+}
 
 /**
  * Local-only booth hardware check.
@@ -28,11 +33,13 @@ export function BoothPreflight({
   inputLabel,
   deviceId,
   onPermissionGranted,
+  onReadyChange,
 }: BoothPreflightProps) {
   const [phase, setPhase] = useState<TestPhase>("idle");
   const [reading, setReading] = useState<InputLevelReading>(EMPTY_READING);
   const [error, setError] = useState<string | null>(null);
   const [mixMinusChecked, setMixMinusChecked] = useState(false);
+  const [signalVerified, setSignalVerified] = useState(false);
 
   const streamRef = useRef<MediaStream | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
@@ -40,6 +47,9 @@ export function BoothPreflight({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const frameRef = useRef<number | null>(null);
   const detachEndObserverRef = useRef<(() => void) | null>(null);
+
+  const ready = isBoothPreflightReady(signalVerified, mixMinusChecked);
+  useEffect(() => onReadyChange?.(ready), [onReadyChange, ready]);
 
   const stopTest = useCallback((updateUi = true) => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
@@ -71,6 +81,7 @@ export function BoothPreflight({
     setError(null);
     setPhase("requesting");
     setReading(EMPTY_READING);
+    setSignalVerified(false);
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("This browser cannot test audio input locally.");
@@ -90,6 +101,7 @@ export function BoothPreflight({
       });
       streamRef.current = stream;
       detachEndObserverRef.current = observeAudioInputEnd(stream, () => {
+        setSignalVerified(false);
         setError(
           "Audio input disconnected during preflight. Reconnect it or choose another input, then test again.",
         );
@@ -121,7 +133,9 @@ export function BoothPreflight({
       const measure = (now: number) => {
         analyser.getFloatTimeDomainData(samples);
         if (now - lastUiUpdate >= 100) {
-          setReading(classifyInputLevel(rmsOf(samples)));
+          const nextReading = classifyInputLevel(rmsOf(samples));
+          setReading(nextReading);
+          if (nextReading.state === "good") setSignalVerified(true);
           lastUiUpdate = now;
         }
         frameRef.current = requestAnimationFrame(measure);
@@ -130,6 +144,7 @@ export function BoothPreflight({
       setPhase("listening");
       frameRef.current = requestAnimationFrame(measure);
     } catch (caught) {
+      setSignalVerified(false);
       const message =
         caught instanceof Error && caught.name === "NotAllowedError"
           ? "Microphone permission was denied."
@@ -176,7 +191,9 @@ export function BoothPreflight({
                 ? reading.label
                 : phase === "error"
                   ? "Input unavailable"
-                  : "Not tested"}
+                  : signalVerified
+                    ? "Signal verified"
+                    : "Not tested"}
           </span>
         </div>
         <div
@@ -222,6 +239,23 @@ export function BoothPreflight({
           The ASAD feed contains the Korean speaker/program audio, but not the interpreter&apos;s English microphone.
         </span>
       </label>
+
+      <div
+        aria-live="polite"
+        className="mt-4 rounded-md border border-[var(--line)] bg-[var(--bg-overlay)] px-3 py-2.5 text-xs leading-relaxed"
+      >
+        {ready ? (
+          <p className="font-semibold text-[var(--accent)]">Ready for live.</p>
+        ) : signalVerified ? (
+          <p className="text-[var(--fg-muted)]">
+            Signal verified. Confirm mix-minus to finish the booth check.
+          </p>
+        ) : (
+          <p className="text-[var(--fg-muted)]">
+            Run the input test until the meter reports a usable signal, then confirm mix-minus.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
