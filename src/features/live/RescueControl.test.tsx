@@ -47,11 +47,11 @@ describe("RescueControl", () => {
       />,
     );
 
-    expect(screen.getByText("Stay with the current point.")).toBeInTheDocument();
-    expect(screen.getByText("God remains faithful.")).toBeInTheDocument();
+    expect(screen.getByText("Stay with the current point.")).toBeTruthy();
+    expect(screen.getByText("God remains faithful.")).toBeTruthy();
     expect(
       screen.getByText(/Recovery cue only · not added to the normal English stream/i),
-    ).toBeInTheDocument();
+    ).toBeTruthy();
   });
 
   it("disables repeated activation while a Rescue request is already loading", () => {
@@ -64,8 +64,8 @@ describe("RescueControl", () => {
       />,
     );
 
-    const button = screen.getByRole("button", { name: "Rescuing…" });
-    expect(button).toBeDisabled();
+    const button = screen.getByRole("button", { name: "Rescuing…" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(onTrigger).not.toHaveBeenCalled();
   });
