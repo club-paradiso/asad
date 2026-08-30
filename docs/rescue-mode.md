@@ -41,6 +41,25 @@ A Rescue turn must:
 
 Sermon Mode still preserves theological precision and Scripture-reference safety during Rescue.
 
+## Server isolation
+
+`POST /api/rescue` is a separate inference path rather than a special flag on `/api/interpret`.
+
+That separation is intentional. A Rescue request must not drain, commit, cancel or reorder the normal interpretation engine's pending queue. The ordinary speech-recognition and interpretation pipeline can therefore continue listening while the emergency request is in flight.
+
+The Rescue endpoint:
+
+- is protected by the same session, origin, body-size and live rate-limit boundaries as paid interpretation calls;
+- accepts at most the already-bounded 1,200-character recent Korean window plus the normal rolling context;
+- uses the deployment's existing LLM router and structured `InterpreterOutput` schema;
+- runs with FAST-style context/deadline pressure, no extended reasoning and a small output budget;
+- performs no quality escalation, because a late beautiful answer is useless during catch-up;
+- strips every `anticipatedChunk` even if a provider ignores the prompt;
+- hard-caps returned Rescue speech to two `safeChunks`;
+- fails closed to an empty low-confidence Rescue when no cloud model is available or output is malformed.
+
+Importantly, the local deterministic live interpreter is **not** used to fake a Rescue translation of the whole window. If a model cannot perform the dedicated recovery task, no Rescue cue is safer than a semantically wrong one.
+
 ## UI contract for a future implementation
 
 The eventual live control should be intentionally simple:
@@ -63,11 +82,20 @@ Therefore implementing Rescue as `pending = last 12 seconds` through the ordinar
 
 ## Current implementation status
 
-This foundation intentionally does **not** add a live button or new network endpoint yet. It provides:
+Implemented and tested:
 
 - bounded recent-Korean selection;
 - deterministic stale-window behaviour;
 - a dedicated Rescue prompt contract;
-- regression tests locking those semantics.
+- isolated `/api/rescue` inference path;
+- server-side output narrowing (no anticipation, maximum two recovery chunks);
+- fail-closed behaviour when Rescue inference is unavailable;
+- regression tests locking those semantics and request bounds.
 
-The next implementation step can wire these pieces into the existing inference router without changing what Rescue means.
+Still intentionally not wired into the live cockpit:
+
+- the `RESCUE` / `R` interaction;
+- transient recovery-cue presentation and expiry;
+- client request lifecycle that guarantees normal live listening continues untouched.
+
+Those are UI/session orchestration changes, not prompt work, and should be wired only after the isolated endpoint is stable.
