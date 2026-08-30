@@ -37,7 +37,10 @@ export function prepPhasePermitsCloud(phase: PrepConsentPhase): boolean {
 }
 
 export function usePrepCloudConsent() {
-  const acknowledged = useCapability(() => hasAcknowledged("prep"), true);
+  // Prep has no user-gesture timing requirement, so unlike the live speech
+  // gate there is no reason to optimistically assume browser consent during
+  // SSR. The button stays closed until hydration reads the real local value.
+  const acknowledged = useCapability(() => hasAcknowledged("prep"), false);
   const [modelAvailable, setModelAvailable] = useState<boolean | undefined>(undefined);
   const [disclosure, setDisclosure] = useState<DisclosureProvider[] | undefined>(undefined);
   const [decision, setDecision] = useState<"granted" | "declined" | null>(null);
