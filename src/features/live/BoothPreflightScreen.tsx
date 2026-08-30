@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { BoothPreflight } from "./BoothPreflight";
-import { useAudioInputs } from "./useAudioInputs";
+import { useBoothAudioInput } from "./useBoothAudioInput";
 
 /** Dedicated hardware check that can be opened before the live console. */
 export function BoothPreflightScreen() {
-  const audioInputs = useAudioInputs(true);
-  const [deviceId, setDeviceId] = useState("");
-  const selectedLabel =
-    audioInputs.devices.find((device) => device.deviceId === deviceId)?.label ??
-    "System default";
+  const audioInput = useBoothAudioInput(true);
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-6 px-5 py-8 sm:px-8">
@@ -40,13 +35,13 @@ export function BoothPreflightScreen() {
           </span>
           <select
             aria-label="Booth preflight audio input"
-            value={deviceId}
-            onChange={(event) => setDeviceId(event.target.value)}
-            disabled={!audioInputs.supported}
+            value={audioInput.deviceId}
+            onChange={(event) => audioInput.setDeviceId(event.target.value)}
+            disabled={!audioInput.supported}
             className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)] disabled:opacity-50"
           >
             <option value="">System default</option>
-            {audioInputs.devices
+            {audioInput.devices
               .filter((device) => device.deviceId !== "default")
               .map((device) => (
                 <option key={device.deviceId} value={device.deviceId}>
@@ -56,15 +51,15 @@ export function BoothPreflightScreen() {
           </select>
         </label>
         <p className="mt-2 text-xs leading-relaxed text-[var(--fg-muted)]">
-          Prefer a direct mixer AUX/MATRIX or USB audio-interface feed. Room microphones are a fallback, not the booth design target.
+          Prefer a direct mixer AUX/MATRIX or USB audio-interface feed. Room microphones are a fallback, not the booth design target. Your selected input is remembered only in this browser.
         </p>
       </section>
 
       <BoothPreflight
-        key={deviceId || "system-default"}
-        inputLabel={selectedLabel}
-        deviceId={deviceId || undefined}
-        onPermissionGranted={() => void audioInputs.refresh()}
+        key={audioInput.deviceId || "system-default"}
+        inputLabel={audioInput.selectedLabel}
+        deviceId={audioInput.deviceId || undefined}
+        onPermissionGranted={() => void audioInput.refresh()}
       />
 
       <section className="rounded-lg border border-[var(--line)] px-4 py-4 text-sm leading-relaxed text-[var(--fg-muted)]">
