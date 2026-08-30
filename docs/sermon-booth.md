@@ -92,6 +92,23 @@ The ASAD feed should contain the Korean speaker/program audio and should **not**
 
 The launcher therefore treats **Input Device** and **Speech Recognition Provider** as different decisions. Deepgram/OpenAI can consume a specifically selected browser audio input; Web Speech uses the browser/system default input and cannot be reliably device-routed by ASAD.
 
+## Booth preflight
+
+Before a real service, open `/booth-preflight` from the home screen and verify the hardware path before starting Sermon Mode.
+
+The preflight is deliberately local-only:
+
+- it requests microphone/audio-input permission only after the interpreter presses **Test input**;
+- it opens the selected browser-visible mixer or audio-interface input;
+- it displays a coarse signal meter (no signal / low / usable / very hot) rather than pretending to be a calibrated dBFS meter;
+- it does not start STT, call the interpretation API, or send the test audio to a cloud provider;
+- stopping the test closes the AudioContext and every capture track;
+- after permission is granted, the browser can expose real device labels so the operator can confirm the correct USB/mixer input.
+
+The operator should also confirm the mix-minus invariant: the Korean speaker/program feed is present, while the interpreter's English microphone is absent from the ASAD input.
+
+A successful preflight proves only the local capture path. It does not replace a real sound check of the church's congregation-facing interpretation system.
+
 ## Recognition terminology policy
 
 Recognition hints are scarce and can bias the recogniser. ASAD therefore never sends the complete church glossary blindly.

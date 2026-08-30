@@ -75,11 +75,16 @@ export function HomeScreen() {
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <SecondaryLink
               href="/prep"
               title="준비 시트"
               detail="설교자 · 본문 · 용어 미리 넣기"
+            />
+            <SecondaryLink
+              href="/booth-preflight"
+              title="부스 사전 점검"
+              detail="믹서 입력 · 신호 레벨 · mix-minus 확인"
             />
             <SecondaryLink
               href="/sessions"
