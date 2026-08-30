@@ -61,6 +61,7 @@ export function BoothPreflightScreen() {
       </section>
 
       <BoothPreflight
+        key={deviceId || "system-default"}
         inputLabel={selectedLabel}
         deviceId={deviceId || undefined}
         onPermissionGranted={() => void audioInputs.refresh()}
