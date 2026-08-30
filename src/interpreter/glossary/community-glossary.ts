@@ -1,520 +1,476 @@
 /**
- * Community-created Korean → English church glossary.
+ * Volunteer-maintained Korean → English church glossary for ASAD sermon mode.
  *
- * Source: "기독교 영단어 500개" workbook supplied by an ASAD church
- * interpretation volunteer. The workbook contains 500 numbered rows; repeated
- * Korean headwords are merged here, yielding 447 unique live-match entries.
+ * Generated from the supplied "기독교 영단어 500개" workbook. The workbook
+ * has 500 numbered rows and 447 unique Korean headwords. Duplicate headwords
+ * are merged; alternate English renderings are retained as alternatives.
  *
- * This is a coverage layer, not the authority layer. The hand-curated
- * THEOLOGICAL_LEXICON remains higher priority when the same Korean headword
- * appears in both sets.
+ * This is a coverage layer. Prep/session decisions and ASAD's hand-curated
+ * theological lexicon remain higher priority at match time.
  */
 import type { GlossaryItem } from "@/types";
 
-export const COMMUNITY_SERMON_GLOSSARY: GlossaryItem[] = [
-  // 하나님·삼위일체
-  { korean: "하나님", english: "God", source: "lexicon" },
-  { korean: "주님", english: "Lord", source: "lexicon" },
-  { korean: "예수님", english: "Jesus", source: "lexicon" },
-  { korean: "예수 그리스도", english: "Jesus Christ", source: "lexicon" },
-  { korean: "그리스도", english: "Christ", source: "lexicon" },
-  { korean: "메시아", english: "Messiah", source: "lexicon" },
-  { korean: "구세주", english: "Savior", source: "lexicon" },
-  { korean: "구속자", english: "Redeemer", source: "lexicon" },
-  { korean: "왕", english: "King", source: "lexicon" },
-  { korean: "왕 중의 왕", english: "King of Kings", source: "lexicon" },
-  { korean: "주님의 주", english: "Lord of Lords", source: "lexicon" },
-  { korean: "전능하신 하나님", english: "Almighty God", source: "lexicon" },
-  { korean: "살아계신 하나님", english: "The Living God", source: "lexicon" },
-  { korean: "창조주", english: "Creator", source: "lexicon" },
-  { korean: "아버지 하나님", english: "God the Father", source: "lexicon" },
-  { korean: "성부", english: "God the Father", source: "lexicon" },
-  { korean: "성자", english: "God the Son", source: "lexicon" },
-  { korean: "성령", english: "Holy Spirit", source: "lexicon" },
-  { korean: "삼위일체", english: "Trinity", source: "lexicon" },
-  { korean: "하나님의 아들", english: "Son of God", source: "lexicon" },
-  { korean: "인자", english: "Son of Man", source: "lexicon" },
-  { korean: "보혜사", english: "Helper (Advocate)", source: "lexicon" },
-  { korean: "주권", english: "Sovereignty", source: "lexicon" },
-  { korean: "주권자", english: "Sovereign Lord", source: "lexicon" },
-  { korean: "영광", english: "Glory", source: "lexicon" },
-  { korean: "영광스러운", english: "Glorious", source: "lexicon" },
-  { korean: "거룩", english: "Holiness", source: "lexicon" },
-  { korean: "거룩한", english: "Holy", source: "lexicon" },
-  { korean: "영원하신", english: "Eternal", source: "lexicon" },
-  { korean: "신실하신", english: "Faithful", source: "lexicon" },
-  { korean: "의로우신", english: "Righteous", source: "lexicon" },
-  { korean: "전지하신", english: "Omniscient", source: "lexicon" },
-  { korean: "전능하신", english: "Almighty", source: "lexicon" },
-  { korean: "무소부재하신", english: "Omnipresent", source: "lexicon" },
-  { korean: "사랑의 하나님", english: "God of Love", source: "lexicon" },
-  { korean: "은혜의 하나님", english: "God of Grace", source: "lexicon" },
-  { korean: "평강의 하나님", english: "God of Peace", source: "lexicon" },
-  { korean: "자비의 하나님", english: "God of Mercy", source: "lexicon" },
-  { korean: "긍휼", english: "Compassion", source: "lexicon" },
-  { korean: "자비", english: "Compassion", alternatives: ["Kindness"], source: "lexicon" },
-  { korean: "은혜", english: "Grace", source: "lexicon" },
-  { korean: "인내", english: "Patience", alternatives: ["Perseverance"], source: "lexicon" },
-  { korean: "선하심", english: "Goodness", source: "lexicon" },
-  { korean: "진리", english: "Truth", source: "lexicon" },
-  { korean: "생명", english: "Life", source: "lexicon" },
-  { korean: "평화", english: "Peace", source: "lexicon" },
-  { korean: "기쁨", english: "Joy", source: "lexicon" },
-  { korean: "소망", english: "Hope", source: "lexicon" },
-  { korean: "사랑", english: "Love", source: "lexicon" },
+const RAW_COMMUNITY_GLOSSARY = `하나님	God	
+주님	Lord	
+예수님	Jesus	
+예수 그리스도	Jesus Christ	
+그리스도	Christ	
+메시아	Messiah	
+구세주	Savior	
+구속자	Redeemer	
+왕	King	
+왕 중의 왕	King of Kings	
+주님의 주	Lord of Lords	
+전능하신 하나님	Almighty God	
+살아계신 하나님	The Living God	
+창조주	Creator	
+아버지 하나님	God the Father	
+성부	God the Father	
+성자	God the Son	
+성령	Holy Spirit	
+삼위일체	Trinity	
+하나님의 아들	Son of God	
+인자	Son of Man	
+보혜사	Helper (Advocate)	
+주권	Sovereignty	
+주권자	Sovereign Lord	
+영광	Glory	
+영광스러운	Glorious	
+거룩	Holiness	
+거룩한	Holy	
+영원하신	Eternal	
+신실하신	Faithful	
+의로우신	Righteous	
+전지하신	Omniscient	
+전능하신	Omnipotent	
+무소부재하신	Omnipresent	
+선하신	Good	
+사랑이신 하나님	God is love	
+공의	Justice	
+공의로우신	Just	
+긍휼	Mercy	
+자비	Compassion	Kindness
+은혜	Grace	
+인내	Patience	Perseverance
+오래 참으심	Longsuffering	
+진리	Truth	
+빛	Light	
+생명	Life	
+평강	Peace	
+기쁨	Joy	
+소망	Hope	
+사랑	Love	
+구원	Salvation	
+구원받다	Be saved	
+복음	Gospel	
+복음을 전하다	Share the Gospel	Preach the Gospel
+믿음	Faith	
+믿다	Believe	
+신뢰	Trust	
+신뢰하다	Trust in	
+은혜로	By grace	
+죄	Sin	
+죄인	Sinner	
+죄를 짓다	Commit sin	
+죄를 고백하다	Confess one's sins	
+회개	Repentance	
+회개하다	Repent	
+용서	Forgiveness	
+용서하다	Forgive	
+용서받다	Be forgiven	
+속죄	Atonement	
+대속	Redemption	
+구속	Redemption	
+구속하다	Redeem	
+십자가	The Cross	
+십자가에 못 박히다	Be crucified	
+십자가를 지다	Take up one's cross	
+부활	Resurrection	
+부활하시다	Rise again	
+죽음	Death	
+영생	Eternal life	
+영원한 생명	Everlasting life	
+심판	Judgment	
+심판하다	Judge	
+의	Righteousness	
+의롭다	Righteous	
+칭의	Justification	
+성화	Sanctification	
+영화(구원의 완성)	Glorification	
+거듭남	New birth	Regeneration
+중생	Regeneration	
+새로운 피조물	New creation	
+언약	Covenant	
+새 언약	New Covenant	
+약속	Promise	
+믿음으로 의롭게 되다	Be justified by faith	
+하나님의 어린양	Lamb of God	
+보혈	The blood of Christ	
+속량	Ransom	Redemption
+화목	Reconciliation	
+성경	Bible	
+하나님의 말씀	Word of God	
+말씀	Scripture	The Word
+본문	Scripture passage	Scripture Passage
+본문 말씀	Today's Scripture	
+구절	Verse	
+장	Chapter	
+절	Verse	
+성경책	Book of the Bible	
+구약성경	Old Testament	
+신약성경	New Testament	
+창세기	Genesis	
+출애굽기	Exodus	
+레위기	Leviticus	
+민수기	Numbers	
+신명기	Deuteronomy	
+시편	Psalms	
+잠언	Proverbs	
+전도서	Ecclesiastes	
+이사야	Isaiah	
+예레미야	Jeremiah	
+에스겔	Ezekiel	
+다니엘	Daniel	
+마태복음	Matthew	
+마가복음	Mark	
+누가복음	Luke	
+요한복음	John	
+사도행전	Acts	
+로마서	Romans	
+고린도전서	1 Corinthians	
+고린도후서	2 Corinthians	
+갈라디아서	Galatians	
+에베소서	Ephesians	
+빌립보서	Philippians	
+골로새서	Colossians	
+히브리서	Hebrews	
+야고보서	James	
+베드로전서	1 Peter	
+요한일서	1 John	
+요한계시록	Revelation	
+예언	Prophecy	
+예언자	Prophet	
+사도	Apostle	
+제자	Disciple	
+복음서	Gospel	
+비유	Parable	
+계명	Commandment	
+율법	Law	
+지혜	Wisdom	
+계시	Revelation	
+교회	Church	
+성도	Believer	Saint
+신자	Believer	
+그리스도인	Christian	
+공동체	Community	
+청년부	Young Adult Ministry	
+청년	Young Adult	
+목사	Pastor	
+담임목사	Senior Pastor	
+전도사	Associate Pastor	Ministry Intern*
+장로	Elder	
+권사	Senior Deaconess	
+안수집사	Ordained Deacon	
+집사	Deacon	Deaconess
+리더	Leader	
+셀리더	Small Group Leader	
+소그룹	Small Group	
+순모임	Life Group	Cell Group
+교제	Fellowship	
+친교	Fellowship	
+섬김	Service	
+섬기다	Serve	
+사역	Ministry	
+사역자	Minister	Ministry Leader
+선교	Mission	Missions
+선교사	Missionary	
+전도	Evangelism	
+전도하다	Evangelize	Share the Gospel
+제자훈련	Discipleship Training	
+제자도	Discipleship	
+양육	Spiritual Nurture	
+봉사	Volunteer Service	
+헌신	Dedication	Commitment
+헌신하다	Dedicate oneself	Commit Oneself
+사명	Calling	Mission
+소명	Calling	
+은사	Spiritual Gift	
+달란트	Talent	
+은혜 나눔	Sharing Testimonies of Grace	
+간증	Testimony	
+새가족	Newcomer	
+등록교인	Registered Member	
+출석하다	Attend	
+출석 교인	Attendee	
+부흥	Revival	
+부흥회	Revival Meeting	
+수련회	Retreat	
+성경공부	Bible Study	
+양육 과정	Discipleship Course	
+파송	Commissioning	
+예배	Worship	
+예배드리다	Worship	
+주일예배	Sunday Worship Service	
+새벽예배	Early Morning Prayer Service	
+수요예배	Wednesday Worship Service	
+금요기도회	Friday Prayer Meeting	
+찬양	Praise	
+찬양하다	Praise	
+경배	Adoration	Worship
+경배하다	Worship	Adore
+찬송	Hymn	
+찬송가	Hymnal	Hymn
+찬양팀	Praise Team	
+인도자	Worship Leader	
+예배 인도	Leading Worship	
+기도	Prayer	
+기도하다	Pray	
+기도회	Prayer Meeting	
+중보기도	Intercessory Prayer	
+중보하다	Intercede	
+기도 제목	Prayer Request	Prayer Point
+응답받은 기도	Answered Prayer	
+감사기도	Prayer of Thanksgiving	
+회개의 기도	Prayer of Repentance	
+축도	Benediction	
+축복기도	Prayer of Blessing	
+대표기도	Pastoral Prayer	Representative Prayer
+묵상기도	Meditative Prayer	
+금식기도	Fasting Prayer	
+금식	Fasting	
+감사	Thanksgiving	Thankfulness
+감사하다	Give Thanks	
+감사드리다	Give Thanks to God	
+헌금	Offering	
+십일조	Tithe	
+감사헌금	Thanksgiving Offering	
+헌신예배	Dedication Service	
+축복	Blessing	
+축복하다	Bless	
+아멘	Amen	
+영광 돌리다	Give Glory to God	
+임재	Presence	
+하나님의 임재	God's Presence	
+성령의 임재	The Presence of the Holy Spirit	
+은혜를 받다	Receive Grace	
+은혜 충만	Full of Grace	
+평안	Peace	
+감격	Deep Gratitude	Joyful Awe
+신앙생활	Christian Life	
+예수님을 따르다	Follow Jesus	
+순종	Obedience	
+순종하다	Obey	
+불순종	Disobedience	
+충성	Faithfulness	
+충성하다	Be Faithful	
+희생	Sacrifice	
+희생하다	Sacrifice	
+겸손	Humility	
+겸손하다	Be Humble	
+온유	Gentleness	
+오래 참음	Patience	Longsuffering
+절제	Self-control	
+거룩한 삶	Holy Life	
+경건	Godliness	
+경건한 삶	Godly Life	
+의로운 삶	Righteous Life	
+성숙	Spiritual Maturity	
+성장	Spiritual Growth	
+변화	Transformation	
+새사람	New Self	
+옛사람	Old Self	
+성령의 열매	Fruit of the Spirit	
+희락	Joy	
+화평	Peace	
+양선	Goodness	
+시험	Temptation	Trial
+유혹	Temptation	
+시험을 이기다	Overcome Temptation	
+영적 싸움	Spiritual Battle	
+영적 성장	Spiritual Growth	
+믿음의 여정	Journey of Faith	
+십자가의 삶	Life of the Cross	
+성도의 삶	Life of a Believer	
+본이 되다	Be an Example	
+끝까지 견디다	Persevere to the End	
+영적 전쟁	Spiritual Warfare	
+성령의 역사	The Work of the Holy Spirit	
+성령의 인도	The Leading of the Holy Spirit	
+성령의 충만	The Fullness of the Holy Spirit	
+성령 충만하다	Be Filled with the Holy Spirit	
+성령의 능력	The Power of the Holy Spirit	
+성령의 음성	The Voice of the Holy Spirit	
+성령의 감동	The Prompting of the Holy Spirit	
+성령의 은사	Spiritual Gifts	
+분별	Discernment	
+영적 분별력	Spiritual Discernment	
+깨달음	Understanding	Insight
+확신	Assurance	Conviction
+담대함	Boldness	
+담대하게	Boldly	
+시험에 들다	Fall into Temptation	
+고난	Suffering	
+환난	Tribulation	
+핍박	Persecution	
+연단	Refinement	
+연단받다	Be Refined	
+사탄	Satan	
+마귀	The Devil	
+악한 영	Evil Spirit	
+악	Evil	
+죄의 유혹	The Temptation of Sin	
+거짓	Falsehood	
+거짓말	Lie	
+속이다	Deceive	
+미혹	Deception	
+믿음의 방패	Shield of Faith	
+구원의 투구	Helmet of Salvation	
+진리의 허리띠	Belt of Truth	
+의의 흉배	Breastplate of Righteousness	
+평안의 복음의 신	Shoes of the Gospel of Peace	
+성령의 검	Sword of the Spirit	
+하나님의 전신갑주	Full Armor of God	
+기도로 무장하다	Be Equipped with Prayer	
+깨어 있다	Stay Alert	
+깨어 기도하다	Watch and Pray	
+승리	Victory	
+승리하다	Overcome	Be Victorious
+복음 전도자	Evangelist	
+단기선교	Short-term Mission Trip	
+해외선교	Overseas Missions	
+국내선교	Local Missions	
+파송하다	Commission	Send Out
+증인	Witness	
+증언하다	Testify	
+간증하다	Share One's Testimony	
+복음의 능력	The Power of the Gospel	
+복음의 메시지	The Message of the Gospel	
+복음 사역	Gospel Ministry	
+하나님 나라	Kingdom of God	
+하나님 나라를 세우다	Advance the Kingdom of God	
+열방	The Nations	
+민족	People Group	Nation
+추수	Harvest	
+추수할 일꾼	Workers for the Harvest	
+제자를 삼다	Make Disciples	
+세례	Baptism	
+세례를 받다	Be Baptized	
+침례	Baptism (침례교 문맥)	
+회심	Conversion	
+새신자	New Believer	
+영접	Receiving Christ	
+영접하다	Receive Christ	
+초청	Invitation	
+초청하다	Invite	
+복음집회	Evangelistic Meeting	
+선교지	Mission Field	
+선교팀	Mission Team	
+복음화	Evangelization	
+중보선교	Intercessory Missions	
+문화선교	Cultural Missions	
+캠퍼스 선교	Campus Ministry	
+교회 개척	Church Planting	
+개척교회	Church Plant	
+미전도종족	Unreached People Group	
+선교 헌금	Mission Offering	
+선교 비전	Mission Vision	
+복음의 증인	Witness of the Gospel	
+지상명령	The Great Commission	
+설교	Sermon	
+말씀을 전하다	Preach the Word	
+설교하다	Preach	
+오늘 본문	Today's Scripture	
+말씀을 나누다	Share the Word	
+주제	Theme	
+핵심	Key Point	
+적용	Application	
+적용하다	Apply	
+교훈	Lesson	
+예화	Illustration	
+예시	Example	
+강조하다	Emphasize	
+설명하다	Explain	
+선포하다	Proclaim	
+권면하다	Exhort	Encourage
+도전하다	Challenge	
+결단	Commitment	Decision
+결단하다	Commit	Decide
+순종의 결단	Commitment to Obedience	
+삶의 적용	Life Application	
+실천	Practice	
+실천하다	Put into Practice	
+묵상	Meditation	
+묵상하다	Meditate	
+나누다(말씀)	Share	
+선포	Proclamation	
+증거	Evidence	Testimony
+증거하다	Bear Witness	
+결론	Conclusion	
+요약	Summary	
+핵심 메시지	Main Message	
+도입	Introduction	
+마무리	Closing	
+축복의 말씀	Words of Blessing	
+권면의 말씀	Words of Exhortation	
+초청의 말씀	Invitation	
+기도로 마치다	Close in Prayer	
+함께 기도하다	Pray Together	
+아멘으로 화답하다	Respond with "Amen"	
+삶을 돌아보다	Reflect on Your Life	
+마음을 열다	Open Your Heart	
+믿음으로 반응하다	Respond in Faith	
+결단의 시간	Time of Commitment	
+삶	Life	
+인생	Life Journey	
+일상	Daily Life	
+습관	Habit	
+선택	Choice	
+결정	Decision	
+자유의지	Free Will	
+책임	Responsibility	
+비전	Vision	
+꿈	Dream	
+목적	Purpose	
+계획	Plan	
+하나님의 계획	God's Plan	
+하나님의 뜻	God's Will	
+기다림	Waiting	
+인도하심	Guidance	
+시련	Trial	
+위로	Comfort	
+회복	Restoration	
+치유	Healing	
+용기	Courage	
+두려움	Fear	
+염려	Worry	Anxiety
+불안	Anxiety	
+관계	Relationship	
+가정	Family	
+부모	Parents	
+형제자매	Brothers and Sisters	
+친구	Friend	
+이웃	Neighbor	
+사랑하다	Love	
+화해	Reconciliation	
+나눔	Sharing	
+격려	Encouragement	
+위로하다	Comfort	
+기도 부탁	Prayer Request	
+하나님께 영광	Glory to God	`;
 
-  // 구원론
-  { korean: "구원", english: "Salvation", source: "lexicon" },
-  { korean: "구원받다", english: "Be saved", source: "lexicon" },
-  { korean: "복음", english: "Gospel", source: "lexicon" },
-  { korean: "복음을 전하다", english: "Share the Gospel", alternatives: ["Preach the Gospel"], source: "lexicon" },
-  { korean: "믿음", english: "Faith", source: "lexicon" },
-  { korean: "믿다", english: "Believe", source: "lexicon" },
-  { korean: "신뢰", english: "Trust", source: "lexicon" },
-  { korean: "신뢰하다", english: "Trust in", source: "lexicon" },
-  { korean: "은혜로", english: "By grace", source: "lexicon" },
-  { korean: "죄", english: "Sin", source: "lexicon" },
-  { korean: "죄인", english: "Sinner", source: "lexicon" },
-  { korean: "죄를 짓다", english: "Commit sin", source: "lexicon" },
-  { korean: "죄를 고백하다", english: "Confess one's sins", source: "lexicon" },
-  { korean: "회개", english: "Repentance", source: "lexicon" },
-  { korean: "회개하다", english: "Repent", source: "lexicon" },
-  { korean: "용서", english: "Forgiveness", source: "lexicon" },
-  { korean: "용서하다", english: "Forgive", source: "lexicon" },
-  { korean: "용서받다", english: "Be forgiven", source: "lexicon" },
-  { korean: "속죄", english: "Atonement", source: "lexicon" },
-  { korean: "대속", english: "Redemption", source: "lexicon" },
-  { korean: "구속", english: "Redemption", source: "lexicon" },
-  { korean: "구속하다", english: "Redeem", source: "lexicon" },
-  { korean: "십자가", english: "The Cross", source: "lexicon" },
-  { korean: "십자가에 못 박히다", english: "Be crucified", source: "lexicon" },
-  { korean: "십자가를 지다", english: "Take up one's cross", source: "lexicon" },
-  { korean: "부활", english: "Resurrection", source: "lexicon" },
-  { korean: "부활하시다", english: "Rise again", source: "lexicon" },
-  { korean: "죽음", english: "Death", source: "lexicon" },
-  { korean: "영생", english: "Eternal life", source: "lexicon" },
-  { korean: "영원한 생명", english: "Everlasting life", source: "lexicon" },
-  { korean: "새 생명", english: "New life", source: "lexicon" },
-  { korean: "거듭나다", english: "Be born again", source: "lexicon" },
-  { korean: "중생", english: "Regeneration", source: "lexicon" },
-  { korean: "칭의", english: "Justification", source: "lexicon" },
-  { korean: "의롭다 하심", english: "Justification", source: "lexicon" },
-  { korean: "성화", english: "Sanctification", source: "lexicon" },
-  { korean: "영화", english: "Glorification", source: "lexicon" },
-  { korean: "선택", english: "Election", alternatives: ["Choice"], source: "lexicon" },
-  { korean: "예정", english: "Predestination", source: "lexicon" },
-  { korean: "부르심", english: "Calling", source: "lexicon" },
-  { korean: "믿음으로", english: "By faith", source: "lexicon" },
-  { korean: "구원의 확신", english: "Assurance of salvation", source: "lexicon" },
-  { korean: "구원받은 자", english: "The saved", source: "lexicon" },
-  { korean: "구원자", english: "Savior", source: "lexicon" },
-  { korean: "보혈", english: "The blood of Christ", source: "lexicon" },
-  { korean: "속량", english: "Ransom", alternatives: ["Redemption"], source: "lexicon" },
-  { korean: "화목", english: "Reconciliation", source: "lexicon" },
-
-  // 성경
-  { korean: "성경", english: "Bible", source: "lexicon" },
-  { korean: "하나님의 말씀", english: "Word of God", source: "lexicon" },
-  { korean: "말씀", english: "Scripture", alternatives: ["The Word"], source: "lexicon" },
-  { korean: "본문", english: "Scripture passage", source: "lexicon" },
-  { korean: "본문 말씀", english: "Today's Scripture", source: "lexicon" },
-  { korean: "구절", english: "Verse", source: "lexicon" },
-  { korean: "장", english: "Chapter", source: "lexicon" },
-  { korean: "절", english: "Verse", source: "lexicon" },
-  { korean: "성경책", english: "Book of the Bible", source: "lexicon" },
-  { korean: "구약성경", english: "Old Testament", source: "lexicon" },
-  { korean: "신약성경", english: "New Testament", source: "lexicon" },
-  { korean: "창세기", english: "Genesis", source: "lexicon" },
-  { korean: "출애굽기", english: "Exodus", source: "lexicon" },
-  { korean: "레위기", english: "Leviticus", source: "lexicon" },
-  { korean: "민수기", english: "Numbers", source: "lexicon" },
-  { korean: "신명기", english: "Deuteronomy", source: "lexicon" },
-  { korean: "시편", english: "Psalms", source: "lexicon" },
-  { korean: "잠언", english: "Proverbs", source: "lexicon" },
-  { korean: "전도서", english: "Ecclesiastes", source: "lexicon" },
-  { korean: "이사야", english: "Isaiah", source: "lexicon" },
-  { korean: "예레미야", english: "Jeremiah", source: "lexicon" },
-  { korean: "에스겔", english: "Ezekiel", source: "lexicon" },
-  { korean: "다니엘", english: "Daniel", source: "lexicon" },
-  { korean: "마태복음", english: "Matthew", source: "lexicon" },
-  { korean: "마가복음", english: "Mark", source: "lexicon" },
-  { korean: "누가복음", english: "Luke", source: "lexicon" },
-  { korean: "요한복음", english: "John", source: "lexicon" },
-  { korean: "사도행전", english: "Acts", source: "lexicon" },
-  { korean: "로마서", english: "Romans", source: "lexicon" },
-  { korean: "고린도전서", english: "1 Corinthians", source: "lexicon" },
-  { korean: "고린도후서", english: "2 Corinthians", source: "lexicon" },
-  { korean: "갈라디아서", english: "Galatians", source: "lexicon" },
-  { korean: "에베소서", english: "Ephesians", source: "lexicon" },
-  { korean: "빌립보서", english: "Philippians", source: "lexicon" },
-  { korean: "골로새서", english: "Colossians", source: "lexicon" },
-  { korean: "데살로니가전서", english: "1 Thessalonians", source: "lexicon" },
-  { korean: "데살로니가후서", english: "2 Thessalonians", source: "lexicon" },
-  { korean: "디모데전서", english: "1 Timothy", source: "lexicon" },
-  { korean: "디모데후서", english: "2 Timothy", source: "lexicon" },
-  { korean: "히브리서", english: "Hebrews", source: "lexicon" },
-  { korean: "야고보서", english: "James", source: "lexicon" },
-  { korean: "베드로전서", english: "1 Peter", source: "lexicon" },
-  { korean: "베드로후서", english: "2 Peter", source: "lexicon" },
-  { korean: "요한일서", english: "1 John", source: "lexicon" },
-  { korean: "요한이서", english: "2 John", source: "lexicon" },
-  { korean: "요한삼서", english: "3 John", source: "lexicon" },
-  { korean: "요한계시록", english: "Revelation", source: "lexicon" },
-  { korean: "복음서", english: "Gospel", source: "lexicon" },
-  { korean: "서신서", english: "Epistle", source: "lexicon" },
-  { korean: "제자", english: "Disciple", source: "lexicon" },
-  { korean: "사도", english: "Apostle", source: "lexicon" },
-  { korean: "비유", english: "Parable", source: "lexicon" },
-  { korean: "율법", english: "Law", source: "lexicon" },
-  { korean: "지혜", english: "Wisdom", source: "lexicon" },
-  { korean: "계시", english: "Revelation", source: "lexicon" },
-
-  // 교회와 공동체
-  { korean: "교회", english: "Church", source: "lexicon" },
-  { korean: "성도", english: "Believer", alternatives: ["Saint"], source: "lexicon" },
-  { korean: "신자", english: "Believer", source: "lexicon" },
-  { korean: "그리스도인", english: "Christian", source: "lexicon" },
-  { korean: "공동체", english: "Community", source: "lexicon" },
-  { korean: "청년부", english: "Young Adult Ministry", source: "lexicon" },
-  { korean: "청년", english: "Young Adult", source: "lexicon" },
-  { korean: "목사", english: "Pastor", source: "lexicon" },
-  { korean: "담임목사", english: "Senior Pastor", source: "lexicon" },
-  { korean: "전도사", english: "Associate Pastor", alternatives: ["Ministry Intern*"], source: "lexicon" },
-  { korean: "장로", english: "Elder", source: "lexicon" },
-  { korean: "권사", english: "Senior Deaconess", source: "lexicon" },
-  { korean: "안수집사", english: "Ordained Deacon", source: "lexicon" },
-  { korean: "집사", english: "Deacon", alternatives: ["Deaconess"], source: "lexicon" },
-  { korean: "리더", english: "Leader", source: "lexicon" },
-  { korean: "셀리더", english: "Small Group Leader", source: "lexicon" },
-  { korean: "소그룹", english: "Small Group", source: "lexicon" },
-  { korean: "순모임", english: "Life Group", alternatives: ["Cell Group"], source: "lexicon" },
-  { korean: "교제", english: "Fellowship", source: "lexicon" },
-  { korean: "친교", english: "Fellowship", source: "lexicon" },
-  { korean: "섬김", english: "Service", source: "lexicon" },
-  { korean: "섬기다", english: "Serve", source: "lexicon" },
-  { korean: "사역", english: "Ministry", source: "lexicon" },
-  { korean: "사역자", english: "Minister", alternatives: ["Ministry Leader"], source: "lexicon" },
-  { korean: "선교", english: "Mission", alternatives: ["Missions"], source: "lexicon" },
-  { korean: "선교사", english: "Missionary", source: "lexicon" },
-  { korean: "전도", english: "Evangelism", source: "lexicon" },
-  { korean: "전도하다", english: "Evangelize", alternatives: ["Share the Gospel"], source: "lexicon" },
-  { korean: "제자훈련", english: "Discipleship Training", source: "lexicon" },
-  { korean: "제자도", english: "Discipleship", source: "lexicon" },
-  { korean: "양육", english: "Spiritual Nurture", source: "lexicon" },
-  { korean: "봉사", english: "Volunteer Service", source: "lexicon" },
-  { korean: "봉사자", english: "Volunteer", source: "lexicon" },
-  { korean: "교역자", english: "Minister", alternatives: ["Pastor"], source: "lexicon" },
-  { korean: "교단", english: "Denomination", source: "lexicon" },
-  { korean: "교구", english: "Parish", source: "lexicon" },
-  { korean: "당회", english: "Session", alternatives: ["Church Council"], source: "lexicon" },
-  { korean: "제직회", english: "Church Officers' Meeting", source: "lexicon" },
-  { korean: "공동의회", english: "Congregational Meeting", source: "lexicon" },
-  { korean: "새가족", english: "Newcomer", source: "lexicon" },
-  { korean: "새신자", english: "New Believer", source: "lexicon" },
-  { korean: "교인", english: "Church Member", source: "lexicon" },
-  { korean: "등록교인", english: "Registered Member", source: "lexicon" },
-  { korean: "출석교인", english: "Attending Member", source: "lexicon" },
-  { korean: "세례교인", english: "Baptized Member", source: "lexicon" },
-  { korean: "입교", english: "Confirmation", source: "lexicon" },
-  { korean: "세례", english: "Baptism", source: "lexicon" },
-  { korean: "성찬", english: "Communion", alternatives: ["The Lord's Supper"], source: "lexicon" },
-  { korean: "헌금", english: "Offering", source: "lexicon" },
-  { korean: "십일조", english: "Tithe", source: "lexicon" },
-  { korean: "성경공부", english: "Bible Study", source: "lexicon" },
-  { korean: "양육 과정", english: "Discipleship Course", source: "lexicon" },
-  { korean: "파송", english: "Commissioning", source: "lexicon" },
-
-  // 예배와 기도
-  { korean: "예배", english: "Worship", source: "lexicon" },
-  { korean: "예배드리다", english: "Worship", source: "lexicon" },
-  { korean: "주일예배", english: "Sunday Worship Service", source: "lexicon" },
-  { korean: "새벽예배", english: "Early Morning Prayer Service", source: "lexicon" },
-  { korean: "수요예배", english: "Wednesday Worship Service", source: "lexicon" },
-  { korean: "금요기도회", english: "Friday Prayer Meeting", source: "lexicon" },
-  { korean: "찬양", english: "Praise", source: "lexicon" },
-  { korean: "찬양하다", english: "Praise", source: "lexicon" },
-  { korean: "경배", english: "Adoration", alternatives: ["Worship"], source: "lexicon" },
-  { korean: "경배하다", english: "Worship", alternatives: ["Adore"], source: "lexicon" },
-  { korean: "찬송", english: "Hymn", source: "lexicon" },
-  { korean: "찬송가", english: "Hymnal", alternatives: ["Hymn"], source: "lexicon" },
-  { korean: "찬양팀", english: "Praise Team", source: "lexicon" },
-  { korean: "인도자", english: "Worship Leader", source: "lexicon" },
-  { korean: "예배 인도", english: "Leading Worship", source: "lexicon" },
-  { korean: "기도", english: "Prayer", source: "lexicon" },
-  { korean: "기도하다", english: "Pray", source: "lexicon" },
-  { korean: "기도회", english: "Prayer Meeting", source: "lexicon" },
-  { korean: "중보기도", english: "Intercessory Prayer", source: "lexicon" },
-  { korean: "중보하다", english: "Intercede", source: "lexicon" },
-  { korean: "기도 제목", english: "Prayer Request", source: "lexicon" },
-  { korean: "응답받은 기도", english: "Answered Prayer", source: "lexicon" },
-  { korean: "감사기도", english: "Prayer of Thanksgiving", source: "lexicon" },
-  { korean: "회개의 기도", english: "Prayer of Repentance", source: "lexicon" },
-  { korean: "축도", english: "Benediction", source: "lexicon" },
-  { korean: "축복기도", english: "Prayer of Blessing", source: "lexicon" },
-  { korean: "대표기도", english: "Pastoral Prayer", alternatives: ["Representative Prayer"], source: "lexicon" },
-  { korean: "묵상기도", english: "Meditative Prayer", source: "lexicon" },
-  { korean: "금식기도", english: "Fasting Prayer", source: "lexicon" },
-  { korean: "금식", english: "Fasting", source: "lexicon" },
-  { korean: "감사", english: "Thanksgiving", source: "lexicon" },
-  { korean: "감사하다", english: "Give Thanks", source: "lexicon" },
-  { korean: "감사제", english: "Thanksgiving Offering", source: "lexicon" },
-  { korean: "헌신", english: "Dedication", alternatives: ["Commitment"], source: "lexicon" },
-  { korean: "결단", english: "Commitment", source: "lexicon" },
-  { korean: "축복", english: "Blessing", source: "lexicon" },
-  { korean: "축복하다", english: "Bless", source: "lexicon" },
-  { korean: "평안", english: "Peace", source: "lexicon" },
-  { korean: "감격", english: "Deep Gratitude", alternatives: ["Joyful Awe"], source: "lexicon" },
-
-  // 신앙생활과 제자도
-  { korean: "신앙생활", english: "Christian Life", source: "lexicon" },
-  { korean: "예수님을 따르다", english: "Follow Jesus", source: "lexicon" },
-  { korean: "순종", english: "Obedience", source: "lexicon" },
-  { korean: "순종하다", english: "Obey", source: "lexicon" },
-  { korean: "불순종", english: "Disobedience", source: "lexicon" },
-  { korean: "충성", english: "Faithfulness", source: "lexicon" },
-  { korean: "충성하다", english: "Be Faithful", source: "lexicon" },
-  { korean: "헌신하다", english: "Dedicate oneself", source: "lexicon" },
-  { korean: "인내하다", english: "Persevere", source: "lexicon" },
-  { korean: "겸손", english: "Humility", source: "lexicon" },
-  { korean: "겸손하다", english: "Be Humble", source: "lexicon" },
-  { korean: "온유", english: "Gentleness", source: "lexicon" },
-  { korean: "절제", english: "Self-control", source: "lexicon" },
-  { korean: "정직", english: "Honesty", source: "lexicon" },
-  { korean: "정직하다", english: "Be Honest", source: "lexicon" },
-  { korean: "성실", english: "Diligence", source: "lexicon" },
-  { korean: "성실하다", english: "Be Diligent", source: "lexicon" },
-  { korean: "용기", english: "Courage", source: "lexicon" },
-  { korean: "담대함", english: "Boldness", source: "lexicon" },
-  { korean: "두려움", english: "Fear", source: "lexicon" },
-  { korean: "두려워하다", english: "Be Afraid", source: "lexicon" },
-  { korean: "친절", english: "Kindness", source: "lexicon" },
-  { korean: "나눔", english: "Sharing", source: "lexicon" },
-  { korean: "나누다", english: "Share", source: "lexicon" },
-  { korean: "돌봄", english: "Care", source: "lexicon" },
-  { korean: "돌보다", english: "Take Care of", source: "lexicon" },
-  { korean: "관계", english: "Relationship", source: "lexicon" },
-  { korean: "화해", english: "Reconciliation", source: "lexicon" },
-  { korean: "화해하다", english: "Reconcile", source: "lexicon" },
-  { korean: "용납", english: "Acceptance", source: "lexicon" },
-  { korean: "용납하다", english: "Accept", source: "lexicon" },
-  { korean: "희생", english: "Sacrifice", source: "lexicon" },
-  { korean: "희생하다", english: "Sacrifice", source: "lexicon" },
-  { korean: "자기부인", english: "Self-denial", source: "lexicon" },
-  { korean: "자기를 부인하다", english: "Deny oneself", source: "lexicon" },
-  { korean: "십자가의 길", english: "The Way of the Cross", source: "lexicon" },
-  { korean: "영적 성장", english: "Spiritual Growth", source: "lexicon" },
-  { korean: "성숙", english: "Maturity", source: "lexicon" },
-  { korean: "영적 성숙", english: "Spiritual Maturity", source: "lexicon" },
-  { korean: "훈련", english: "Training", source: "lexicon" },
-  { korean: "경건훈련", english: "Spiritual Discipline", source: "lexicon" },
-  { korean: "묵상", english: "Meditation", source: "lexicon" },
-  { korean: "큐티", english: "Quiet Time", source: "lexicon" },
-  { korean: "영적 습관", english: "Spiritual Habit", source: "lexicon" },
-  { korean: "말씀 묵상", english: "Meditation on Scripture", source: "lexicon" },
-  { korean: "기도 생활", english: "Prayer Life", source: "lexicon" },
-  { korean: "신앙의 여정", english: "Journey of Faith", source: "lexicon" },
-  { korean: "믿음의 성장", english: "Growth in Faith", source: "lexicon" },
-  { korean: "영적 열매", english: "Spiritual Fruit", source: "lexicon" },
-
-  // 영적 전쟁과 성령의 역사
-  { korean: "영적 전쟁", english: "Spiritual Warfare", source: "lexicon" },
-  { korean: "영적 싸움", english: "Spiritual Battle", source: "lexicon" },
-  { korean: "성령의 역사", english: "The Work of the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 인도", english: "The Leading of the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 충만", english: "The Fullness of the Holy Spirit", source: "lexicon" },
-  { korean: "성령 충만하다", english: "Be Filled with the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 능력", english: "The Power of the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 음성", english: "The Voice of the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 열매", english: "The Fruit of the Spirit", source: "lexicon" },
-  { korean: "성령의 은사", english: "Spiritual Gifts", source: "lexicon" },
-  { korean: "은사", english: "Spiritual Gift", source: "lexicon" },
-  { korean: "방언", english: "Speaking in Tongues", source: "lexicon" },
-  { korean: "예언", english: "Prophecy", source: "lexicon" },
-  { korean: "치유", english: "Healing", source: "lexicon" },
-  { korean: "치유하다", english: "Heal", source: "lexicon" },
-  { korean: "분별", english: "Discernment", source: "lexicon" },
-  { korean: "분별하다", english: "Discern", source: "lexicon" },
-  { korean: "악", english: "Evil", source: "lexicon" },
-  { korean: "악한 영", english: "Evil Spirit", source: "lexicon" },
-  { korean: "사탄", english: "Satan", source: "lexicon" },
-  { korean: "마귀", english: "Devil", source: "lexicon" },
-  { korean: "귀신", english: "Demon", source: "lexicon" },
-  { korean: "시험", english: "Temptation", source: "lexicon" },
-  { korean: "시험하다", english: "Tempt", source: "lexicon" },
-  { korean: "유혹", english: "Temptation", source: "lexicon" },
-  { korean: "유혹하다", english: "Tempt", source: "lexicon" },
-  { korean: "영적 공격", english: "Spiritual Attack", source: "lexicon" },
-  { korean: "영적 권세", english: "Spiritual Authority", source: "lexicon" },
-  { korean: "권세", english: "Authority", source: "lexicon" },
-  { korean: "능력", english: "Power", source: "lexicon" },
-  { korean: "기적", english: "Miracle", source: "lexicon" },
-  { korean: "표적", english: "Sign", source: "lexicon" },
-  { korean: "성령 세례", english: "Baptism in the Holy Spirit", source: "lexicon" },
-  { korean: "기름부음", english: "Anointing", source: "lexicon" },
-  { korean: "기름부으심", english: "Anointing", source: "lexicon" },
-  { korean: "안수", english: "Laying on of Hands", source: "lexicon" },
-  { korean: "안수하다", english: "Lay Hands on", source: "lexicon" },
-  { korean: "영적 은사", english: "Spiritual Gift", source: "lexicon" },
-  { korean: "영적 권능", english: "Spiritual Power", source: "lexicon" },
-  { korean: "하나님의 능력", english: "The Power of God", source: "lexicon" },
-  { korean: "성령의 임재", english: "The Presence of the Holy Spirit", source: "lexicon" },
-  { korean: "하나님의 임재", english: "The Presence of God", source: "lexicon" },
-  { korean: "임재", english: "Presence", source: "lexicon" },
-  { korean: "영적 분별", english: "Spiritual Discernment", source: "lexicon" },
-  { korean: "계시의 영", english: "Spirit of Revelation", source: "lexicon" },
-  { korean: "지혜의 영", english: "Spirit of Wisdom", source: "lexicon" },
-  { korean: "성령의 위로", english: "The Comfort of the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 도우심", english: "The Help of the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 감동", english: "The Inspiration of the Holy Spirit", source: "lexicon" },
-  { korean: "성령의 깨달음", english: "The Illumination of the Holy Spirit", source: "lexicon" },
-
-  // 전도와 선교
-  { korean: "전도하다", english: "Share the Gospel", alternatives: ["Evangelize"], source: "lexicon" },
-  { korean: "복음 전도자", english: "Evangelist", source: "lexicon" },
-  { korean: "단기선교", english: "Short-term Mission Trip", source: "lexicon" },
-  { korean: "해외선교", english: "Overseas Missions", source: "lexicon" },
-  { korean: "국내선교", english: "Domestic Missions", source: "lexicon" },
-  { korean: "선교지", english: "Mission Field", source: "lexicon" },
-  { korean: "선교팀", english: "Mission Team", source: "lexicon" },
-  { korean: "선교단체", english: "Mission Organization", source: "lexicon" },
-  { korean: "미전도종족", english: "Unreached People Group", source: "lexicon" },
-  { korean: "복음화", english: "Evangelization", source: "lexicon" },
-  { korean: "복음화하다", english: "Evangelize", source: "lexicon" },
-  { korean: "전도 대상자", english: "Evangelism Contact", source: "lexicon" },
-  { korean: "전도 집회", english: "Evangelistic Meeting", source: "lexicon" },
-  { korean: "전도 행사", english: "Evangelism Event", source: "lexicon" },
-  { korean: "복음 집회", english: "Gospel Meeting", source: "lexicon" },
-  { korean: "복음을 나누다", english: "Share the Gospel", source: "lexicon" },
-  { korean: "간증하다", english: "Give a Testimony", source: "lexicon" },
-  { korean: "간증", english: "Testimony", source: "lexicon" },
-  { korean: "전도 훈련", english: "Evangelism Training", source: "lexicon" },
-  { korean: "선교 훈련", english: "Missions Training", source: "lexicon" },
-  { korean: "선교 헌신", english: "Commitment to Missions", source: "lexicon" },
-  { korean: "선교 헌금", english: "Mission Offering", source: "lexicon" },
-  { korean: "선교 보고", english: "Mission Report", source: "lexicon" },
-  { korean: "선교 기도", english: "Prayer for Missions", source: "lexicon" },
-  { korean: "세계선교", english: "World Missions", source: "lexicon" },
-  { korean: "열방", english: "The Nations", source: "lexicon" },
-  { korean: "민족", english: "People Group", alternatives: ["Nation"], source: "lexicon" },
-  { korean: "복음의 빚진 자", english: "Debtor to the Gospel", source: "lexicon" },
-  { korean: "복음의 통로", english: "Channel of the Gospel", source: "lexicon" },
-  { korean: "복음의 증인", english: "Witness of the Gospel", source: "lexicon" },
-  { korean: "증인", english: "Witness", source: "lexicon" },
-  { korean: "증거하다", english: "Testify", source: "lexicon" },
-  { korean: "증거", english: "Testimony", alternatives: ["Evidence"], source: "lexicon" },
-  { korean: "전도폭발", english: "Evangelism Explosion", source: "lexicon" },
-  { korean: "노방전도", english: "Street Evangelism", source: "lexicon" },
-  { korean: "관계전도", english: "Relational Evangelism", source: "lexicon" },
-  { korean: "문화선교", english: "Cultural Missions", source: "lexicon" },
-  { korean: "의료선교", english: "Medical Missions", source: "lexicon" },
-  { korean: "교육선교", english: "Educational Missions", source: "lexicon" },
-  { korean: "선교적 교회", english: "Missional Church", source: "lexicon" },
-  { korean: "선교적 삶", english: "Missional Life", source: "lexicon" },
-  { korean: "선교적 제자", english: "Missional Disciple", source: "lexicon" },
-  { korean: "지상명령", english: "The Great Commission", source: "lexicon" },
-
-  // 설교 표현
-  { korean: "설교", english: "Sermon", source: "lexicon" },
-  { korean: "말씀을 전하다", english: "Preach the Word", source: "lexicon" },
-  { korean: "설교하다", english: "Preach", source: "lexicon" },
-  { korean: "오늘 본문", english: "Today's Scripture", source: "lexicon" },
-  { korean: "말씀을 나누다", english: "Share the Word", source: "lexicon" },
-  { korean: "주제", english: "Theme", source: "lexicon" },
-  { korean: "핵심", english: "Key Point", source: "lexicon" },
-  { korean: "핵심 메시지", english: "Key Message", source: "lexicon" },
-  { korean: "적용", english: "Application", source: "lexicon" },
-  { korean: "적용하다", english: "Apply", source: "lexicon" },
-  { korean: "예화", english: "Illustration", source: "lexicon" },
-  { korean: "예를 들다", english: "Give an Example", source: "lexicon" },
-  { korean: "비유하다", english: "Use a Metaphor", source: "lexicon" },
-  { korean: "설명하다", english: "Explain", source: "lexicon" },
-  { korean: "강조하다", english: "Emphasize", source: "lexicon" },
-  { korean: "기억하다", english: "Remember", source: "lexicon" },
-  { korean: "기억하십시오", english: "Remember", source: "lexicon" },
-  { korean: "생각해 보십시오", english: "Think about this", source: "lexicon" },
-  { korean: "함께 생각해 봅시다", english: "Let's think about this together", source: "lexicon" },
-  { korean: "함께 보겠습니다", english: "Let's look at this together", source: "lexicon" },
-  { korean: "말씀을 보겠습니다", english: "Let's look at the Scripture", source: "lexicon" },
-  { korean: "다시 말씀드리겠습니다", english: "Let me say that again", source: "lexicon" },
-  { korean: "중요합니다", english: "This is important", source: "lexicon" },
-  { korean: "명심하십시오", english: "Keep this in mind", source: "lexicon" },
-  { korean: "질문하겠습니다", english: "Let me ask you a question", source: "lexicon" },
-  { korean: "여러분에게 묻겠습니다", english: "Let me ask you", source: "lexicon" },
-  { korean: "왜 그렇습니까", english: "Why is that?", source: "lexicon" },
-  { korean: "어떻게 해야 합니까", english: "What should we do?", source: "lexicon" },
-  { korean: "무엇을 의미합니까", english: "What does this mean?", source: "lexicon" },
-  { korean: "결론", english: "Conclusion", source: "lexicon" },
-  { korean: "결론적으로", english: "In conclusion", source: "lexicon" },
-  { korean: "마무리", english: "Closing", source: "lexicon" },
-  { korean: "마무리하겠습니다", english: "Let me conclude", source: "lexicon" },
-  { korean: "말씀을 맺겠습니다", english: "Let me close with this", source: "lexicon" },
-  { korean: "도전", english: "Challenge", source: "lexicon" },
-  { korean: "도전합니다", english: "I challenge you", source: "lexicon" },
-  { korean: "권면", english: "Exhortation", source: "lexicon" },
-  { korean: "권면합니다", english: "I encourage you", source: "lexicon" },
-  { korean: "부탁드립니다", english: "I ask you", alternatives: ["I urge you"], source: "lexicon" },
-  { korean: "소망합니다", english: "I hope", alternatives: ["I pray"], source: "lexicon" },
-  { korean: "기도합니다", english: "I pray", source: "lexicon" },
-  { korean: "축복합니다", english: "I bless you", source: "lexicon" },
-  { korean: "은혜가 있기를 바랍니다", english: "May you experience God's grace", source: "lexicon" },
-  { korean: "말씀을 붙잡다", english: "Hold on to the Word", source: "lexicon" },
-  { korean: "말씀대로 살다", english: "Live according to the Word", source: "lexicon" },
-  { korean: "결단하다", english: "Make a Commitment", source: "lexicon" },
-  { korean: "결단의 시간", english: "Time of Commitment", source: "lexicon" },
-
-  // 청년부 · 삶의 적용 · 관계
-  { korean: "삶", english: "Life", source: "lexicon" },
-  { korean: "인생", english: "Life Journey", source: "lexicon" },
-  { korean: "일상", english: "Daily Life", source: "lexicon" },
-  { korean: "습관", english: "Habit", source: "lexicon" },
-  { korean: "결정", english: "Decision", source: "lexicon" },
-  { korean: "자유의지", english: "Free Will", source: "lexicon" },
-  { korean: "책임", english: "Responsibility", source: "lexicon" },
-  { korean: "목표", english: "Goal", source: "lexicon" },
-  { korean: "꿈", english: "Dream", source: "lexicon" },
-  { korean: "비전", english: "Vision", source: "lexicon" },
-  { korean: "소명", english: "Calling", source: "lexicon" },
-  { korean: "직업", english: "Career", source: "lexicon" },
-  { korean: "진로", english: "Career Path", source: "lexicon" },
-  { korean: "공부", english: "Study", source: "lexicon" },
-  { korean: "시험", english: "Test", alternatives: ["Temptation"], source: "lexicon" },
-  { korean: "학교", english: "School", source: "lexicon" },
-  { korean: "대학", english: "University", source: "lexicon" },
-  { korean: "직장", english: "Workplace", source: "lexicon" },
-  { korean: "직장생활", english: "Work Life", source: "lexicon" },
-  { korean: "돈", english: "Money", source: "lexicon" },
-  { korean: "재정", english: "Finances", source: "lexicon" },
-  { korean: "시간", english: "Time", source: "lexicon" },
-  { korean: "건강", english: "Health", source: "lexicon" },
-  { korean: "감정", english: "Emotion", source: "lexicon" },
-  { korean: "마음", english: "Heart", source: "lexicon" },
-  { korean: "생각", english: "Thought", source: "lexicon" },
-  { korean: "걱정", english: "Worry", source: "lexicon" },
-  { korean: "걱정하다", english: "Worry", source: "lexicon" },
-  { korean: "염려", english: "Anxiety", alternatives: ["Worry"], source: "lexicon" },
-  { korean: "염려하다", english: "Be Anxious", source: "lexicon" },
-  { korean: "불안", english: "Anxiety", source: "lexicon" },
-  { korean: "외로움", english: "Loneliness", source: "lexicon" },
-  { korean: "고독", english: "Solitude", alternatives: ["Loneliness"], source: "lexicon" },
-  { korean: "갈등", english: "Conflict", source: "lexicon" },
-  { korean: "상처", english: "Wound", alternatives: ["Emotional Hurt"], source: "lexicon" },
-  { korean: "상처받다", english: "Be Hurt", source: "lexicon" },
-  { korean: "회복", english: "Restoration", alternatives: ["Healing"], source: "lexicon" },
-  { korean: "회복되다", english: "Be Restored", source: "lexicon" },
-  { korean: "용서받다", english: "Be Forgiven", source: "lexicon" },
-  { korean: "사과하다", english: "Apologize", source: "lexicon" },
-  { korean: "이해하다", english: "Understand", source: "lexicon" },
-  { korean: "공감", english: "Empathy", source: "lexicon" },
-  { korean: "공감하다", english: "Empathize", source: "lexicon" },
-  { korean: "친구", english: "Friend", source: "lexicon" },
-  { korean: "우정", english: "Friendship", source: "lexicon" },
-  { korean: "가족", english: "Family", source: "lexicon" },
-  { korean: "부모", english: "Parents", source: "lexicon" },
-  { korean: "부모님", english: "Parents", source: "lexicon" },
-  { korean: "형제자매", english: "Brothers and Sisters", source: "lexicon" },
-  { korean: "이웃", english: "Neighbor", source: "lexicon" },
-  { korean: "하나님께 영광", english: "Glory to God", source: "lexicon" },
-];
+export const COMMUNITY_SERMON_GLOSSARY: GlossaryItem[] = RAW_COMMUNITY_GLOSSARY
+  .split("\n")
+  .filter(Boolean)
+  .map((line) => {
+    const [korean, english, alternativesRaw = ""] = line.split("\t");
+    const alternatives = alternativesRaw ? alternativesRaw.split("\x1f") : [];
+    return {
+      korean,
+      english,
+      ...(alternatives.length ? { alternatives } : {}),
+      source: "lexicon" as const,
+    };
+  });
 
 export const COMMUNITY_SERMON_GLOSSARY_SOURCE_COUNT = 500;
 export const COMMUNITY_SERMON_GLOSSARY_UNIQUE_COUNT = COMMUNITY_SERMON_GLOSSARY.length;
