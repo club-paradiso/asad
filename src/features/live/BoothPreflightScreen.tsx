@@ -1,14 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { BoothPreflight } from "./BoothPreflight";
 import { useBoothAudioInput } from "./useBoothAudioInput";
+import {
+  clearBoothPreflightAcknowledgement,
+  writeBoothPreflightAcknowledgement,
+} from "./booth-preflight-ack";
 
 /** Dedicated hardware check that can be opened before the live console. */
 export function BoothPreflightScreen() {
   const audioInput = useBoothAudioInput(true);
   const [preflightReady, setPreflightReady] = useState(false);
+
+  const handleReadyChange = useCallback(
+    (ready: boolean) => {
+      setPreflightReady(ready);
+      if (ready) writeBoothPreflightAcknowledgement(audioInput.deviceId || undefined);
+      else clearBoothPreflightAcknowledgement();
+    },
+    [audioInput.deviceId],
+  );
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-6 px-5 py-8 sm:px-8">
@@ -40,6 +53,7 @@ export function BoothPreflightScreen() {
             value={audioInput.deviceId}
             onChange={(event) => {
               setPreflightReady(false);
+              clearBoothPreflightAcknowledgement();
               audioInput.setDeviceId(event.target.value);
             }}
             disabled={!audioInput.supported}
@@ -65,7 +79,7 @@ export function BoothPreflightScreen() {
         inputLabel={audioInput.selectedLabel}
         deviceId={audioInput.deviceId || undefined}
         onPermissionGranted={() => void audioInput.refresh()}
-        onReadyChange={setPreflightReady}
+        onReadyChange={handleReadyChange}
       />
 
       <section className="rounded-lg border border-[var(--line)] px-4 py-4 text-sm leading-relaxed text-[var(--fg-muted)]">
