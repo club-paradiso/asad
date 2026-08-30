@@ -39,8 +39,7 @@ import { KoreanStream } from "./KoreanStream";
 import { SettingsSheet } from "./SettingsSheet";
 import { Teleprompter } from "./Teleprompter";
 import { DemoRibbon } from "./DemoRibbon";
-import { RescueControl } from "./RescueControl";
-import { useRescueCue } from "./useRescueCue";
+import { LiveRescueOverlay } from "./LiveRescueOverlay";
 import { aiStateFrom } from "./AiStatus";
 import type { PrepSheet } from "@/types";
 
@@ -67,18 +66,6 @@ export function LiveConsole({
 
   const { snapshot, phase, error, demoBeat, startedAt, lastProvider, start, stop, correct } =
     session;
-
-  const rescue = useRescueCue({
-    enabled:
-      settings.mode === "sermon" &&
-      source !== "demo" &&
-      phase === "running" &&
-      !settingsOpen,
-    snapshot,
-    mode: settings.mode,
-    prep,
-    startedAt,
-  });
 
   // NO DISCLOSURE FETCH HERE, deliberately.
   //
@@ -254,15 +241,12 @@ export function LiveConsole({
           />
         )}
 
-        {rescueAvailable && (
-          <div className="absolute bottom-3 right-3 z-10 max-w-[min(90vw,32rem)]">
-            <RescueControl
-              state={rescue.state}
-              onTrigger={() => void rescue.trigger()}
-              onClear={rescue.clear}
-              disabled={settingsOpen}
-            />
-          </div>
+        {rescueAvailable && !settingsOpen && (
+          <LiveRescueOverlay
+            snapshot={snapshot}
+            prep={prep}
+            startedAt={startedAt}
+          />
         )}
 
         {frozen && (
