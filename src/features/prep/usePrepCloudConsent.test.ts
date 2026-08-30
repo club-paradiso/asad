@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { privacyAcknowledgementKey } from "@/features/live/PrivacyDisclosure";
+import { localPrepBrief } from "@/interpreter/prep/local-brief";
 import {
   prepPhasePermitsCloud,
   resolvePrepConsent,
@@ -63,5 +64,23 @@ describe("Prep cloud consent", () => {
     expect(prepPhasePermitsCloud("declined")).toBe(false);
     expect(prepPhasePermitsCloud("clear")).toBe(true);
     expect(prepPhasePermitsCloud("granted")).toBe(true);
+  });
+
+  it("labels an explicit local-only brief without suggesting cloud setup", () => {
+    const brief = localPrepBrief(
+      {
+        mode: "sermon",
+        speaker: "류정길",
+        title: "은혜",
+        notes: "민감한 목회 메모",
+        outline: "오늘의 설교 개요",
+      },
+      { localOnly: true },
+    );
+
+    expect(brief.overview).toContain(
+      "No prep content was sent to an AI provider.",
+    );
+    expect(brief.overview).not.toContain("Add an LLM key");
   });
 });
