@@ -37,6 +37,24 @@ export interface MicrophoneCaptureOptions {
   deviceId?: string;
 }
 
+/**
+ * Constraints for a raw-audio STT capture.
+ *
+ * An operator-selected booth input is a requirement, not a preference. Using a
+ * bare `deviceId` string is only an "ideal" constraint and allows the browser
+ * to silently choose another microphone. `exact` makes a missing/disconnected
+ * mixer fail visibly instead of accidentally listening to the laptop mic.
+ */
+export function captureAudioConstraints(deviceId?: string): MediaTrackConstraints {
+  return {
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    channelCount: 1,
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: true,
+  };
+}
+
 export class MicrophoneCapture {
   private context: AudioContext | null = null;
   private stream: MediaStream | null = null;
@@ -65,13 +83,7 @@ export class MicrophoneCapture {
     this.stream =
       this.options.stream ??
       (await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: this.options.deviceId,
-          channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: true,
-        },
+        audio: captureAudioConstraints(this.options.deviceId),
       }));
     this.ownsStream = !this.options.stream;
 
