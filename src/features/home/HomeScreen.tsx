@@ -69,6 +69,15 @@ export function HomeScreen() {
           <p className="brand-caption">그 외</p>
           <div className="flex flex-col">
             <QuietRow href="/prep" title="준비 시트" detail="설교자 · 본문 · 용어 미리 넣기" />
+            {/* Added on main while this redesign was in flight. It is a
+                pre-session check, so it belongs with the other pre-session
+                links rather than beside the two modes — the launcher's top
+                half answers "which job", and this is not one. */}
+            <QuietRow
+              href="/booth-preflight"
+              title="부스 사전 점검"
+              detail="믹서 입력 · 신호 레벨 · mix-minus 확인"
+            />
             <QuietRow href="/sessions" title="지난 세션" detail="복기 · 내보내기" />
           </div>
         </div>

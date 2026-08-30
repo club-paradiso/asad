@@ -9,6 +9,7 @@
  * wins over 족속.
  */
 import type { GlossaryItem, InterpretationMode } from "@/types";
+import { COMMUNITY_SERMON_GLOSSARY } from "./community-glossary";
 import { lexiconFor } from "./lexicon";
 import { findWholeWordOccurrences } from "./match-korean";
 
@@ -28,6 +29,10 @@ const byLengthDesc = (a: GlossaryItem, b: GlossaryItem) =>
  *
  * `extra` carries prep-sheet and model-supplied entries, which outrank the
  * built-in lexicon when both match the same Korean string.
+ *
+ * In sermon mode the volunteer-maintained community glossary extends coverage
+ * after the hand-curated lexicon. This ordering is intentional: broad coverage
+ * must never silently replace a context-aware decision such as 대속 → atonement.
  */
 export function matchGlossary(
   text: string,
@@ -36,7 +41,12 @@ export function matchGlossary(
 ): GlossaryMatch[] {
   if (!text.trim()) return [];
 
-  const entries = dedupeByKorean([...extra, ...lexiconFor(mode)]).sort(byLengthDesc);
+  const community = mode === "sermon" ? COMMUNITY_SERMON_GLOSSARY : [];
+  const entries = dedupeByKorean([
+    ...extra,
+    ...lexiconFor(mode),
+    ...community,
+  ]).sort(byLengthDesc);
 
   // Track which characters are already claimed so a longer match suppresses
   // the shorter terms nested inside it.

@@ -18,6 +18,7 @@
  * dot, because a colour-blind interpreter in a dark booth is exactly the
  * reader this product has.
  */
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -43,6 +44,20 @@ const LEVEL_COLOUR: Record<ReadinessLevel, string> = {
   limited: "var(--warn)",
   blocked: "var(--danger)",
 };
+
+/**
+ * The launcher already has one precise state for a real Sermon input that has
+ * not been sound-checked in this tab. Keep the navigation rule here, next to
+ * the UI that renders it, instead of making StartScreen carry presentation
+ * chrome as well as session orchestration.
+ */
+export function isBoothPreflightActionRow(row: ReadinessRow): boolean {
+  return (
+    row.label === "Input" &&
+    row.level === "limited" &&
+    row.value.includes("not preflight-verified")
+  );
+}
 
 export function Readiness({
   rows,
@@ -129,6 +144,14 @@ export function Readiness({
                 <span className="mt-1 w-full text-xs leading-relaxed text-[var(--fg-muted)] lg:text-sm">
                   {row.detail}
                 </span>
+              )}
+              {isBoothPreflightActionRow(row) && (
+                <Link
+                  href="/booth-preflight"
+                  className="mt-2 inline-flex min-h-9 w-full items-center text-xs font-semibold text-[var(--accent)] underline-offset-4 hover:underline lg:text-sm"
+                >
+                  Run booth preflight →
+                </Link>
               )}
             </dd>
           </div>

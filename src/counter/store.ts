@@ -11,6 +11,7 @@
  */
 import { generateCode } from "./codes";
 import type { CounterMessage, CounterSession, Participant } from "./types";
+import type { CounterProfileId } from "./profiles";
 
 /** A counter session is not a document. Idle sessions are discarded. */
 export const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
@@ -30,7 +31,11 @@ export interface CounterStoreStats {
 export interface CounterStore {
   readonly kind: "memory" | "redis";
   readonly shared: boolean;
-  create(input: { hostLang: string; deskLabel?: string }): Awaitable<CounterSession>;
+  create(input: {
+    hostLang: string;
+    deskLabel?: string;
+    profileId?: CounterProfileId;
+  }): Awaitable<CounterSession>;
   get(code: string): Awaitable<CounterSession | undefined>;
   update(
     code: string,
@@ -56,7 +61,11 @@ class MemoryCounterStore implements CounterStore {
     }
   }
 
-  create(input: { hostLang: string; deskLabel?: string }): CounterSession {
+  create(input: {
+    hostLang: string;
+    deskLabel?: string;
+    profileId?: CounterProfileId;
+  }): CounterSession {
     this.sweep();
     let code = generateCode();
     for (let attempt = 0; attempt < UPDATE_RETRIES && this.sessions.has(code); attempt += 1) {
@@ -72,6 +81,7 @@ class MemoryCounterStore implements CounterStore {
       hostLang: input.hostLang,
       guestLang: null,
       deskLabel: input.deskLabel,
+      profileId: input.profileId ?? "general",
       messages: [],
       nextSeq: 1,
     };
@@ -198,7 +208,11 @@ class RedisCounterStore implements CounterStore {
     return body.result as T;
   }
 
-  async create(input: { hostLang: string; deskLabel?: string }): Promise<CounterSession> {
+  async create(input: {
+    hostLang: string;
+    deskLabel?: string;
+    profileId?: CounterProfileId;
+  }): Promise<CounterSession> {
     for (let attempt = 0; attempt < UPDATE_RETRIES; attempt += 1) {
       const code = generateCode();
       const at = this.now();
@@ -210,6 +224,7 @@ class RedisCounterStore implements CounterStore {
         hostLang: input.hostLang,
         guestLang: null,
         deskLabel: input.deskLabel,
+        profileId: input.profileId ?? "general",
         messages: [],
         nextSeq: 1,
       };

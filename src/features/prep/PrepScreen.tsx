@@ -19,11 +19,17 @@ import { loadSettings, prepStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
 import { romaniseName } from "@/lib/romanise";
+import { localPrepBrief } from "@/interpreter/prep/local-brief";
+import { PrivacyDisclosure } from "@/features/live/PrivacyDisclosure";
 import { Button, Field, Label, TextArea, TextInput } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SessionGlossaryEditor } from "./SessionGlossaryEditor";
+import { usePrepCloudConsent } from "./usePrepCloudConsent";
 
 export function PrepScreen() {
-  // The brief is generated server-side by a model; authorise before asking.
+  // The cloud brief route is guarded. Minting a session token sends no Prep
+  // content and does not authorise an AI provider; the disclosure below is the
+  // separate authority on whether the actual prep material may leave.
   useSessionToken();
 
   const [prep, setPrep] = useLocalStore(prepStore);
@@ -31,6 +37,8 @@ export function PrepScreen() {
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [buildRequested, setBuildRequested] = useState(false);
+  const consent = usePrepCloudConsent();
 
   const patch = useCallback(
     (next: Partial<PrepSheet>) => {
@@ -40,22 +48,53 @@ export function PrepScreen() {
     [prep, setPrep],
   );
 
-  const generate = useCallback(async () => {
+  const currentInput = useCallback(
+    () => ({
+      mode: loadSettings().mode,
+      speaker: prep.speaker,
+      title: prep.title,
+      organisation: prep.organisation,
+      scripture: prep.scripture,
+      notes: prep.notes,
+      outline: prep.outline,
+    }),
+    [prep],
+  );
+
+  const applyBrief = useCallback(
+    (nextBrief: PrepBrief, reason?: string) => {
+      setBrief(nextBrief);
+      setNotice(reason ?? null);
+      setStatus("done");
+
+      // The brief populates live session context, which is the whole point of
+      // preparing: terminology and names carry straight into the console.
+      // Existing Prep terms win here, so a human override is never overwritten
+      // merely because the AI brief was regenerated.
+      const merged = mergeGlossary(prep.glossary, nextBrief.keyTerms);
+      patch({
+        glossary: merged,
+        entities: [
+          ...prep.entities.filter(
+            (existing) =>
+              !nextBrief.properNouns.some((noun) => noun.korean === existing.korean),
+          ),
+          ...nextBrief.properNouns,
+        ],
+      });
+    },
+    [patch, prep.entities, prep.glossary],
+  );
+
+  /** Cloud path. Call only after the Prep consent state has authorised it. */
+  const generateCloud = useCallback(async () => {
     setStatus("loading");
     setNotice(null);
     try {
       const response = await guardedFetch("/api/prep", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: loadSettings().mode,
-          speaker: prep.speaker,
-          title: prep.title,
-          organisation: prep.organisation,
-          scripture: prep.scripture,
-          notes: prep.notes,
-          outline: prep.outline,
-        }),
+        body: JSON.stringify(currentInput()),
       });
       if (!response.ok) throw new Error(`Request failed (${response.status}).`);
 
@@ -64,31 +103,53 @@ export function PrepScreen() {
         degraded?: boolean;
         reason?: string;
       };
-      setBrief(data.brief);
-      if (data.reason) setNotice(data.reason);
-      setStatus("done");
-
-      // The brief populates live session context, which is the whole point of
-      // preparing: terminology and names carry straight into the console.
-      const merged = mergeGlossary(prep.glossary, data.brief.keyTerms);
-      patch({
-        glossary: merged,
-        entities: [
-          ...prep.entities.filter(
-            (existing) => !data.brief.properNouns.some((noun) => noun.korean === existing.korean),
-          ),
-          ...data.brief.properNouns,
-        ],
-      });
+      applyBrief(data.brief, data.reason);
     } catch (error) {
       setStatus("error");
       setNotice(error instanceof Error ? error.message : "브리프를 만들지 못했습니다.");
     }
-  }, [prep, patch]);
+  }, [applyBrief, currentInput]);
+
+  /**
+   * Real local-only path: no /api/prep request and no AI provider. The same
+   * deterministic engine used by the server fallback runs in this browser.
+   */
+  const generateLocal = useCallback(() => {
+    setStatus("loading");
+    setNotice(null);
+    try {
+      const nextBrief = localPrepBrief(currentInput(), { localOnly: true });
+      applyBrief(nextBrief, "Built locally — no prep content was sent to an AI provider.");
+    } catch (error) {
+      setStatus("error");
+      setNotice(
+        error instanceof Error ? error.message : "Could not build the local-only brief.",
+      );
+    }
+  }, [applyBrief, currentInput]);
+
+  const requestGenerate = () => {
+    if (status === "loading" || consent.phase === "checking") return;
+
+    if (consent.phase === "needed") {
+      setBuildRequested(true);
+      return;
+    }
+
+    // A declined decision belongs to this page visit. Likewise, when config
+    // explicitly says there is no model, there is no benefit in shipping the
+    // outline to our own API merely to get the same deterministic result back.
+    if (consent.phase === "declined" || consent.modelAvailable === false) {
+      generateLocal();
+      return;
+    }
+
+    if (consent.mayUseCloud) void generateCloud();
+  };
 
   return (
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-6 px-5 py-8">
+    <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-6 px-5 py-8">
       <PageHeader
         title="준비 시트"
         detail="전부 선택 사항입니다. 여기 적어둔 건 통역 세션으로 그대로 넘어갑니다."
@@ -153,8 +214,18 @@ export function PrepScreen() {
       </Field>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button tone="primary" onClick={() => void generate()} disabled={status === "loading"}>
-          {status === "loading" ? "브리프 만드는 중…" : "통역 브리프 만들기"}
+        <Button
+          tone="primary"
+          onClick={requestGenerate}
+          disabled={status === "loading" || consent.phase === "checking"}
+        >
+          {consent.phase === "checking"
+            ? "개인정보 설정 확인 중…"
+            : status === "loading"
+              ? "브리프 만드는 중…"
+              : consent.phase === "declined" || consent.modelAvailable === false
+                ? "통역 브리프 만들기 · 기기 안에서만"
+                : "통역 브리프 만들기"}
         </Button>
         {saved && <span className="brand-caption normal-case">이 브라우저에 저장됨</span>}
       </div>
@@ -167,33 +238,30 @@ export function PrepScreen() {
 
       {brief && <BriefView brief={brief} />}
 
-      {prep.glossary.length > 0 && (
-        <section className="flex flex-col gap-2 border-t border-[var(--line)] pt-5">
-          <Label>세션 용어집 ({prep.glossary.length})</Label>
-          <ul className="flex flex-wrap gap-1.5 text-xs">
-            {prep.glossary.map((term) => (
-              <li
-                key={term.korean}
-                className="rounded border border-[var(--line)] bg-[var(--bg-raised)] px-2 py-1"
-                title={term.note}
-              >
-                <span className="font-korean">{term.korean}</span>
-                <span className="mx-1.5 text-[var(--fg-dim)]">→</span>
-                {term.english}
-              </li>
-            ))}
-          </ul>
-          <Button
-            size="sm"
-            tone="quiet"
-            onClick={() => patch({ glossary: [] })}
-            className="self-start"
-          >
-            용어집 비우기
-          </Button>
-        </section>
+      <SessionGlossaryEditor
+        items={prep.glossary}
+        onChange={(glossary) => patch({ glossary })}
+      />
+
+      {buildRequested && consent.phase === "needed" && (
+        <PrivacyDisclosure
+          context="prep"
+          providers={consent.providers}
+          onAccept={() => {
+            // Do not wait for the state update: accepting this dialog is the
+            // authorisation event for this specific request.
+            consent.grant();
+            setBuildRequested(false);
+            void generateCloud();
+          }}
+          onUseLocalOnly={() => {
+            consent.decline();
+            setBuildRequested(false);
+            generateLocal();
+          }}
+        />
       )}
-      </div>
+    </div>
     </div>
   );
 }

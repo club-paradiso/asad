@@ -7,6 +7,7 @@
  * Korean transcript running, it never throws into React.
  */
 import { z } from "zod";
+import { COUNTER_PROFILE_IDS } from "@/counter/profiles";
 
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 
@@ -225,6 +226,7 @@ const languageTag = z
 export const createCounterSessionSchema = z.object({
   hostLang: languageTag,
   deskLabel: z.string().trim().max(60).optional(),
+  profileId: z.enum(COUNTER_PROFILE_IDS).default("general"),
 });
 
 export const joinCounterSessionSchema = z.object({
@@ -240,4 +242,6 @@ export const counterMessageSchema = z.object({
   text: z.string().trim().min(1).max(2000),
   /** Set when re-running an earlier message with different wording. */
   rephraseOf: z.string().max(64).optional(),
+  action: z.enum(["simplify", "retry"]).optional(),
+  actionOf: z.string().max(64).optional(),
 });

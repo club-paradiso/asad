@@ -32,9 +32,56 @@ registerProcessor('tong-yuck-capture', TongYuckCapture);
 export interface MicrophoneCaptureOptions {
   onFrame: (pcm16: ArrayBuffer) => void;
   onError?: (error: Error) => void;
+  /** Called when a live audio track ends unexpectedly after capture starts. */
+  onEnded?: () => void;
   /** Supply an existing stream (mixer, WebRTC) instead of opening a mic. */
   stream?: MediaStream;
   deviceId?: string;
+}
+
+/**
+ * Constraints for a raw-audio STT capture.
+ *
+ * An operator-selected booth input is a requirement, not a preference. Using a
+ * bare `deviceId` string is only an "ideal" constraint and allows the browser
+ * to silently choose another microphone. `exact` makes a missing/disconnected
+ * mixer fail visibly instead of accidentally listening to the laptop mic.
+ */
+export function captureAudioConstraints(deviceId?: string): MediaTrackConstraints {
+  return {
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    channelCount: 1,
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: true,
+  };
+}
+
+/**
+ * Observe a capture stream for an unexpected track end.
+ *
+ * Returns an idempotent cleanup function. Cleanup is intentionally called
+ * before ASAD stops tracks itself, so a normal session teardown cannot be
+ * mistaken for a mixer disconnect.
+ */
+export function observeAudioInputEnd(stream: MediaStream, onEnded: () => void): () => void {
+  const tracks = stream.getAudioTracks();
+  let active = true;
+  let reported = false;
+
+  const handleEnded = () => {
+    if (!active || reported) return;
+    reported = true;
+    onEnded();
+  };
+
+  for (const track of tracks) track.addEventListener("ended", handleEnded);
+
+  return () => {
+    if (!active) return;
+    active = false;
+    for (const track of tracks) track.removeEventListener("ended", handleEnded);
+  };
 }
 
 export class MicrophoneCapture {
@@ -45,6 +92,7 @@ export class MicrophoneCapture {
   private source: MediaStreamAudioSourceNode | null = null;
   private buffer: number[] = [];
   private workletUrl: string | null = null;
+  private detachEndObserver: (() => void) | null = null;
 
   constructor(private readonly options: MicrophoneCaptureOptions) {}
 
@@ -65,15 +113,15 @@ export class MicrophoneCapture {
     this.stream =
       this.options.stream ??
       (await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: this.options.deviceId,
-          channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: true,
-        },
+        audio: captureAudioConstraints(this.options.deviceId),
       }));
     this.ownsStream = !this.options.stream;
+
+    if (this.stream.getAudioTracks().length === 0) {
+      throw new Error("The selected audio input has no live audio track.");
+    }
+
+    this.detachEndObserver = observeAudioInputEnd(this.stream, () => this.options.onEnded?.());
 
     const Ctor =
       typeof AudioContext !== "undefined"
@@ -116,6 +164,10 @@ export class MicrophoneCapture {
   }
 
   async stop(): Promise<void> {
+    // Remove `ended` listeners before stopping owned tracks. Otherwise a normal
+    // user-initiated End session could look exactly like a hardware failure.
+    this.detachEndObserver?.();
+    this.detachEndObserver = null;
     this.node?.port.close();
     this.node?.disconnect();
     this.source?.disconnect();

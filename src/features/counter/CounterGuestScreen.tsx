@@ -133,11 +133,20 @@ export function CounterGuestScreen({ code }: { code: string }) {
           viewerLang={lang}
           strings={t}
           onConfirm={(message) => void confirmRisks(session.send, message)}
-          onRephrase={(message) =>
+          onSimplify={(message) =>
             void session.send({
               text: message.originalText,
               source: "text",
-              rephraseOf: message.id,
+              action: "simplify",
+              actionOf: message.id,
+            })
+          }
+          onRetry={(message) =>
+            void session.send({
+              text: message.originalText,
+              source: "text",
+              action: "retry",
+              actionOf: message.id,
             })
           }
         />
@@ -164,7 +173,7 @@ function confirmRisks(
   send: ReturnType<typeof useCounterSession>["send"],
   message: CounterMessage,
 ) {
-  const text = buildConfirmationText(message.risks ?? []);
+  const text = buildConfirmationText(message.criticalValues ?? message.risks ?? []);
   if (!text) return;
   return send({ text, source: "confirm" });
 }

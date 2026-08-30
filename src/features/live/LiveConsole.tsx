@@ -39,6 +39,7 @@ import { KoreanStream } from "./KoreanStream";
 import { SettingsSheet } from "./SettingsSheet";
 import { Teleprompter } from "./Teleprompter";
 import { DemoRibbon } from "./DemoRibbon";
+import { LiveRescueOverlay } from "./LiveRescueOverlay";
 import { aiStateFrom } from "./AiStatus";
 import type { PrepSheet } from "@/types";
 
@@ -169,6 +170,8 @@ export function LiveConsole({
 
   const teleprompter = settings.view === "teleprompter";
   const providerLabel = STT_PROVIDER_INFO[source]?.label ?? source;
+  const rescueAvailable =
+    settings.mode === "sermon" && source !== "demo" && phase === "running";
 
   return (
     <div
@@ -235,6 +238,14 @@ export function LiveConsole({
                     ? "Starting the scripted session…"
                     : "English assistance will appear here as the speaker begins."
             }
+          />
+        )}
+
+        {rescueAvailable && !settingsOpen && (
+          <LiveRescueOverlay
+            snapshot={snapshot}
+            prep={prep}
+            startedAt={startedAt}
           />
         )}
 

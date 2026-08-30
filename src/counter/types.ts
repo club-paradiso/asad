@@ -15,6 +15,37 @@ export type MessageStatus = "pending" | "done" | "failed";
 /** How the text was produced. Quick phrases never touch a model. */
 export type MessageSource = "voice" | "text" | "quick-phrase" | "confirm";
 
+export type CounterMessageAction = "simplify" | "retry";
+
+export type CriticalValueKind =
+  | "integer"
+  | "decimal"
+  | "money"
+  | "date"
+  | "time"
+  | "phone"
+  | "identifier"
+  | "name";
+
+export interface CriticalValue {
+  kind: CriticalValueKind;
+  text: string;
+  /** Deterministic comparison key; never shown directly to users. */
+  normalized: string;
+}
+
+export interface IntegrityIssue {
+  kind: CriticalValueKind;
+  sourceText: string;
+  targetText?: string;
+  reason: "missing" | "changed" | "added";
+}
+
+export interface TranslationIntegrity {
+  status: "verified" | "mismatch";
+  issues: IntegrityIssue[];
+}
+
 /**
  * A span in the translated text worth reading back aloud.
  *
@@ -24,7 +55,7 @@ export type MessageSource = "voice" | "text" | "quick-phrase" | "confirm";
  */
 export interface RiskSpan {
   text: string;
-  kind: "number" | "time" | "date" | "money" | "name";
+  kind: "number" | "time" | "date" | "money" | "name" | "phone" | "identifier";
 }
 
 export interface CounterMessage {
@@ -46,6 +77,13 @@ export interface CounterMessage {
   risks?: RiskSpan[];
   /** Set when this message is a rephrasing of an earlier one. */
   rephraseOf?: string;
+  /** Explicit translation action replacing the old generic rephrase affordance. */
+  action?: CounterMessageAction;
+  actionOf?: string;
+  /** Values extracted from the source for deterministic read-back. */
+  criticalValues?: CriticalValue[];
+  /** Semantic comparison between source and translated critical values. */
+  integrity?: TranslationIntegrity;
   /** Present when translation failed, so the UI can say why. */
   error?: string;
 }
@@ -67,6 +105,8 @@ export interface CounterSession {
   nextSeq: number;
   /** Optional label shown to the visitor, e.g. "접수 창구 2". */
   deskLabel?: string;
+  /** Lightweight translation vocabulary context, never a legal/medical decision mode. */
+  profileId: import("./profiles").CounterProfileId;
 }
 
 /** What a client is allowed to see. Never exposes internals. */
@@ -76,6 +116,7 @@ export interface SessionView {
   hostLang: string;
   guestLang: string | null;
   deskLabel?: string;
+  profileId: import("./profiles").CounterProfileId;
   messages: CounterMessage[];
   /** Cursor to pass on the next poll. */
   seq: number;
@@ -88,6 +129,7 @@ export const toView = (session: CounterSession, since = 0): SessionView => ({
   hostLang: session.hostLang,
   guestLang: session.guestLang,
   deskLabel: session.deskLabel,
+  profileId: session.profileId ?? "general",
   messages: session.messages.filter((m) => m.seq > since),
   seq: session.nextSeq - 1,
   guestPresent: session.guestJoinedAt !== undefined,

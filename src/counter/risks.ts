@@ -95,7 +95,7 @@ export function detectRisks(text: string): RiskSpan[] {
  * Sent as its own message so the other party sees only the values in question,
  * not the whole sentence again.
  */
-export function buildConfirmationText(risks: RiskSpan[]): string {
+export function buildConfirmationText(risks: Array<Pick<RiskSpan, "text">>): string {
   if (risks.length === 0) return "";
   return risks.map((r) => r.text).join(" · ");
 }

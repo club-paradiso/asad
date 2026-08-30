@@ -74,7 +74,7 @@ export async function translateForCounter(
         maxOutputTokens: 500,
         // Slightly warmer than the live path: a rephrase that returns the same
         // words is not a rephrase.
-        temperature: input.rephrase ? 0.5 : 0.2,
+        temperature: input.action === "simplify" || input.rephrase ? 0.35 : 0.2,
         jsonSchema: COUNTER_JSON_SCHEMA,
         thinking: "none",
       },

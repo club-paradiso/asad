@@ -326,11 +326,13 @@ check(
 // The mock utterance contains a document term, so it must pause for risk-based
 // transcript confirmation instead of auto-submitting every voice message.
 await guest.waitForTimeout(850);
+const confirmVoice = guest.getByRole("button", { name: "Yes" });
+await confirmVoice.waitFor({ state: "visible", timeout: 2000 });
 check(
   "critical voice transcript waits for confirmation",
-  queuedRequests.length === 0 && (await guest.getByRole("button", { name: "Yes" }).isVisible()),
+  queuedRequests.length === 0 && (await confirmVoice.isVisible()),
 );
-await guest.getByRole("button", { name: "Yes" }).click();
+await confirmVoice.click();
 await guest.waitForTimeout(50);
 check(
   "confirmed speech submits after the utterance ends",

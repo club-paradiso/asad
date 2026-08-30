@@ -51,7 +51,10 @@ const GENERAL_PHRASES: Array<{ korean: string; english: string }> = [
   { korean: "다음 장표를 봐 주시기 바랍니다.", english: "If you'll look at the next slide." },
 ];
 
-export function localPrepBrief(input: PrepInput): PrepBrief {
+export function localPrepBrief(
+  input: PrepInput,
+  options: { localOnly?: boolean } = {},
+): PrepBrief {
   const corpus = [input.title, input.notes, input.outline].filter(Boolean).join("\n");
   const sermon = input.mode === "sermon";
 
@@ -99,14 +102,17 @@ export function localPrepBrief(input: PrepInput): PrepBrief {
     uniqueScripture[0] ? `on ${uniqueScripture[0].display}` : null,
   ].filter(Boolean);
 
+  const localExplanation = options.localOnly
+    ? "This brief was assembled locally from your prep sheet, the built-in lexicon and Scripture normalisation. No prep content was sent to an AI provider."
+    : "No interpretation model is configured, so this brief was assembled from your prep sheet, the built-in lexicon and Scripture normalisation. Add an LLM key for a content-aware briefing.";
+
   const overview =
     (overviewParts.length > 1
       ? `${overviewParts.join(" ")}. `
       : sermon
         ? "Sermon session. "
         : "General interpretation session. ") +
-    "No interpretation model is configured, so this brief was assembled from your prep sheet, " +
-    "the built-in lexicon and Scripture normalisation. Add an LLM key for a content-aware briefing.";
+    localExplanation;
 
   return {
     overview,

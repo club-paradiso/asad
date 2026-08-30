@@ -6,7 +6,7 @@
  * Requirement: live interpretation in three interactions or fewer, and an
  * honest answer to four questions before any of them —
  *
- *   Am I ready?   What am I interpreting?   Which microphone?   Can I start?
+ *   Am I ready?   What am I interpreting?   Which input?   Can I start?
  *
  * TWO CONSTRAINTS MEET HERE, and they look like they conflict:
  *
@@ -45,6 +45,8 @@ import { BRAND } from "@/lib/brand";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
+import { useBoothAudioInput } from "./useBoothAudioInput";
+import { isBoothPreflightAcknowledged } from "./booth-preflight-ack";
 import { preferredSttSource } from "./sourcePreference";
 import { useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
@@ -104,6 +106,7 @@ export function StartScreen() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
   const [advanced, setAdvanced] = useState(false);
+  const [boothPreflightVerified, setBoothPreflightVerified] = useState(false);
 
   /** Private-deployment gate, when one is configured. */
   const [gate, setGate] = useState<{
@@ -147,12 +150,33 @@ export function StartScreen() {
   );
 
   const source = sourceOverride ?? configuredSource;
+  const canChooseAudioInput = source !== "demo" && source !== "webspeech";
+  const audioInputs = useBoothAudioInput(canChooseAudioInput);
+  const audioDeviceId = audioInputs.deviceId;
+  const selectedAudioLabel = audioInputs.selectedLabel;
+
+  useEffect(() => {
+    const refresh = () =>
+      setBoothPreflightVerified(
+        settings.mode === "sermon" &&
+          canChooseAudioInput &&
+          isBoothPreflightAcknowledged(audioDeviceId || undefined),
+      );
+
+    refresh();
+    // The acknowledgement is intentionally short-lived. Re-check while the
+    // launcher is left open so a four-hour-old sound check cannot remain green
+    // forever just because nobody navigated away.
+    const timer = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(timer);
+  }, [settings.mode, canChooseAudioInput, audioDeviceId]);
 
   const session = useLiveSession({
     mode: settings.mode,
     lag: settings.lag,
     prep,
     source,
+    audioDeviceId: canChooseAudioInput ? audioDeviceId || undefined : undefined,
   });
 
   // Resolved here, before the tap, so pressing Start can never outrun it.
@@ -167,8 +191,25 @@ export function StartScreen() {
   }, [browserSttAvailable, config]);
 
   const rows = useMemo(
-    () => readinessRows({ config, source, consent: consent.phase }),
-    [config, source, consent.phase],
+    () =>
+      readinessRows({
+        config,
+        mode: settings.mode,
+        source,
+        consent: consent.phase,
+        audioInputLabel: selectedAudioLabel,
+        audioInputSupported: audioInputs.supported,
+        boothPreflightVerified,
+      }),
+    [
+      config,
+      settings.mode,
+      source,
+      consent.phase,
+      selectedAudioLabel,
+      audioInputs.supported,
+      boothPreflightVerified,
+    ],
   );
 
   if (screen === "live") {
@@ -261,7 +302,7 @@ export function StartScreen() {
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
         <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)] pb-6">
           <div className="min-w-0">
-            <h1 className="flex items-center gap-2.5 text-lg font-semibold tracking-[-0.02em]">
+            <h1 className="max-w-3xl break-all text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
               <Wordmark variant="compact" />
               <span className="text-[var(--line-strong)]">/</span>
               <span>라이브 통역</span>
@@ -321,16 +362,44 @@ export function StartScreen() {
                       label: mode === "sermon" ? "설교" : "일반",
                       title:
                         mode === "sermon"
-                          ? "성경 구절 인식, 신학 용어, 교회 말투, 말놀이까지 살핍니다."
+                          ? "교회 통역 부스에서 일하는 통역사를 위한 모드입니다."
                           : "회의 · 강연 · 인터뷰. 신학적 전제 없이 옮깁니다.",
                     }),
                   )}
                 />
               </ControlRow>
 
-              <ControlRow label="소리">
+              <ControlRow label="입력">
+                {source === "demo" ? (
+                  <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
+                    녹음된 한국어 설교
+                  </p>
+                ) : source === "webspeech" ? (
+                  <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
+                    시스템 기본값 · 마이크는 브라우저 인식이 제어합니다
+                  </p>
+                ) : (
+                  <select
+                    aria-label="오디오 입력 장치"
+                    value={audioDeviceId}
+                    onChange={(event) => audioInputs.setDeviceId(event.target.value)}
+                    className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)]"
+                  >
+                    <option value="">시스템 기본값</option>
+                    {audioInputs.devices
+                      .filter((device) => device.deviceId !== "default")
+                      .map((device) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label}
+                        </option>
+                      ))}
+                  </select>
+                )}
+              </ControlRow>
+
+              <ControlRow label="인식">
                 <Segmented
-                  label="소리 입력"
+                  label="음성 인식"
                   indicator
                   value={source}
                   onChange={setSourceOverride}
@@ -362,6 +431,15 @@ export function StartScreen() {
               </p>
             </section>
 
+            {settings.mode === "sermon" && (
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] px-4 py-3 text-sm leading-relaxed text-[var(--fg-muted)]">
+                <strong className="font-semibold text-[var(--fg)]">
+                  부스 모드.
+                </strong>{" "}
+                통역사와 교회의 동시통역 음향 설비가 이미 있다는 전제로 동작합니다. 통역사를 보조할 뿐, 번역을 회중에게 직접 송출하지는 않습니다.
+              </div>
+            )}
+
             <Button
               tone="primary"
               size="lg"
@@ -390,7 +468,7 @@ export function StartScreen() {
             >
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium marker:content-none">
                 <span>
-                  <span className="font-semibold text-[var(--fg)]">
+                  <span className="font-semibold text-[var(--accent)]">
                     시작 전에 챙길 것
                   </span>
                   <span className="ml-2 text-sm text-[var(--fg-muted)]">
@@ -419,9 +497,7 @@ export function StartScreen() {
                 >
                   준비 시트 작성
                   {prep.speaker || prep.title ? (
-                    <span className="ml-1.5 font-semibold text-[var(--ok)]">
-                      · 입력됨
-                    </span>
+                    <span className="ml-1.5 text-[var(--accent)]">· ready</span>
                   ) : null}
                 </Link>
                 <Link
@@ -508,8 +584,12 @@ function ControlRow({
  */
 export function readinessRows(input: {
   config: AppConfig | null;
+  mode?: InterpretationMode;
   source: SttProviderId;
   consent?: string;
+  audioInputLabel?: string;
+  audioInputSupported?: boolean;
+  boothPreflightVerified?: boolean;
 }): ReadinessRow[] {
   const { config, source } = input;
   const demo = source === "demo";
@@ -517,15 +597,39 @@ export function readinessRows(input: {
 
   const audio: ReadinessRow = demo
     ? {
-        label: "소리",
-        value: "녹음된 한국어 설교 — 마이크 없음",
+        label: "입력",
+        value: "녹음된 한국어 설교",
         level: "ready",
       }
-    : {
-        label: "소리",
-        value: SOURCE_LABEL_KO[source] ?? info.label,
-        level: "ready",
-      };
+    : source === "webspeech"
+      ? {
+          label: "입력",
+          value: "시스템 기본 마이크",
+          level: "limited",
+          detail:
+            "입력 장치는 브라우저 음성 인식이 고릅니다. 교회 믹서를 써야 한다면 예배 전에 시스템 입력을 먼저 지정해 두세요.",
+        }
+      : input.audioInputSupported === false
+        ? {
+            label: "입력",
+            value: "이 브라우저는 오디오 입력 목록을 읽지 못합니다",
+            level: "limited",
+          }
+        : input.mode === "sermon" && input.boothPreflightVerified !== true
+          ? {
+              label: "입력",
+              value: `${input.audioInputLabel ?? "시스템 기본값"} · 사전 점검 안 됨`,
+              level: "limited",
+              detail:
+                "부스 사전 점검으로 한국어 프로그램 피드와 mix-minus가 쓸 만한지 확인하세요. 지금 바로 부스를 돌려야 한다면 그대로 시작해도 됩니다.",
+            }
+          : {
+              label: "입력",
+              value: input.audioInputLabel ?? "시스템 기본값",
+              level: "ready",
+              detail:
+                "부스에서는 실내 마이크보다 교회 믹서나 USB 오디오 인터페이스 피드를 쓰는 편이 낫습니다.",
+            };
 
   const recognition: ReadinessRow = demo
     ? {
