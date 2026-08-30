@@ -1,17 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BoothPreflight } from "./BoothPreflight";
 import { useAudioInputs } from "./useAudioInputs";
+import {
+  readPreferredBoothAudioDeviceId,
+  resolvePreferredBoothAudioDeviceId,
+  writePreferredBoothAudioDeviceId,
+} from "./booth-audio-preference";
 
 /** Dedicated hardware check that can be opened before the live console. */
 export function BoothPreflightScreen() {
   const audioInputs = useAudioInputs(true);
   const [deviceId, setDeviceId] = useState("");
+
+  // Restore only after device enumeration so a stale or disconnected USB input
+  // never becomes an invisible selection. If the stored input is absent we
+  // safely remain on System default, while keeping the preference available in
+  // case permission/device enumeration later reveals it.
+  useEffect(() => {
+    if (deviceId || audioInputs.devices.length === 0) return;
+    const preferred = readPreferredBoothAudioDeviceId();
+    const resolved = resolvePreferredBoothAudioDeviceId(preferred, audioInputs.devices);
+    if (resolved) setDeviceId(resolved);
+  }, [audioInputs.devices, deviceId]);
+
   const selectedLabel =
     audioInputs.devices.find((device) => device.deviceId === deviceId)?.label ??
     "System default";
+
+  const chooseDevice = (nextDeviceId: string) => {
+    setDeviceId(nextDeviceId);
+    writePreferredBoothAudioDeviceId(nextDeviceId);
+  };
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-6 px-5 py-8 sm:px-8">
@@ -41,7 +63,7 @@ export function BoothPreflightScreen() {
           <select
             aria-label="Booth preflight audio input"
             value={deviceId}
-            onChange={(event) => setDeviceId(event.target.value)}
+            onChange={(event) => chooseDevice(event.target.value)}
             disabled={!audioInputs.supported}
             className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)] disabled:opacity-50"
           >
@@ -56,7 +78,7 @@ export function BoothPreflightScreen() {
           </select>
         </label>
         <p className="mt-2 text-xs leading-relaxed text-[var(--fg-muted)]">
-          Prefer a direct mixer AUX/MATRIX or USB audio-interface feed. Room microphones are a fallback, not the booth design target.
+          Prefer a direct mixer AUX/MATRIX or USB audio-interface feed. Room microphones are a fallback, not the booth design target. Your selected input is remembered only in this browser.
         </p>
       </section>
 
