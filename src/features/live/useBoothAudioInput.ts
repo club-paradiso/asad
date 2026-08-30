@@ -21,9 +21,17 @@ export function useBoothAudioInput(enabled = true) {
 
   useEffect(() => {
     if (!enabled || deviceId || audioInputs.devices.length === 0) return;
-    const preferred = readPreferredBoothAudioDeviceId();
-    const resolved = resolvePreferredBoothAudioDeviceId(preferred, audioInputs.devices);
-    if (resolved) setDeviceIdState(resolved);
+
+    // Restore after the effect body. Besides satisfying React's effect
+    // discipline, this lets device enumeration settle before the remembered
+    // id is applied and avoids a render/effect feedback loop.
+    const restore = window.setTimeout(() => {
+      const preferred = readPreferredBoothAudioDeviceId();
+      const resolved = resolvePreferredBoothAudioDeviceId(preferred, audioInputs.devices);
+      if (resolved) setDeviceIdState(resolved);
+    }, 0);
+
+    return () => window.clearTimeout(restore);
   }, [audioInputs.devices, deviceId, enabled]);
 
   const setDeviceId = useCallback((nextDeviceId: string) => {
