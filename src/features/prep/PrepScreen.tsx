@@ -230,7 +230,7 @@ export function PrepScreen() {
             : status === "loading"
               ? "Building brief…"
               : consent.phase === "declined" || consent.modelAvailable === false
-                ? "Build local-only brief"
+                ? "Build interpretation brief · local-only"
                 : "Build interpretation brief"}
         </Button>
         {saved && <span className="text-xs text-[var(--fg-dim)]">Saved to this browser</span>}
