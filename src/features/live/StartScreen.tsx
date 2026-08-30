@@ -45,7 +45,7 @@ import type { AppConfig } from "@/app/api/config/route";
 import { BRAND } from "@/lib/brand";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
-import { useAudioInputs } from "./useAudioInputs";
+import { useBoothAudioInput } from "./useBoothAudioInput";
 import { preferredSttSource } from "./sourcePreference";
 import { useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
@@ -61,7 +61,6 @@ export function StartScreen() {
   const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(
     null,
   );
-  const [audioDeviceId, setAudioDeviceId] = useState("");
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
   const [advanced, setAdvanced] = useState(false);
@@ -109,10 +108,9 @@ export function StartScreen() {
 
   const source = sourceOverride ?? configuredSource;
   const canChooseAudioInput = source !== "demo" && source !== "webspeech";
-  const audioInputs = useAudioInputs(canChooseAudioInput);
-  const selectedAudioLabel =
-    audioInputs.devices.find((device) => device.deviceId === audioDeviceId)?.label ??
-    "System default";
+  const audioInputs = useBoothAudioInput(canChooseAudioInput);
+  const audioDeviceId = audioInputs.deviceId;
+  const selectedAudioLabel = audioInputs.selectedLabel;
 
   const session = useLiveSession({
     mode: settings.mode,
@@ -319,7 +317,7 @@ export function StartScreen() {
                   <select
                     aria-label="Audio input device"
                     value={audioDeviceId}
-                    onChange={(event) => setAudioDeviceId(event.target.value)}
+                    onChange={(event) => audioInputs.setDeviceId(event.target.value)}
                     className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)]"
                   >
                     <option value="">System default</option>
