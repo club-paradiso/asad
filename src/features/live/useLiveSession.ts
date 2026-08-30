@@ -190,6 +190,21 @@ export function useLiveSession(options: LiveSessionOptions) {
     engine.start();
     setStartedAt(Date.now());
 
+    // Hardware/provider terminal failures abort the interpreter engine first,
+    // then close capture/provider resources before exposing Try again. Keeping
+    // the engine instance in this closure prevents an old teardown from
+    // overwriting a newer retry session if the user moves quickly.
+    const failTerminally = (message: string) => {
+      setError(message);
+      engine.stop();
+      void teardown().finally(() => {
+        if (engineRef.current !== engine) return;
+        engine.setConnection("error");
+        engine.setHealth("stt", "down", message);
+        setPhase("idle");
+      });
+    };
+
     try {
       // The recogniser gets only the highest-value terms. In sermon mode this
       // includes community-glossary terms that actually occur in today's prep.
@@ -243,7 +258,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         // Tear it down and expose the direct-interaction retry button instead
         // of leaving the UI saying "running" while the microphone is dead.
         if (status === "error") {
-          void teardown().finally(() => setPhase("idle"));
+          failTerminally("Speech recognition stopped unexpectedly. Check the connection, then tap Try again.");
         }
       });
 
@@ -257,9 +272,20 @@ export function useLiveSession(options: LiveSessionOptions) {
           deviceId: current.audioDeviceId || undefined,
           onFrame: (frame) => provider.sendAudio(frame),
           onError: (err) => setError(err.message),
+          onEnded: () => {
+            failTerminally(
+              current.audioDeviceId
+                ? "Selected audio input disconnected. Reconnect it or choose System default, then tap Try again."
+                : "Audio input disconnected. Check the input device, then tap Try again.",
+            );
+          },
         });
         micRef.current = mic;
         await mic.start();
+        // A track can theoretically end while AudioWorklet setup is still
+        // finishing. In that case terminal teardown has already detached this
+        // mic; never let the tail of start() resurrect the session as running.
+        if (micRef.current !== mic) return;
       }
 
       tickRef.current = setInterval(() => engineRef.current?.tick(), TICK_MS);
@@ -269,13 +295,18 @@ export function useLiveSession(options: LiveSessionOptions) {
         err instanceof Error
           ? err.name === "NotAllowedError"
             ? "Microphone permission was denied. Grant access, then tap Try again."
-            : err.message
+            : err.name === "OverconstrainedError" || err.name === "NotFoundError"
+              ? "The selected audio input is unavailable. Reconnect it or choose System default, then tap Try again."
+              : err.message
           : "Could not start the session.";
       setError(message);
-      engineRef.current?.setConnection("error");
-      engineRef.current?.setHealth("stt", "down", message);
+      engine.stop();
       await teardown();
-      setPhase("idle");
+      if (engineRef.current === engine) {
+        engine.setConnection("error");
+        engine.setHealth("stt", "down", message);
+        setPhase("idle");
+      }
     }
   }, [phase, interpret, resolveBible, script, teardown]);
 
