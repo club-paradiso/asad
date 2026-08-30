@@ -13,6 +13,7 @@ import { Button, Label } from "@/components/ui/primitives";
 import { useCapability } from "@/hooks/useCapability";
 
 export type PrivacyDisclosureContext = "live" | "prep";
+export type PrivacyDisclosureChoice = "cloud" | "local-only";
 
 const ACK_KEYS: Record<PrivacyDisclosureContext, string> = {
   live: "tong-yuck:free-tier-privacy-ack",
@@ -26,6 +27,17 @@ export interface DisclosureProvider {
 
 export function privacyAcknowledgementKey(context: PrivacyDisclosureContext): string {
   return ACK_KEYS[context];
+}
+
+/**
+ * Only choosing the cloud path is consent for later cloud use. Selecting the
+ * local-only alternative proves the opposite and must never be persisted as a
+ * cloud permission.
+ */
+export function privacyChoicePersistsCloudAcceptance(
+  choice: PrivacyDisclosureChoice,
+): boolean {
+  return choice === "cloud";
 }
 
 /** Whether this browser has already accepted this workflow's cloud disclosure. */
@@ -100,6 +112,14 @@ export function PrivacyDisclosure({
     setDismissed(true);
   }, [context]);
 
+  const choose = (choice: PrivacyDisclosureChoice) => {
+    if (privacyChoicePersistsCloudAcceptance(choice)) acknowledge();
+    else setDismissed(true);
+
+    if (choice === "cloud") onAccept();
+    else onUseLocalOnly();
+  };
+
   if (!visible) return null;
 
   return (
@@ -138,25 +158,10 @@ export function PrivacyDisclosure({
         </p>
 
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-          <Button
-            tone="primary"
-            className="flex-1"
-            onClick={() => {
-              // Only the path that actually permits cloud use is persisted as
-              // accepted. Choosing local-only is not consent for a later run.
-              acknowledge();
-              onAccept();
-            }}
-          >
+          <Button tone="primary" className="flex-1" onClick={() => choose("cloud")}>
             {copy.accept}
           </Button>
-          <Button
-            className="flex-1"
-            onClick={() => {
-              setDismissed(true);
-              onUseLocalOnly();
-            }}
-          >
+          <Button className="flex-1" onClick={() => choose("local-only")}>
             {copy.localOnly}
           </Button>
         </div>
