@@ -61,4 +61,55 @@ describe("Counter Composer", () => {
     expect(onSend).toHaveBeenCalledWith("I need help", "text");
     expect(screen.queryByText(/Deepgram|OpenAI|provider/i)).toBeNull();
   });
+
+  it("keeps typing enabled while a previous translation is still busy", () => {
+    render(
+      <Composer
+        lang="ko-KR"
+        strings={stringsFor("ko-KR")}
+        busy
+        onSend={vi.fn()}
+      />,
+    );
+    const input = screen.getByPlaceholderText("내용을 입력하세요") as HTMLInputElement;
+    expect(input.disabled).toBe(false);
+    fireEvent.change(input, { target: { value: "다음 문장도 입력돼요" } });
+    expect(input.value).toBe("다음 문장도 입력돼요");
+  });
+
+  it("keeps a submitted typed turn recoverable and prevents accidental duplicate send", () => {
+    const onSend = vi.fn();
+    render(<Composer lang="ko-KR" strings={stringsFor("ko-KR")} onSend={onSend} />);
+    const input = screen.getByPlaceholderText("내용을 입력하세요") as HTMLInputElement;
+    const form = input.closest("form")!;
+
+    fireEvent.change(input, { target: { value: "여권을 보여 주세요" } });
+    fireEvent.submit(form);
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(input.value).toBe("여권을 보여 주세요");
+
+    fireEvent.submit(form);
+    expect(onSend).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(input, { target: { value: "체류카드도 보여 주세요" } });
+    fireEvent.submit(form);
+    expect(onSend).toHaveBeenCalledTimes(2);
+    expect(onSend).toHaveBeenLastCalledWith("체류카드도 보여 주세요", "text");
+  });
+
+  it("does not submit while a Korean IME composition is being committed", () => {
+    const onSend = vi.fn();
+    render(<Composer lang="ko-KR" strings={stringsFor("ko-KR")} onSend={onSend} />);
+    const input = screen.getByPlaceholderText("내용을 입력하세요") as HTMLInputElement;
+    const form = input.closest("form")!;
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "안녕하세요" } });
+    fireEvent.submit(form);
+    expect(onSend).not.toHaveBeenCalled();
+
+    fireEvent.compositionEnd(input);
+    fireEvent.submit(form);
+    expect(onSend).toHaveBeenCalledWith("안녕하세요", "text");
+  });
 });
