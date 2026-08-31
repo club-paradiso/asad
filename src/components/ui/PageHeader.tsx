@@ -18,7 +18,7 @@ export function PageHeader({
         <Link
           href={backHref}
           aria-label={backLabel}
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-[var(--line)] bg-[var(--bg-raised)] text-[var(--fg-muted)] shadow-sm transition-[color,background-color,border-color,transform] hover:-translate-x-0.5 hover:border-[var(--line-strong)] hover:text-[var(--fg)]"
+          className="grid size-11 shrink-0 place-items-center rounded-full border border-[var(--line)] bg-[var(--bg-raised)] text-[var(--fg-muted)] shadow-sm transition-[color,background-color,border-color,transform] hover:-translate-x-0.5 hover:border-[var(--line-strong)] hover:text-[var(--fg)]"
         >
           <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
             <path
