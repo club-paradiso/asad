@@ -121,14 +121,15 @@ export function CounterHostScreen() {
         onFinish={finish}
       />
 
-      {session.error && (
+      {session.error && !session.ended && (
         <p className="bg-[color-mix(in_srgb,var(--danger)_18%,transparent)] px-4 py-2 text-center text-sm text-[var(--danger)]">
           {session.error}
         </p>
       )}
 
-      {/* Waiting, or the code was asked for again: the code is the screen. */}
-      {!guestJoined || showCode ? (
+      {session.ended ? (
+        <HostEndedPanel onNext={next} />
+      ) : !guestJoined || showCode ? (
         <JoinPanel
           code={code}
           deskLabel={view?.deskLabel}
@@ -232,9 +233,11 @@ function HostHeader({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <HeaderButton onClick={onShowCode} active={showingCode}>
-          QR
-        </HeaderButton>
+        {!ended && (
+          <HeaderButton onClick={onShowCode} active={showingCode}>
+            QR
+          </HeaderButton>
+        )}
         <HeaderButton onClick={onNext}>다음 손님</HeaderButton>
         <HeaderButton onClick={onFinish} tone="danger">
           종료
@@ -271,6 +274,35 @@ function HeaderButton({
     >
       {children}
     </button>
+  );
+}
+
+function HostEndedPanel({ onNext }: { onNext: () => void }) {
+  return (
+    <main
+      className="grid min-h-0 flex-1 place-items-center px-5 py-8"
+      role="status"
+      aria-live="assertive"
+    >
+      <section className="w-full max-w-lg rounded-3xl border border-[var(--line)] bg-[var(--bg-raised)] p-7 text-center sm:p-9">
+        <div className="mx-auto grid size-16 place-items-center rounded-full bg-[var(--accent-dim)] text-3xl text-[var(--accent)]" aria-hidden>
+          ✓
+        </div>
+        <h2 className="mt-5 text-2xl font-semibold text-[var(--fg)]">
+          민원인과의 대화가 종료되었습니다
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-[var(--fg-muted)]">
+          이 대화 화면은 닫혔습니다. 다음 손님을 시작하면 새 QR 코드와 새 세션이 만들어집니다.
+        </p>
+        <button
+          type="button"
+          onClick={onNext}
+          className="mt-7 min-h-16 w-full rounded-xl border border-[var(--accent)] bg-[var(--accent)] px-5 text-lg font-semibold text-[var(--accent-contrast)]"
+        >
+          다음 손님 시작
+        </button>
+      </section>
+    </main>
   );
 }
 
