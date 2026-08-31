@@ -70,6 +70,10 @@ export function CounterGuestScreen({ code }: { code: string }) {
     [code],
   );
 
+  const finish = useCallback(async () => {
+    await session.end({ leave: true });
+  }, [session]);
+
   if (!lang) {
     return (
       <LanguagePicker code={code} onChoose={join} joining={joining} error={joinError} />
@@ -102,15 +106,26 @@ export function CounterGuestScreen({ code }: { code: string }) {
           </p>
         </div>
 
-        {canChangeLanguage && (
+        <div className="ms-auto flex items-center gap-2">
+          {canChangeLanguage && (
+            <button
+              type="button"
+              onClick={() => setLang(null)}
+              className="rounded-md border border-[var(--line-strong)] px-3 py-1.5 text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
+            >
+              {t.changeLanguage}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setLang(null)}
-            className="ms-auto rounded-md border border-[var(--line-strong)] px-3 py-1.5 text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
+            onClick={() => void finish()}
+            aria-label={t.ended}
+            title={t.ended}
+            className="grid size-8 place-items-center rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-lg leading-none text-[var(--danger)]"
           >
-            {t.changeLanguage}
+            ×
           </button>
-        )}
+        </div>
       </header>
 
       {session.ended && (
