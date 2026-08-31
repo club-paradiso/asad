@@ -1,24 +1,5 @@
 "use client";
 
-/**
- * The launcher.
- *
- * What was here: two large bordered cards, each with an icon tile, a badge, a
- * three-item ticked feature list and a full-width blue button — a pricing
- * page. It answered "what does this product do?", which is a question nobody
- * arriving at their own tool is asking. The interpreter opening this thirty
- * seconds before a service is asking "which one, and where is the button".
- *
- * So the feature lists are gone and the two modes are two rows. A row is
- * enough: the mode's name is the largest thing on it, one line says who it is
- * for, and the whole row is the target. Both modes now fit above the fold on
- * a 390pt phone, which the cards never did — the second mode used to start
- * below 1350px of scroll.
- *
- * The brand gets the top third and nothing else. Hero, wordmark and tagline
- * are allowed to be strange up there because no task is running yet; from the
- * mode list down, this is a working screen.
- */
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -27,81 +8,83 @@ export function HomeScreen() {
   return (
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
       <div
-        className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-10 px-5 pb-8 sm:px-8"
+        className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col px-5 sm:px-8 lg:px-10"
         style={{
-          paddingTop: "calc(2rem + var(--safe-top))",
-          paddingBottom: "calc(2rem + var(--safe-bottom))",
+          paddingTop: "calc(1.5rem + var(--safe-top))",
+          paddingBottom: "calc(1.5rem + var(--safe-bottom))",
         }}
       >
-        <header className="flex flex-col gap-5">
-          <Wordmark className="text-[1.75rem] sm:text-[2.25rem]" />
-          {/* The tagline is set as a correction: the claim gets struck, the
-              shrug replaces it. This is the one place on the launcher the
-              device appears at full strength — it is the brand statement, and
-              there is no task behind it to obstruct. */}
-          <p className="type-context max-w-md text-[0.9375rem] leading-relaxed text-[var(--fg-muted)]">
-            <span className="brand-struck">정확한 번역</span>{" "}
-            <span className="font-semibold text-[var(--fg)]">
-              아무튼 알아들었으면 된 거 아닌가요.
-            </span>
-          </p>
-        </header>
+        <main className="grid flex-1 items-center gap-10 py-8 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:gap-14 lg:py-12">
+          <section className="flex max-w-xl flex-col gap-6 lg:pr-4">
+            <Wordmark className="text-[2.15rem] sm:text-[2.8rem] lg:text-[3.25rem]" />
 
-        <nav aria-label="모드" className="flex flex-col">
-          <p className="brand-caption mb-3">무엇을 하시나요</p>
+            <div className="flex flex-col gap-3">
+              <p className="max-w-lg text-lg font-medium leading-relaxed tracking-[-0.018em] text-[var(--fg)] sm:text-xl">
+                <span className="brand-struck text-[var(--fg-muted)]">정확한 번역</span>{" "}
+                아무튼 알아들었으면 된 거 아닌가요.
+              </p>
+              <p className="max-w-md text-sm leading-relaxed text-[var(--fg-muted)] sm:text-[0.9375rem]">
+                통역사를 대신하지 않고, 현장에서 놓치기 쉬운 말과 맥락을 빠르게 붙잡아 주는 AI 통역 보조 도구입니다.
+              </p>
+            </div>
 
-          <ModeRow
-            href="/live"
-            title="라이브 통역"
-            who="한 사람이 말하고, 당신이 옮깁니다"
-            detail="설교 · 강연 · 회의"
-            primary
-          />
-          <ModeRow
-            href="/counter"
-            title="현장 응대"
-            who="창구에서 마주 앉아 주고받습니다"
-            detail="QR · 설치 없음"
-          />
-        </nav>
+            <div className="hidden items-center gap-3 text-xs text-[var(--fg-dim)] lg:flex">
+              <span className="font-semibold text-[var(--fg)]">{BRAND.shortName}</span>
+              <span aria-hidden className="h-3 w-px bg-[var(--line-strong)]" />
+              <span>{BRAND.descriptor}</span>
+            </div>
+          </section>
 
-        <div className="flex flex-col gap-3">
-          <p className="brand-caption">그 외</p>
-          <div className="flex flex-col">
-            <QuietRow href="/prep" title="준비 시트" detail="설교자 · 본문 · 용어 미리 넣기" />
-            {/* Added on main while this redesign was in flight. It is a
-                pre-session check, so it belongs with the other pre-session
-                links rather than beside the two modes — the launcher's top
-                half answers "which job", and this is not one. */}
-            <QuietRow
-              href="/booth-preflight"
-              title="부스 사전 점검"
-              detail="믹서 입력 · 신호 레벨 · mix-minus 확인"
-            />
-            <QuietRow href="/sessions" title="지난 세션" detail="복기 · 내보내기" />
-          </div>
-        </div>
+          <section className="flex min-w-0 flex-col gap-7">
+            <div>
+              <p className="brand-caption mb-3">지금 할 일</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ModeCard
+                  href="/live"
+                  title="라이브 통역"
+                  who="한 사람이 말하고, 당신이 옮깁니다"
+                  detail="설교 · 강연 · 회의"
+                  primary
+                />
+                <ModeCard
+                  href="/counter"
+                  title="현장 응대"
+                  who="창구에서 마주 앉아 주고받습니다"
+                  detail="QR · 설치 없음"
+                />
+              </div>
+            </div>
 
-        <p className="mt-auto pt-6 type-context text-[var(--fg-dim)]">
-          {BRAND.shortName} · {BRAND.descriptor} · 현장 응대 기록은 세션
-          동안만 임시 보관됩니다
-        </p>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <p className="brand-caption">도구</p>
+                <span className="text-xs text-[var(--fg-dim)]">시작 전 준비와 기록</span>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] shadow-sm">
+                <QuietRow href="/prep" title="준비 시트" detail="설교자 · 본문 · 용어 미리 넣기" />
+                <QuietRow
+                  href="/booth-preflight"
+                  title="부스 사전 점검"
+                  detail="믹서 입력 · 신호 레벨 · mix-minus 확인"
+                />
+                <QuietRow href="/sessions" title="지난 세션" detail="복기 · 내보내기" last />
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <footer className="flex flex-col gap-2 border-t border-[var(--line)] pt-4 text-xs leading-relaxed text-[var(--fg-dim)] sm:flex-row sm:items-center sm:justify-between">
+          <span className="lg:hidden">
+            {BRAND.shortName} · {BRAND.descriptor}
+          </span>
+          <span>현장 응대 기록은 세션 동안만 임시 보관됩니다</span>
+        </footer>
       </div>
     </div>
   );
 }
 
-/**
- * A mode.
- *
- * The whole row is the link, so the target is ~88px tall rather than the
- * 56px of a button inside a card — which matters more than it sounds, because
- * this is pressed one-handed, in a hurry, often in low light.
- *
- * `primary` is carried by weight and a rule, not by a filled button. Two
- * filled CTAs on one screen is two primary actions, which is none.
- */
-function ModeRow({
+function ModeCard({
   href,
   title,
   who,
@@ -114,38 +97,58 @@ function ModeRow({
   detail: string;
   primary?: boolean;
 }) {
+  const palette = primary
+    ? "border-[var(--brand-ink)] bg-[var(--brand-ink)] text-[var(--brand-paper)] shadow-md"
+    : "border-[var(--line)] bg-[var(--bg-raised)] text-[var(--fg)] shadow-sm";
+
   return (
     <Link
       href={href}
-      className="group flex items-center gap-4 border-b border-[var(--line)] py-5 first:border-t transition-colors hover:bg-[var(--accent-dim)]"
+      className={`group flex min-h-[10.5rem] flex-col justify-between rounded-[1.35rem] border p-5 transition-[transform,box-shadow,border-color,background-color] active:scale-[0.985] sm:min-h-[11.5rem] ${palette} hover:-translate-y-0.5 hover:shadow-lg`}
     >
-      <span className="flex min-w-0 flex-col gap-1">
+      <div className="flex items-start justify-between gap-4">
         <span
           className={
             primary
-              ? "type-display text-2xl leading-tight text-[var(--fg)] sm:text-[1.75rem]"
-              : "type-display text-xl leading-tight text-[var(--fg)] sm:text-2xl"
+              ? "text-xs font-semibold tracking-wide text-[color-mix(in_srgb,var(--brand-paper)_70%,transparent)]"
+              : "text-xs font-semibold tracking-wide text-[var(--fg-dim)]"
           }
         >
+          {detail}
+        </span>
+        <span
+          className={
+            primary
+              ? "grid size-9 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--brand-paper)_12%,transparent)] text-[var(--brand-paper)] transition-transform group-hover:translate-x-0.5"
+              : "grid size-9 shrink-0 place-items-center rounded-full bg-[var(--bg-overlay)] text-[var(--fg)] transition-transform group-hover:translate-x-0.5"
+          }
+        >
+          <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
+            <path
+              d="M5 10h9M10.5 6.5 14 10l-3.5 3.5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="type-display text-[1.7rem] leading-none sm:text-[1.9rem]">
           {title}
         </span>
-        <span className="text-sm leading-snug text-[var(--fg-muted)]">
+        <span
+          className={
+            primary
+              ? "text-sm leading-relaxed text-[color-mix(in_srgb,var(--brand-paper)_72%,transparent)]"
+              : "text-sm leading-relaxed text-[var(--fg-muted)]"
+          }
+        >
           {who}
         </span>
-        <span className="brand-caption mt-0.5">{detail}</span>
-      </span>
-      <svg
-        aria-hidden
-        viewBox="0 0 24 24"
-        className="ms-auto size-5 shrink-0 text-[var(--fg-dim)] transition-transform group-hover:translate-x-0.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M9 6l6 6-6 6" />
-      </svg>
+      </div>
     </Link>
   );
 }
@@ -154,29 +157,37 @@ function QuietRow({
   href,
   title,
   detail,
+  last = false,
 }: {
   href: string;
   title: string;
   detail: string;
+  last?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="flex min-h-14 items-center gap-3 border-b border-[var(--line)] py-3 first:border-t transition-colors hover:bg-[var(--accent-dim)]"
+      className={`group flex min-h-16 items-center gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--accent-dim)] sm:px-5 ${last ? "" : "border-b border-[var(--line)]"}`}
     >
-      <span className="text-sm font-semibold text-[var(--fg)]">{title}</span>
-      <span className="type-context text-[var(--fg-dim)]">{detail}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-[var(--fg)]">{title}</span>
+        <span className="mt-0.5 block truncate text-xs text-[var(--fg-dim)] sm:text-sm">
+          {detail}
+        </span>
+      </span>
       <svg
         aria-hidden
-        viewBox="0 0 24 24"
-        className="ms-auto size-4 shrink-0 text-[var(--fg-dim)]"
+        viewBox="0 0 20 20"
+        className="size-4 shrink-0 text-[var(--fg-dim)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--fg)]"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
       >
-        <path d="M9 6l6 6-6 6" />
+        <path
+          d="m7.5 4.5 5.5 5.5-5.5 5.5"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     </Link>
   );
