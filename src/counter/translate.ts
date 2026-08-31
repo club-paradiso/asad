@@ -1,27 +1,19 @@
 /**
  * Counter translation service.
  *
- * Sits on the existing LLM router, so it inherits the circuit breaker, the
- * fallback chain and the rate-limit awareness for free. Two things differ from
- * the live interpretation path:
- *
- *  1. **Open-weight preference.** Counter Mode defaults to providers serving
- *     open-weight models, which is both the stated requirement and — with Groq
- *     — the best privacy posture available on a free tier.
- *  2. **A more forgiving deadline.** Turn-taking at a counter tolerates a few
- *     seconds in a way simultaneous interpretation never can.
- *
- * There is no local fallback that can translate. When every provider fails the
- * message is marked `failed` and the UI says so plainly, because a counter is
- * exactly the wrong place to silently show something that is not a translation.
+ * General Counter sessions use the shared LLM router and its configured
+ * fallback chain. Refugee and judicial/case-processing profiles take a
+ * deliberately narrower path: OpenRouter with data_collection=deny only.
+ * They never fall through to Google AI Studio or another external provider.
  */
 import "server-only";
 import { llmRouter } from "@/providers/llm";
-import { OPEN_WEIGHT } from "@/providers/llm/router";
-import { appEnv } from "@/lib/env";
+import { LlmRouter, OPEN_WEIGHT } from "@/providers/llm/router";
+import { appEnv, type AppEnv } from "@/lib/env";
 import { parseCounterOutput, type CounterOutput } from "@/lib/schema";
 import { toLlmError } from "@/providers/llm/errors";
 import { telemetry } from "@/lib/telemetry";
+import { isSensitiveCounterProfile } from "./profiles";
 import { COUNTER_JSON_SCHEMA, COUNTER_SYSTEM_PROMPT, buildCounterPrompt } from "./prompt";
 import type { CounterPromptInput } from "./prompt";
 
@@ -40,29 +32,71 @@ export interface TranslationResult {
   error?: string;
 }
 
+/**
+ * Build the router for one Counter turn.
+ *
+ * Sensitive profiles are pinned to OpenRouter and strict privacy. This is not
+ * a preference: it is a hard routing boundary. If OpenRouter is unavailable,
+ * the turn fails rather than sending refugee/judicial content to another cloud.
+ */
+function routerForCounter(input: CounterPromptInput): {
+  router: LlmRouter;
+  sensitive: boolean;
+  policyError?: string;
+} {
+  const env = appEnv();
+  const sensitive = isSensitiveCounterProfile(input.profileId);
+  if (!sensitive) return { router: llmRouter(), sensitive: false };
+
+  if (
+    !env.llm.providers.openrouter.configured ||
+    env.llm.openrouter.policy.dataCollection !== "deny"
+  ) {
+    return {
+      router: new LlmRouter(env),
+      sensitive: true,
+      policyError:
+        "민감업무 보호 모드에서는 수집 차단이 설정된 OpenRouter만 사용할 수 있습니다.",
+    };
+  }
+
+  const sensitiveEnv: AppEnv = {
+    ...env,
+    llm: {
+      ...env.llm,
+      routingMode: "pinned",
+      pinned: "openrouter",
+      privacyMode: "strict",
+      allowPaidFallback: false,
+    },
+  };
+
+  return { router: new LlmRouter(sensitiveEnv), sensitive: true };
+}
+
 export async function translateForCounter(
   input: CounterPromptInput,
 ): Promise<TranslationResult> {
   const started = Date.now();
-  const router = llmRouter();
+  const { router, sensitive, policyError } = routerForCounter(input);
 
-  // Open weights first when asked for, but only as an ordering. If no
-  // open-weight provider is configured the request still goes out: a visitor
-  // at a counter needs an answer more than they need a particular licence.
+  if (policyError) {
+    return { ok: false, latencyMs: Date.now() - started, error: policyError };
+  }
+
+  // Open weights first when asked for, but only as an ordering for general
+  // sessions. The sensitive router is already hard-pinned to OpenRouter.
   const prefer = appEnv().llm.counterPreferOpen ? OPEN_WEIGHT : undefined;
 
   // No cloud provider at all. The local interpreter cannot translate arbitrary
   // language pairs, so say so rather than emit something useless.
-  //
-  // Asked of the same chain `complete` will walk, `prefer` included, so this
-  // check and the request that follows can never disagree about whether a
-  // translation was possible.
   if (!router.wouldReach(prefer)) {
     return {
       ok: false,
       latencyMs: Date.now() - started,
-      error:
-        "No translation provider is configured. Counter Mode needs an LLM key — see docs/counter-mode.md.",
+      error: sensitive
+        ? "민감업무 보호 모드의 허용된 번역 제공자를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
+        : "No translation provider is configured. Counter Mode needs an LLM key — see docs/counter-mode.md.",
     };
   }
 
@@ -85,6 +119,17 @@ export async function translateForCounter(
       },
     );
 
+    // A sensitive request must never report that it reached a second cloud
+    // provider. This assertion is intentionally redundant with the pinned
+    // router so a future routing refactor fails closed rather than leaking.
+    if (sensitive && result.provider !== "openrouter") {
+      return {
+        ok: false,
+        latencyMs: Date.now() - started,
+        error: "민감업무 보호 정책에 따라 번역을 중단했습니다.",
+      };
+    }
+
     const output = parseCounterOutput(result.response.text);
     telemetry.recordSchemaResult(output !== null);
 
@@ -105,8 +150,6 @@ export async function translateForCounter(
       model: result.model,
     });
 
-    // An empty translation is a legitimate answer for unintelligible input, but
-    // it is not something to show as if it were a translation.
     if (!output.translation.trim()) {
       return {
         ok: false,
@@ -130,7 +173,9 @@ export async function translateForCounter(
     return {
       ok: false,
       latencyMs: Date.now() - started,
-      error: llmError.message,
+      error: sensitive
+        ? "민감업무 보호 모드에서는 다른 외부 모델로 자동 전환하지 않습니다. 잠시 후 다시 시도해 주세요."
+        : llmError.message,
     };
   }
 }

@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { resolveCounterRedisConfig, type RedisConfig } from "@/counter/store";
-import type { CounterProfileId } from "@/counter/profiles";
+import { isSensitiveCounterProfile, type CounterProfileId } from "@/counter/profiles";
 import type { TranslationIntegrity } from "@/counter/types";
 import { redactForLearning } from "./privacy";
 import { hasSafetyReviewFlag } from "./review";
@@ -54,24 +54,34 @@ export interface RecordLearningCandidateInput {
  * Raw session codes, participant identities, desk labels and the unredacted
  * utterance never enter this store. Safety-flagged, low-confidence and
  * integrity-mismatched turns are deliberately excluded from training data.
+ *
+ * Refugee and judicial/case-processing profiles are fail-closed: their turns
+ * never enter the Learning Vault at all, even after redaction. Those sessions
+ * exist only in the short-lived Counter session store and are deleted when the
+ * session ends (or its TTL expires).
  */
 export async function recordLearningCandidate(
   input: RecordLearningCandidateInput,
 ): Promise<{ stored: boolean; durable: boolean; reason?: string }> {
+  const durable = !!resolveCounterRedisConfig();
+
+  if (isSensitiveCounterProfile(input.profileId)) {
+    return { stored: false, durable, reason: "sensitive-profile-excluded" };
+  }
   if (hasSafetyReviewFlag(input.reviewFlags)) {
-    return { stored: false, durable: !!resolveCounterRedisConfig(), reason: "safety-review" };
+    return { stored: false, durable, reason: "safety-review" };
   }
   if (input.confidence !== "high") {
-    return { stored: false, durable: !!resolveCounterRedisConfig(), reason: "not-high-confidence" };
+    return { stored: false, durable, reason: "not-high-confidence" };
   }
   if (input.integrity?.status === "mismatch") {
-    return { stored: false, durable: !!resolveCounterRedisConfig(), reason: "integrity-mismatch" };
+    return { stored: false, durable, reason: "integrity-mismatch" };
   }
 
   const source = redactForLearning(input.sourceText);
   const target = redactForLearning(input.modelTranslation);
   if (!source.text || !target.text) {
-    return { stored: false, durable: !!resolveCounterRedisConfig(), reason: "empty-after-redaction" };
+    return { stored: false, durable, reason: "empty-after-redaction" };
   }
 
   const sourceHash = createHash("sha256")
@@ -111,6 +121,8 @@ export function learningVaultInfo(env: NodeJS.ProcessEnv = process.env) {
     retentionDays: redis ? 180 : null,
     rawIdentityStored: false,
     personRiskProfiles: false,
+    sensitiveProfilesStored: false,
+    sensitivePolicy: "session-only" as const,
   };
 }
 
