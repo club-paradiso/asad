@@ -45,7 +45,11 @@ describe("Counter Composer", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "말하기" })); });
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByText(/“9월 7일” 맞나요/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "맞아요" }));
+    fireEvent.click(screen.getByRole("button", { name: "직접 수정" }));
+    expect(onSend).not.toHaveBeenCalled();
+    const input = screen.getByPlaceholderText("내용을 입력하세요") as HTMLInputElement;
+    expect(input.value).toBe("체류기간은 9월 7일까지예요");
+    fireEvent.submit(input.closest("form")!);
     expect(onSend).toHaveBeenCalledWith("체류기간은 9월 7일까지예요", "voice");
   });
 
