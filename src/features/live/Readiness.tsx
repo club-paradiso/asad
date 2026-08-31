@@ -117,7 +117,7 @@ export function Readiness({
                   {isBoothPreflightActionRow(row) && (
                     <Link
                       href="/booth-preflight"
-                      className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg-overlay)] px-3 text-xs font-semibold text-[var(--fg)] transition-[background-color,border-color,transform] hover:-translate-y-px hover:border-[var(--line-strong)] hover:bg-[var(--accent-dim)] sm:text-sm"
+                      className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg-overlay)] px-3 text-xs font-semibold text-[var(--fg)] transition-[background-color,border-color,transform] hover:-translate-y-px hover:border-[var(--line-strong)] hover:bg-[var(--accent-dim)] sm:text-sm"
                     >
                       부스 사전 점검 열기
                       <svg aria-hidden viewBox="0 0 20 20" className="size-3.5" fill="none">
