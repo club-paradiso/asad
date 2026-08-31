@@ -177,13 +177,12 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           return;
         }
 
-        if (this.options.utterance) {
-          this.wantRunning = false;
-          this.emitStatus("closed");
-          return;
-        }
+        // Mobile browsers and WebKit can end a recognition object after a
+        // short pause even with continuous=true. Counter turn completion is
+        // owned by the controller's language-aware silence timer, so restart
+        // here instead of letting the browser chop a multilingual sentence.
         this.emitStatus("reconnecting");
-        this.scheduleRestart(recognition, 350);
+        this.scheduleRestart(recognition, this.options.utterance ? 180 : 350);
       };
 
       try {
