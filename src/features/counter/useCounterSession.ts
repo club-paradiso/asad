@@ -25,6 +25,7 @@ import type {
 const POLL_ACTIVE_MS = 1200;
 const POLL_HIDDEN_MS = 8000;
 const REMOTE_END_NOTICE_MS = 2200;
+const SEND_RETRY_DELAYS_MS = [0, 400, 1100] as const;
 
 export interface SendInput {
   text: string;
@@ -38,6 +39,18 @@ export interface EndOptions {
   /** Leave Counter Mode after the server session has been discarded. */
   leave?: boolean;
 }
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const newMessageRequestId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+};
+
+const retryableStatus = (status: number): boolean =>
+  status === 408 || status === 425 || status === 429 || status >= 500;
 
 export function useCounterSession(code: string | null, role: Participant) {
   // Both sides reach a model, so both need authorising before they type.
@@ -130,20 +143,12 @@ export function useCounterSession(code: string | null, role: Participant) {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    // Closing/reloading/navigating away should also release the other side.
-    // `keepalive` is the most reliable cross-browser best effort available for
-    // a DELETE during page teardown; the server TTL remains the final fallback.
-    const onPageHide = () => {
-      if (stopped.current) return;
-      stopped.current = true;
-      void fetch(`/api/counter/session?code=${encodeURIComponent(code)}`, {
-        method: "DELETE",
-        keepalive: true,
-      }).catch(() => {});
-    };
-    window.addEventListener("pagehide", onPageHide);
-
     return () => {
+      // Do not DELETE on pagehide/unmount. Mobile Safari and Chrome can fire
+      // lifecycle events while switching apps, opening the camera, or reclaiming
+      // memory. Treating that as an explicit hang-up was terminating healthy
+      // conversations. Explicit End still deletes immediately; Redis TTL cleans
+      // up abandoned sessions.
       stopped.current = true;
       clearTimeout(timer);
       if (leaveTimer.current) {
@@ -151,7 +156,6 @@ export function useCounterSession(code: string | null, role: Participant) {
         leaveTimer.current = null;
       }
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("pagehide", onPageHide);
     };
   }, [code, poll]);
 
@@ -163,6 +167,7 @@ export function useCounterSession(code: string | null, role: Participant) {
       pendingSends.current += 1;
       setSending(true);
       setError(null);
+      const requestId = newMessageRequestId();
 
       let resolveResult: (message: CounterMessage | null) => void = () => {};
       const result = new Promise<CounterMessage | null>((resolve) => {
@@ -170,27 +175,49 @@ export function useCounterSession(code: string | null, role: Participant) {
       });
 
       const run = async () => {
+        let lastError = "Network problem — check the connection and try again.";
+
         try {
-          const response = await guardedFetch("/api/counter/message", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ code, from: role, ...input, text }),
-          });
-          const data = (await response.json()) as {
-            message?: CounterMessage;
-            error?: string;
-          };
-          if (!response.ok || !data.message) {
-            setError(data.error ?? "Could not send that.");
-            resolveResult(null);
-            return;
+          for (let attempt = 0; attempt < SEND_RETRY_DELAYS_MS.length; attempt += 1) {
+            const delay = SEND_RETRY_DELAYS_MS[attempt];
+            if (delay > 0) await sleep(delay);
+
+            try {
+              const response = await guardedFetch("/api/counter/message", {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  "x-asad-message-id": requestId,
+                },
+                body: JSON.stringify({ code, from: role, ...input, text }),
+              });
+              const data = (await response.json().catch(() => ({}))) as {
+                message?: CounterMessage;
+                error?: string;
+              };
+
+              if (response.ok && data.message) {
+                merge([data.message]);
+                cursor.current = Math.max(cursor.current, data.message.seq);
+                resolveResult(data.message);
+                return;
+              }
+
+              lastError = data.error ?? `Could not send that (${response.status}).`;
+              const mayRetry = retryableStatus(response.status);
+              if (!mayRetry || attempt === SEND_RETRY_DELAYS_MS.length - 1) {
+                setError(lastError);
+                resolveResult(null);
+                return;
+              }
+            } catch {
+              if (attempt === SEND_RETRY_DELAYS_MS.length - 1) {
+                setError(lastError);
+                resolveResult(null);
+                return;
+              }
+            }
           }
-          merge([data.message]);
-          cursor.current = Math.max(cursor.current, data.message.seq);
-          resolveResult(data.message);
-        } catch {
-          setError("Network problem — check the connection and try again.");
-          resolveResult(null);
         } finally {
           pendingSends.current = Math.max(0, pendingSends.current - 1);
           setSending(pendingSends.current > 0);
@@ -202,7 +229,12 @@ export function useCounterSession(code: string | null, role: Participant) {
       sendQueue.current = sendQueue.current
         .catch(() => {})
         .then(run)
-        .catch(() => {});
+        .catch(() => {
+          pendingSends.current = Math.max(0, pendingSends.current - 1);
+          setSending(pendingSends.current > 0);
+          setError("Network problem — check the connection and try again.");
+          resolveResult(null);
+        });
 
       return result;
     },
