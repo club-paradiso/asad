@@ -29,7 +29,7 @@ export function Composer({
   busy?: boolean;
 }) {
   const [draft, setDraft] = useState("");
-  const [submittedText, setSubmittedText] = useState<string | null>(null);
+  const [recoverableText, setRecoverableText] = useState<string | null>(null);
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
@@ -39,16 +39,27 @@ export function Composer({
 
   const submit = useCallback(() => {
     const text = draft.trim();
-    if (!text || disabled || composing.current || submittedText === text) return;
+    if (!text || disabled || composing.current) return;
 
-    // Do not destroy the user's words before the network has had a chance to
-    // fail. Keep the submitted turn selected in the field: the next keystroke
-    // naturally replaces it, while a dropped request leaves the exact original
-    // text recoverable. submittedText also blocks accidental Enter double-send.
-    setSubmittedText(text);
+    // Keep one in-memory recovery copy before clearing the field. This lets the
+    // next turn be typed immediately while translation is still running, but a
+    // dropped request never destroys the only copy of what the person typed.
+    setRecoverableText(text);
+    setDraft("");
     onSend(text, "text");
-    queueMicrotask(() => inputRef.current?.select());
-  }, [draft, disabled, onSend, submittedText]);
+    queueMicrotask(() => inputRef.current?.focus());
+  }, [draft, disabled, onSend]);
+
+  const restoreTypedTurn = useCallback(() => {
+    if (!recoverableText) return;
+    setDraft(recoverableText);
+    setRecoverableText(null);
+    queueMicrotask(() => {
+      inputRef.current?.focus();
+      const end = recoverableText.length;
+      inputRef.current?.setSelectionRange(end, end);
+    });
+  }, [recoverableText]);
 
   const startVoice = useCallback(() => {
     if (disabled) return;
@@ -88,7 +99,6 @@ export function Composer({
             : copy.speak;
   const failureCopy = voice.failure ? copy.failure(voice.failure) : null;
   const cleanDraft = draft.trim();
-  const alreadySubmitted = !!cleanDraft && submittedText === cleanDraft;
 
   return (
     <div
@@ -198,9 +208,7 @@ export function Composer({
             onChange={(event) => {
               const value = event.target.value;
               setDraft(value);
-              if (submittedText !== null && value.trim() !== submittedText) {
-                setSubmittedText(null);
-              }
+              if (value.trim()) setRecoverableText(null);
             }}
             onCompositionStart={() => {
               composing.current = true;
@@ -231,9 +239,20 @@ export function Composer({
               "focus:border-[var(--accent)] focus:outline-none disabled:opacity-40",
             )}
           />
+          {recoverableText && cleanDraft.length === 0 && (
+            <button
+              type="button"
+              onClick={restoreTypedTurn}
+              aria-label={restoreLabel(lang)}
+              title={restoreLabel(lang)}
+              className="grid min-h-12 min-w-12 shrink-0 place-items-center rounded-full border border-[var(--line-strong)] text-xl text-[var(--fg-muted)]"
+            >
+              ↩
+            </button>
+          )}
           <button
             type="submit"
-            disabled={disabled || cleanDraft.length === 0 || alreadySubmitted}
+            disabled={disabled || cleanDraft.length === 0}
             className={cn(
               "min-h-12 shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent)] px-5",
               "text-base font-semibold text-[var(--accent-contrast)] transition-opacity",
@@ -246,6 +265,13 @@ export function Composer({
       </div>
     </div>
   );
+}
+
+function restoreLabel(language: string): string {
+  if (language.startsWith("ko")) return "방금 입력 복원";
+  if (language.startsWith("zh")) return "恢复刚才的输入";
+  if (language.startsWith("ja")) return "直前の入力を復元";
+  return "Restore previous text";
 }
 
 function MicIcon() {
