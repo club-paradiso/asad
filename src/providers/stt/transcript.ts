@@ -18,11 +18,34 @@ const SCRIPT_TESTS: Record<string, RegExp> = {
   my: /[\u1000-\u109f\uaa60-\uaa7f]/u,
 };
 
+// A deliberately small, high-signal set rather than pretending script
+// conversion is a dictionary. These characters commonly distinguish public-
+// service phrases and let us break ties when WebSpeech returns both variants.
+const SIMPLIFIED_HINT = /[这国证签办体门长话发务关续请号录处华]/u;
+const TRADITIONAL_HINT = /[這國證簽辦體門長話發務關續請號錄處華]/u;
+
 const baseLanguage = (language: string | undefined) =>
   (language ?? "").split("-")[0]?.toLowerCase() ?? "";
 
 const cleanupJoined = (value: string) =>
   value.replace(/\s+([,.!?;:，。！？；：])/gu, "$1").trim();
+
+const chineseVariantBonus = (text: string, language: string | undefined): number => {
+  const tag = (language ?? "").toLowerCase();
+  if (tag === "zh-cn") {
+    return [...text].reduce(
+      (score, char) => score + (SIMPLIFIED_HINT.test(char) ? 0.08 : TRADITIONAL_HINT.test(char) ? -0.08 : 0),
+      0,
+    );
+  }
+  if (tag === "zh-tw") {
+    return [...text].reduce(
+      (score, char) => score + (TRADITIONAL_HINT.test(char) ? 0.08 : SIMPLIFIED_HINT.test(char) ? -0.08 : 0),
+      0,
+    );
+  }
+  return 0;
+};
 
 /**
  * Select the recognition alternative that best matches the script expected for
@@ -45,7 +68,11 @@ export function pickSpeechAlternative(
     if (!compact.length) return -1;
     const expected = compact.filter((char) => script.test(char)).length;
     const latin = compact.filter((char) => /[A-Za-z]/u.test(char)).length;
-    return expected / compact.length - latin / compact.length * 0.2;
+    return (
+      expected / compact.length -
+      (latin / compact.length) * 0.2 +
+      chineseVariantBonus(text, language)
+    );
   };
 
   return usable.reduce((best, candidate) =>
