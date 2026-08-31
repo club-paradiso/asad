@@ -172,7 +172,9 @@ export async function POST(request: Request) {
     });
   }
 
-  const recent = session.messages.slice(-4).map((m) => ({
+  // Six turns is still compact enough for free-tier models, but gives short
+  // multilingual replies enough context to resolve pronouns and omitted subjects.
+  const recent = session.messages.slice(-6).map((m) => ({
     from: m.from,
     text: m.originalText,
     lang: m.originalLang,
