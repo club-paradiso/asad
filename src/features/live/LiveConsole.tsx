@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SessionSettings, StoredSession } from "@/types";
 import { activeChunk } from "@/interpreter/engine/chunks";
+import type { EngineSnapshot } from "@/interpreter/engine/session";
 import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useHotkeys } from "@/hooks/useHotkeys";
@@ -116,27 +117,28 @@ export function LiveConsole({
     [settings, onSettingsChange],
   );
 
-  const buildStoredSession = useCallback((): StoredSession => {
-    return {
+  const buildStoredSession = useCallback(
+    (sourceSnapshot: EngineSnapshot = snapshot): StoredSession => ({
       id: `session-${startedAt ?? Date.now()}`,
       startedAt: startedAt ?? Date.now(),
       endedAt: Date.now(),
       mode: settings.mode,
       title: prep.title,
       speaker: prep.speaker,
-      segments: snapshot.segments,
-      chunks: snapshot.chunks.filter((c) => c.state !== "anticipated"),
-      scripture: snapshot.scripture,
-      glossary: snapshot.glossary,
-      culturalNotes: snapshot.culturalNotes,
-      entities: snapshot.entities,
-      corrections: snapshot.corrections,
-    };
-  }, [snapshot, settings.mode, prep, startedAt]);
+      segments: sourceSnapshot.segments,
+      chunks: sourceSnapshot.chunks.filter((c) => c.state !== "anticipated"),
+      scripture: sourceSnapshot.scripture,
+      glossary: sourceSnapshot.glossary,
+      culturalNotes: sourceSnapshot.culturalNotes,
+      entities: sourceSnapshot.entities,
+      corrections: sourceSnapshot.corrections,
+    }),
+    [snapshot, settings.mode, prep, startedAt],
+  );
 
   const handleEnd = useCallback(async () => {
-    await stop();
-    const stored = buildStoredSession();
+    const finalSnapshot = await stop();
+    const stored = buildStoredSession(finalSnapshot);
     // Nothing is written unless the interpreter asked for it.
     if (settings.saveHistory) saveSession(stored);
     onEnd(settings.saveHistory ? stored : null);
@@ -242,11 +244,7 @@ export function LiveConsole({
         )}
 
         {rescueAvailable && !settingsOpen && (
-          <LiveRescueOverlay
-            snapshot={snapshot}
-            prep={prep}
-            startedAt={startedAt}
-          />
+          <LiveRescueOverlay snapshot={snapshot} prep={prep} startedAt={startedAt} />
         )}
 
         {frozen && (
@@ -322,7 +320,9 @@ export function LiveConsole({
           })
         }
         showKorean={settings.showKorean}
-        onToggleKorean={() => onSettingsChange({ ...settings, showKorean: !settings.showKorean })}
+        onToggleKorean={() =>
+          onSettingsChange({ ...settings, showKorean: !settings.showKorean })
+        }
         showGlossary={settings.showGlossary}
         onToggleGlossary={() =>
           onSettingsChange({ ...settings, showGlossary: !settings.showGlossary })
