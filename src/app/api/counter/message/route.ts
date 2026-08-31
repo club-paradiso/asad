@@ -23,7 +23,6 @@ import { recordLearningCandidate } from "@/learning/vault";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** One counter utterance. Generous for a typed paragraph, useless for a flood. */
 const MAX_BODY_BYTES = 16 * 1024;
 const MESSAGE_ID_RE = /^[A-Za-z0-9._:-]{8,96}$/;
 
@@ -31,9 +30,6 @@ let counter = 0;
 const nextId = () => `m${Date.now().toString(36)}${(counter += 1).toString(36)}`;
 
 export async function POST(request: Request) {
-  // The counter reaches a model too, so it is guarded on the same terms. A
-  // visitor's phone loads the app before it can post, so it holds a session
-  // token like any other client.
   const guarded = await guardInferenceRoute(request, {
     requireSession: true,
     maxBodyBytes: MAX_BODY_BYTES,
@@ -67,9 +63,6 @@ export async function POST(request: Request) {
   const { from, source, rephraseOf, action, actionOf } = parsed.data;
   let text = parsed.data.text;
 
-  // A network can drop the response after Redis already accepted the turn. The
-  // client retries the same request id; return the stored message rather than
-  // translating and displaying it a second time.
   if (clientRequestId) {
     const duplicate = session.messages.find(
       (message) => message.from === from && message.clientRequestId === clientRequestId,
@@ -93,8 +86,6 @@ export async function POST(request: Request) {
     if (!original || original.source === "quick-phrase" || original.source === "confirm") {
       return NextResponse.json({ error: "That message cannot be translated again." }, { status: 400 });
     }
-    // The stored utterance is authoritative. A client cannot alter the facts
-    // while asking the server to simplify or retry an earlier translation.
     text = original.originalText;
   }
   const originalLang = sourceLangFor(session, from);
@@ -127,7 +118,6 @@ export async function POST(request: Request) {
     return { message: persisted, duplicate };
   };
 
-  /* --- Quick phrases: no model, no latency, no variance ----------------- */
   if (source === "quick-phrase") {
     const resolved = resolveQuickPhrase(text, originalLang, targetLang);
     if (resolved) {
@@ -154,11 +144,8 @@ export async function POST(request: Request) {
         duplicate: persisted.duplicate,
       });
     }
-    // Missing translation for this language pair — fall through to the model
-    // rather than showing the wrong language.
   }
 
-  /* --- Confirmation read-back ------------------------------------------- */
   if (source === "confirm") {
     const message: Omit<CounterMessage, "seq"> = {
       id: nextId(),
@@ -185,10 +172,10 @@ export async function POST(request: Request) {
     });
   }
 
-  /* --- Model path -------------------------------------------------------- */
   const recent = session.messages.slice(-4).map((m) => ({
     from: m.from,
     text: m.originalText,
+    lang: m.originalLang,
   }));
 
   const result = await translateForCounter({
@@ -196,6 +183,7 @@ export async function POST(request: Request) {
     sourceLang: originalLang,
     targetLang,
     recent,
+    inputMode: source === "voice" ? "voice" : "text",
     rephrase: !!rephraseOf,
     action,
     deskLabel: session.deskLabel,
@@ -252,9 +240,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
 
-  // Learning storage is deliberately downstream of translation and session
-  // persistence. A vault outage must never block two people trying to talk.
-  // A duplicate retry must not become a duplicate learning example either.
   if (!persisted.duplicate && message.status === "done") {
     try {
       await recordLearningCandidate({
@@ -268,8 +253,6 @@ export async function POST(request: Request) {
         reviewFlags: message.reviewFlags,
       });
     } catch {
-      // No content in logs: the storage failure is less important than keeping
-      // a potentially sensitive utterance out of observability systems.
       console.warn("Learning Vault write failed.");
     }
   }
