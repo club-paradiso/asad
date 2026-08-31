@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { StartScreen } from "@/features/live/StartScreen";
 import { BRAND } from "@/lib/brand";
+import styles from "./live-page.module.css";
 
 const title = `라이브 통역 · ${BRAND.name}`;
 
@@ -23,5 +24,9 @@ export const metadata: Metadata = {
 };
 
 export default function LivePage() {
-  return <StartScreen />;
+  return (
+    <div className={styles.page}>
+      <StartScreen />
+    </div>
+  );
 }
