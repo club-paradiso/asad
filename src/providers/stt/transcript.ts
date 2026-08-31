@@ -18,20 +18,20 @@ const SCRIPT_TESTS: Record<string, RegExp> = {
   my: /[\u1000-\u109f\uaa60-\uaa7f]/u,
 };
 
-// A deliberately small, high-signal set rather than pretending script
-// conversion is a dictionary. These characters commonly distinguish public-
-// service phrases and let us break ties when WebSpeech returns both variants.
 const SIMPLIFIED_HINT = /[这国证签办体门长话发务关续请号录处华]/u;
 const TRADITIONAL_HINT = /[這國證簽辦體門長話發務關續請號錄處華]/u;
 
+// STT defaults to Korean elsewhere in the app (webSpeechLanguage/deepgramLanguage).
+// Keep helpers consistent when a caller omits a language rather than inventing
+// an accidental third default that changes spacing/alternative ranking.
 const baseLanguage = (language: string | undefined) =>
-  (language ?? "").split("-")[0]?.toLowerCase() ?? "";
+  (language ?? "ko-KR").split("-")[0]?.toLowerCase() ?? "ko";
 
 const cleanupJoined = (value: string) =>
   value.replace(/\s+([,.!?;:，。！？；：])/gu, "$1").trim();
 
 const chineseVariantBonus = (text: string, language: string | undefined): number => {
-  const tag = (language ?? "").toLowerCase();
+  const tag = (language ?? "ko-KR").toLowerCase();
   if (tag === "zh-cn") {
     return [...text].reduce(
       (score, char) => score + (SIMPLIFIED_HINT.test(char) ? 0.08 : TRADITIONAL_HINT.test(char) ? -0.08 : 0),
@@ -47,11 +47,6 @@ const chineseVariantBonus = (text: string, language: string | undefined): number
   return 0;
 };
 
-/**
- * Select the recognition alternative that best matches the script expected for
- * the chosen language. Browsers sometimes rank a Latin-looking phonetic guess
- * above the native-script result for Chinese, Arabic, Hindi, etc.
- */
 export function pickSpeechAlternative(
   alternatives: readonly string[],
   language: string | undefined,
