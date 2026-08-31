@@ -1,6 +1,7 @@
 /** Language-aware transcript cleanup shared by browser and cloud STT paths. */
 
 const NO_SPACE_BASES = new Set(["zh", "ja", "th", "km", "my"]);
+const BROWSER_RESULT_NO_SPACE_BASES = new Set([...NO_SPACE_BASES, "ko"]);
 
 const SCRIPT_TESTS: Record<string, RegExp> = {
   ko: /[\uac00-\ud7a3\u1100-\u11ff]/u,
@@ -19,6 +20,9 @@ const SCRIPT_TESTS: Record<string, RegExp> = {
 
 const baseLanguage = (language: string | undefined) =>
   (language ?? "").split("-")[0]?.toLowerCase() ?? "";
+
+const cleanupJoined = (value: string) =>
+  value.replace(/\s+([,.!?;:，。！？；：])/gu, "$1").trim();
 
 /**
  * Select the recognition alternative that best matches the script expected for
@@ -49,7 +53,7 @@ export function pickSpeechAlternative(
   );
 }
 
-/** Join recognition chunks without injecting unnatural spaces into CJK/Thai/etc. */
+/** Join separate STT chunks. Stable Korean chunks are words/phrases, so retain spaces. */
 export function joinTranscriptParts(
   parts: readonly string[],
   language: string | undefined,
@@ -57,5 +61,21 @@ export function joinTranscriptParts(
   const clean = parts.map((part) => part.trim()).filter(Boolean);
   if (!clean.length) return "";
   const separator = NO_SPACE_BASES.has(baseLanguage(language)) ? "" : " ";
-  return clean.join(separator).replace(/\s+([,.!?;:，。！？；：])/gu, "$1").trim();
+  return cleanupJoined(clean.join(separator));
+}
+
+/**
+ * Join multiple result slots from ONE browser recognition event. WebSpeech can
+ * split a single Korean lexical item across slots (안녕 + 하세요); historically
+ * those slots were concatenated verbatim. Keep that behavior for Korean while
+ * still using normal word spacing between independently stable STT chunks.
+ */
+export function joinBrowserResultParts(
+  parts: readonly string[],
+  language: string | undefined,
+): string {
+  const clean = parts.map((part) => part.trim()).filter(Boolean);
+  if (!clean.length) return "";
+  const separator = BROWSER_RESULT_NO_SPACE_BASES.has(baseLanguage(language)) ? "" : " ";
+  return cleanupJoined(clean.join(separator));
 }
