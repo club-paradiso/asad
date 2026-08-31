@@ -39,6 +39,42 @@ import { guardedFetch } from "@/lib/session-client";
 
 /** How often the engine's clock advances. 200ms is well inside human latency. */
 const TICK_MS = 200;
+/** Short retries only. Live work cannot wait through a conventional API backoff. */
+const INTERPRET_RETRY_DELAYS_MS = [0, 350, 900] as const;
+/** Give recognisers a moment to emit their final result after capture is sealed. */
+const FINAL_STT_SETTLE_MS = 160;
+/** Do not let End hang indefinitely on a free model or bad venue network. */
+const FINAL_INFLIGHT_WAIT_MS = 2200;
+const FINAL_FLUSH_WAIT_MS = 2800;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const abortableSleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("aborted", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+
+const retryableInterpretStatus = (status: number) =>
+  status === 408 || status === 425 || status === 429 || status >= 500;
+
+const retryAfterMs = (response: Response): number | null => {
+  const raw = response.headers.get("retry-after");
+  if (!raw) return null;
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
+};
 
 export type SessionPhase = "idle" | "starting" | "running" | "ended";
 
@@ -98,11 +134,24 @@ export function useLiveSession(options: LiveSessionOptions) {
   /** One interpretation call. Demo mode never touches the network. */
   const interpret = useCallback(
     async (request: InterpretRequest, signal: AbortSignal): Promise<InterpretResult> => {
+      const localFallback = (reason: string): InterpretResult => {
+        setLastProvider("local");
+        return {
+          output: interpretLocally({
+            pending: request.pending,
+            mode: request.mode,
+            scriptId: optionsRef.current.source === "demo" ? script.id : undefined,
+            allowAnticipation: request.allowAnticipation,
+          }),
+          degraded: true,
+          reason,
+        };
+      };
+
       if (optionsRef.current.source === "demo") {
         // Simulated model latency, so demo mode shows the real rhythm of the
         // console rather than an impossibly instant one.
-        await new Promise((resolve) => setTimeout(resolve, 420));
-        if (signal.aborted) throw new DOMException("aborted", "AbortError");
+        await abortableSleep(420, signal);
         setLastProvider("local");
         return {
           output: interpretLocally({
@@ -114,34 +163,69 @@ export function useLiveSession(options: LiveSessionOptions) {
         };
       }
 
-      const response = await guardedFetch("/api/interpret", {
-        method: "POST",
-        signal,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(request),
-      });
+      let lastFailure = "Interpretation network request failed.";
 
-      if (!response.ok) {
-        // 429 is the one status worth naming: it is the deployment protecting
-        // itself, not a fault, and the console recovers on the next turn.
-        throw new Error(
-          response.status === 429
-            ? "Interpretation is being rate limited — slowing down."
-            : `Interpretation request failed (${response.status}).`,
-        );
+      for (let attempt = 0; attempt < INTERPRET_RETRY_DELAYS_MS.length; attempt += 1) {
+        if (attempt > 0) {
+          await abortableSleep(INTERPRET_RETRY_DELAYS_MS[attempt], signal);
+        }
+
+        try {
+          const response = await guardedFetch("/api/interpret", {
+            method: "POST",
+            signal,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(request),
+          });
+
+          if (response.ok) {
+            const data = (await response.json()) as {
+              output: unknown;
+              provider?: string;
+              degraded?: boolean;
+              reason?: string;
+            };
+            const parsed = interpreterOutputSchema.safeParse(data.output);
+            if (!parsed.success) {
+              return localFallback(
+                "The interpretation response was malformed — this turn used the local fallback.",
+              );
+            }
+
+            setLastProvider(data.provider);
+            return { output: parsed.data, degraded: data.degraded, reason: data.reason };
+          }
+
+          lastFailure =
+            response.status === 429
+              ? "The free interpretation provider is temporarily rate limited."
+              : `Interpretation request failed (${response.status}).`;
+
+          if (
+            !retryableInterpretStatus(response.status) ||
+            attempt === INTERPRET_RETRY_DELAYS_MS.length - 1
+          ) {
+            return localFallback(`${lastFailure} This turn used the local fallback instead.`);
+          }
+
+          // Honour a small Retry-After when present, but never let a server-side
+          // abuse window turn into a long blank patch in a live sermon.
+          const serverDelay = retryAfterMs(response);
+          if (serverDelay && serverDelay <= 1500) {
+            await abortableSleep(serverDelay, signal);
+          }
+        } catch (err) {
+          if (signal.aborted || (err instanceof Error && err.name === "AbortError")) throw err;
+          lastFailure = err instanceof Error ? err.message : "Interpretation network request failed.";
+          if (attempt === INTERPRET_RETRY_DELAYS_MS.length - 1) {
+            return localFallback(
+              `${lastFailure} The connection did not recover, so this turn used the local fallback.`,
+            );
+          }
+        }
       }
 
-      const data = (await response.json()) as {
-        output: unknown;
-        provider?: string;
-        degraded?: boolean;
-        reason?: string;
-      };
-      const parsed = interpreterOutputSchema.safeParse(data.output);
-      if (!parsed.success) throw new Error("Interpretation response failed validation.");
-
-      setLastProvider(data.provider);
-      return { output: parsed.data, degraded: data.degraded, reason: data.reason };
+      return localFallback(`${lastFailure} This turn used the local fallback.`);
     },
     [script.id],
   );
@@ -162,10 +246,38 @@ export function useLiveSession(options: LiveSessionOptions) {
     providerRef.current = null;
   }, []);
 
-  const stop = useCallback(async () => {
-    engineRef.current?.stop();
+  const stop = useCallback(async (): Promise<EngineSnapshot> => {
+    const engine = engineRef.current;
+
+    // Seal STT first while the engine is still alive. Browser/cloud recognisers
+    // may emit one last stable transcript as capture closes; stopping the engine
+    // first used to throw that final sentence away.
     await teardown();
+    if (!engine) {
+      const finalSnapshot = emptySnapshot();
+      setSnapshot(finalSnapshot);
+      setPhase("ended");
+      return finalSnapshot;
+    }
+
+    await sleep(FINAL_STT_SETTLE_MS);
+
+    // Let a turn that was already in flight finish if it is close. A hard cap
+    // keeps End responsive on poor venue Wi-Fi and free-provider stalls.
+    const waitUntil = Date.now() + FINAL_INFLIGHT_WAIT_MS;
+    while (engine.snapshot().thinking && Date.now() < waitUntil) {
+      await sleep(80);
+    }
+
+    if (!engine.snapshot().thinking) {
+      await Promise.race([engine.flushPending(), sleep(FINAL_FLUSH_WAIT_MS)]);
+    }
+
+    engine.stop();
+    const finalSnapshot = engine.snapshot();
+    setSnapshot(finalSnapshot);
     setPhase("ended");
+    return finalSnapshot;
   }, [teardown]);
 
   const start = useCallback(async () => {
@@ -213,18 +325,23 @@ export function useLiveSession(options: LiveSessionOptions) {
       const credentials =
         current.source === "demo" || current.source === "webspeech"
           ? undefined
-          : ((await fetchSttCredentials()) ?? undefined);
+          : ((await fetchSttCredentials("ko-KR", undefined, "live")) ?? undefined);
 
-      // A cloud provider that turns out to be unconfigured falls back to demo
-      // rather than opening a console that cannot hear anything.
-      const effectiveSource: SttProviderId =
-        credentials && credentials.provider !== current.source
-          ? credentials.provider
-          : current.source;
+      // Never silently replace a real microphone with the scripted demo. That
+      // looked like a successful session while listening to nothing the speaker
+      // actually said. The launcher normally prevents this state; if deployment
+      // configuration changes underneath an open page, fail visibly instead.
+      if (current.source !== "demo" && current.source !== "webspeech" && !credentials) {
+        throw new Error(
+          `${current.source} speech recognition is not configured. Return to the start screen and choose Browser input.`,
+        );
+      }
+
+      const effectiveSource: SttProviderId = credentials?.provider ?? current.source;
 
       if (effectiveSource !== current.source) {
         setError(
-          `${current.source} is not configured on the server — running the scripted demo instead.`,
+          `The server selected ${effectiveSource} speech recognition instead of ${current.source}.`,
         );
       }
 
@@ -258,7 +375,9 @@ export function useLiveSession(options: LiveSessionOptions) {
         // Tear it down and expose the direct-interaction retry button instead
         // of leaving the UI saying "running" while the microphone is dead.
         if (status === "error") {
-          failTerminally("Speech recognition stopped unexpectedly. Check the connection, then tap Try again.");
+          failTerminally(
+            "Speech recognition stopped unexpectedly. Check the connection, then tap Try again.",
+          );
         }
       });
 
