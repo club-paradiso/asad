@@ -204,8 +204,8 @@ export function Segmented<T extends string>({
               "inline-flex items-center justify-center gap-1.5 rounded-lg",
               INTERACTIVE,
               size === "sm"
-                ? "min-h-10 px-2.5 text-[0.75rem]"
-                : "min-h-10 px-3.5 text-sm",
+                ? "min-h-11 px-2.5 text-[0.75rem]"
+                : "min-h-11 px-3.5 text-sm",
               selected
                 ? "bg-[var(--accent)] text-[var(--accent-contrast)] font-semibold shadow-sm"
                 : "text-[var(--fg-muted)] hover:bg-[color-mix(in_srgb,var(--bg-raised)_72%,transparent)] hover:text-[var(--fg)]",
