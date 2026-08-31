@@ -54,9 +54,9 @@ export interface CounterPromptInput {
 function targetLanguageGuidance(targetLang: string): string | null {
   switch (targetLang.toLowerCase()) {
     case "zh-cn":
-      return "TARGET WRITING: Use natural Mainland Mandarin in Simplified Chinese. Do not output pinyin or Traditional Chinese unless the source explicitly contains it.";
+      return "TARGET WRITING: Use natural Mainland Mandarin in Simplified Chinese (简体中文). Do not output pinyin or Traditional Chinese unless the source explicitly contains it.";
     case "zh-tw":
-      return "TARGET WRITING: Use natural Taiwan Mandarin in Traditional Chinese. Do not output pinyin or Simplified-only wording unless the source explicitly contains it.";
+      return "TARGET WRITING: Use natural Taiwan Mandarin in Traditional Chinese (繁體中文). Do not output pinyin or Simplified-only wording unless the source explicitly contains it.";
     case "ja-jp":
       return "TARGET WRITING: Use natural modern Japanese service-counter speech. Prefer ordinary polite Japanese, not stiff legalistic prose.";
     case "ko-kr":
@@ -146,7 +146,7 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
 
   if (input.inputMode === "voice") {
     lines.push(
-      "SOURCE IS SPEECH-TO-TEXT: Silently fix only obvious spacing, punctuation, segmentation, and token-boundary artifacts. You may repair an ordinary word only when grammar plus recent context make the intended reading clear. Never silently repair uncertain names, numbers, dates, document names, visa/status codes, addresses, phone numbers, or identifiers. When uncertain, preserve the source and lower confidence.",
+      "SOURCE IS SPEECH-TO-TEXT: Silently fix only obvious spacing, punctuation, and token-boundary artifacts, including obvious segmentation errors. You may repair an ordinary word only when grammar plus recent context make the intended reading clear. Do not guess uncertain names, numbers, dates, document names, visa/status codes, addresses, phone numbers, or identifiers. When uncertain, preserve the source and lower confidence.",
     );
     const voiceGuidance = sourceVoiceGuidance(input.sourceLang);
     if (voiceGuidance) lines.push(voiceGuidance);
