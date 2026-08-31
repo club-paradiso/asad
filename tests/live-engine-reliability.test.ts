@@ -60,7 +60,7 @@ describe("live interpretation reliability", () => {
   });
 
   it("flushes final stable speech immediately during graceful shutdown", async () => {
-    let now = 0;
+    const now = 0;
     let snapshot: EngineSnapshot | null = null;
     const pending: string[] = [];
 
