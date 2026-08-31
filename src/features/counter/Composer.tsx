@@ -24,41 +24,31 @@ export function Composer({
 }: {
   lang: string;
   strings: CounterStrings;
-  onSend: (text: string, source: "voice" | "text") => Promise<unknown> | unknown;
+  onSend: (text: string, source: "voice" | "text") => void;
   disabled?: boolean;
   busy?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [submittedText, setSubmittedText] = useState<string | null>(null);
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
-  const draftRevision = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const voice = useVoiceInput(lang);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
-  const submit = useCallback(async () => {
+  const submit = useCallback(() => {
     const text = draft.trim();
-    if (!text || disabled || composing.current) return;
+    if (!text || disabled || composing.current || submittedText === text) return;
 
-    // Clear immediately so the next turn can be typed while this one is being
-    // translated. If delivery fails, restore only when the user has not typed
-    // anything newer in the meantime. A late failure must never erase or
-    // overwrite a newer draft.
-    const revisionAtSubmit = draftRevision.current;
-    setDraft("");
-
-    let delivered = true;
-    try {
-      const result = await onSend(text, "text");
-      delivered = result !== null && result !== false;
-    } catch {
-      delivered = false;
-    }
-
-    if (!delivered && draftRevision.current === revisionAtSubmit) {
-      setDraft(text);
-    }
-  }, [draft, disabled, onSend]);
+    // Do not destroy the user's words before the network has had a chance to
+    // fail. Keep the submitted turn selected in the field: the next keystroke
+    // naturally replaces it, while a dropped request leaves the exact original
+    // text recoverable. submittedText also blocks accidental Enter double-send.
+    setSubmittedText(text);
+    onSend(text, "text");
+    queueMicrotask(() => inputRef.current?.select());
+  }, [draft, disabled, onSend, submittedText]);
 
   const startVoice = useCallback(() => {
     if (disabled) return;
@@ -71,7 +61,7 @@ export function Composer({
         setPendingVoice({ text: spoken, risks });
         return;
       }
-      void onSend(spoken, "voice");
+      onSend(spoken, "voice");
     });
   }, [disabled, onSend, voice]);
 
@@ -97,6 +87,8 @@ export function Composer({
             ? copy.translating
             : copy.speak;
   const failureCopy = voice.failure ? copy.failure(voice.failure) : null;
+  const cleanDraft = draft.trim();
+  const alreadySubmitted = !!cleanDraft && submittedText === cleanDraft;
 
   return (
     <div
@@ -122,7 +114,7 @@ export function Composer({
                 type="button"
                 className="min-h-11 flex-1 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-contrast)]"
                 onClick={() => {
-                  void onSend(pendingVoice.text, "voice");
+                  onSend(pendingVoice.text, "voice");
                   setPendingVoice(null);
                   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
                     navigator.vibrate(8);
@@ -197,14 +189,18 @@ export function Composer({
           className="flex min-w-0 items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            void submit();
+            submit();
           }}
         >
           <input
+            ref={inputRef}
             value={draft}
             onChange={(event) => {
-              draftRevision.current += 1;
-              setDraft(event.target.value);
+              const value = event.target.value;
+              setDraft(value);
+              if (submittedText !== null && value.trim() !== submittedText) {
+                setSubmittedText(null);
+              }
             }}
             onCompositionStart={() => {
               composing.current = true;
@@ -237,7 +233,7 @@ export function Composer({
           />
           <button
             type="submit"
-            disabled={disabled || draft.trim().length === 0}
+            disabled={disabled || cleanDraft.length === 0 || alreadySubmitted}
             className={cn(
               "min-h-12 shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent)] px-5",
               "text-base font-semibold text-[var(--accent-contrast)] transition-opacity",
