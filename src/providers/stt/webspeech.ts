@@ -12,7 +12,7 @@
  */
 import { BaseSpeechProvider, type SttProviderId, type SttProviderOptions } from "./types";
 import { webSpeechLanguage } from "./language";
-import { joinTranscriptParts, pickSpeechAlternative } from "./transcript";
+import { joinBrowserResultParts, pickSpeechAlternative } from "./transcript";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
@@ -137,7 +137,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
             interim.push(text);
           }
         }
-        const partial = joinTranscriptParts(interim, this.options.language);
+        const partial = joinBrowserResultParts(interim, this.options.language);
         if (partial) this.emitPartial(partial);
       };
 
