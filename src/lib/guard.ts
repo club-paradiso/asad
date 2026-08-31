@@ -16,7 +16,9 @@
  *      determined attacker with curl, and is not claimed to.
  *   3. **Body size** — bounds what one accepted request can cost in tokens.
  *   4. **Rate limit** — per session first, then per source address, bounding
- *      what an accepted client can spend over time.
+ *      what an accepted client can spend over time. The in-process limiter is
+ *      always enforced; when the deployment already has Upstash/Vercel KV,
+ *      the same checks are also enforced globally across serverless instances.
  *
  * What this is NOT: an identity system. There are no users, no accounts and no
  * sessions that outlive a browser tab, because none of those would make the
@@ -27,6 +29,7 @@ import { NextResponse } from "next/server";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { appEnv } from "./env";
 import { RequestRateLimiter, type RateLimitRule } from "./rate-limit";
+import { checkSharedRateLimits, type SharedRateLimitCheck } from "./shared-rate-limit";
 
 /* -------------------------------------------------------------------------- */
 /* Session tokens                                                              */
@@ -375,6 +378,11 @@ export async function guardInferenceRoute(
   }
 
   const address = clientAddress(request);
+  const sharedChecks: SharedRateLimitCheck[] = [];
+
+  // Keep the process-local limiter even when Redis exists. It is the latency-
+  // free first line and, more importantly, it means a Redis outage cannot turn
+  // "global protection unavailable" into "no protection at all".
   for (const limit of options.limits) {
     const key = limit.by === "session" ? (session ?? `addr:${address}`) : address;
     const verdict = limiterFor(limit.rule).check(`${limit.rule}:${key}`);
@@ -384,6 +392,27 @@ export async function guardInferenceRoute(
         "x-ratelimit-limit": String(verdict.limit),
         "x-ratelimit-remaining": "0",
       });
+    }
+    sharedChecks.push({
+      name: limit.rule,
+      key,
+      rule: RATE_RULES[limit.rule],
+    });
+  }
+
+  // One Redis round-trip covers every rule on this route. When shared storage
+  // is not configured (or briefly unavailable), null means the already-passed
+  // local checks remain the enforcement floor.
+  const sharedVerdicts = await checkSharedRateLimits(sharedChecks);
+  if (sharedVerdicts) {
+    for (const verdict of sharedVerdicts) {
+      if (!verdict.allowed) {
+        return deny(429, "Too many requests. Slow down and try again shortly.", {
+          "retry-after": String(verdict.retryAfterSeconds),
+          "x-ratelimit-limit": String(verdict.limit),
+          "x-ratelimit-remaining": "0",
+        });
+      }
     }
   }
 
