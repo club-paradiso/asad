@@ -2,6 +2,8 @@
 
 **A real-time AI copilot for human interpreters.** Korean → English.
 
+> **Project status:** Active development. The Vercel deployment is intentionally access-controlled; run locally to evaluate the product.
+
 The name plays on 통역 — *interpretation*.
 
 tong-yuck does not translate for you. It sits beside a working simultaneous
@@ -181,7 +183,7 @@ DEEPGRAM_PROJECT_ID=...      # needed to mint short-lived browser keys
 LLM_ROUTING_MODE=pinned
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=...
-OPENROUTER_PRIMARY_MODEL=google/gemini-3.7-flash
+OPENROUTER_PRIMARY_MODEL=google/gemma-4-26b-a4b-it:free
 
 OPENROUTER_PROVIDER_SORT=latency
 OPENROUTER_DATA_COLLECTION=deny
@@ -491,7 +493,7 @@ Stated plainly, because a tool used live should not surprise you.
   upstream actually serves it from cache has not been measured against a real
   key.
 - **The live model default has not been verified against the live catalogue.**
-  `google/gemini-3.7-flash` is what `.env.example` and the code default to, but
+  `google/gemma-4-26b-a4b-it:free` is the current Vercel deployment setting, but
   network policy in the build environment blocked `openrouter.ai`, so the slug
   was never confirmed to exist. That is exactly what `npm run health:openrouter`
   is for — run it before trusting the deployment.
@@ -525,7 +527,6 @@ parts).
 
 ---
 
-## Licence
+## License
 
-[MIT](LICENSE). Use it, change it, ship it, sell it — keep the copyright notice
-and the licence text, and understand there is no warranty.
+Released under the [MIT License](LICENSE). You may use, modify, distribute, sublicense, and sell the software, provided that you retain the copyright notice and license text. It is provided without warranty.
