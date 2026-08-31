@@ -109,6 +109,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     await new Promise<void>((resolve, reject) => {
       let connected = false;
       let settled = false;
+      let hasResult = false;
 
       recognition.onstart = () => {
         connected = true;
@@ -129,6 +130,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
             this.options.language,
           );
           if (!text) continue;
+          hasResult = true;
           if (result.isFinal) {
             if (i >= event.resultIndex) this.emitStable(text);
           } else {
@@ -177,10 +179,16 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           return;
         }
 
-        // Mobile browsers and WebKit can end a recognition object after a
-        // short pause even with continuous=true. Counter turn completion is
-        // owned by the controller's language-aware silence timer, so restart
-        // here instead of letting the browser chop a multilingual sentence.
+        // A one-turn recognizer that heard absolutely nothing should finish as
+        // no-speech instead of restarting forever. Once speech has begun,
+        // however, mobile browsers may auto-end on a short pause; reconnect and
+        // let the Counter controller's silence timer decide the real turn end.
+        if (this.options.utterance && !hasResult) {
+          this.wantRunning = false;
+          this.emitStatus("closed");
+          return;
+        }
+
         this.emitStatus("reconnecting");
         this.scheduleRestart(recognition, this.options.utterance ? 180 : 350);
       };
