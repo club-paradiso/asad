@@ -213,18 +213,17 @@ export async function GET() {
       textAvailable: env.bible.provider !== "reference-only",
     },
 
-    // What stands between a public URL and the deployer's provider balance.
-    // The per-instance caveat is stated here rather than implied, because a
-    // limit that claims to be global and is not is worse than no limit.
     protection: {
       accessGate: env.access.enabled,
-      // "enforced" needs a secret that is identical on every instance. Without
-      // one, session tokens key rate limits but cannot refuse a request — see
-      // sessionEnforcement in src/lib/guard.ts.
+      // Session verification and request-rate scope are separate. A deployment
+      // may have shared Redis counters while still lacking a stable signing
+      // secret for session-token enforcement.
       sessionEnforcement: sessionEnforcement(),
       rateLimits: RATE_RULES,
-      scope: "per-instance",
-      note: "Rate limits are held in the memory of one server instance. On a multi-instance or serverless deployment the effective ceiling is the limit multiplied by the number of warm instances. For a hard global ceiling, set a spend limit on the provider key.",
+      scope: storage.shared ? "shared-redis + per-instance fallback" : "per-instance",
+      note: storage.shared
+        ? "Paid-route limits are enforced through shared Redis across Vercel instances, with the in-process limiter retained as a fallback if Redis is unavailable."
+        : "Rate limits are held in the memory of one server instance. On a multi-instance or serverless deployment the effective ceiling is the limit multiplied by the number of warm instances. For a hard global ceiling, configure shared Upstash/Vercel KV storage or set a spend limit on the provider key.",
     },
 
     workload: LIVE_WORKLOAD,
