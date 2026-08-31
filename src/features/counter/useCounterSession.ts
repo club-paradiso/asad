@@ -24,6 +24,7 @@ import type {
 
 const POLL_ACTIVE_MS = 1200;
 const POLL_HIDDEN_MS = 8000;
+const REMOTE_END_NOTICE_MS = 2200;
 
 export interface SendInput {
   text: string;
@@ -55,6 +56,7 @@ export function useCounterSession(code: string | null, role: Participant) {
   const stopped = useRef(false);
   const sendQueue = useRef<Promise<void>>(Promise.resolve());
   const pendingSends = useRef(0);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /** Merge a batch, replacing by id so a resend does not duplicate. */
   const merge = useCallback((incoming: CounterMessage[]) => {
@@ -82,11 +84,16 @@ export function useCounterSession(code: string | null, role: Participant) {
       );
       if (response.status === 404) {
         // The other participant ended the consultation (or the session expired).
-        // Leave immediately instead of stranding this side on a dead chat.
+        // First render the localized ended state so the visitor understands why
+        // the conversation disappeared, then leave Counter Mode automatically.
         setEnded(true);
         setConnected(false);
         stopped.current = true;
-        leaveCounterMode();
+        if (leaveTimer.current) clearTimeout(leaveTimer.current);
+        leaveTimer.current = setTimeout(() => {
+          leaveTimer.current = null;
+          leaveCounterMode();
+        }, REMOTE_END_NOTICE_MS);
         return;
       }
       if (!response.ok) throw new Error(`Poll failed (${response.status})`);
@@ -139,6 +146,10 @@ export function useCounterSession(code: string | null, role: Participant) {
     return () => {
       stopped.current = true;
       clearTimeout(timer);
+      if (leaveTimer.current) {
+        clearTimeout(leaveTimer.current);
+        leaveTimer.current = null;
+      }
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pagehide", onPageHide);
     };
@@ -200,6 +211,10 @@ export function useCounterSession(code: string | null, role: Participant) {
 
   const end = useCallback(
     async (options: EndOptions = {}) => {
+      if (leaveTimer.current) {
+        clearTimeout(leaveTimer.current);
+        leaveTimer.current = null;
+      }
       if (!code) {
         if (options.leave) leaveCounterMode();
         return;
