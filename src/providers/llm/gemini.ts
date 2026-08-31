@@ -60,10 +60,10 @@ function applyThinkingConfig(
 
   if (usesThinkingLevel(model)) {
     generationConfig.thinkingConfig = {
-      // Gemma 4 supports only minimal/high. Gemini 3+ also accepts these
-      // values, so map the generic router's low setting to the low-latency
-      // minimal mode rather than sending an unsupported literal "low".
-      thinkingLevel: thinking === "high" ? "high" : "minimal",
+      // The generic router exposes none/low/medium. Gemma 4 exposes only
+      // minimal/high, so medium is the one level that escalates to high.
+      // Live interpretation uses none, which stays on the low-latency path.
+      thinkingLevel: thinking === "medium" ? "high" : "minimal",
     };
     return;
   }
