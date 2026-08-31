@@ -17,8 +17,8 @@ export const BRAND = {
   nameLead: "아무튼서로알아들었으면",
   /** Wordmark line 2 — the shrug. Loud, wide, followed by the mark. */
   nameTail: "된거아닌가요",
-  /** Korean secondary mark. Tight spaces only; never the primary signature. */
-  secondaryMark: "아서알?",
+  /** Full Korean signature; do not collapse it into an acronym-style nickname. */
+  secondaryMark: "아무튼 서로 알아들었으면 된 거 아닌가요?",
   /** Latin short form, for technical and non-Korean contexts. */
   shortName: "ASAD",
   /**
