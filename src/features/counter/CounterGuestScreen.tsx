@@ -17,7 +17,7 @@
  * No install, no account, no app store. A web page is the only thing a stranger
  * at a counter will actually open.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   COUNTER_LANGUAGES,
   PRIORITY_LANGUAGES,
@@ -32,8 +32,10 @@ import type { CounterMessage, SessionView } from "@/counter/types";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
+import { CounterEndedScreen } from "./CounterEndedScreen";
 import { QuickPhraseBar } from "./QuickPhraseBar";
 import { ProviderNotice, useCounterDisclosure } from "./ProviderNotice";
+import { sessionEndCopy } from "./session-end-copy";
 import { useClientValue } from "@/hooks/useClientValue";
 import { cn } from "@/lib/cn";
 
@@ -72,7 +74,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
   );
 
   const finish = useCallback(async () => {
-    await session.end({ leave: true });
+    await session.end();
   }, [session]);
 
   if (!lang) {
@@ -81,7 +83,12 @@ export function CounterGuestScreen({ code }: { code: string }) {
     );
   }
 
+  if (session.ended) {
+    return <GuestSessionClosing lang={lang} />;
+  }
+
   const t = stringsFor(lang);
+  const endCopy = sessionEndCopy(lang);
   const rtl = findLanguage(lang)?.rtl ?? false;
   const view = session.session;
   // Changing a mis-tapped language is allowed until the visitor has spoken;
@@ -99,11 +106,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
             {view?.deskLabel || formatCode(code)}
           </p>
           <p className="truncate text-xs text-[var(--fg-dim)]">
-            {session.ended
-              ? t.ended
-              : !session.connected
-                ? t.connecting
-                : findLanguage(lang)?.endonym}
+            {!session.connected ? t.connecting : findLanguage(lang)?.endonym}
           </p>
         </div>
 
@@ -112,7 +115,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
             <button
               type="button"
               onClick={() => setLang(null)}
-              className="rounded-md border border-[var(--line-strong)] px-3 py-1.5 text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
+              className="min-h-11 rounded-lg border border-[var(--line-strong)] px-3 text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
             >
               {t.changeLanguage}
             </button>
@@ -120,20 +123,14 @@ export function CounterGuestScreen({ code }: { code: string }) {
           <button
             type="button"
             onClick={() => void finish()}
-            aria-label={t.ended}
-            title={t.ended}
-            className="grid size-8 place-items-center rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-lg leading-none text-[var(--danger)]"
+            aria-label={endCopy.endAction}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 text-sm font-semibold text-[var(--danger)]"
           >
-            ×
+            <span aria-hidden className="text-lg leading-none">×</span>
+            <span>{endCopy.endAction}</span>
           </button>
         </div>
       </header>
-
-      {session.ended && (
-        <p className="bg-[var(--bg-overlay)] px-4 py-2 text-center text-sm text-[var(--fg-muted)]">
-          {t.ended}
-        </p>
-      )}
 
       {session.error && (
         <p className="bg-[color-mix(in_srgb,var(--danger)_18%,transparent)] px-4 py-2 text-center text-sm text-[var(--danger)]">
@@ -182,6 +179,39 @@ export function CounterGuestScreen({ code }: { code: string }) {
       />
     </div>
   );
+}
+
+function GuestSessionClosing({ lang }: { lang: string }) {
+  useEffect(() => {
+    const destination = `/counter/ended?lang=${encodeURIComponent(lang)}`;
+
+    // A browser only permits scripts to close tabs/windows that were opened by
+    // script. QR/deep-link tabs normally have no opener, so do not trigger a
+    // browser warning by attempting an impossible close. When closing is
+    // permitted, try it after the terminal state has painted once.
+    const closeTimer = window.setTimeout(() => {
+      if (window.opener) {
+        try {
+          window.close();
+        } catch {
+          // The deterministic location.replace fallback below handles refusal.
+        }
+      }
+    }, 180);
+
+    // location.replace removes the dead consultation URL from browser history,
+    // so Back cannot reopen a session that has already been deleted.
+    const replaceTimer = window.setTimeout(() => {
+      if (!window.closed) window.location.replace(destination);
+    }, 650);
+
+    return () => {
+      window.clearTimeout(closeTimer);
+      window.clearTimeout(replaceTimer);
+    };
+  }, [lang]);
+
+  return <CounterEndedScreen lang={lang} />;
 }
 
 function confirmRisks(
