@@ -1,7 +1,7 @@
 "use client";
 
 /** Counter input zone: voice first, then typing, with no dead-end state. */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findLanguage } from "@/counter/languages";
 import { detectRisks } from "@/counter/risks";
 import type { RiskSpan } from "@/counter/types";
@@ -29,17 +29,37 @@ export function Composer({
   busy?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [recoverableText, setRecoverableText] = useState<string | null>(null);
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const composing = useRef(false);
   const voice = useVoiceInput(lang);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
   const submit = useCallback(() => {
     const text = draft.trim();
-    if (!text || disabled) return;
+    if (!text || disabled || composing.current) return;
+
+    // Keep one in-memory recovery copy before clearing the field. This lets the
+    // next turn be typed immediately while translation is still running, but a
+    // dropped request never destroys the only copy of what the person typed.
+    setRecoverableText(text);
     setDraft("");
     onSend(text, "text");
+    queueMicrotask(() => inputRef.current?.focus());
   }, [draft, disabled, onSend]);
+
+  const restoreTypedTurn = useCallback(() => {
+    if (!recoverableText) return;
+    setDraft(recoverableText);
+    setRecoverableText(null);
+    queueMicrotask(() => {
+      inputRef.current?.focus();
+      const end = recoverableText.length;
+      inputRef.current?.setSelectionRange(end, end);
+    });
+  }, [recoverableText]);
 
   const startVoice = useCallback(() => {
     if (disabled) return;
@@ -78,6 +98,7 @@ export function Composer({
             ? copy.translating
             : copy.speak;
   const failureCopy = voice.failure ? copy.failure(voice.failure) : null;
+  const cleanDraft = draft.trim();
 
   return (
     <div
@@ -182,8 +203,30 @@ export function Composer({
           }}
         >
           <input
+            ref={inputRef}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setDraft(value);
+              if (value.trim()) setRecoverableText(null);
+            }}
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            onCompositionEnd={() => {
+              composing.current = false;
+            }}
+            onKeyDown={(event) => {
+              // Korean/Chinese/Japanese IMEs use Enter to commit a composition.
+              // Safari and some Android browsers can otherwise submit the form
+              // at the same time, producing a truncated or accidental message.
+              if (
+                event.key === "Enter" &&
+                (composing.current || event.nativeEvent.isComposing || event.keyCode === 229)
+              ) {
+                event.preventDefault();
+              }
+            }}
             placeholder={strings.typeHere}
             disabled={disabled}
             dir={rtl ? "rtl" : undefined}
@@ -196,9 +239,20 @@ export function Composer({
               "focus:border-[var(--accent)] focus:outline-none disabled:opacity-40",
             )}
           />
+          {recoverableText && cleanDraft.length === 0 && (
+            <button
+              type="button"
+              onClick={restoreTypedTurn}
+              aria-label={restoreLabel(lang)}
+              title={restoreLabel(lang)}
+              className="grid min-h-12 min-w-12 shrink-0 place-items-center rounded-full border border-[var(--line-strong)] text-xl text-[var(--fg-muted)]"
+            >
+              ↩
+            </button>
+          )}
           <button
             type="submit"
-            disabled={disabled || draft.trim().length === 0}
+            disabled={disabled || cleanDraft.length === 0}
             className={cn(
               "min-h-12 shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent)] px-5",
               "text-base font-semibold text-[var(--accent-contrast)] transition-opacity",
@@ -211,6 +265,13 @@ export function Composer({
       </div>
     </div>
   );
+}
+
+function restoreLabel(language: string): string {
+  if (language.startsWith("ko")) return "방금 입력 복원";
+  if (language.startsWith("zh")) return "恢复刚才的输入";
+  if (language.startsWith("ja")) return "直前の入力を復元";
+  return "Restore previous text";
 }
 
 function MicIcon() {
