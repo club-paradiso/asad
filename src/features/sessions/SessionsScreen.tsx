@@ -15,6 +15,8 @@ import { clearSessions, deleteSession, refreshSessions, sessionsStore } from "@/
 import { useLocalStore } from "@/lib/local-store";
 import { downloadSession } from "@/lib/export";
 import { Button, Label } from "@/components/ui/primitives";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StateBlock } from "@/components/ui/states";
 import { SessionSummary } from "./SessionSummary";
 
 export function SessionsScreen() {
@@ -26,24 +28,30 @@ export function SessionsScreen() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-5 px-5 py-8">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sessions</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            Stored in this browser only. Never uploaded, and audio is never kept.
-          </p>
-        </div>
-        <Link href="/" className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:underline">
-          ← Console
-        </Link>
-      </header>
+    <div data-surface="launcher" className="min-h-[100dvh] w-full">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-6 px-5 py-8">
+      <PageHeader
+        title="지난 세션"
+        detail="이 브라우저에만 저장됩니다. 업로드하지 않고, 음성은 아예 남기지 않습니다."
+      />
 
       {sessions.length === 0 ? (
-        <p className="rounded-md border border-[var(--line)] bg-[var(--bg-raised)] px-4 py-6 text-sm text-[var(--fg-dim)]">
-          No saved sessions. Turn on <strong className="text-[var(--fg-muted)]">Save this
-          session</strong> in the live console settings before you finish, and it will appear here.
-        </p>
+        /* The empty state is the one screen here nobody is mid-task on, so it
+           is where the brand gets to speak. It also has to do a job the old
+           paragraph did badly: say the ONE thing that would have put a session
+           in this list, and link to where that switch lives. */
+        <StateBlock
+          title="아직 저장된 세션이 없어요."
+          detail="통역을 끝내기 전에 콘솔 설정에서 '이 세션 저장'을 켜두면 여기에 남습니다."
+          action={
+            <Link
+              href="/live"
+              className="inline-flex min-h-11 items-center rounded-md border border-[var(--line-strong)] px-4 text-sm font-semibold text-[var(--fg)] transition-colors hover:bg-[var(--accent-dim)]"
+            >
+              통역 시작하러 가기
+            </Link>
+          }
+        />
       ) : (
         <>
           <ul className="flex flex-col gap-2">
@@ -54,18 +62,19 @@ export function SessionsScreen() {
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
-                    {session.title || "Untitled session"}
+                    {session.title || "제목 없는 세션"}
                   </p>
-                  <p className="text-xs text-[var(--fg-dim)]">
-                    {new Date(session.startedAt).toLocaleString()} · {session.mode} ·{" "}
-                    {session.segments.length} segments
+                  <p className="brand-caption mt-0.5 normal-case">
+                    {new Date(session.startedAt).toLocaleString("ko-KR")} ·{" "}
+                    {session.mode === "sermon" ? "설교" : "일반"} ·{" "}
+                    {session.segments.length}구절
                   </p>
                 </div>
                 <Button size="sm" onClick={() => setSelected(session)}>
-                  Review
+                  복기
                 </Button>
                 <Button size="sm" tone="quiet" onClick={() => downloadSession(session, "markdown")}>
-                  Export
+                  내보내기
                 </Button>
                 <Button
                   size="sm"
@@ -76,14 +85,14 @@ export function SessionsScreen() {
                     refreshSessions();
                   }}
                 >
-                  Delete
+                  삭제
                 </Button>
               </li>
             ))}
           </ul>
 
           <div className="mt-2 flex flex-col gap-2 border-t border-[var(--line)] pt-4">
-            <Label>Danger zone</Label>
+            <Label>되돌릴 수 없는 작업</Label>
             <Button
               tone="danger"
               className="self-start"
@@ -92,11 +101,12 @@ export function SessionsScreen() {
                 refreshSessions();
               }}
             >
-              Delete all saved sessions
+              저장된 세션 전부 삭제
             </Button>
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

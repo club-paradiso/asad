@@ -1,233 +1,156 @@
 "use client";
 
 /**
- * Public mode launcher.
+ * The launcher.
  *
- * The home screen stays intentionally simple: pick the job you need and move
- * on. Operator diagnostics, provider status and live-console keyboard hints
- * belong inside the relevant tools, not on the public landing surface.
+ * What was here: two large bordered cards, each with an icon tile, a badge, a
+ * three-item ticked feature list and a full-width blue button — a pricing
+ * page. It answered "what does this product do?", which is a question nobody
+ * arriving at their own tool is asking. The interpreter opening this thirty
+ * seconds before a service is asking "which one, and where is the button".
+ *
+ * So the feature lists are gone and the two modes are two rows. A row is
+ * enough: the mode's name is the largest thing on it, one line says who it is
+ * for, and the whole row is the target. Both modes now fit above the fold on
+ * a 390pt phone, which the cards never did — the second mode used to start
+ * below 1350px of scroll.
+ *
+ * The brand gets the top third and nothing else. Hero, wordmark and tagline
+ * are allowed to be strange up there because no task is running yet; from the
+ * mode list down, this is a working screen.
  */
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export function HomeScreen() {
   return (
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
-        <header className="flex flex-wrap items-start gap-x-4 gap-y-3">
-          <div className="min-w-0 flex flex-col gap-1">
-            <h1 className="type-display max-w-3xl break-all text-[1.35rem] leading-[1.08] tracking-[-0.025em] text-[var(--fg)] sm:text-[1.7rem]">
-              {BRAND.name}
-            </h1>
-            <p className="text-xs text-[var(--fg-dim)] sm:text-[0.8rem]">
-              {BRAND.shortName} · {BRAND.descriptor}
-            </p>
-          </div>
+      <div
+        className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-10 px-5 pb-8 sm:px-8"
+        style={{
+          paddingTop: "calc(2rem + var(--safe-top))",
+          paddingBottom: "calc(2rem + var(--safe-bottom))",
+        }}
+      >
+        <header className="flex flex-col gap-5">
+          <Wordmark className="text-[1.75rem] sm:text-[2.25rem]" />
+          {/* The tagline is set as a correction: the claim gets struck, the
+              shrug replaces it. This is the one place on the launcher the
+              device appears at full strength — it is the brand statement, and
+              there is no task behind it to obstruct. */}
+          <p className="type-context max-w-md text-[0.9375rem] leading-relaxed text-[var(--fg-muted)]">
+            <span className="brand-struck">정확한 번역</span>{" "}
+            <span className="font-semibold text-[var(--fg)]">
+              아무튼 알아들었으면 된 거 아닌가요.
+            </span>
+          </p>
         </header>
 
-        <div className="my-auto flex flex-col gap-8">
-          <div className="flex flex-col gap-1.5">
-            <h2 className="type-display text-3xl leading-[1.08] text-[var(--fg)] sm:text-[2.5rem]">
-              {BRAND.tagline}
-            </h2>
-            <p className="text-sm text-[var(--fg-muted)]">
-              라이브 통역과 현장 응대 중 지금 필요한 방식만 고르면 됩니다.
-            </p>
-          </div>
+        <nav aria-label="모드" className="flex flex-col">
+          <p className="brand-caption mb-3">무엇을 하시나요</p>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-            <ModeCard
-              href="/live"
-              tone="accent"
-              badge="주 모드"
-              title="라이브 통역"
-              summary="한 사람이 말하고, 당신이 옮깁니다. 설교 · 강연 · 회의."
-              points={[
-                "말한 것 · 지금 · 예측을 한 화면에서 구분해 보여줍니다",
-                "성경 구절, 용어, 문화적 표현을 자동으로 짚어줍니다",
-                "지연 시간을 직접 고르고, 세션은 저장하거나 버립니다",
-              ]}
-              action="통역 시작"
-              icon={
-                <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v1a7 7 0 0 1-14 0v-1M12 18v4" />
-              }
-            />
+          <ModeRow
+            href="/live"
+            title="라이브 통역"
+            who="한 사람이 말하고, 당신이 옮깁니다"
+            detail="설교 · 강연 · 회의"
+            primary
+          />
+          <ModeRow
+            href="/counter"
+            title="현장 응대"
+            who="창구에서 마주 앉아 주고받습니다"
+            detail="QR · 설치 없음"
+          />
+        </nav>
 
-            <ModeCard
-              href="/counter"
-              tone="info"
-              title="현장 응대"
-              summary="창구에서 마주 앉아 주고받습니다."
-              points={[
-                "QR을 찍으면 손님 폰에서 바로 열립니다",
-                "화면 전체가 손님의 모국어로 바뀝니다",
-                "설치 없음 · 계정 없음 · 세션 종료 시 삭제",
-              ]}
-              action="QR 코드 띄우기"
-              icon={
-                <>
-                  <rect x="3" y="3" width="7" height="7" rx="1.4" />
-                  <rect x="14" y="3" width="7" height="7" rx="1.4" />
-                  <rect x="3" y="14" width="7" height="7" rx="1.4" />
-                  <path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20.5v.5" />
-                </>
-              }
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <SecondaryLink
-              href="/prep"
-              title="준비 시트"
-              detail="설교자 · 본문 · 용어 미리 넣기"
-            />
-            <SecondaryLink
+        <div className="flex flex-col gap-3">
+          <p className="brand-caption">그 외</p>
+          <div className="flex flex-col">
+            <QuietRow href="/prep" title="준비 시트" detail="설교자 · 본문 · 용어 미리 넣기" />
+            {/* Added on main while this redesign was in flight. It is a
+                pre-session check, so it belongs with the other pre-session
+                links rather than beside the two modes — the launcher's top
+                half answers "which job", and this is not one. */}
+            <QuietRow
               href="/booth-preflight"
               title="부스 사전 점검"
               detail="믹서 입력 · 신호 레벨 · mix-minus 확인"
             />
-            <SecondaryLink
-              href="/sessions"
-              title="지난 세션"
-              detail="복기 · 내보내기"
-            />
+            <QuietRow href="/sessions" title="지난 세션" detail="복기 · 내보내기" />
           </div>
         </div>
 
-        <footer className="mt-auto pt-4 text-right text-xs text-[var(--fg-dim)]">
-          현장 응대 기록은 세션 동안만 임시 보관됩니다
-        </footer>
+        <p className="mt-auto pt-6 type-context text-[var(--fg-dim)]">
+          {BRAND.shortName} · {BRAND.descriptor} · 현장 응대 기록은 세션
+          동안만 임시 보관됩니다
+        </p>
       </div>
     </div>
   );
 }
 
-function ModeCard({
+/**
+ * A mode.
+ *
+ * The whole row is the link, so the target is ~88px tall rather than the
+ * 56px of a button inside a card — which matters more than it sounds, because
+ * this is pressed one-handed, in a hurry, often in low light.
+ *
+ * `primary` is carried by weight and a rule, not by a filled button. Two
+ * filled CTAs on one screen is two primary actions, which is none.
+ */
+function ModeRow({
   href,
-  tone,
-  badge,
   title,
-  summary,
-  points,
-  action,
-  icon,
+  who,
+  detail,
+  primary = false,
 }: {
   href: string;
-  tone: "accent" | "info";
-  badge?: string;
   title: string;
-  summary: string;
-  points: string[];
-  action: string;
-  icon: React.ReactNode;
+  who: string;
+  detail: string;
+  primary?: boolean;
 }) {
-  const colour = tone === "accent" ? "var(--accent)" : "var(--info)";
-
   return (
     <Link
       href={href}
-      className="group flex flex-col gap-5 rounded-2xl border bg-[var(--bg-raised)] p-6 transition-colors"
-      style={{
-        borderColor:
-          tone === "accent"
-            ? "color-mix(in srgb, var(--accent) 34%, transparent)"
-            : "var(--line)",
-      }}
+      className="group flex items-center gap-4 border-b border-[var(--line)] py-5 first:border-t transition-colors hover:bg-[var(--accent-dim)]"
     >
-      <div className="flex flex-wrap items-start gap-x-3.5 gap-y-2">
+      <span className="flex min-w-0 flex-col gap-1">
         <span
-          aria-hidden
-          className="flex size-11 shrink-0 items-center justify-center rounded-xl border"
-          style={{
-            borderColor: `color-mix(in srgb, ${colour} 32%, transparent)`,
-            background: `color-mix(in srgb, ${colour} 13%, transparent)`,
-            color: colour,
-          }}
+          className={
+            primary
+              ? "type-display text-2xl leading-tight text-[var(--fg)] sm:text-[1.75rem]"
+              : "type-display text-xl leading-tight text-[var(--fg)] sm:text-2xl"
+          }
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="size-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            {icon}
-          </svg>
+          {title}
         </span>
-        <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="type-display text-xl text-[var(--fg)]">{title}</h3>
-          <p className="text-sm leading-relaxed text-[var(--fg-muted)]">
-            {summary}
-          </p>
-        </div>
-        {badge && (
-          <span
-            className="order-first ms-auto shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold tracking-wide sm:order-none"
-            style={{
-              background: `color-mix(in srgb, ${colour} 14%, transparent)`,
-              color: colour,
-            }}
-          >
-            {badge}
-          </span>
-        )}
-      </div>
-
-      <ul className="flex flex-col gap-2.5">
-        {points.map((point) => (
-          <li key={point} className="flex items-start gap-2.5">
-            <svg
-              aria-hidden
-              viewBox="0 0 24 24"
-              className="mt-0.5 size-3.5 shrink-0"
-              fill="none"
-              stroke={colour}
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-            <span className="text-sm leading-snug text-[var(--fg-muted)]">
-              {point}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <span
-        className="mt-auto inline-flex min-h-14 items-center justify-center gap-2.5 rounded-xl px-5 text-base font-semibold transition-[filter]"
-        style={
-          tone === "accent"
-            ? { background: "var(--accent)", color: "var(--accent-contrast)" }
-            : {
-                border: `1px solid color-mix(in srgb, ${colour} 45%, transparent)`,
-                background: `color-mix(in srgb, ${colour} 10%, transparent)`,
-                color: colour,
-              }
-        }
-      >
-        {action}
-        <svg
-          aria-hidden
-          viewBox="0 0 24 24"
-          className="size-[1.05rem] transition-transform group-hover:translate-x-0.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 12h14M13 6l6 6-6 6" />
-        </svg>
+        <span className="text-sm leading-snug text-[var(--fg-muted)]">
+          {who}
+        </span>
+        <span className="brand-caption mt-0.5">{detail}</span>
       </span>
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        className="ms-auto size-5 shrink-0 text-[var(--fg-dim)] transition-transform group-hover:translate-x-0.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M9 6l6 6-6 6" />
+      </svg>
     </Link>
   );
 }
 
-function SecondaryLink({
+function QuietRow({
   href,
   title,
   detail,
@@ -239,10 +162,22 @@ function SecondaryLink({
   return (
     <Link
       href={href}
-      className="flex min-h-16 flex-col justify-center gap-0.5 rounded-xl border border-[var(--line)] px-4 py-3 transition-colors hover:border-[var(--line-strong)]"
+      className="flex min-h-14 items-center gap-3 border-b border-[var(--line)] py-3 first:border-t transition-colors hover:bg-[var(--accent-dim)]"
     >
       <span className="text-sm font-semibold text-[var(--fg)]">{title}</span>
-      <span className="text-xs text-[var(--fg-dim)]">{detail}</span>
+      <span className="type-context text-[var(--fg-dim)]">{detail}</span>
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        className="ms-auto size-4 shrink-0 text-[var(--fg-dim)]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M9 6l6 6-6 6" />
+      </svg>
     </Link>
   );
 }

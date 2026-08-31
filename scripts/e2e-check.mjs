@@ -42,9 +42,9 @@ page.on("console", (message) => {
 await page.goto(`${base}/prep`, { waitUntil: "networkidle" });
 await page.getByPlaceholder("류정길").fill("류정길");
 await page.getByPlaceholder("새길교회").fill("새길교회");
-await page.getByPlaceholder("Our Identity in Christ").fill("택하신 족속");
+await page.getByPlaceholder("그리스도 안에서 우리는 누구인가").fill("택하신 족속");
 await page.getByPlaceholder("1 Peter 2:9").fill("1 Peter 2:9");
-await page.getByRole("button", { name: /Build interpretation brief/ }).click();
+await page.getByRole("button", { name: /통역 브리프 만들기/ }).click();
 await page.waitForTimeout(2500);
 
 const brief = await page.locator("body").innerText();
@@ -74,8 +74,8 @@ await page.goto(`${base}/live`, { waitUntil: "networkidle" });
 // The audio picker is a radiogroup, not a row of buttons: it is a choice
 // between mutually exclusive options, and saying so is what lets a screen
 // reader announce "2 of 3" instead of reading three unrelated buttons.
-await page.getByRole("radio", { name: /^Demo/ }).click();
-await page.getByRole("button", { name: "Run demo" }).click();
+await page.getByRole("radio", { name: /^데모/ }).click();
+await page.getByRole("button", { name: "데모 실행" }).click();
 await page.waitForTimeout(3000);
 
 await page.getByLabel("Session settings").click();
@@ -123,7 +123,7 @@ await page.goto(`${base}/sessions`, { waitUntil: "networkidle" });
 await page.waitForTimeout(600);
 check(
   "saved session appears in the list",
-  !/No saved sessions/.test(await page.locator("body").innerText()),
+  !/아직 저장된 세션이 없어요/.test(await page.locator("body").innerText()),
 );
 await page.screenshot({ path: join(outDir, "sessions.png") });
 
@@ -199,8 +199,8 @@ await host.getByRole("button", { name: "QR 코드 띄우기" }).click();
 await host.waitForTimeout(1500);
 
 const joinText = await host.locator("body").innerText();
-const code = joinText.match(/TY-([A-Z0-9]{4})/)?.[1];
-check("counter issues a room code", !!code, code ? `TY-${code}` : "none found");
+const code = joinText.match(/AS-([A-Z0-9]{4})/)?.[1];
+check("counter issues a room code", !!code, code ? `AS-${code}` : "none found");
 check(
   "counter renders a QR the visitor can scan",
   (await host.locator('svg[role="img"]').count()) > 0,

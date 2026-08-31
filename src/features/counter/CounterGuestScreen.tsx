@@ -25,6 +25,7 @@ import {
   suggestLanguage,
 } from "@/counter/languages";
 import { formatCode } from "@/counter/codes";
+import { Mark } from "@/components/brand/Mark";
 import { buildConfirmationText } from "@/counter/risks";
 import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
@@ -235,16 +236,25 @@ function LanguagePicker({
   const t = stringsFor(selected);
 
   return (
+    <div data-surface="launcher" className="min-h-[100dvh] w-full">
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-5 px-4 py-7">
-      <header className="text-center">
+      <header className="flex flex-col items-center gap-3 text-center">
+        {/* The only screen in the product a person outside the organisation
+            ever sees, and it used to carry no identity at all — just a grid of
+            language names and a code stamped with a brand name we retired.
+            The mark goes here, small: they are choosing a language, not
+            admiring a logo. */}
+        <Mark size={28} title="아무튼서로알아들었으면된거아닌가요" />
         {/* Multilingual on purpose: this line has to be read by someone who has
             not yet told us what they read. */}
-        <h1 className="text-xl font-semibold text-[var(--fg)]">
-          Choose your language
-        </h1>
-        <p className="mt-1 text-sm text-[var(--fg-muted)]">
-          언어를 선택하세요 · 选择语言 · 言語を選択 · Chọn ngôn ngữ
-        </p>
+        <div>
+          <h1 className="text-xl font-semibold text-[var(--fg)]">
+            Choose your language
+          </h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">
+            언어를 선택하세요 · 选择语言 · 言語を選択 · Chọn ngôn ngữ
+          </p>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 gap-2.5">
@@ -274,7 +284,26 @@ function LanguagePicker({
       </div>
 
       {error && (
-        <p className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-center text-sm text-[var(--danger)]">
+        /* Shape as well as hue: this is read by someone who does not share a
+           language with the staff member, and red-on-its-own is the one
+           signal that carries nothing at all for a colour-blind reader. */
+        <p
+          role="alert"
+          className="flex items-start justify-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-center text-sm text-[var(--danger)]"
+        >
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className="mt-0.5 size-4 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          >
+            <path d="M12 3 22 21H2z" />
+            <path d="M12 10v4" strokeLinecap="round" />
+            <path d="M12 17.5h.01" strokeLinecap="round" />
+          </svg>
           {error}
         </p>
       )}
@@ -292,14 +321,13 @@ function LanguagePicker({
           type="button"
           disabled={joining}
           onClick={() => onChoose(selected)}
-          className="w-full rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-5 py-4 text-lg font-semibold text-[var(--bg)] disabled:pointer-events-none disabled:opacity-40"
+          className="w-full rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-5 py-4 text-lg font-semibold text-[var(--accent-contrast)] disabled:pointer-events-none disabled:opacity-40"
         >
           {joining ? t.connecting : t.start}
         </button>
-        <p className="mt-2 text-center font-mono text-[0.7rem] text-[var(--fg-dim)]">
-          {formatCode(code)}
-        </p>
+        <p className="brand-caption mt-2 text-center">{formatCode(code)}</p>
       </div>
+    </div>
     </div>
   );
 }

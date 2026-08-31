@@ -19,6 +19,7 @@ import { COUNTER_PROFILES, findCounterProfile, type CounterProfileId } from "@/c
 import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
 import { Label } from "@/components/ui/primitives";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useClientValue } from "@/hooks/useClientValue";
 import { useLocalStore } from "@/lib/local-store";
 import { useCounterSession } from "./useCounterSession";
@@ -107,7 +108,7 @@ export function CounterHostScreen() {
   const guestJoined = !!view?.guestPresent && !!view.guestLang;
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-[var(--bg)]">
+    <div data-surface="launcher" className="flex h-[100dvh] flex-col bg-[var(--bg)]">
       <HostHeader
         code={code}
         deskLabel={view?.deskLabel}
@@ -395,14 +396,12 @@ function SetupScreen({
     const language = findLanguage(hostLang);
     const profile = findCounterProfile(profileId);
     return (
+      <div data-surface="launcher" className="min-h-[100dvh] w-full">
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-7 px-5 py-8 sm:py-12">
-        <header>
-          <p className="text-sm font-semibold text-[var(--accent)]">현장 응대</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">바로 시작할까요?</h1>
-          <p className="mt-2 text-sm text-[var(--fg-muted)]">
-            지난번 설정으로 QR을 바로 만들 수 있습니다.
-          </p>
-        </header>
+        <PageHeader
+          title="바로 시작할까요?"
+          detail="지난번 설정으로 QR을 바로 만들 수 있습니다."
+        />
 
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-5">
           <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "현장 응대"}</p>
@@ -441,19 +440,17 @@ function SetupScreen({
           <span>대화 기록은 세션 동안만 임시 보관됩니다.</span>
         </footer>
       </div>
+      </div>
     );
   }
 
   return (
+    <div data-surface="launcher" className="min-h-[100dvh] w-full">
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-7 px-5 py-8 sm:py-12">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">현장 응대 모드</h1>
-        <p className="mt-1.5 text-sm leading-relaxed text-[var(--fg-muted)]">
-          QR 코드를 보여주면 손님이 자기 휴대폰으로 참여합니다. 설치는 필요
-          없습니다. 자주 쓰는 문구는 모델을 거치지 않고 그대로 전달되고, 숫자와
-          이름은 확인용으로 표시됩니다.
-        </p>
-      </header>
+      <PageHeader
+        title="현장 응대"
+        detail="QR을 보여주면 손님이 자기 휴대폰으로 참여합니다. 설치는 필요 없습니다."
+      />
 
       <section className="flex flex-col gap-3">
         <Label>1 · 직원 언어</Label>
@@ -547,7 +544,7 @@ function SetupScreen({
         type="button"
         onClick={onStart}
         disabled={starting}
-        className="rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-5 py-4 text-lg font-semibold text-[var(--bg)] disabled:pointer-events-none disabled:opacity-40"
+        className="rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-5 py-4 text-lg font-semibold text-[var(--accent-contrast)] disabled:pointer-events-none disabled:opacity-40"
       >
         {starting ? "준비 중…" : "QR 코드 띄우기"}
       </button>
@@ -558,6 +555,7 @@ function SetupScreen({
         </Link>
         <span>대화 기록은 세션 동안만 임시 보관됩니다.</span>
       </footer>
+    </div>
     </div>
   );
 }

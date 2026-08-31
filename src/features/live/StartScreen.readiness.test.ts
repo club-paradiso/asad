@@ -13,11 +13,11 @@ describe("launcher booth preflight readiness", () => {
     });
 
     expect(input).toMatchObject({
-      label: "Input",
-      value: "USB Mixer · not preflight-verified",
+      label: "입력",
+      value: "USB Mixer · 사전 점검 안 됨",
       level: "limited",
     });
-    expect(input.detail).toMatch(/You can still start/i);
+    expect(input.detail).toMatch(/그대로 시작해도 됩니다/);
   });
 
   it("returns the same Sermon input to ready after a matching fresh preflight", () => {
@@ -31,7 +31,7 @@ describe("launcher booth preflight readiness", () => {
     });
 
     expect(input).toMatchObject({
-      label: "Input",
+      label: "입력",
       value: "USB Mixer",
       level: "ready",
     });

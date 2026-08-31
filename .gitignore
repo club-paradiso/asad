@@ -17,3 +17,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .vercel
+
+# The seeded canvas is a build output of .design-canvas/*.dc.html — it embeds a
+# ~2MB editor payload and is republished from source, never edited in place.
+.design-canvas/*.html
+!.design-canvas/*.dc.html

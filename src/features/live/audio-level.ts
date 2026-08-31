@@ -19,15 +19,15 @@ export function classifyInputLevel(rms: number): InputLevelReading {
   const meter = Math.min(1, safe * 5);
 
   if (safe < 0.008) {
-    return { rms: safe, meter, state: "silent", label: "No signal" };
+    return { rms: safe, meter, state: "silent", label: "신호 없음" };
   }
   if (safe < 0.025) {
-    return { rms: safe, meter, state: "low", label: "Signal is low" };
+    return { rms: safe, meter, state: "low", label: "신호가 약함" };
   }
   if (safe < 0.22) {
-    return { rms: safe, meter, state: "good", label: "Signal looks usable" };
+    return { rms: safe, meter, state: "good", label: "쓸 만한 신호" };
   }
-  return { rms: safe, meter, state: "hot", label: "Signal is very hot" };
+  return { rms: safe, meter, state: "hot", label: "신호가 너무 큼" };
 }
 
 export function rmsOf(samples: Float32Array): number {

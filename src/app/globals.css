@@ -45,6 +45,30 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
+/* ==========================================================================
+   Brand layer — "Communication Error Chic"
+
+   These four values are the identity. They do not change per surface; every
+   surface below re-expresses the working palette in terms of them, so the
+   brand is one decision rather than five.
+
+     ink     the thing you read, and the thing you press. Warm near-black.
+     paper   warm off-white. Not #fff — a screen that quotes a page.
+     red     the correction mark. It means "look here, this is off" and
+             nothing else: the ? of the wordmark, an error, a struck word.
+             It is deliberately NOT the button colour, so a red button in
+             this product always means something is wrong.
+     amber   live/now. Console state only — see [data-surface="live"].
+   ========================================================================== */
+:root {
+  --brand-ink: #12100e;
+  --brand-paper: #faf7f2;
+  --brand-cream: #f2ede4;
+  --brand-red: #c81e1e;
+  --brand-red-on-dark: #f05a50;
+  --brand-navy: #1b2a4a;
+}
+
 :root {
   color-scheme: dark;
 
@@ -124,33 +148,41 @@
   --info-dim: rgba(94, 200, 216, 0.14);
 }
 
-/* The launcher is a preparation surface, not the live reading surface. It is
-   deliberately light and operational even when the OS is in dark mode; the
-   live console keeps its auditorium-safe dark palette above. */
+/* Paper — every surface that is not the live console.
+   Launcher, prep, review, counter host. The interpreter is reading and
+   deciding here, not performing, so it is light in any OS theme: these
+   screens get used in a lit office and a bright church foyer, and a dark
+   launcher next to a dark console made the whole product feel like one
+   long night shift.
+
+   The action colour is ink, not the brand red. A near-black button is
+   unmistakably the primary thing on a warm page, reads at any size, and
+   leaves red free to mean "correction" — which is the entire brand idea. */
 [data-surface="launcher"] {
   color-scheme: light;
-  --bg: #ffffff;
+  --bg: var(--brand-paper);
   --bg-raised: #ffffff;
-  --bg-overlay: #f6f8fc;
-  --line: #dfe5ef;
-  --line-strong: #c7d1e0;
-  --fg: #0b1739;
-  --fg-muted: #5f6d88;
-  --fg-dim: #7b879d;
-  --accent: #144ddd;
-  --accent-contrast: #ffffff;
-  --accent-dim: rgba(20, 77, 221, 0.1);
-  --info: #156f86;
-  --info-dim: rgba(21, 111, 134, 0.09);
-  --ok: #18a664;
-  --warn: #a76416;
-  --danger: #c63c3c;
+  --bg-overlay: var(--brand-cream);
+  --line: #e4ddd1;
+  --line-strong: #cbc2b3;
+  --fg: var(--brand-ink);
+  --fg-muted: #4a4540;
+  --fg-dim: #6b655e;
+  /* `accent` is the ACTION role. On paper that is ink. */
+  --accent: var(--brand-ink);
+  --accent-contrast: var(--brand-paper);
+  --accent-dim: rgba(18, 16, 14, 0.06);
+  --info: var(--brand-navy);
+  --info-dim: rgba(27, 42, 74, 0.07);
+  --ok: #1c7a4f;
+  --warn: #96601a;
+  --danger: var(--brand-red);
   background: var(--bg);
   /* `color` as well as `background`, and this is not decorative.
      `body` resolves `color: var(--fg)` against the ROOT tokens, and this
      surface only rebinds --fg for its own subtree — so every element that
      merely INHERITS its colour (the wordmark, the readiness headings) kept
-     the dark theme's near-white and rendered invisible on this white
+     the dark theme's near-white and rendered invisible on this
      background. Restating it here re-resolves the inherited colour. */
   color: var(--fg);
 }
@@ -399,4 +431,115 @@ select:focus-visible,
 
 .chunk-enter {
   animation: chunk-in 140ms ease-out;
+}
+
+/* --- Brand expression ----------------------------------------------------
+
+   The rule that keeps this from becoming decoration: these classes are only
+   allowed on brand surfaces — wordmark, hero, empty, success, onboarding.
+   None of them may appear inside a live reading area or a form the user is
+   trying to complete. If a device makes a task harder it comes out, and the
+   concept survives that just fine.
+   ------------------------------------------------------------------------- */
+
+/* The wordmark's second line. Tighter and heavier than the first, because
+   "된거아닌가요?" is the half of the name that carries the shrug. */
+.brand-wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.94;
+  /* The name is 15 unspaced Hangul syllables. Korean must break between
+     syllables, never inside one, and `keep-all` alone will not wrap a run
+     with no spaces in it — `anywhere` is what lets the two-line lockup
+     hold its shape at 320px without a mid-syllable hyphen. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* The upper line: same family, deliberately narrower and quieter, so the
+   lockup reads as a sentence that starts hedging and ends shrugging. */
+.brand-wordmark-lead {
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--fg-muted);
+}
+
+/* The one typographic interruption the brand gets. A caption/timecode voice
+   borrowed from subtitles — used for section labels and annotations, never
+   for anything the user has to read at speed. */
+.brand-caption {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  /* 0.02em, not the 0.08em a Latin caption would take. CSS cannot track by
+     script, and Hangul syllables are already generously side-beared — Latin
+     letter-spacing on "무엇을 하시나요" opens visible holes between the
+     syllables and reads as broken kerning. The mono face and the size carry
+     the caption voice on their own. */
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A correction mark: struck text with the replacement following it. This is
+   the brand's core gesture — the wrong word is still legible under the line,
+   because being understood anyway is the whole point. */
+.brand-struck {
+  text-decoration: line-through;
+  text-decoration-color: var(--brand-red);
+  text-decoration-thickness: 2px;
+  color: var(--fg-dim);
+}
+
+/* An annotation underline — the wobble of a pen, not a border. Drawn as a
+   background so it sits under descenders instead of clipping them. */
+.brand-underline {
+  background-image: linear-gradient(
+    to right,
+    var(--brand-red) 0,
+    var(--brand-red) 100%
+  );
+  background-repeat: no-repeat;
+  background-position: 0 calc(100% - 0.06em);
+  background-size: 100% 2px;
+  padding-bottom: 0.08em;
+}
+
+/* Deliberate misalignment, used exactly once per screen at most: the nudge
+   that makes a heading look mistyped until you notice it is consistent.
+   Capped at 3px — beyond that it stops reading as intent and starts reading
+   as a broken layout. */
+.brand-nudge {
+  transform: translateY(-2px) rotate(-0.6deg);
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-nudge {
+    transform: none;
+  }
+}
+
+/* On the console the brand red has to clear a near-black background, which
+   #c81e1e does not. Nothing else about the console palette changes. */
+[data-surface="live"] {
+  --brand-red: var(--brand-red-on-dark);
+}
+
+/* The ? → ✓ resolve. Fires once, on a success, and never loops. */
+@keyframes mark-resolve {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.mark-resolve {
+  animation: mark-resolve 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }

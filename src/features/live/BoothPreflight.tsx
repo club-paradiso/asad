@@ -84,7 +84,7 @@ export function BoothPreflight({
     setSignalVerified(false);
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError("This browser cannot test audio input locally.");
+      setError("이 브라우저에서는 오디오 입력을 로컬에서 점검할 수 없습니다.");
       setPhase("error");
       return;
     }
@@ -103,7 +103,7 @@ export function BoothPreflight({
       detachEndObserverRef.current = observeAudioInputEnd(stream, () => {
         setSignalVerified(false);
         setError(
-          "Audio input disconnected during preflight. Reconnect it or choose another input, then test again.",
+          "점검 중에 오디오 입력이 끊겼습니다. 다시 연결하거나 다른 입력을 고른 뒤 한 번 더 점검해 주세요.",
         );
         setPhase("error");
         stopTest(false);
@@ -147,13 +147,13 @@ export function BoothPreflight({
       setSignalVerified(false);
       const message =
         caught instanceof Error && caught.name === "NotAllowedError"
-          ? "Microphone permission was denied."
+          ? "마이크 권한이 거부되었습니다."
           : caught instanceof Error &&
               (caught.name === "OverconstrainedError" || caught.name === "NotFoundError")
-            ? "The selected audio input is unavailable. Reconnect it or choose another input."
+            ? "선택한 오디오 입력을 쓸 수 없습니다. 다시 연결하거나 다른 입력을 고르세요."
             : caught instanceof Error
               ? caught.message
-              : "Could not open this audio input.";
+              : "이 오디오 입력을 열지 못했습니다.";
       setError(message);
       setPhase("error");
       stopTest(false);
@@ -164,18 +164,18 @@ export function BoothPreflight({
 
   return (
     <section
-      aria-label="Booth preflight"
+      aria-label="부스 사전 점검"
       className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] px-4 py-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-[var(--fg)]">Booth preflight</h2>
+          <h2 className="text-sm font-semibold text-[var(--fg)]">부스 사전 점검</h2>
           <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
-            Test the selected church feed before the service. This meter is local only; no audio is sent to ASAD providers.
+            예배 전에 선택한 교회 피드를 점검합니다. 이 미터는 기기 안에서만 동작하고, 오디오는 어디로도 전송되지 않습니다.
           </p>
         </div>
         <span className="rounded-sm border border-[var(--line-strong)] px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--fg-dim)]">
-          Local only
+          기기 안에서만
         </span>
       </div>
 
@@ -186,20 +186,20 @@ export function BoothPreflight({
           </span>
           <span aria-live="polite" className="shrink-0 text-[var(--fg-muted)]">
             {phase === "requesting"
-              ? "Opening…"
+              ? "여는 중…"
               : phase === "listening"
                 ? reading.label
                 : phase === "error"
-                  ? "Input unavailable"
+                  ? "입력 사용 불가"
                   : signalVerified
-                    ? "Signal verified"
-                    : "Not tested"}
+                    ? "신호 확인됨"
+                    : "점검 전"}
           </span>
         </div>
         <div
           className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--line)]"
           role="meter"
-          aria-label="Input level"
+          aria-label="입력 레벨"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={phase === "listening" ? meterPercent : 0}
@@ -217,11 +217,11 @@ export function BoothPreflight({
         <div className="mt-3 flex gap-2">
           {phase === "listening" ? (
             <Button tone="neutral" size="sm" onClick={() => stopTest()}>
-              Stop test
+              점검 중지
             </Button>
           ) : (
             <Button tone="neutral" size="sm" onClick={() => void startTest()}>
-              Test input
+              입력 점검
             </Button>
           )}
         </div>
@@ -235,8 +235,8 @@ export function BoothPreflight({
           className="mt-0.5 size-4 shrink-0 accent-[var(--accent)]"
         />
         <span>
-          <strong className="font-semibold text-[var(--fg)]">Mix-minus checked.</strong>{" "}
-          The ASAD feed contains the Korean speaker/program audio, but not the interpreter&apos;s English microphone.
+          <strong className="font-semibold text-[var(--fg)]">Mix-minus 확인함.</strong>{" "}
+          이 피드에는 한국어 화자·프로그램 오디오만 들어오고, 통역사의 영어 마이크는 섞이지 않습니다.
         </span>
       </label>
 
@@ -245,14 +245,14 @@ export function BoothPreflight({
         className="mt-4 rounded-md border border-[var(--line)] bg-[var(--bg-overlay)] px-3 py-2.5 text-xs leading-relaxed"
       >
         {ready ? (
-          <p className="font-semibold text-[var(--accent)]">Ready for live.</p>
+          <p className="font-semibold text-[var(--ok)]">통역 시작할 준비가 됐습니다.</p>
         ) : signalVerified ? (
           <p className="text-[var(--fg-muted)]">
-            Signal verified. Confirm mix-minus to finish the booth check.
+            신호는 확인됐습니다. mix-minus까지 확인하면 부스 점검이 끝납니다.
           </p>
         ) : (
           <p className="text-[var(--fg-muted)]">
-            Run the input test until the meter reports a usable signal, then confirm mix-minus.
+            미터에 쓸 만한 신호가 뜰 때까지 입력을 점검한 뒤, mix-minus를 확인해 주세요.
           </p>
         )}
       </div>

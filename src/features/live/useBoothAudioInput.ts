@@ -42,7 +42,10 @@ export function useBoothAudioInput(enabled = true) {
   const selectedLabel = useMemo(
     () =>
       audioInputs.devices.find((device) => device.deviceId === deviceId)?.label ??
-      "System default",
+      // Korean, because every surface that renders this label is a launcher
+      // surface. Real device labels come from the OS and stay whatever the OS
+      // calls them — only the fallback is ours to name.
+      "시스템 기본값",
     [audioInputs.devices, deviceId],
   );
 
