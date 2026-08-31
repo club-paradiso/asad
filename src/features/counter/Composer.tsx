@@ -1,7 +1,7 @@
 "use client";
 
 /** Counter input zone: voice first, then typing, with no dead-end state. */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findLanguage } from "@/counter/languages";
 import { detectRisks } from "@/counter/risks";
 import type { RiskSpan } from "@/counter/types";
@@ -24,21 +24,40 @@ export function Composer({
 }: {
   lang: string;
   strings: CounterStrings;
-  onSend: (text: string, source: "voice" | "text") => void;
+  onSend: (text: string, source: "voice" | "text") => Promise<unknown> | unknown;
   disabled?: boolean;
   busy?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
+  const draftRevision = useRef(0);
+  const composing = useRef(false);
   const voice = useVoiceInput(lang);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
-  const submit = useCallback(() => {
+  const submit = useCallback(async () => {
     const text = draft.trim();
-    if (!text || disabled) return;
+    if (!text || disabled || composing.current) return;
+
+    // Clear immediately so the next turn can be typed while this one is being
+    // translated. If delivery fails, restore only when the user has not typed
+    // anything newer in the meantime. A late failure must never erase or
+    // overwrite a newer draft.
+    const revisionAtSubmit = draftRevision.current;
     setDraft("");
-    onSend(text, "text");
+
+    let delivered = true;
+    try {
+      const result = await onSend(text, "text");
+      delivered = result !== null && result !== false;
+    } catch {
+      delivered = false;
+    }
+
+    if (!delivered && draftRevision.current === revisionAtSubmit) {
+      setDraft(text);
+    }
   }, [draft, disabled, onSend]);
 
   const startVoice = useCallback(() => {
@@ -52,7 +71,7 @@ export function Composer({
         setPendingVoice({ text: spoken, risks });
         return;
       }
-      onSend(spoken, "voice");
+      void onSend(spoken, "voice");
     });
   }, [disabled, onSend, voice]);
 
@@ -103,7 +122,7 @@ export function Composer({
                 type="button"
                 className="min-h-11 flex-1 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-contrast)]"
                 onClick={() => {
-                  onSend(pendingVoice.text, "voice");
+                  void onSend(pendingVoice.text, "voice");
                   setPendingVoice(null);
                   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
                     navigator.vibrate(8);
@@ -178,12 +197,32 @@ export function Composer({
           className="flex min-w-0 items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            submit();
+            void submit();
           }}
         >
           <input
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              draftRevision.current += 1;
+              setDraft(event.target.value);
+            }}
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            onCompositionEnd={() => {
+              composing.current = false;
+            }}
+            onKeyDown={(event) => {
+              // Korean/Chinese/Japanese IMEs use Enter to commit a composition.
+              // Safari and some Android browsers can otherwise submit the form
+              // at the same time, producing a truncated or accidental message.
+              if (
+                event.key === "Enter" &&
+                (composing.current || event.nativeEvent.isComposing || event.keyCode === 229)
+              ) {
+                event.preventDefault();
+              }
+            }}
             placeholder={strings.typeHere}
             disabled={disabled}
             dir={rtl ? "rtl" : undefined}
