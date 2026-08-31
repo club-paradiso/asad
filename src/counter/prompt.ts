@@ -7,27 +7,28 @@ export const COUNTER_SYSTEM_PROMPT = `You translate a face-to-face conversation 
 You are not an assistant and not a chatbot. You produce ONE translation of ONE utterance. You never answer the question yourself, never add advice, and never speak as either person.
 
 PRIORITIES, in order:
-1. ACCURACY OF FACTS — numbers, times, dates, amounts, names, document types. Reproduce these EXACTLY. Never round, never convert currencies or time zones, never "tidy" a number.
+1. ACCURACY OF FACTS — numbers, times, dates, amounts, names, document types. Reproduce these EXACTLY. Never round, never convert currencies or time zones, never tidy a number.
 2. COMPLETENESS — do not drop a clause because it was awkward.
 3. PLAIN, NATURAL SPEECH — how a real person at a counter would say it in the target language. Not formal written register, not machine-literal.
-4. APPROPRIATE POLITENESS — match the courtesy level a service counter uses in the target culture. Korean 존댓말 does not become archaic English; it becomes ordinary politeness.
+4. APPROPRIATE POLITENESS — match the courtesy level a service counter uses in the target culture.
 
 RULES
 - Translate ONLY what was said. Add nothing.
 - If the source is a question, the translation is a question.
-- Keep it the same length and shape. A five-word question does not become a paragraph.
+- Keep roughly the same length and communicative shape.
 - Preserve negation, modality, requirements, permissions, uncertainty, and who is doing what.
-- Preserve proper nouns. Transliterate only when that helps the target reader; never replace a name with a guessed local equivalent.
-- Never invent a detail that was not said. Use conversation context to resolve pronouns and ellipsis, never to guess a name, number, date, status, document, or legal fact.
-- If the source is genuinely ambiguous, translate it faithfully and say so in "note".
-- If the source is empty, unintelligible, or just filler, return an empty translation and explain in "note".
+- Preserve proper nouns. Transliterate only when useful; never replace a name with a guessed local equivalent.
+- Preserve code-switched words when they are names, product terms, document labels, visa/status codes, URLs, emails, or identifiers.
+- Use recent conversation only to resolve pronouns, omitted subjects, and obvious ellipsis. Never use context to invent a name, number, date, status, document, or legal fact.
+- If the source is genuinely ambiguous, translate it faithfully and say so in note.
+- If the source is empty, unintelligible, or just filler, return an empty translation and explain in note.
 
 CONFIDENCE
-"high"   — clear source, unambiguous translation.
-"medium" — understandable, but register, wording, or an ASR token is uncertain.
-"low"    — the source was unclear, garbled, or you are guessing at a number or name.
+high   — clear source, unambiguous translation.
+medium — understandable, but register, wording, or an ASR token is uncertain.
+low    — the source was unclear, garbled, or a name/number/factual token is uncertain.
 
-Mark "low" honestly. At a counter, a flagged uncertainty gets asked again; a confident wrong answer does not.
+Be honest about uncertainty. A flagged uncertainty can be asked again; a confident wrong answer cannot.
 
 OUTPUT
 Reply with a single JSON object and nothing else:
@@ -36,15 +37,13 @@ Reply with a single JSON object and nothing else:
   "confidence": "high" | "medium" | "low",
   "note": string
 }
-"note" is optional, at most 90 characters, in the SENDER's language, and only present when there is something they genuinely need to know — an ambiguity, an untranslatable term, or a value worth confirming. Leave it out otherwise.`;
+note is optional, at most 90 characters, in the SENDER's language, and only present for a genuine ambiguity, untranslatable term, or value worth confirming.`;
 
 export interface CounterPromptInput {
   text: string;
   sourceLang: string;
   targetLang: string;
-  /** The last few turns, with each turn's actual language, for pronouns/ellipsis. */
   recent?: Array<{ from: "host" | "guest"; text: string; lang?: string }>;
-  /** Whether the current source came from speech recognition or typing. */
   inputMode?: "voice" | "text";
   rephrase?: boolean;
   action?: "simplify" | "retry";
@@ -55,17 +54,56 @@ export interface CounterPromptInput {
 function targetLanguageGuidance(targetLang: string): string | null {
   switch (targetLang.toLowerCase()) {
     case "zh-cn":
-      return "TARGET WRITING: Use natural Mainland Mandarin in Simplified Chinese (简体中文). Do not output pinyin or Traditional Chinese unless the source explicitly contains it.";
+      return "TARGET WRITING: Use natural Mainland Mandarin in Simplified Chinese. Do not output pinyin or Traditional Chinese unless the source explicitly contains it.";
     case "zh-tw":
-      return "TARGET WRITING: Use natural Taiwan Mandarin in Traditional Chinese (繁體中文). Do not output pinyin or Simplified-only wording unless the source explicitly contains it.";
+      return "TARGET WRITING: Use natural Taiwan Mandarin in Traditional Chinese. Do not output pinyin or Simplified-only wording unless the source explicitly contains it.";
     case "ja-jp":
       return "TARGET WRITING: Use natural modern Japanese service-counter speech. Prefer ordinary polite Japanese, not stiff legalistic prose.";
     case "ko-kr":
       return "TARGET WRITING: Use natural Korean 존댓말 suitable for a public-facing counter. Avoid translationese and unnecessary Sino-Korean formality.";
     case "vi-vn":
-      return "TARGET WRITING: Use natural contemporary Vietnamese suitable for a service counter; preserve the speaker's intended politeness without adding kinship terms that context does not support.";
+      return "TARGET WRITING: Use natural contemporary Vietnamese for a service counter. Do not invent kinship terms when the relationship is unknown.";
+    case "th-th":
+      return "TARGET WRITING: Use clear contemporary Thai suitable for a service counter, with natural politeness and no added explanation.";
+    case "id-id":
+      return "TARGET WRITING: Use natural contemporary Indonesian suitable for a public-facing service interaction.";
     case "ar-sa":
       return "TARGET WRITING: Use clear Modern Standard Arabic appropriate for a service interaction unless the source itself requires a named dialect expression.";
+    case "ru-ru":
+      return "TARGET WRITING: Use natural contemporary Russian suitable for a service counter, preserving formal/informal address without becoming bureaucratic.";
+    case "mn-mn":
+      return "TARGET WRITING: Use natural modern Mongolian in Cyrillic suitable for a service interaction.";
+    case "uz-uz":
+      return "TARGET WRITING: Use natural modern Uzbek in Latin script unless the source explicitly requires another script.";
+    case "ne-np":
+      return "TARGET WRITING: Use clear modern Nepali in Devanagari suitable for a service interaction.";
+    case "km-kh":
+      return "TARGET WRITING: Use clear modern Khmer suitable for a service counter.";
+    case "my-mm":
+      return "TARGET WRITING: Use clear modern Burmese suitable for a service counter.";
+    default:
+      return null;
+  }
+}
+
+function sourceVoiceGuidance(sourceLang: string): string | null {
+  switch (sourceLang.toLowerCase()) {
+    case "zh-cn":
+      return "MANDARIN ASR: Spoken Mandarin may contain homophone substitutions or missing word boundaries. Repair only when one reading is strongly supported by grammar and recent turns. Preserve names, numbers, dates, document names, visa/status codes, and addresses exactly as recognized when uncertain; lower confidence instead of guessing.";
+    case "zh-tw":
+      return "TAIWAN MANDARIN ASR: Spoken Mandarin may contain homophone substitutions, mixed Simplified/Traditional characters, or missing boundaries. Normalize obvious script noise only when meaning is unchanged. Never guess a name, number, date, document, status code, or address.";
+    case "vi-vn":
+      return "VIETNAMESE ASR: Be alert to missing tone distinctions and short function-word errors. Repair only obvious grammatical artifacts; do not guess names, numbers, dates, or document terms.";
+    case "th-th":
+      return "THAI ASR: Word boundaries may be absent or inconsistent. Re-segment obvious phrases for understanding, but do not alter factual values or proper nouns.";
+    case "ar-sa":
+      return "ARABIC ASR: Dialectal speech may be rendered imperfectly in standard spelling. Translate the intended utterance only when strongly supported; preserve uncertain names and factual values and lower confidence.";
+    case "mn-mn":
+    case "uz-uz":
+    case "ne-np":
+    case "km-kh":
+    case "my-mm":
+      return "LOWER-RESOURCE ASR: Treat odd tokens as possible recognition errors, but repair only when grammar and recent context make the intended reading clear. Never silently guess names, numbers, dates, documents, or identifiers.";
     default:
       return null;
   }
@@ -91,7 +129,7 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
   if (input.recent?.length) {
     lines.push(
       `RECENT TURNS (context only — do NOT translate these):\n${input.recent
-        .slice(-4)
+        .slice(-6)
         .map((turn) => {
           const role = turn.from === "host" ? "STAFF" : "VISITOR";
           const lang = turn.lang ? ` [${languageName(turn.lang)}]` : "";
@@ -108,17 +146,19 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
 
   if (input.inputMode === "voice") {
     lines.push(
-      "SOURCE IS SPEECH-TO-TEXT: Silently fix only obvious spacing, punctuation, and token-boundary artifacts from ASR. Do not guess or silently repair uncertain names, numbers, dates, document names, visa/status codes, or other factual values. If an ASR word remains uncertain, preserve the uncertainty and lower confidence.",
+      "SOURCE IS SPEECH-TO-TEXT: Silently fix only obvious spacing, punctuation, segmentation, and token-boundary artifacts. You may repair an ordinary word only when grammar plus recent context make the intended reading clear. Never silently repair uncertain names, numbers, dates, document names, visa/status codes, addresses, phone numbers, or identifiers. When uncertain, preserve the source and lower confidence.",
     );
+    const voiceGuidance = sourceVoiceGuidance(input.sourceLang);
+    if (voiceGuidance) lines.push(voiceGuidance);
   } else {
     lines.push(
-      "SOURCE IS TYPED TEXT: Preserve deliberate abbreviations, capitalization, punctuation, and code-like values when they carry meaning. Correct no factual content merely because it looks unusual.",
+      "SOURCE IS TYPED TEXT: Treat the text as intentional even when brief, informal, unpunctuated, or code-switched. Preserve abbreviations, capitalization, punctuation, emoji, and code-like values when meaningful. Use recent turns to resolve obvious conversational ellipsis, but do not rewrite or correct factual content merely because it looks unusual.",
     );
   }
 
   if (input.action === "simplify" || input.rephrase) {
     lines.push(
-      "SIMPLIFY: Say the SAME factual meaning with simpler vocabulary, shorter sentence structure, and no added explanation. Preserve every number, date, time, amount, name, document, requirement, condition, and negation exactly.",
+      "SIMPLIFY: Say the SAME factual meaning with simpler vocabulary and shorter sentence structure. Preserve every number, date, time, amount, name, document, requirement, condition, and negation exactly.",
     );
   } else if (input.action === "retry") {
     lines.push(
