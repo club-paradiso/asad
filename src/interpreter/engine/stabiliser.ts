@@ -50,6 +50,25 @@ export function pushStable(
   };
 }
 
+/**
+ * Put an interpretation unit back in front of whatever arrived while its
+ * request was in flight. A transient network failure must never turn into a
+ * missing sentence in the English stream.
+ */
+export function restorePending(
+  state: StabiliserState,
+  text: string,
+  now: number,
+): StabiliserState {
+  const clean = text.trim();
+  if (!clean) return state;
+  return {
+    pending: state.pending ? `${clean} ${state.pending}` : clean,
+    pendingSince: Math.min(state.pendingSince ?? now, now),
+    lastEventAt: state.lastEventAt,
+  };
+}
+
 /** Note recogniser activity without adding anything to the buffer. */
 export const touch = (state: StabiliserState, now: number): StabiliserState => ({
   ...state,
