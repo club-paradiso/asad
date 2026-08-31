@@ -65,6 +65,11 @@ export interface CounterMessage {
   seq: number;
   from: Participant;
   source: MessageSource;
+  /**
+   * Client-generated idempotency key. It lets a dropped POST be retried without
+   * displaying the same utterance twice. It is random and carries no user data.
+   */
+  clientRequestId?: string;
   originalText: string;
   originalLang: string;
   translatedText: string;
