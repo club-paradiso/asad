@@ -81,9 +81,7 @@ export function CounterHostScreen() {
   }, [session, start]);
 
   const finish = useCallback(async () => {
-    await session.end();
-    setCode(null);
-    setShowCode(false);
+    await session.end({ leave: true });
   }, [session]);
 
   if (!code) {
