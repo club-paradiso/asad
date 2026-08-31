@@ -143,11 +143,11 @@ export function findCounterProfile(id: string | undefined): CounterProfile {
   return COUNTER_PROFILES.find((profile) => profile.id === id) ?? COUNTER_PROFILES[0];
 }
 
-export function counterDataClass(id: CounterProfileId): CounterDataClass {
+export function counterDataClass(id: CounterProfileId | undefined): CounterDataClass {
   return findCounterProfile(id).dataClass;
 }
 
-export function isSensitiveCounterProfile(id: CounterProfileId): boolean {
+export function isSensitiveCounterProfile(id: CounterProfileId | undefined): boolean {
   return counterDataClass(id) !== "general";
 }
 
