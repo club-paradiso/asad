@@ -17,6 +17,8 @@ import { extractCriticalValues, validateTranslationIntegrity } from "@/counter/i
 import { translateForCounter } from "@/counter/translate";
 import type { CounterMessage } from "@/counter/types";
 import { guardInferenceRoute } from "@/lib/guard";
+import { buildHumanReviewFlags } from "@/learning/review";
+import { recordLearningCandidate } from "@/learning/vault";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -188,11 +190,41 @@ export async function POST(request: Request) {
     message.confidence = "low";
   }
 
+  if (message.status === "done") {
+    const reviewFlags = buildHumanReviewFlags({
+      sourceText: text,
+      confidence: message.confidence,
+      integrity: message.integrity,
+    });
+    if (reviewFlags.length) message.reviewFlags = reviewFlags;
+  }
+
   const stored = await store.update(code, (s) => {
     appendMessage(s, message);
   });
   if (!stored) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
+  }
+
+  // Learning storage is deliberately downstream of translation and session
+  // persistence. A vault outage must never block two people trying to talk.
+  if (message.status === "done") {
+    try {
+      await recordLearningCandidate({
+        sourceText: message.originalText,
+        modelTranslation: message.translatedText,
+        sourceLang: message.originalLang,
+        targetLang: message.targetLang,
+        profileId: session.profileId,
+        confidence: message.confidence,
+        integrity: message.integrity,
+        reviewFlags: message.reviewFlags,
+      });
+    } catch {
+      // No content in logs: the storage failure is less important than keeping
+      // a potentially sensitive utterance out of observability systems.
+      console.warn("Learning Vault write failed.");
+    }
   }
 
   return NextResponse.json({
