@@ -18,15 +18,10 @@ export function HomeScreen() {
           <section className="flex max-w-xl flex-col gap-6 lg:pr-4">
             <Wordmark className="text-[2.15rem] sm:text-[2.8rem] lg:text-[3.25rem]" />
 
-            <div className="flex flex-col gap-3">
-              <p className="max-w-lg text-lg font-medium leading-relaxed tracking-[-0.018em] text-[var(--fg)] sm:text-xl">
-                <span className="brand-struck text-[var(--fg-muted)]">정확한 번역</span>{" "}
-                아무튼 알아들었으면 된 거 아닌가요.
-              </p>
-              <p className="max-w-md text-sm leading-relaxed text-[var(--fg-muted)] sm:text-[0.9375rem]">
-                통역사를 대신하지 않고, 현장에서 놓치기 쉬운 말과 맥락을 빠르게 붙잡아 주는 AI 통역 보조 도구입니다.
-              </p>
-            </div>
+            <p className="max-w-lg text-lg font-medium leading-relaxed tracking-[-0.018em] text-[var(--fg)] sm:text-xl">
+              <span className="brand-struck text-[var(--fg-muted)]">정확한 번역</span>{" "}
+              아무튼 알아들었으면 된 거 아닌가요.
+            </p>
 
             <div className="hidden items-center gap-3 text-xs text-[var(--fg-dim)] lg:flex">
               <span className="font-semibold text-[var(--fg)]">{BRAND.shortName}</span>
