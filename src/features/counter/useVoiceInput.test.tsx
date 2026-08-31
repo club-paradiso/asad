@@ -89,7 +89,10 @@ describe("useVoiceInput", () => {
 
     expect(result.current.listening).toBe(true);
     expect(MockRecognition.current?.lang).toBe("ko-KR");
-    expect(MockRecognition.current?.continuous).toBe(false);
+    // Counter keeps the recogniser open through short conversational pauses;
+    // the controller, not the browser's first pause, decides turn completion.
+    expect(MockRecognition.current?.continuous).toBe(true);
+    expect(MockRecognition.current?.maxAlternatives).toBe(3);
 
     await act(async () => {
       MockRecognition.current?.emit("안녕하세요", true);

@@ -25,6 +25,7 @@ export const dynamic = "force-dynamic";
 
 /** One counter utterance. Generous for a typed paragraph, useless for a flood. */
 const MAX_BODY_BYTES = 16 * 1024;
+const MESSAGE_ID_RE = /^[A-Za-z0-9._:-]{8,96}$/;
 
 let counter = 0;
 const nextId = () => `m${Date.now().toString(36)}${(counter += 1).toString(36)}`;
@@ -48,6 +49,9 @@ export async function POST(request: Request) {
   const code = normaliseCode(parsed.data.code);
   if (!code) return NextResponse.json({ error: "Invalid code." }, { status: 400 });
 
+  const rawRequestId = request.headers.get("x-asad-message-id")?.trim() ?? "";
+  const clientRequestId = MESSAGE_ID_RE.test(rawRequestId) ? rawRequestId : undefined;
+
   const store = counterStore();
   const session = await store.get(code);
   if (!session) {
@@ -62,6 +66,22 @@ export async function POST(request: Request) {
 
   const { from, source, rephraseOf, action, actionOf } = parsed.data;
   let text = parsed.data.text;
+
+  // A network can drop the response after Redis already accepted the turn. The
+  // client retries the same request id; return the stored message rather than
+  // translating and displaying it a second time.
+  if (clientRequestId) {
+    const duplicate = session.messages.find(
+      (message) => message.from === from && message.clientRequestId === clientRequestId,
+    );
+    if (duplicate) {
+      return NextResponse.json({
+        message: duplicate,
+        viaModel: duplicate.source !== "quick-phrase" && duplicate.source !== "confirm",
+        duplicate: true,
+      });
+    }
+  }
 
   if ((action && !actionOf) || (!action && actionOf) || (action && source !== "text")) {
     return NextResponse.json({ error: "Invalid message action." }, { status: 400 });
@@ -80,6 +100,33 @@ export async function POST(request: Request) {
   const originalLang = sourceLangFor(session, from);
   const targetLang = targetLangFor(session, from);
 
+  const persistOnce = async (
+    message: Omit<CounterMessage, "seq">,
+  ): Promise<{ message: CounterMessage; duplicate: boolean } | null> => {
+    let duplicate = false;
+    const stored = await store.update(code, (s) => {
+      const existing = clientRequestId
+        ? s.messages.find(
+            (item) => item.from === from && item.clientRequestId === clientRequestId,
+          )
+        : undefined;
+      if (existing) {
+        duplicate = true;
+        return;
+      }
+      appendMessage(s, message);
+    });
+    if (!stored) return null;
+
+    const persisted = clientRequestId
+      ? stored.messages.find(
+          (item) => item.from === from && item.clientRequestId === clientRequestId,
+        )
+      : stored.messages[stored.messages.length - 1];
+    if (!persisted) return null;
+    return { message: persisted, duplicate };
+  };
+
   /* --- Quick phrases: no model, no latency, no variance ----------------- */
   if (source === "quick-phrase") {
     const resolved = resolveQuickPhrase(text, originalLang, targetLang);
@@ -88,6 +135,7 @@ export async function POST(request: Request) {
         id: nextId(),
         from,
         source: "quick-phrase",
+        clientRequestId,
         originalText: resolved.originalText,
         originalLang,
         translatedText: resolved.translatedText,
@@ -96,15 +144,14 @@ export async function POST(request: Request) {
         status: "done",
         confidence: "high",
       };
-      const stored = await store.update(code, (s) => {
-        appendMessage(s, message);
-      });
-      if (!stored) {
+      const persisted = await persistOnce(message);
+      if (!persisted) {
         return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
       }
       return NextResponse.json({
-        message: stored.messages[stored.messages.length - 1],
+        message: persisted.message,
         viaModel: false,
+        duplicate: persisted.duplicate,
       });
     }
     // Missing translation for this language pair — fall through to the model
@@ -117,6 +164,7 @@ export async function POST(request: Request) {
       id: nextId(),
       from,
       source: "confirm",
+      clientRequestId,
       originalText: text,
       originalLang,
       translatedText: text,
@@ -126,15 +174,14 @@ export async function POST(request: Request) {
       confidence: "high",
       risks: detectRisks(text),
     };
-    const stored = await store.update(code, (s) => {
-      appendMessage(s, message);
-    });
-    if (!stored) {
+    const persisted = await persistOnce(message);
+    if (!persisted) {
       return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
     }
     return NextResponse.json({
-      message: stored.messages[stored.messages.length - 1],
+      message: persisted.message,
       viaModel: false,
+      duplicate: persisted.duplicate,
     });
   }
 
@@ -159,6 +206,7 @@ export async function POST(request: Request) {
     id: nextId(),
     from,
     source,
+    clientRequestId,
     originalText: text,
     originalLang,
     targetLang,
@@ -199,16 +247,15 @@ export async function POST(request: Request) {
     if (reviewFlags.length) message.reviewFlags = reviewFlags;
   }
 
-  const stored = await store.update(code, (s) => {
-    appendMessage(s, message);
-  });
-  if (!stored) {
+  const persisted = await persistOnce(message);
+  if (!persisted) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
 
   // Learning storage is deliberately downstream of translation and session
   // persistence. A vault outage must never block two people trying to talk.
-  if (message.status === "done") {
+  // A duplicate retry must not become a duplicate learning example either.
+  if (!persisted.duplicate && message.status === "done") {
     try {
       await recordLearningCandidate({
         sourceText: message.originalText,
@@ -228,8 +275,9 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    message: stored.messages[stored.messages.length - 1],
+    message: persisted.message,
     viaModel: true,
+    duplicate: persisted.duplicate,
     provider: result.provider,
     latencyMs: result.latencyMs,
   });

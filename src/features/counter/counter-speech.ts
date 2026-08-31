@@ -63,7 +63,10 @@ const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
   browserSpeechSupported: () => WebSpeechProvider.isSupported(),
   cloudAudioSupported: () => MicrophoneCapture.isSupported(),
   connectTimeoutMs: 4500,
-  stableDelayMs: 650,
+  // 650ms was short enough to interpret a natural mid-sentence pause as the
+  // end of the turn. A little over a second is still quick at a counter, while
+  // giving multilingual speakers time to breathe or search for a word.
+  stableDelayMs: 1400,
 };
 
 class AttemptError extends Error {

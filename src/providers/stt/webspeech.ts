@@ -111,9 +111,16 @@ export class WebSpeechProvider extends BaseSpeechProvider {
 
     const recognition = new Ctor();
     recognition.lang = webSpeechLanguage(this.options.language);
-    recognition.continuous = !this.options.utterance;
+    // Counter used to set `continuous=false` for a one-shot utterance. Browser
+    // engines then treated a tiny conversational pause as the end of the turn,
+    // chopping sentences in half. Keep recognition continuous and let the
+    // Counter controller decide when a long enough pause really means "done".
+    // Live Mode was already continuous, so this also keeps one browser policy.
+    recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
+    // Asking for a few alternatives gives supporting engines more room to do
+    // language-specific decoding without changing the public transcript API.
+    recognition.maxAlternatives = 3;
     this.recognition = recognition;
 
     await new Promise<void>((resolve, reject) => {
@@ -183,6 +190,9 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         }
 
         if (this.options.utterance) {
+          // Some browsers still end a continuous recogniser on their own. In
+          // one-turn Counter Mode, treat that browser decision as the end of the
+          // current turn rather than silently starting a second recogniser.
           this.wantRunning = false;
           this.emitStatus("closed");
           return;

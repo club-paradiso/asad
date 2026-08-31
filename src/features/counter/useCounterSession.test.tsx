@@ -86,7 +86,7 @@ describe("useCounterSession end lifecycle", () => {
     );
   });
 
-  it("best-effort ends the session when the browser page is left", async () => {
+  it("does not mistake a mobile page lifecycle event for an explicit hang-up", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "DELETE") {
         return new Response(JSON.stringify({ ended: true }), {
@@ -108,11 +108,9 @@ describe("useCounterSession end lifecycle", () => {
       window.dispatchEvent(new Event("pagehide"));
     });
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/counter/session?code=AC34",
-        expect.objectContaining({ method: "DELETE", keepalive: true }),
-      ),
-    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(
+      fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "DELETE"),
+    ).toBe(false);
   });
 });
