@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "env": {
     "STT_PROVIDER": "webspeech",
-    "LLM_ROUTING_MODE": "pinned",
+    "LLM_ROUTING_MODE": "reliable",
     "LLM_PROVIDER": "openrouter",
     "LLM_ALLOW_PAID_FALLBACK": "false",
     "LLM_COUNTER_PREFER_OPEN": "true",
