@@ -307,20 +307,27 @@ check(
 );
 
 await guest.waitForTimeout(850);
-const confirmVoice = guest.getByRole("button", { name: "Yes" });
-await confirmVoice.waitFor({ state: "visible", timeout: 2500 });
+const editVoice = guest.getByRole("button", { name: "Edit transcript" });
+await editVoice.waitFor({ state: "visible", timeout: 2500 });
 check(
-  "critical voice transcript waits for confirmation",
-  queuedRequests.length === 0 && (await confirmVoice.isVisible()),
+  "critical voice transcript waits for human review",
+  queuedRequests.length === 0 && (await editVoice.isVisible()),
 );
-await confirmVoice.click();
-await guest.waitForTimeout(50);
+await editVoice.click();
 check(
-  "confirmed speech submits after the utterance ends",
-  queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
+  "recognized speech remains editable before sending",
+  (await guestInput.inputValue()) === "My visa number is 123456",
 );
 
 const guestSend = guest.getByRole("button", { name: "Send" });
+await guestSend.click();
+await guest.waitForTimeout(50);
+check(
+  "reviewed speech submits after the utterance ends",
+  queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
+);
+
+await guestInput.fill("typed while listening");
 check("Send stays enabled while translation is pending", await guestSend.isEnabled());
 await guestSend.click();
 check("typed draft clears immediately when queued", (await guestInput.inputValue()) === "");
