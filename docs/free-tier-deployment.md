@@ -197,3 +197,30 @@ Then in the console, say:
 
 You should see the Korean transcript, English assistance, and `1 Peter 2:9` in
 the context rail — with no paid API involved.
+
+---
+
+## Recovering from a Vercel Hobby build limit
+
+Vercel can reject a Git deployment before a build starts when the Hobby plan's
+rolling build limit is exhausted. That failure is attached to the commit and is
+not proof that the application failed to build.
+
+When this happens:
+
+1. Compare the SHA of GitHub `main` with the SHA of the latest Vercel deployment
+   whose target is `production`.
+2. Confirm the same code has a successful Preview deployment or green CI before
+   retriggering production.
+3. After the rolling limit clears, create one meaningful `main` push or use a
+   production redeploy. Do not repeatedly push empty commits while the limit is
+   still active, because every accepted Preview build consumes more of the same
+   allowance.
+4. Verify the resulting production deployment is `READY`, then check
+   `/api/config` and `/api/diagnostics` rather than assuming a green Git status
+   means the live aliases moved.
+
+This recovery procedure matters because a failed Vercel commit status does not
+magically retry itself when the rolling limit later expires. Humans apparently
+needed a distributed deployment platform to reinvent the concept of taking a
+number and waiting for the counter to call it.
