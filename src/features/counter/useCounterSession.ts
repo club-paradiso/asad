@@ -24,7 +24,6 @@ import type {
 
 const POLL_ACTIVE_MS = 1200;
 const POLL_HIDDEN_MS = 8000;
-const REMOTE_END_NOTICE_MS = 2200;
 const SEND_RETRY_DELAYS_MS = [0, 400, 1100] as const;
 
 export interface SendInput {
@@ -69,7 +68,6 @@ export function useCounterSession(code: string | null, role: Participant) {
   const stopped = useRef(false);
   const sendQueue = useRef<Promise<void>>(Promise.resolve());
   const pendingSends = useRef(0);
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /** Merge a batch, replacing by id so a resend does not duplicate. */
   const merge = useCallback((incoming: CounterMessage[]) => {
@@ -83,8 +81,8 @@ export function useCounterSession(code: string | null, role: Participant) {
 
   const leaveCounterMode = useCallback(() => {
     // Browsers generally refuse to close tabs they did not open themselves.
-    // Replacing the route is deterministic on iOS/Android/desktop and also
-    // prevents the Back button from reopening a dead consultation.
+    // The explicit staff-side "End Counter Mode" action returns to the app.
+    // Visitor-side soft-close behavior lives in CounterGuestScreen instead.
     router.replace("/");
   }, [router]);
 
@@ -97,16 +95,11 @@ export function useCounterSession(code: string | null, role: Participant) {
       );
       if (response.status === 404) {
         // The other participant ended the consultation (or the session expired).
-        // First render the localized ended state so the visitor understands why
-        // the conversation disappeared, then leave Counter Mode automatically.
+        // Raise a terminal state only. The host keeps the ASAD shell, while the
+        // visitor surface decides how to close/replace its own browser page.
         setEnded(true);
         setConnected(false);
         stopped.current = true;
-        if (leaveTimer.current) clearTimeout(leaveTimer.current);
-        leaveTimer.current = setTimeout(() => {
-          leaveTimer.current = null;
-          leaveCounterMode();
-        }, REMOTE_END_NOTICE_MS);
         return;
       }
       if (!response.ok) throw new Error(`Poll failed (${response.status})`);
@@ -122,7 +115,7 @@ export function useCounterSession(code: string | null, role: Participant) {
       // A dropped poll is normal on venue wifi; the next one recovers.
       setConnected(false);
     }
-  }, [code, leaveCounterMode, merge]);
+  }, [code, merge]);
 
   useEffect(() => {
     if (!code) return;
@@ -151,10 +144,6 @@ export function useCounterSession(code: string | null, role: Participant) {
       // up abandoned sessions.
       stopped.current = true;
       clearTimeout(timer);
-      if (leaveTimer.current) {
-        clearTimeout(leaveTimer.current);
-        leaveTimer.current = null;
-      }
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [code, poll]);
@@ -162,7 +151,7 @@ export function useCounterSession(code: string | null, role: Participant) {
   const send = useCallback(
     (input: SendInput): Promise<CounterMessage | null> => {
       const text = input.text.trim();
-      if (!code || !text) return Promise.resolve(null);
+      if (!code || !text || stopped.current) return Promise.resolve(null);
 
       pendingSends.current += 1;
       setSending(true);
@@ -181,6 +170,11 @@ export function useCounterSession(code: string | null, role: Participant) {
           for (let attempt = 0; attempt < SEND_RETRY_DELAYS_MS.length; attempt += 1) {
             const delay = SEND_RETRY_DELAYS_MS[attempt];
             if (delay > 0) await sleep(delay);
+
+            if (stopped.current) {
+              resolveResult(null);
+              return;
+            }
 
             try {
               const response = await guardedFetch("/api/counter/message", {
@@ -243,15 +237,14 @@ export function useCounterSession(code: string | null, role: Participant) {
 
   const end = useCallback(
     async (options: EndOptions = {}) => {
-      if (leaveTimer.current) {
-        clearTimeout(leaveTimer.current);
-        leaveTimer.current = null;
-      }
+      setEnded(true);
+      setConnected(false);
+      stopped.current = true;
+
       if (!code) {
         if (options.leave) leaveCounterMode();
         return;
       }
-      stopped.current = true;
       await fetch(`/api/counter/session?code=${encodeURIComponent(code)}`, {
         method: "DELETE",
       }).catch(() => {});
