@@ -42,6 +42,23 @@ export async function GET() {
   const [counterSessions] = await Promise.all([store.stats()]);
   const storage = counterStoreInfo();
 
+  // Diagnostics is explicitly a live-health surface, so report the same
+  // provider preference as /api/interpret. The generic router plan can quite
+  // correctly prefer a one-shot-capable free provider, but Live Mode must put
+  // a provider that can sustain the 45-minute workload first.
+  const liveActive =
+    router.preferred((id) => {
+      if (env.llm.paidTier.has(id)) return true;
+      const caps = capabilitiesFor(id);
+      return (
+        !caps.freeTierPossible ||
+        assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull).viable
+      );
+    }) ?? plan.active;
+  const liveChain = liveActive
+    ? [liveActive, ...plan.chain.filter((id) => id !== liveActive)]
+    : plan.chain;
+
   // Vercel can retain an optional variable with an empty-string value. The
   // parser deliberately rejects an empty model id, but for an optional model
   // override an empty value semantically means "use the provider default".
@@ -50,19 +67,23 @@ export async function GET() {
     return process.env[problem.field]?.trim() !== "";
   });
 
+  const sttCredentialsRequired =
+    env.stt.provider === "deepgram" || env.stt.provider === "openai";
+
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
 
     stt: {
       provider: env.stt.provider,
+      credentialsRequired: sttCredentialsRequired,
       keyConfigured:
         env.stt.provider === "deepgram"
           ? !!env.stt.deepgramKey
           : env.stt.provider === "openai"
             ? !!env.stt.openaiKey
-            : true,
+            : null,
       ephemeralKeysAvailable:
-        env.stt.provider === "deepgram" ? !!env.stt.deepgramProjectId : true,
+        env.stt.provider === "deepgram" ? !!env.stt.deepgramProjectId : null,
       model: env.stt.provider === "deepgram" ? env.stt.deepgramModel : env.stt.openaiModel,
     },
 
@@ -70,8 +91,8 @@ export async function GET() {
       routingMode: plan.mode,
       privacyMode: plan.privacyMode,
       allowPaidFallback: plan.allowPaidFallback,
-      active: plan.active,
-      chain: plan.chain,
+      active: liveActive,
+      chain: liveChain,
       warnings: plan.warnings,
 
       // The gateway's own configuration. Reported whether or not OpenRouter is
