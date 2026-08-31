@@ -52,18 +52,25 @@ function getConstructor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-function alternativesFor(result: SpeechRecognitionResultLike) {
-  const alternatives: Array<{ transcript: string; confidence?: number }> = [];
+function alternativesFor(result: SpeechRecognitionResultLike): string[] {
+  const alternatives: Array<{ transcript: string; confidence: number; index: number }> = [];
   for (let i = 0; i < result.length; i += 1) {
     const alternative = result[i];
-    if (alternative?.transcript) {
-      alternatives.push({
-        transcript: alternative.transcript,
-        confidence: alternative.confidence,
-      });
-    }
+    if (!alternative?.transcript) continue;
+    alternatives.push({
+      transcript: alternative.transcript,
+      confidence:
+        typeof alternative.confidence === "number" && Number.isFinite(alternative.confidence)
+          ? alternative.confidence
+          : -1,
+      index: i,
+    });
   }
-  return alternatives;
+  alternatives.sort((a, b) => {
+    const confidenceOrder = b.confidence - a.confidence;
+    return confidenceOrder !== 0 ? confidenceOrder : a.index - b.index;
+  });
+  return alternatives.map((alternative) => alternative.transcript);
 }
 
 export class WebSpeechProvider extends BaseSpeechProvider {
