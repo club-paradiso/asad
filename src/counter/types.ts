@@ -6,6 +6,7 @@
  * turn-taking messages rather than a continuous stabilised stream, and no
  * temporal locking, because nothing here is "already being said out loud".
  */
+import type { HumanReviewFlag } from "@/learning/types";
 
 export type Participant = "host" | "guest";
 
@@ -84,6 +85,8 @@ export interface CounterMessage {
   criticalValues?: CriticalValue[];
   /** Semantic comparison between source and translated critical values. */
   integrity?: TranslationIntegrity;
+  /** Session-scoped cues requiring a human to inspect this turn. Never a person-level risk label. */
+  reviewFlags?: HumanReviewFlag[];
   /** Present when translation failed, so the UI can say why. */
   error?: string;
 }
