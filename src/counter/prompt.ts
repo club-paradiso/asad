@@ -1,17 +1,4 @@
-/**
- * Counter translation prompt.
- *
- * A different job from the sermon prompt, and the differences matter:
- *
- *  - **Bidirectional, arbitrary language pair.** Not Korean→English.
- *  - **Turn-taking, not simultaneous.** No chunking, no anticipation, no
- *    scaffolds — one utterance in, one out.
- *  - **The reader is not an interpreter.** They are a member of the public who
- *    will act on what they read. So this must be plain, complete, and never
- *    hedged into ambiguity.
- *  - **Numbers and names are the whole ballgame.** A wrong time or price is the
- *    failure that actually costs someone something.
- */
+/** Counter translation prompt: one face-to-face utterance in, one faithful utterance out. */
 import { languageName } from "./languages";
 import { findCounterProfile, type CounterProfileId } from "./profiles";
 
@@ -29,13 +16,15 @@ RULES
 - Translate ONLY what was said. Add nothing.
 - If the source is a question, the translation is a question.
 - Keep it the same length and shape. A five-word question does not become a paragraph.
-- Preserve proper nouns; transliterate them into the target script when the target does not use Latin script, and keep the original in parentheses when it is a name the other party may need to write down.
-- Never invent a detail that was not said. If the source is genuinely ambiguous, translate it faithfully and say so in "note".
+- Preserve negation, modality, requirements, permissions, uncertainty, and who is doing what.
+- Preserve proper nouns. Transliterate only when that helps the target reader; never replace a name with a guessed local equivalent.
+- Never invent a detail that was not said. Use conversation context to resolve pronouns and ellipsis, never to guess a name, number, date, status, document, or legal fact.
+- If the source is genuinely ambiguous, translate it faithfully and say so in "note".
 - If the source is empty, unintelligible, or just filler, return an empty translation and explain in "note".
 
 CONFIDENCE
 "high"   — clear source, unambiguous translation.
-"medium" — understandable, but register or a word choice is uncertain.
+"medium" — understandable, but register, wording, or an ASR token is uncertain.
 "low"    — the source was unclear, garbled, or you are guessing at a number or name.
 
 Mark "low" honestly. At a counter, a flagged uncertainty gets asked again; a confident wrong answer does not.
@@ -47,23 +36,39 @@ Reply with a single JSON object and nothing else:
   "confidence": "high" | "medium" | "low",
   "note": string
 }
-"note" is optional, at most 90 characters, in the SENDER's language, and only
-present when there is something they genuinely need to know — an ambiguity, an
-untranslatable term, or a value worth confirming. Leave it out otherwise.`;
+"note" is optional, at most 90 characters, in the SENDER's language, and only present when there is something they genuinely need to know — an ambiguity, an untranslatable term, or a value worth confirming. Leave it out otherwise.`;
 
 export interface CounterPromptInput {
   text: string;
   sourceLang: string;
   targetLang: string;
-  /** The last few turns, so pronouns and ellipsis resolve. */
-  recent?: Array<{ from: "host" | "guest"; text: string }>;
-  /** Ask for a different wording than last time. */
+  /** The last few turns, with each turn's actual language, for pronouns/ellipsis. */
+  recent?: Array<{ from: "host" | "guest"; text: string; lang?: string }>;
+  /** Whether the current source came from speech recognition or typing. */
+  inputMode?: "voice" | "text";
   rephrase?: boolean;
-  /** Explicit revision behavior for understandable message actions. */
   action?: "simplify" | "retry";
-  /** Where the counter is, e.g. "병원 접수" — sharpens vocabulary choice. */
   deskLabel?: string;
   profileId?: CounterProfileId;
+}
+
+function targetLanguageGuidance(targetLang: string): string | null {
+  switch (targetLang.toLowerCase()) {
+    case "zh-cn":
+      return "TARGET WRITING: Use natural Mainland Mandarin in Simplified Chinese (简体中文). Do not output pinyin or Traditional Chinese unless the source explicitly contains it.";
+    case "zh-tw":
+      return "TARGET WRITING: Use natural Taiwan Mandarin in Traditional Chinese (繁體中文). Do not output pinyin or Simplified-only wording unless the source explicitly contains it.";
+    case "ja-jp":
+      return "TARGET WRITING: Use natural modern Japanese service-counter speech. Prefer ordinary polite Japanese, not stiff legalistic prose.";
+    case "ko-kr":
+      return "TARGET WRITING: Use natural Korean 존댓말 suitable for a public-facing counter. Avoid translationese and unnecessary Sino-Korean formality.";
+    case "vi-vn":
+      return "TARGET WRITING: Use natural contemporary Vietnamese suitable for a service counter; preserve the speaker's intended politeness without adding kinship terms that context does not support.";
+    case "ar-sa":
+      return "TARGET WRITING: Use clear Modern Standard Arabic appropriate for a service interaction unless the source itself requires a named dialect expression.";
+    default:
+      return null;
+  }
 }
 
 export function buildCounterPrompt(input: CounterPromptInput): string {
@@ -81,22 +86,35 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
     }
   }
 
-  if (input.deskLabel) {
-    lines.push(`SETTING: ${input.deskLabel}`);
-  }
+  if (input.deskLabel) lines.push(`SETTING: ${input.deskLabel}`);
 
   if (input.recent?.length) {
-    // Short context only. A counter exchange is not a document, and a long
-    // history invites the model to answer rather than translate.
     lines.push(
       `RECENT TURNS (context only — do NOT translate these):\n${input.recent
         .slice(-4)
-        .map((turn) => `  ${turn.from === "host" ? "STAFF" : "VISITOR"}: ${turn.text}`)
+        .map((turn) => {
+          const role = turn.from === "host" ? "STAFF" : "VISITOR";
+          const lang = turn.lang ? ` [${languageName(turn.lang)}]` : "";
+          return `  ${role}${lang}: ${turn.text}`;
+        })
         .join("\n")}`,
     );
   }
 
   lines.push(`TRANSLATE FROM ${source} INTO ${target}.`);
+
+  const targetGuidance = targetLanguageGuidance(input.targetLang);
+  if (targetGuidance) lines.push(targetGuidance);
+
+  if (input.inputMode === "voice") {
+    lines.push(
+      "SOURCE IS SPEECH-TO-TEXT: Silently fix only obvious spacing, punctuation, and token-boundary artifacts from ASR. Do not guess or silently repair uncertain names, numbers, dates, document names, visa/status codes, or other factual values. If an ASR word remains uncertain, preserve the uncertainty and lower confidence.",
+    );
+  } else {
+    lines.push(
+      "SOURCE IS TYPED TEXT: Preserve deliberate abbreviations, capitalization, punctuation, and code-like values when they carry meaning. Correct no factual content merely because it looks unusual.",
+    );
+  }
 
   if (input.action === "simplify" || input.rephrase) {
     lines.push(
@@ -114,7 +132,6 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
   return lines.join("\n\n");
 }
 
-/** JSON Schema for providers that enforce one natively. */
 export const COUNTER_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
   properties: {
