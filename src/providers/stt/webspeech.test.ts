@@ -120,6 +120,47 @@ describe("WebSpeechProvider", () => {
     expect(partials).toEqual(["안녕하세요"]);
   });
 
+  it("promotes an unchanged interim hypothesis when WebKit never marks it final", async () => {
+    vi.useFakeTimers();
+    const provider = new WebSpeechProvider();
+    const partials: string[] = [];
+    const stable: string[] = [];
+    provider.onPartial((text) => partials.push(text));
+    provider.onStable((text) => stable.push(text));
+
+    const connected = provider.connect();
+    const recognition = FakeRecognition.last!;
+    recognition.onstart?.();
+    await connected;
+
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: {
+        length: 1,
+        0: result("하나님은 사랑이십니다", false),
+      },
+    });
+
+    expect(partials).toEqual(["하나님은 사랑이십니다"]);
+    expect(stable).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(1099);
+    expect(stable).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(stable).toEqual(["하나님은 사랑이십니다"]);
+
+    // If WebKit eventually reports the same hypothesis as final, do not feed
+    // the sermon engine the same sentence twice.
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: {
+        length: 1,
+        0: result("하나님은 사랑이십니다", true),
+      },
+    });
+    expect(stable).toEqual(["하나님은 사랑이십니다"]);
+  });
+
   it("restarts after a normal browser end while the session is wanted", async () => {
     vi.useFakeTimers();
     const provider = new WebSpeechProvider();

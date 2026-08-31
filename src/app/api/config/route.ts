@@ -82,10 +82,22 @@ export async function GET() {
     (stt === "deepgram" && !!env.stt.deepgramKey) ||
     (stt === "openai" && !!env.stt.openaiKey);
 
+  // Live is continuous. Prefer a configured provider whose documented free
+  // quota can actually carry the workload; a one-shot-capable provider that
+  // dies four minutes into a sermon is not the provider this screen should
+  // advertise as active. If none can sustain it, fall back to the normal plan
+  // and expose the capacity warning as before.
+  const liveActive = router.preferred((id) => {
+    if (env.llm.paidTier.has(id)) return true;
+    const caps = capabilitiesFor(id);
+    return !caps.freeTierPossible ||
+      assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull).viable;
+  });
+
   // The router is the authority on what a live turn would reach: it accounts
   // for every provider, the routing mode, the privacy mode, breaker state and
   // quota pressure.
-  const active = plan.active;
+  const active = liveActive ?? plan.active;
   const modelAvailable = active !== null && active !== "local";
 
   // Connected is not the same as sufficient. Say which.
