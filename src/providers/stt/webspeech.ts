@@ -4,11 +4,6 @@
  * No key, no server, no audio leaves the browser API boundary. This is the
  * zero-configuration live path and the graceful fallback when a cloud provider
  * is unreachable.
- *
- * Known limits, documented rather than hidden: Chrome and Edge implement it
- * well, Safari's support is partial and iOS Safari will not run it in the
- * background. `isSupported()` gates the UI so the interpreter is told this up
- * front rather than discovering it mid-service.
  */
 import { BaseSpeechProvider, type SttProviderId, type SttProviderOptions } from "./types";
 import { webSpeechLanguage } from "./language";
@@ -16,6 +11,7 @@ import { joinBrowserResultParts, pickSpeechAlternative } from "./transcript";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
+  confidence?: number;
 }
 interface SpeechRecognitionResultLike {
   isFinal: boolean;
@@ -42,17 +38,8 @@ interface SpeechRecognitionLike {
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 const BENIGN_ERRORS = new Set(["no-speech", "aborted"]);
-const PERMANENT_ERRORS = new Set([
-  "not-allowed",
-  "language-not-supported",
-  "language-unavailable",
-]);
-const RECOVERABLE_ERRORS = new Set([
-  "service-not-allowed",
-  "audio-capture",
-  "network",
-]);
-
+const PERMANENT_ERRORS = new Set(["not-allowed", "language-not-supported", "language-unavailable"]);
+const RECOVERABLE_ERRORS = new Set(["service-not-allowed", "audio-capture", "network"]);
 const RECOVERY_ATTEMPTS = 4;
 const RECOVERY_BACKOFF_MS = [400, 1200, 3000, 6000];
 
@@ -65,11 +52,16 @@ function getConstructor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-function alternativesFor(result: SpeechRecognitionResultLike): string[] {
-  const alternatives: string[] = [];
+function alternativesFor(result: SpeechRecognitionResultLike) {
+  const alternatives: Array<{ transcript: string; confidence?: number }> = [];
   for (let i = 0; i < result.length; i += 1) {
-    const transcript = result[i]?.transcript;
-    if (transcript) alternatives.push(transcript);
+    const alternative = result[i];
+    if (alternative?.transcript) {
+      alternatives.push({
+        transcript: alternative.transcript,
+        confidence: alternative.confidence,
+      });
+    }
   }
   return alternatives;
 }
@@ -125,10 +117,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         const interim: string[] = [];
         for (let i = 0; i < event.results.length; i += 1) {
           const result = event.results[i];
-          const text = pickSpeechAlternative(
-            alternativesFor(result),
-            this.options.language,
-          );
+          const text = pickSpeechAlternative(alternativesFor(result), this.options.language);
           if (!text) continue;
           hasResult = true;
           if (result.isFinal) {
@@ -148,7 +137,6 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         const recoverable = RECOVERABLE_ERRORS.has(code);
         const budgetLeft = recoverable && this.recoveryUsed < RECOVERY_ATTEMPTS;
         const fatal = PERMANENT_ERRORS.has(code) || (recoverable && !budgetLeft);
-
         const error = new Error(
           fatal && recoverable
             ? `Speech recognition stopped after ${RECOVERY_ATTEMPTS} attempts to recover: ${code}`
@@ -156,16 +144,13 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         );
 
         if (fatal) this.wantRunning = false;
-
         if (!fatal) this.recoveryUsed += 1;
         else this.emitError(error);
 
         this.emitStatus(fatal ? "error" : "reconnecting", code);
-
         if (!fatal && recoverable) {
           this.scheduleRestart(recognition, RECOVERY_BACKOFF_MS[this.recoveryUsed - 1] ?? 6000);
         }
-
         if (fatal && !connected && !settled) {
           settled = true;
           this.wantRunning = false;
@@ -178,17 +163,11 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           this.emitStatus("closed");
           return;
         }
-
-        // A one-turn recognizer that heard absolutely nothing should finish as
-        // no-speech instead of restarting forever. Once speech has begun,
-        // however, mobile browsers may auto-end on a short pause; reconnect and
-        // let the Counter controller's silence timer decide the real turn end.
         if (this.options.utterance && !hasResult) {
           this.wantRunning = false;
           this.emitStatus("closed");
           return;
         }
-
         this.emitStatus("reconnecting");
         this.scheduleRestart(recognition, this.options.utterance ? 180 : 350);
       };
@@ -210,14 +189,12 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       try {
         recognition.start();
       } catch {
-        // Already starting — harmless. The pending start event remains the authority.
+        // Already starting; the pending start event remains authoritative.
       }
     }, delayMs);
   }
 
-  sendAudio(): void {
-    // The browser owns the microphone for this provider.
-  }
+  sendAudio(): void {}
 
   async disconnect(): Promise<void> {
     this.wantRunning = false;
