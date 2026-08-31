@@ -15,6 +15,8 @@ interface PendingVoice {
   risks: RiskSpan[];
 }
 
+type DraftSource = "voice" | "text";
+
 export function Composer({
   lang,
   strings,
@@ -29,6 +31,7 @@ export function Composer({
   busy?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [draftSource, setDraftSource] = useState<DraftSource>("text");
   const [recoverableText, setRecoverableText] = useState<string | null>(null);
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,16 +46,21 @@ export function Composer({
 
     // Keep one in-memory recovery copy before clearing the field. This lets the
     // next turn be typed immediately while translation is still running, but a
-    // dropped request never destroys the only copy of what the person typed.
+    // dropped request never destroys the only copy of what the person entered.
+    const source = draftSource;
     setRecoverableText(text);
     setDraft("");
-    onSend(text, "text");
+    setDraftSource("text");
+    setPendingVoice(null);
+    onSend(text, source);
     queueMicrotask(() => inputRef.current?.focus());
-  }, [draft, disabled, onSend]);
+  }, [draft, draftSource, disabled, onSend]);
 
   const restoreTypedTurn = useCallback(() => {
     if (!recoverableText) return;
     setDraft(recoverableText);
+    setDraftSource("text");
+    setPendingVoice(null);
     setRecoverableText(null);
     queueMicrotask(() => {
       inputRef.current?.focus();
@@ -63,18 +71,27 @@ export function Composer({
 
   const startVoice = useCallback(() => {
     if (disabled) return;
+    if (draft.trim()) setRecoverableText(draft);
     setPendingVoice(null);
     void voice.start().then((text) => {
       const spoken = text.trim();
       if (!spoken) return;
+
       const risks = detectRisks(spoken);
-      if (risks.length > 0) {
-        setPendingVoice({ text: spoken, risks });
-        return;
-      }
-      onSend(spoken, "voice");
+      setDraft(spoken);
+      setDraftSource("voice");
+      setPendingVoice(risks.length > 0 ? { text: spoken, risks } : null);
+
+      // Speech recognition is probabilistic, especially for names and proper
+      // nouns. Always hand the transcript back to the user for correction
+      // instead of treating ASR output as an unquestionable final message.
+      queueMicrotask(() => {
+        inputRef.current?.focus();
+        const end = spoken.length;
+        inputRef.current?.setSelectionRange(end, end);
+      });
     });
-  }, [disabled, onSend, voice]);
+  }, [disabled, draft, voice]);
 
   const toggleVoice = useCallback(() => {
     if (voice.listening) voice.stop();
@@ -124,14 +141,15 @@ export function Composer({
                 type="button"
                 className="min-h-11 flex-1 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-contrast)]"
                 onClick={() => {
-                  onSend(pendingVoice.text, "voice");
                   setPendingVoice(null);
-                  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-                    navigator.vibrate(8);
-                  }
+                  queueMicrotask(() => {
+                    inputRef.current?.focus();
+                    const end = draft.length;
+                    inputRef.current?.setSelectionRange(end, end);
+                  });
                 }}
               >
-                {copy.yes}
+                {editTranscriptLabel(lang)}
               </button>
               <button
                 type="button"
@@ -208,6 +226,10 @@ export function Composer({
             onChange={(event) => {
               const value = event.target.value;
               setDraft(value);
+              if (!value.trim()) {
+                setDraftSource("text");
+                setPendingVoice(null);
+              }
               if (value.trim()) setRecoverableText(null);
             }}
             onCompositionStart={() => {
@@ -262,6 +284,16 @@ export function Composer({
             {strings.send}
           </button>
         </form>
+
+        {draftSource === "voice" && cleanDraft.length > 0 && (
+          <p
+            className="text-center text-xs leading-relaxed text-[var(--fg-dim)]"
+            dir={rtl ? "rtl" : undefined}
+            aria-live="polite"
+          >
+            {voiceReviewHint(lang)}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -272,6 +304,26 @@ function restoreLabel(language: string): string {
   if (language.startsWith("zh")) return "恢复刚才的输入";
   if (language.startsWith("ja")) return "直前の入力を復元";
   return "Restore previous text";
+}
+
+function editTranscriptLabel(language: string): string {
+  if (language.startsWith("ko")) return "직접 수정";
+  if (language.startsWith("zh")) return "手动修改";
+  if (language.startsWith("ja")) return "手動で修正";
+  return "Edit transcript";
+}
+
+function voiceReviewHint(language: string): string {
+  if (language.startsWith("ko")) {
+    return "음성 인식 결과를 확인하고, 이름·고유명사나 잘못 인식된 부분을 직접 수정한 뒤 전송하세요.";
+  }
+  if (language.startsWith("zh")) {
+    return "请检查语音识别结果，必要时修改姓名、专有名词或识别错误后再发送。";
+  }
+  if (language.startsWith("ja")) {
+    return "音声認識の結果を確認し、人名・固有名詞や誤認識された箇所を必要に応じて修正してから送信してください。";
+  }
+  return "Review the speech transcript and correct names, proper nouns, or any recognition errors before sending.";
 }
 
 function MicIcon() {
