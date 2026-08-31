@@ -8,11 +8,13 @@ Use Hugging Face only where it improves ASAD without creating a paid dependency.
 
 ### 1. Counter speech fallback
 
-Preferred candidate: `openai/whisper-large-v3-turbo` through Hugging Face Inference Providers when it is available inside the free allowance.
+Implemented Counter fallback: `openai/whisper-large-v3-turbo` through Hugging Face Inference Providers. On 2026-08-31 its model page reports an Automatic Speech Recognition Inference Provider (DeepInfra) and a warm inference state. Hugging Face's task documentation currently recommends `openai/whisper-large-v3`; `HF_STT_MODEL` is therefore an explicit server-side override if provider availability changes.
 
 Use it for discrete Counter utterances when browser SpeechRecognition is unavailable, fails, or cannot reliably cover the selected language. Keep browser speech as the zero-cost fast path and never make paid HF inference a requirement for a conversation to continue.
 
-A Vercel-side `HF_TOKEN` with only the required Inference Providers permission must be supplied before enabling this path. Never expose the token to the browser.
+A Vercel-side `HF_TOKEN` with only the required Inference Providers permission must be supplied before enabling this path. This is the one canonical secret name; no `HUGGINGFACE_API_TOKEN` alias is read. Never expose the token to the browser or diagnostics.
+
+The browser buffers one short, 16 kHz mono PCM16 utterance only in memory, wraps it as WAV, and posts it to `/api/stt/hf`. The server checks the Counter session profile, then sends the WAV once to the provider. It does not log or store the audio or transcript. The route has same-origin, session, size, and rate protections; `refugee` and `judicial` profiles are rejected before any HF request.
 
 ### 2. Free-only routing
 

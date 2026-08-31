@@ -174,6 +174,7 @@ export function CounterHostScreen() {
             lang={hostLang}
             strings={t}
             busy={session.sending}
+            counterCode={code}
             onSend={(text, source) => void session.send({ text, source })}
           />
         </>

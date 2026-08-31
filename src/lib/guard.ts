@@ -288,6 +288,8 @@ export const RATE_RULES = {
   counter: { limit: 30, windowMs: 60_000 },
   /** Minting recogniser credentials. One per session start. */
   sttToken: { limit: 10, windowMs: 60_000 },
+  /** Batch fallback is intentionally scarce: one short Counter utterance. */
+  sttHf: { limit: 6, windowMs: 60_000 },
   /** The health check calls a provider; it is not a page-load endpoint. */
   health: { limit: 4, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;

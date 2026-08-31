@@ -13,6 +13,9 @@
  */
 export const TARGET_SAMPLE_RATE = 16000;
 
+/** PCM16 bytes in a short Counter utterance. Kept in memory only. */
+export const MAX_COUNTER_UTTERANCE_BYTES = TARGET_SAMPLE_RATE * 2 * 24;
+
 /** ~50 ms of 16 kHz mono audio. */
 const FRAME_SAMPLES = 800;
 
@@ -213,4 +216,66 @@ export function floatToPcm16(samples: ArrayLike<number>): ArrayBuffer {
     view.setInt16(i * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
   }
   return buffer;
+}
+
+/**
+ * Wrap the microphone's already-resampled PCM16 bytes in a minimal WAV file.
+ * No audio is persisted: callers hold this only for the one request to an
+ * optional batch recogniser.
+ */
+export function pcm16ToWav(pcm16: ArrayBuffer, sampleRate = TARGET_SAMPLE_RATE): ArrayBuffer {
+  const wav = new ArrayBuffer(44 + pcm16.byteLength);
+  const view = new DataView(wav);
+  const write = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+  write(0, "RIFF");
+  view.setUint32(4, 36 + pcm16.byteLength, true);
+  write(8, "WAVE");
+  write(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  write(36, "data");
+  view.setUint32(40, pcm16.byteLength, true);
+  new Uint8Array(wav, 44).set(new Uint8Array(pcm16));
+  return wav;
+}
+
+/** One bounded, ephemeral PCM16 buffer for a Counter fallback request. */
+export class Pcm16UtteranceBuffer {
+  private readonly chunks: Uint8Array[] = [];
+  private length = 0;
+
+  append(frame: ArrayBuffer): boolean {
+    if (this.length + frame.byteLength > MAX_COUNTER_UTTERANCE_BYTES) return false;
+    this.chunks.push(new Uint8Array(frame.slice(0)));
+    this.length += frame.byteLength;
+    return true;
+  }
+
+  get byteLength() {
+    return this.length;
+  }
+
+  toArrayBuffer(): ArrayBuffer {
+    const joined = new Uint8Array(this.length);
+    let offset = 0;
+    for (const chunk of this.chunks) {
+      joined.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return joined.buffer;
+  }
+
+  clear() {
+    this.chunks.length = 0;
+    this.length = 0;
+  }
 }

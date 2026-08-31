@@ -83,6 +83,10 @@ const rawEnvSchema = z.object({
   DEEPGRAM_PROJECT_ID: z.string().trim().optional(),
   DEEPGRAM_STT_MODEL: z.string().trim().optional(),
   OPENAI_STT_MODEL: z.string().trim().optional(),
+  // Server-only optional Counter fallback. Do not use HUGGINGFACE_API_TOKEN:
+  // one name prevents silent deployment drift and accidental client exposure.
+  HF_TOKEN: optionalKey,
+  HF_STT_MODEL: modelId.optional(),
 
   LLM_ROUTING_MODE: z.string().trim().toLowerCase().optional(),
   LLM_PRIVACY_MODE: z.string().trim().toLowerCase().optional(),
@@ -159,6 +163,8 @@ export interface AppEnv {
     deepgramModel: string;
     openaiKey?: string;
     openaiModel: string;
+    hfToken?: string;
+    hfModel: string;
   };
   llm: {
     routingMode: RoutingMode;
@@ -310,7 +316,6 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       message: "STT_PROVIDER is openai but no key is set — the console will run in demo mode.",
     });
   }
-
   /* --- LLM routing ------------------------------------------------------ */
   let routingMode: RoutingMode = "auto-free";
   if (raw.LLM_ROUTING_MODE) {
@@ -526,6 +531,8 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       deepgramModel: raw.DEEPGRAM_STT_MODEL ?? "nova-3",
       openaiKey: raw.OPENAI_API_KEY,
       openaiModel: raw.OPENAI_STT_MODEL ?? "gpt-live-transcribe",
+      hfToken: raw.HF_TOKEN,
+      hfModel: raw.HF_STT_MODEL ?? "openai/whisper-large-v3-turbo",
     },
     llm: {
       routingMode,

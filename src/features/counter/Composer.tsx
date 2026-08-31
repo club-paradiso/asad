@@ -23,12 +23,15 @@ export function Composer({
   onSend,
   disabled = false,
   busy = false,
+  counterCode,
 }: {
   lang: string;
   strings: CounterStrings;
   onSend: (text: string, source: "voice" | "text") => void;
   disabled?: boolean;
   busy?: boolean;
+  /** Used only by the server to enforce the session's sensitive-data policy. */
+  counterCode?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [draftSource, setDraftSource] = useState<DraftSource>("text");
@@ -36,7 +39,7 @@ export function Composer({
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
-  const voice = useVoiceInput(lang);
+  const voice = useVoiceInput(lang, counterCode);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
@@ -142,14 +145,10 @@ export function Composer({
                 className="min-h-11 flex-1 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-contrast)]"
                 onClick={() => {
                   setPendingVoice(null);
-                  queueMicrotask(() => {
-                    inputRef.current?.focus();
-                    const end = draft.length;
-                    inputRef.current?.setSelectionRange(end, end);
-                  });
+                  submit();
                 }}
               >
-                {editTranscriptLabel(lang)}
+                {copy.yes}
               </button>
               <button
                 type="button"
@@ -304,13 +303,6 @@ function restoreLabel(language: string): string {
   if (language.startsWith("zh")) return "恢复刚才的输入";
   if (language.startsWith("ja")) return "直前の入力を復元";
   return "Restore previous text";
-}
-
-function editTranscriptLabel(language: string): string {
-  if (language.startsWith("ko")) return "직접 수정";
-  if (language.startsWith("zh")) return "手动修改";
-  if (language.startsWith("ja")) return "手動で修正";
-  return "Edit transcript";
 }
 
 function voiceReviewHint(language: string): string {

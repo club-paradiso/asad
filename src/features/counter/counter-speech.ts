@@ -8,9 +8,11 @@
  */
 import {
   MicrophoneCapture,
+  Pcm16UtteranceBuffer,
   WebSpeechProvider,
   createSpeechProvider,
   fetchSttCredentials,
+  transcribeWithHuggingFace,
   type CreateSttOptions,
   type SpeechProvider,
   type SttCredentials,
@@ -52,6 +54,8 @@ export interface CounterSpeechDependencies {
   }): MicrophoneHandle;
   browserSpeechSupported(): boolean;
   cloudAudioSupported(): boolean;
+  hfFallbackSupported(): boolean;
+  transcribeHf(input: { pcm16: ArrayBuffer; language: string; code?: string }): Promise<string>;
   connectTimeoutMs: number;
   stableDelayMs: number;
 }
@@ -62,6 +66,8 @@ const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
   createMicrophone: (options) => new MicrophoneCapture(options),
   browserSpeechSupported: () => WebSpeechProvider.isSupported(),
   cloudAudioSupported: () => MicrophoneCapture.isSupported(),
+  hfFallbackSupported: () => MicrophoneCapture.isSupported(),
+  transcribeHf: transcribeWithHuggingFace,
   connectTimeoutMs: 4500,
   stableDelayMs: 1400,
 };
@@ -125,6 +131,7 @@ export class CounterSpeechController {
       onFallback?: () => void;
     },
     private readonly dependencies: CounterSpeechDependencies = DEFAULT_DEPENDENCIES,
+    private readonly counterCode?: string,
   ) {}
 
   static isPotentiallyAvailable(
@@ -169,7 +176,22 @@ export class CounterSpeechController {
         return this.complete(text, usedFallback);
       } catch (error) {
         const failure = toFailure(error);
-        return this.complete("", usedFallback, failure);
+        if (failure === "permission" || failure === "stopped") {
+          return this.complete("", usedFallback, failure);
+        }
+        usedFallback = true;
+        this.handlers.onFallback?.();
+      }
+    }
+
+    // Browser recognition is absent in Firefox and iOS Safari. This is a
+    // short, one-utterance batch capture — never a hidden continuous upload.
+    if (this.dependencies.hfFallbackSupported()) {
+      try {
+        const text = await this.attemptHuggingFace();
+        return this.complete(text, usedFallback);
+      } catch (error) {
+        return this.complete("", usedFallback, toFailure(error));
       }
     }
 
@@ -320,6 +342,84 @@ export class CounterSpeechController {
       stableTimer = null;
       await microphone?.stop().catch(() => {});
       await provider.disconnect().catch(() => {});
+      this.active = null;
+    }
+  }
+
+  /** Capture only one spoken turn, then submit its in-memory PCM buffer once. */
+  private async attemptHuggingFace(): Promise<string> {
+    if (this.disposed) throw new AttemptError("stopped");
+
+    const audio = new Pcm16UtteranceBuffer();
+    let microphone: MicrophoneHandle | null = null;
+    let heardSpeech = false;
+    let stopped = false;
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+    let maxTimer: ReturnType<typeof setTimeout> | null = null;
+    let resolveCapture!: () => void;
+    let rejectCapture!: (error: Error) => void;
+    const capturePromise = new Promise<void>((resolve, reject) => {
+      resolveCapture = resolve;
+      rejectCapture = reject;
+    });
+    const finish = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = null;
+      resolveCapture();
+    };
+
+    this.active = {
+      stop: () => {
+        stopped = true;
+        this.handlers.onPhase("finishing");
+        finish();
+      },
+      cancel: () => {
+        stopped = true;
+        rejectCapture(new AttemptError("stopped"));
+        void microphone?.stop().catch(() => {});
+      },
+    };
+
+    try {
+      microphone = this.dependencies.createMicrophone({
+        onFrame: (frame) => {
+          if (!audio.append(frame)) {
+            finish();
+            return;
+          }
+          // A small RMS-free amplitude check is enough to end a Counter turn
+          // after speech. It is deliberately not speech detection and is never
+          // transmitted as telemetry.
+          const samples = new Int16Array(frame);
+          let peak = 0;
+          for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+          if (peak > 450) {
+            heardSpeech = true;
+            if (silenceTimer) clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(finish, this.dependencies.stableDelayMs);
+          }
+        },
+        onError: (error) => rejectCapture(normaliseAttemptError(error)),
+      });
+      await microphone.start();
+      this.handlers.onPhase("listening");
+      // A model fallback must not leave a visible spinner running indefinitely.
+      maxTimer = setTimeout(finish, 30_000);
+      await capturePromise;
+      if (stopped && !heardSpeech) throw new AttemptError("stopped");
+      if (!heardSpeech || audio.byteLength === 0) return "";
+      this.handlers.onPhase("finishing");
+      return await this.dependencies.transcribeHf({
+        pcm16: audio.toArrayBuffer(),
+        language: this.language,
+        code: this.counterCode,
+      });
+    } finally {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      if (maxTimer) clearTimeout(maxTimer);
+      await microphone?.stop().catch(() => {});
+      audio.clear();
       this.active = null;
     }
   }
