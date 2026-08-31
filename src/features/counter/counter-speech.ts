@@ -35,7 +35,6 @@ export type CounterVoiceFailure =
 export interface CounterVoiceResult {
   text: string;
   failure?: CounterVoiceFailure;
-  /** Internal quality signal only. Never expose provider names in the UI. */
   usedFallback: boolean;
 }
 
@@ -66,6 +65,31 @@ const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
   connectTimeoutMs: 4500,
   stableDelayMs: 1400,
 };
+
+function utteranceDelay(language: string, baseDelay: number): number {
+  const base = language.split("-")[0]?.toLowerCase();
+  switch (base) {
+    case "zh":
+      return Math.max(baseDelay, 1900);
+    case "th":
+    case "km":
+    case "my":
+      return Math.max(baseDelay, 1800);
+    case "ja":
+    case "ar":
+    case "ur":
+      return Math.max(baseDelay, 1700);
+    case "vi":
+    case "mn":
+    case "uz":
+    case "ne":
+      return Math.max(baseDelay, 1600);
+    case "ko":
+      return Math.max(baseDelay, 1500);
+    default:
+      return baseDelay;
+  }
+}
 
 class AttemptError extends Error {
   constructor(readonly code: CounterVoiceFailure) {
@@ -205,8 +229,7 @@ export class CounterSpeechController {
       rejectUtterance = reject;
     });
 
-    const currentText = () =>
-      joinTranscriptParts([stableText, partialText], this.language);
+    const currentText = () => joinTranscriptParts([stableText, partialText], this.language);
     const fail = (error: unknown) => {
       const attemptError = normaliseAttemptError(error);
       if (connected) rejectUtterance(attemptError);
@@ -220,9 +243,7 @@ export class CounterSpeechController {
 
     provider.onPartial((text) => {
       partialText = text.trim();
-      this.handlers.onPartial(
-        joinTranscriptParts([stableText, partialText], this.language),
-      );
+      this.handlers.onPartial(joinTranscriptParts([stableText, partialText], this.language));
     });
     provider.onStable((text) => {
       const clean = text.trim();
@@ -231,7 +252,10 @@ export class CounterSpeechController {
       partialText = "";
       this.handlers.onPartial(stableText);
       if (stableTimer) clearTimeout(stableTimer);
-      stableTimer = setTimeout(finish, this.dependencies.stableDelayMs);
+      stableTimer = setTimeout(
+        finish,
+        utteranceDelay(this.language, this.dependencies.stableDelayMs),
+      );
     });
     provider.onError(fail);
     provider.onStatus((status) => {
