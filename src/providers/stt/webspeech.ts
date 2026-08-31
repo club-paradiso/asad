@@ -11,6 +11,7 @@
  * front rather than discovering it mid-service.
  */
 import { BaseSpeechProvider, type SttProviderId, type SttProviderOptions } from "./types";
+import { webSpeechLanguage } from "./language";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
@@ -71,15 +72,7 @@ const RECOVERABLE_ERRORS = new Set([
   "network",
 ]);
 
-/**
- * How many times a serious-but-temporary failure is forgiven before the
- * console admits the microphone is not coming back.
- *
- * Bounded on purpose: retrying forever leaves the UI claiming to listen to a
- * microphone that is dead, which is the failure this budget replaced.
- */
 const RECOVERY_ATTEMPTS = 4;
-/** Backoff per attempt. Long enough for a device switch to settle. */
 const RECOVERY_BACKOFF_MS = [400, 1200, 3000, 6000];
 
 function getConstructor(): SpeechRecognitionCtor | null {
@@ -98,7 +91,6 @@ export class WebSpeechProvider extends BaseSpeechProvider {
   private recognition: SpeechRecognitionLike | null = null;
   private wantRunning = false;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Recoverable failures spent so far. Reset by any successful listen. */
   private recoveryUsed = 0;
 
   constructor(private readonly options: SttProviderOptions = {}) {
@@ -118,7 +110,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     this.emitStatus("connecting");
 
     const recognition = new Ctor();
-    recognition.lang = this.options.language ?? "ko-KR";
+    recognition.lang = webSpeechLanguage(this.options.language);
     recognition.continuous = !this.options.utterance;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
@@ -130,8 +122,6 @@ export class WebSpeechProvider extends BaseSpeechProvider {
 
       recognition.onstart = () => {
         connected = true;
-        // Listening again means the trouble passed. Spend the budget on the
-        // NEXT run of failures, not on a tally accumulated across the hour.
         this.recoveryUsed = 0;
         this.emitStatus("listening");
         if (!settled) {
@@ -141,16 +131,11 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       };
 
       recognition.onresult = (event) => {
-        // Web Speech may update only one result while older interim results are
-        // still present. Rebuilding the visible partial from every non-final
-        // result prevents words from disappearing between result events.
         let interim = "";
         for (let i = 0; i < event.results.length; i += 1) {
           const result = event.results[i];
           const text = result[0]?.transcript ?? "";
           if (result.isFinal) {
-            // Final results before resultIndex were already emitted on an
-            // earlier event; emitting them again duplicates the transcript.
             if (i >= event.resultIndex) this.emitStable(text);
           } else {
             interim += text;
@@ -163,10 +148,6 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         const code = event.error ?? "unknown";
         if (BENIGN_ERRORS.has(code)) return;
 
-        // A recoverable failure is only fatal once the budget is spent. This is
-        // the difference between "the headset switched" and "the microphone is
-        // gone", and nothing in the error code itself distinguishes them —
-        // only whether trying again works.
         const recoverable = RECOVERABLE_ERRORS.has(code);
         const budgetLeft = recoverable && this.recoveryUsed < RECOVERY_ATTEMPTS;
         const fatal = PERMANENT_ERRORS.has(code) || (recoverable && !budgetLeft);
@@ -177,32 +158,17 @@ export class WebSpeechProvider extends BaseSpeechProvider {
             : `Speech recognition error: ${code}`,
         );
 
-        // Permission and hardware errors do not heal by calling start() every
-        // 250 ms. Stop the restart loop and give the UI a real retry action.
         if (fatal) this.wantRunning = false;
 
-        // A recoverable failure the interpreter never sees is the point: they
-        // are mid-sentence. Report it as a health blip, not as an error banner
-        // over the English they are reading.
         if (!fatal) this.recoveryUsed += 1;
         else this.emitError(error);
 
         this.emitStatus(fatal ? "error" : "reconnecting", code);
 
-        // `onend` normally drives the restart, but a recogniser that errored
-        // without ever starting may never fire it. Schedule the retry here so
-        // the budget is actually spent trying rather than waiting.
         if (!fatal && recoverable) {
           this.scheduleRestart(recognition, RECOVERY_BACKOFF_MS[this.recoveryUsed - 1] ?? 6000);
         }
 
-        // A connection that never reached onstart should fail its start()
-        // promise. This keeps the session out of the dishonest "running"
-        // phase and makes the retry button available immediately.
-        //
-        // Only once the failure is final, though: rejecting while a retry is
-        // still scheduled would end the session on the first blip, which is
-        // the whole behaviour the recovery budget exists to prevent.
         if (fatal && !connected && !settled) {
           settled = true;
           this.wantRunning = false;
@@ -210,15 +176,12 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         }
       };
 
-      // Browsers stop recognition on silence; restart it for a long session.
       recognition.onend = () => {
         if (!this.wantRunning) {
           this.emitStatus("closed");
           return;
         }
 
-        // A Counter turn is one utterance. Natural silence is completion, not
-        // a reason to restart the recogniser as Live Mode does.
         if (this.options.utterance) {
           this.wantRunning = false;
           this.emitStatus("closed");
@@ -238,14 +201,6 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     });
   }
 
-  /**
-   * Bring the recogniser back after it stopped.
-   *
-   * One place, because two callers need it and they must not disagree: the
-   * routine silence restart (`onend`) and the recovery retry after a serious
-   * failure. A second scheduled restart always replaces the first, so a burst
-   * of errors produces one pending attempt rather than a pile-up.
-   */
   private scheduleRestart(recognition: SpeechRecognitionLike, delayMs: number): void {
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = setTimeout(() => {
@@ -253,8 +208,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       try {
         recognition.start();
       } catch {
-        // Already starting — harmless. The pending start event remains the
-        // authority on whether listening actually resumed.
+        // Already starting — harmless. The pending start event remains the authority.
       }
     }, delayMs);
   }
