@@ -45,18 +45,20 @@ describe("live interpretation reliability", () => {
     engine.tick();
     await vi.waitFor(() => expect(snapshot?.thinking).toBe(false));
 
+    const failedState = snapshot as unknown as EngineSnapshot;
     expect(pending).toEqual(["첫 번째 문장은 절대로 사라지면 안 됩니다."]);
-    expect(snapshot?.health.llm).toBe("down");
+    expect(failedState.health.llm).toBe("down");
 
     engine.handleStable("두 번째 문장도 이어집니다.");
     now += 3000;
     engine.tick();
     await vi.waitFor(() => expect(snapshot?.thinking).toBe(false));
 
+    const recoveredState = snapshot as unknown as EngineSnapshot;
     expect(pending).toHaveLength(2);
     expect(pending[1]).toContain("첫 번째 문장은 절대로 사라지면 안 됩니다.");
     expect(pending[1]).toContain("두 번째 문장도 이어집니다.");
-    expect(snapshot?.chunks.some((chunk) => chunk.text === "Recovered English")).toBe(true);
+    expect(recoveredState.chunks.some((chunk) => chunk.text === "Recovered English")).toBe(true);
   });
 
   it("flushes final stable speech immediately during graceful shutdown", async () => {
@@ -84,7 +86,8 @@ describe("live interpretation reliability", () => {
     // the interpreter to stare at the console waiting for that timer.
     await engine.flushPending();
 
+    const finalState = snapshot as unknown as EngineSnapshot;
     expect(pending).toEqual(["그리고 이것이 마지막으로 꼭 전달해야 할 말"]);
-    expect(snapshot?.chunks.some((chunk) => chunk.text === "Final English")).toBe(true);
+    expect(finalState.chunks.some((chunk) => chunk.text === "Final English")).toBe(true);
   });
 });
