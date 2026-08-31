@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe("useCounterSession end lifecycle", () => {
-  it("leaves Counter Mode when the other participant ends the session", async () => {
+  it("shows the ended state before leaving when the other participant ends", async () => {
     globalThis.fetch = vi.fn(async () =>
       new Response(JSON.stringify({ error: "Session not found or expired." }), {
         status: 404,
@@ -46,9 +46,15 @@ describe("useCounterSession end lifecycle", () => {
 
     const { result } = renderHook(() => useCounterSession("AC34", "guest"));
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
-    expect(result.current.ended).toBe(true);
+    await waitFor(() => expect(result.current.ended).toBe(true));
     expect(result.current.connected).toBe(false);
+    expect(replace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2300));
+    });
+
+    expect(replace).toHaveBeenCalledWith("/");
   });
 
   it("can end locally and leave without affecting the next-visitor flow", async () => {

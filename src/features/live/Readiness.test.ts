@@ -9,8 +9,16 @@ const row = (overrides: Partial<ReadinessRow> = {}): ReadinessRow => ({
 });
 
 describe("booth preflight readiness shortcut", () => {
-  it("appears only for the limited Input state produced by an unverified Sermon booth input", () => {
+  it("appears for the legacy English limited Input state", () => {
     expect(isBoothPreflightActionRow(row())).toBe(true);
+  });
+
+  it("appears for the localized Korean readiness state shown by the launcher", () => {
+    expect(
+      isBoothPreflightActionRow(
+        row({ label: "입력", value: "USB Mixer · 사전 점검 안 됨" }),
+      ),
+    ).toBe(true);
   });
 
   it("does not appear after the input becomes ready", () => {
