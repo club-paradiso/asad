@@ -39,11 +39,18 @@ export interface GeminiConfig {
 const DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 /**
- * Gemini 3.x replaced the legacy numeric thinking budget with thinking levels.
- * Sending thinkingBudget: 0 to current Gemini 3 models can be rejected with
- * HTTP 400, which previously caused the process-wide circuit breaker to bench
- * an otherwise healthy provider. Keep legacy budgets only for pre-3 models.
+ * Current Gemini 3+ and Gemma 4 models use discrete thinking levels rather
+ * than the legacy numeric thinking budget. Sending thinkingBudget: 0 to them
+ * can be rejected with HTTP 400 and wrongly trip the provider circuit breaker.
  */
+function usesThinkingLevel(model: string): boolean {
+  const geminiMajor = /^gemini-(\d+)/i.exec(model)?.[1];
+  if (geminiMajor && Number(geminiMajor) >= 3) return true;
+
+  const gemmaMajor = /^gemma-(\d+)/i.exec(model)?.[1];
+  return !!gemmaMajor && Number(gemmaMajor) >= 4;
+}
+
 function applyThinkingConfig(
   generationConfig: Record<string, unknown>,
   model: string,
@@ -51,12 +58,12 @@ function applyThinkingConfig(
 ): void {
   if (!thinking) return;
 
-  const major = /^gemini-(\d+)/i.exec(model)?.[1];
-  const isGemini3OrNewer = major ? Number(major) >= 3 : false;
-
-  if (isGemini3OrNewer) {
+  if (usesThinkingLevel(model)) {
     generationConfig.thinkingConfig = {
-      thinkingLevel: thinking === "none" ? "minimal" : thinking,
+      // The generic router exposes none/low/medium. Gemma 4 exposes only
+      // minimal/high, so medium is the one level that escalates to high.
+      // Live interpretation uses none, which stays on the low-latency path.
+      thinkingLevel: thinking === "medium" ? "high" : "minimal",
     };
     return;
   }
@@ -83,7 +90,8 @@ export class GeminiLlmProvider implements LlmProvider {
     };
 
     // Gemini 3.x docs recommend leaving temperature at the model default. It is
-    // still useful for older models, so only send it there.
+    // still useful for older Gemini models and Gemma, so only omit it on
+    // Gemini 3+.
     const major = /^gemini-(\d+)/i.exec(this.config.model)?.[1];
     const isGemini3OrNewer = major ? Number(major) >= 3 : false;
     if (!isGemini3OrNewer) {

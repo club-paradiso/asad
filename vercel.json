@@ -6,6 +6,7 @@
     "LLM_PROVIDER": "openrouter",
     "LLM_ALLOW_PAID_FALLBACK": "false",
     "LLM_COUNTER_PREFER_OPEN": "true",
+    "GEMINI_LLM_MODEL": "gemma-4-26b-a4b-it",
     "OPENROUTER_PRIMARY_MODEL": "google/gemma-4-26b-a4b-it:free",
     "OPENROUTER_QUALITY_MODEL": "google/gemma-4-31b-it:free",
     "OPENROUTER_QUALITY_ESCALATION": "false",
