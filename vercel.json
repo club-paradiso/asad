@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "env": {
+    "STT_PROVIDER": "webspeech",
+    "LLM_ROUTING_MODE": "pinned",
+    "LLM_PROVIDER": "openrouter",
+    "LLM_ALLOW_PAID_FALLBACK": "false",
+    "LLM_COUNTER_PREFER_OPEN": "true",
+    "OPENROUTER_PRIMARY_MODEL": "google/gemma-4-26b-a4b-it:free",
+    "OPENROUTER_QUALITY_MODEL": "google/gemma-4-31b-it:free",
+    "OPENROUTER_QUALITY_ESCALATION": "false",
+    "OPENROUTER_PROVIDER_SORT": "latency",
+    "OPENROUTER_DATA_COLLECTION": "deny",
+    "OPENROUTER_ZDR": "false",
+    "OPENROUTER_ALLOW_PROVIDER_FALLBACKS": "true",
+    "OPENROUTER_REQUIRE_PARAMETERS": "true",
+    "BIBLE_PROVIDER": "reference-only"
+  }
+}
