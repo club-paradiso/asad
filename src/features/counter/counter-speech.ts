@@ -67,6 +67,8 @@ const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
 };
 
 function utteranceDelay(language: string, baseDelay: number): number {
+  // Tests and explicit callers may deliberately request an immediate finish.
+  if (baseDelay <= 100) return baseDelay;
   const base = language.split("-")[0]?.toLowerCase();
   switch (base) {
     case "zh":
