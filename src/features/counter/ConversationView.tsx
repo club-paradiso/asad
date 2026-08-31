@@ -184,6 +184,23 @@ export function ConversationView({
                   </div>
                 )}
 
+                {viewerRole === "host" && message.reviewFlags?.length ? (
+                  <div
+                    role="alert"
+                    className="mt-2 rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_7%,transparent)] p-2 text-xs leading-relaxed text-[var(--danger)]"
+                  >
+                    <p className="font-semibold">직원 확인 필요</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {message.reviewFlags.map((flag, index) => (
+                        <li key={`${flag.kind}-${index}`}>{flag.reason}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-1 text-[var(--fg-dim)]">
+                      이 표시는 현재 발화만 확인하라는 신호이며, 개인 위험도나 자동 행정판단에 사용되지 않습니다.
+                    </p>
+                  </div>
+                ) : null}
+
                 {/* Metadata row: only what is actionable. */}
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-[var(--fg-dim)]">
                   {message.source === "quick-phrase" && (
