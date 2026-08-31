@@ -37,11 +37,11 @@ describe("Gemma 4 through the Gemini API", () => {
     expect(body.generationConfig.responseJsonSchema).toEqual({ type: "object" });
   });
 
-  it("maps generic high thinking to Gemma 4 high", async () => {
+  it("maps generic medium thinking to Gemma 4 high", async () => {
     await new GeminiLlmProvider({ apiKey: TEST_CREDENTIAL, model: "gemma-4-31b-it" }).complete({
       system: "s",
       user: "u",
-      thinking: "high",
+      thinking: "medium",
     });
 
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
