@@ -16,6 +16,7 @@ import {
   type SttCredentials,
   type SttProviderId,
 } from "@/providers/stt";
+import { joinTranscriptParts } from "@/providers/stt/transcript";
 
 export type CounterVoicePhase =
   | "idle"
@@ -63,9 +64,6 @@ const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
   browserSpeechSupported: () => WebSpeechProvider.isSupported(),
   cloudAudioSupported: () => MicrophoneCapture.isSupported(),
   connectTimeoutMs: 4500,
-  // 650ms was short enough to interpret a natural mid-sentence pause as the
-  // end of the turn. A little over a second is still quick at a counter, while
-  // giving multilingual speakers time to breathe or search for a word.
   stableDelayMs: 1400,
 };
 
@@ -207,7 +205,8 @@ export class CounterSpeechController {
       rejectUtterance = reject;
     });
 
-    const currentText = () => (stableText.trim() || partialText.trim()).trim();
+    const currentText = () =>
+      joinTranscriptParts([stableText, partialText], this.language);
     const fail = (error: unknown) => {
       const attemptError = normaliseAttemptError(error);
       if (connected) rejectUtterance(attemptError);
@@ -222,13 +221,13 @@ export class CounterSpeechController {
     provider.onPartial((text) => {
       partialText = text.trim();
       this.handlers.onPartial(
-        [stableText.trim(), partialText].filter(Boolean).join(" ").trim(),
+        joinTranscriptParts([stableText, partialText], this.language),
       );
     });
     provider.onStable((text) => {
       const clean = text.trim();
       if (!clean) return;
-      stableText = [stableText.trim(), clean].filter(Boolean).join(" ").trim();
+      stableText = joinTranscriptParts([stableText, clean], this.language);
       partialText = "";
       this.handlers.onPartial(stableText);
       if (stableTimer) clearTimeout(stableTimer);

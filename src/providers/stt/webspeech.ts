@@ -12,14 +12,15 @@
  */
 import { BaseSpeechProvider, type SttProviderId, type SttProviderOptions } from "./types";
 import { webSpeechLanguage } from "./language";
+import { joinBrowserResultParts, pickSpeechAlternative } from "./transcript";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
 }
 interface SpeechRecognitionResultLike {
   isFinal: boolean;
-  0: SpeechRecognitionAlternativeLike;
   length: number;
+  [index: number]: SpeechRecognitionAlternativeLike;
 }
 interface SpeechRecognitionEventLike {
   resultIndex: number;
@@ -40,32 +41,12 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
-/** Routine during any pause in speech. Not worth a word to the interpreter. */
 const BENIGN_ERRORS = new Set(["no-speech", "aborted"]);
-
-/**
- * Conditions that genuinely do not heal by trying again.
- *
- * Deliberately short. Everything here is a decision someone made — the visitor
- * denied the microphone, the deployment asked for a language this browser does
- * not have — and no amount of retrying changes it.
- */
 const PERMANENT_ERRORS = new Set([
   "not-allowed",
   "language-not-supported",
   "language-unavailable",
 ]);
-
-/**
- * Serious, but temporary.
- *
- * These used to be classified fatal, and that was the bug: ONE of them ended
- * the session outright, mid-sermon, with no retry. They are exactly the
- * failures that heal on their own — a Bluetooth headset taking the input
- * device, another app grabbing the microphone for a moment, the platform
- * speech service hiccupping. An interpreter working a room cannot have the
- * console give up the first time a headset switches.
- */
 const RECOVERABLE_ERRORS = new Set([
   "service-not-allowed",
   "audio-capture",
@@ -82,6 +63,15 @@ function getConstructor(): SpeechRecognitionCtor | null {
     webkitSpeechRecognition?: SpeechRecognitionCtor;
   };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+function alternativesFor(result: SpeechRecognitionResultLike): string[] {
+  const alternatives: string[] = [];
+  for (let i = 0; i < result.length; i += 1) {
+    const transcript = result[i]?.transcript;
+    if (transcript) alternatives.push(transcript);
+  }
+  return alternatives;
 }
 
 export class WebSpeechProvider extends BaseSpeechProvider {
@@ -111,21 +101,15 @@ export class WebSpeechProvider extends BaseSpeechProvider {
 
     const recognition = new Ctor();
     recognition.lang = webSpeechLanguage(this.options.language);
-    // Counter used to set `continuous=false` for a one-shot utterance. Browser
-    // engines then treated a tiny conversational pause as the end of the turn,
-    // chopping sentences in half. Keep recognition continuous and let the
-    // Counter controller decide when a long enough pause really means "done".
-    // Live Mode was already continuous, so this also keeps one browser policy.
     recognition.continuous = true;
     recognition.interimResults = true;
-    // Asking for a few alternatives gives supporting engines more room to do
-    // language-specific decoding without changing the public transcript API.
     recognition.maxAlternatives = 3;
     this.recognition = recognition;
 
     await new Promise<void>((resolve, reject) => {
       let connected = false;
       let settled = false;
+      let hasResult = false;
 
       recognition.onstart = () => {
         connected = true;
@@ -138,17 +122,23 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       };
 
       recognition.onresult = (event) => {
-        let interim = "";
+        const interim: string[] = [];
         for (let i = 0; i < event.results.length; i += 1) {
           const result = event.results[i];
-          const text = result[0]?.transcript ?? "";
+          const text = pickSpeechAlternative(
+            alternativesFor(result),
+            this.options.language,
+          );
+          if (!text) continue;
+          hasResult = true;
           if (result.isFinal) {
             if (i >= event.resultIndex) this.emitStable(text);
           } else {
-            interim += text;
+            interim.push(text);
           }
         }
-        if (interim) this.emitPartial(interim);
+        const partial = joinBrowserResultParts(interim, this.options.language);
+        if (partial) this.emitPartial(partial);
       };
 
       recognition.onerror = (event) => {
@@ -189,16 +179,18 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           return;
         }
 
-        if (this.options.utterance) {
-          // Some browsers still end a continuous recogniser on their own. In
-          // one-turn Counter Mode, treat that browser decision as the end of the
-          // current turn rather than silently starting a second recogniser.
+        // A one-turn recognizer that heard absolutely nothing should finish as
+        // no-speech instead of restarting forever. Once speech has begun,
+        // however, mobile browsers may auto-end on a short pause; reconnect and
+        // let the Counter controller's silence timer decide the real turn end.
+        if (this.options.utterance && !hasResult) {
           this.wantRunning = false;
           this.emitStatus("closed");
           return;
         }
+
         this.emitStatus("reconnecting");
-        this.scheduleRestart(recognition, 350);
+        this.scheduleRestart(recognition, this.options.utterance ? 180 : 350);
       };
 
       try {

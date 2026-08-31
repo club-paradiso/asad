@@ -75,7 +75,7 @@ afterEach(() => {
 });
 
 describe("useVoiceInput", () => {
-  it("starts from one call and resolves when the utterance ends naturally", async () => {
+  it("starts from one call and resolves when the controller decides the utterance ended", async () => {
     const { result } = renderHook(() => useVoiceInput("ko-KR"));
 
     expect(result.current.supported).toBe(true);
@@ -89,18 +89,19 @@ describe("useVoiceInput", () => {
 
     expect(result.current.listening).toBe(true);
     expect(MockRecognition.current?.lang).toBe("ko-KR");
-    // Counter keeps the recogniser open through short conversational pauses;
-    // the controller, not the browser's first pause, decides turn completion.
     expect(MockRecognition.current?.continuous).toBe(true);
     expect(MockRecognition.current?.maxAlternatives).toBe(3);
 
     await act(async () => {
       MockRecognition.current?.emit("안녕하세요", true);
+      // A browser auto-end no longer owns turn completion; the controller's
+      // silence threshold does. This simulates WebKit ending early.
       MockRecognition.current?.end();
+      await spoken;
     });
 
     await expect(spoken).resolves.toBe("안녕하세요");
-    expect(result.current.listening).toBe(false);
+    await waitFor(() => expect(result.current.listening).toBe(false));
   });
 
   it("keeps the latest interim words when a second tap stops listening", async () => {
