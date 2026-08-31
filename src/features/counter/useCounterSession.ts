@@ -13,6 +13,7 @@
  * context and server sequence numbers remain deterministic.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
 import type {
   CounterMessage,
@@ -32,9 +33,15 @@ export interface SendInput {
   actionOf?: string;
 }
 
+export interface EndOptions {
+  /** Leave Counter Mode after the server session has been discarded. */
+  leave?: boolean;
+}
+
 export function useCounterSession(code: string | null, role: Participant) {
   // Both sides reach a model, so both need authorising before they type.
   useSessionToken();
+  const router = useRouter();
 
   const [session, setSession] = useState<SessionView | null>(null);
   const [messages, setMessages] = useState<CounterMessage[]>([]);
@@ -59,6 +66,13 @@ export function useCounterSession(code: string | null, role: Participant) {
     });
   }, []);
 
+  const leaveCounterMode = useCallback(() => {
+    // Browsers generally refuse to close tabs they did not open themselves.
+    // Replacing the route is deterministic on iOS/Android/desktop and also
+    // prevents the Back button from reopening a dead consultation.
+    router.replace("/");
+  }, [router]);
+
   const poll = useCallback(async () => {
     if (!code || stopped.current) return;
     try {
@@ -67,11 +81,12 @@ export function useCounterSession(code: string | null, role: Participant) {
         { cache: "no-store" },
       );
       if (response.status === 404) {
-        // Reported as a state, not an error string: each screen says it in the
-        // language its own reader speaks.
+        // The other participant ended the consultation (or the session expired).
+        // Leave immediately instead of stranding this side on a dead chat.
         setEnded(true);
         setConnected(false);
         stopped.current = true;
+        leaveCounterMode();
         return;
       }
       if (!response.ok) throw new Error(`Poll failed (${response.status})`);
@@ -87,7 +102,7 @@ export function useCounterSession(code: string | null, role: Participant) {
       // A dropped poll is normal on venue wifi; the next one recovers.
       setConnected(false);
     }
-  }, [code, merge]);
+  }, [code, leaveCounterMode, merge]);
 
   useEffect(() => {
     if (!code) return;
@@ -108,10 +123,24 @@ export function useCounterSession(code: string | null, role: Participant) {
     };
     document.addEventListener("visibilitychange", onVisible);
 
+    // Closing/reloading/navigating away should also release the other side.
+    // `keepalive` is the most reliable cross-browser best effort available for
+    // a DELETE during page teardown; the server TTL remains the final fallback.
+    const onPageHide = () => {
+      if (stopped.current) return;
+      stopped.current = true;
+      void fetch(`/api/counter/session?code=${encodeURIComponent(code)}`, {
+        method: "DELETE",
+        keepalive: true,
+      }).catch(() => {});
+    };
+    window.addEventListener("pagehide", onPageHide);
+
     return () => {
       stopped.current = true;
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pagehide", onPageHide);
     };
   }, [code, poll]);
 
@@ -169,13 +198,20 @@ export function useCounterSession(code: string | null, role: Participant) {
     [code, role, merge],
   );
 
-  const end = useCallback(async () => {
-    if (!code) return;
-    stopped.current = true;
-    await fetch(`/api/counter/session?code=${encodeURIComponent(code)}`, {
-      method: "DELETE",
-    }).catch(() => {});
-  }, [code]);
+  const end = useCallback(
+    async (options: EndOptions = {}) => {
+      if (!code) {
+        if (options.leave) leaveCounterMode();
+        return;
+      }
+      stopped.current = true;
+      await fetch(`/api/counter/session?code=${encodeURIComponent(code)}`, {
+        method: "DELETE",
+      }).catch(() => {});
+      if (options.leave) leaveCounterMode();
+    },
+    [code, leaveCounterMode],
+  );
 
   return {
     session,
