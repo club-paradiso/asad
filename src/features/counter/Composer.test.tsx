@@ -77,7 +77,7 @@ describe("Counter Composer", () => {
     expect(input.value).toBe("다음 문장도 입력돼요");
   });
 
-  it("keeps a submitted typed turn recoverable and prevents accidental duplicate send", () => {
+  it("clears a queued turn immediately but keeps a one-tap recovery copy", () => {
     const onSend = vi.fn();
     render(<Composer lang="ko-KR" strings={stringsFor("ko-KR")} onSend={onSend} />);
     const input = screen.getByPlaceholderText("내용을 입력하세요") as HTMLInputElement;
@@ -86,10 +86,14 @@ describe("Counter Composer", () => {
     fireEvent.change(input, { target: { value: "여권을 보여 주세요" } });
     fireEvent.submit(form);
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(input.value).toBe("여권을 보여 주세요");
+    expect(input.value).toBe("");
 
+    const restore = screen.getByRole("button", { name: "방금 입력 복원" });
     fireEvent.submit(form);
     expect(onSend).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(restore);
+    expect(input.value).toBe("여권을 보여 주세요");
 
     fireEvent.change(input, { target: { value: "체류카드도 보여 주세요" } });
     fireEvent.submit(form);
