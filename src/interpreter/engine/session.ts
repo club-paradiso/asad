@@ -55,6 +55,7 @@ import {
   emptyStabiliser,
   flushReason,
   pushStable,
+  restorePending,
   shouldAnticipate,
   touch,
   type StabiliserState,
@@ -152,6 +153,17 @@ export class InterpretationEngine {
     this.setConnection("connecting");
   }
 
+  /**
+   * Flush whatever finalised Korean is still waiting without requiring another
+   * clock tick. Used during graceful shutdown after the recogniser has been
+   * sealed, so the final spoken thought is not lost merely because End was
+   * pressed before the normal stabilisation timer fired.
+   */
+  async flushPending(): Promise<void> {
+    if (this.stopped || this.inFlight || !this.stabiliser.pending.trim()) return;
+    await this.flush("quiet");
+  }
+
   stop(): void {
     this.stopped = true;
     this.inFlight?.abort();
@@ -178,9 +190,12 @@ export class InterpretationEngine {
     this.memory = {
       ...this.memory,
       glossary: mergeGlossary(seeded.glossary, this.memory.glossary),
-      entities: [...seeded.entities, ...this.memory.entities.filter(
-        (e) => !seeded.entities.some((s) => s.korean === e.korean),
-      )],
+      entities: [
+        ...seeded.entities,
+        ...this.memory.entities.filter(
+          (e) => !seeded.entities.some((s) => s.korean === e.korean),
+        ),
+      ],
       topic: this.memory.topic ?? seeded.topic,
     };
     this.emit();
@@ -191,7 +206,11 @@ export class InterpretationEngine {
     this.emit();
   }
 
-  setHealth(part: keyof SubsystemHealth, status: SubsystemHealth[keyof SubsystemHealth], reason?: string): void {
+  setHealth(
+    part: keyof SubsystemHealth,
+    status: SubsystemHealth[keyof SubsystemHealth],
+    reason?: string,
+  ): void {
     if (this.health[part] === status && (!reason || reason === this.degradedReason)) return;
     this.health = { ...this.health, [part]: status };
     this.degradedReason = status === "ok" ? undefined : reason ?? this.degradedReason;
@@ -297,8 +316,10 @@ export class InterpretationEngine {
       void this.enrichScripture();
     } catch (error) {
       if (controller.signal.aborted) return;
-      // The Korean transcript keeps running. That is the whole point of
-      // subsystem-level health: one dead component is not a dead session.
+      // Do not discard a thought merely because the network or free model had
+      // a bad turn. New stable speech may have arrived while this request was
+      // running, so restore the failed unit in front of that newer text.
+      this.stabiliser = restorePending(this.stabiliser, pending, this.clock);
       this.setHealth(
         "llm",
         "down",
@@ -319,9 +340,10 @@ export class InterpretationEngine {
     const result = addSafeChunks(chunks, output.safeChunks, now);
     chunks = result.chunks;
 
-    chunks = allowAnticipation && output.anticipatedChunks?.length
-      ? setAnticipatedChunks(chunks, output.anticipatedChunks, now)
-      : clearAnticipated(chunks);
+    chunks =
+      allowAnticipation && output.anticipatedChunks?.length
+        ? setAnticipatedChunks(chunks, output.anticipatedChunks, now)
+        : clearAnticipated(chunks);
 
     this.chunks = trimChunks(chunks);
 
@@ -383,7 +405,11 @@ export class InterpretationEngine {
         }
       } catch {
         // A missing verse is a non-event: the reference is already on screen.
-        this.setHealth("bible", "degraded", "Scripture lookup failed — showing references only.");
+        this.setHealth(
+          "bible",
+          "degraded",
+          "Scripture lookup failed — showing references only.",
+        );
       }
     }
   }
