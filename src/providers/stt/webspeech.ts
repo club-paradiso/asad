@@ -42,6 +42,13 @@ const PERMANENT_ERRORS = new Set(["not-allowed", "language-not-supported", "lang
 const RECOVERABLE_ERRORS = new Set(["service-not-allowed", "audio-capture", "network"]);
 const RECOVERY_ATTEMPTS = 4;
 const RECOVERY_BACKOFF_MS = [400, 1200, 3000, 6000];
+/**
+ * Safari/WebKit can keep returning useful interim text without ever flipping
+ * SpeechRecognitionResult.isFinal. If the text has stopped changing for this
+ * long, treat the current hypothesis as stable enough for live interpretation.
+ * A later final result is de-duplicated by result index.
+ */
+const INTERIM_STABLE_AFTER_MS = 1100;
 
 function getConstructor(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
@@ -73,6 +80,14 @@ function alternativesFor(result: SpeechRecognitionResultLike): string[] {
   return alternatives.map((alternative) => alternative.transcript);
 }
 
+function stableDelta(previous: string | undefined, next: string): string {
+  const before = previous?.trim() ?? "";
+  const after = next.trim();
+  if (!after || after === before) return "";
+  if (before && after.startsWith(before)) return after.slice(before.length).trim();
+  return after;
+}
+
 export class WebSpeechProvider extends BaseSpeechProvider {
   readonly id: SttProviderId = "webspeech";
   readonly needsAudio = false;
@@ -80,6 +95,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
   private recognition: SpeechRecognitionLike | null = null;
   private wantRunning = false;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
+  private interimCommitTimer: ReturnType<typeof setTimeout> | null = null;
   private recoveryUsed = 0;
 
   constructor(private readonly options: SttProviderOptions = {}) {
@@ -109,10 +125,35 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       let connected = false;
       let settled = false;
       let hasResult = false;
+      const interimByIndex = new Map<number, string>();
+      const committedByIndex = new Map<number, string>();
+
+      const clearInterimCommit = () => {
+        if (this.interimCommitTimer) clearTimeout(this.interimCommitTimer);
+        this.interimCommitTimer = null;
+      };
+
+      const commitInterim = () => {
+        clearInterimCommit();
+        for (const [index, text] of [...interimByIndex.entries()].sort((a, b) => a[0] - b[0])) {
+          const delta = stableDelta(committedByIndex.get(index), text);
+          if (delta) this.emitStable(delta);
+          committedByIndex.set(index, text.trim());
+        }
+      };
+
+      const scheduleInterimCommit = () => {
+        clearInterimCommit();
+        if (interimByIndex.size === 0) return;
+        this.interimCommitTimer = setTimeout(commitInterim, INTERIM_STABLE_AFTER_MS);
+      };
 
       recognition.onstart = () => {
         connected = true;
         this.recoveryUsed = 0;
+        interimByIndex.clear();
+        committedByIndex.clear();
+        clearInterimCommit();
         this.emitStatus("listening");
         if (!settled) {
           settled = true;
@@ -128,13 +169,20 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           if (!text) continue;
           hasResult = true;
           if (result.isFinal) {
-            if (i >= event.resultIndex) this.emitStable(text);
+            interimByIndex.delete(i);
+            if (i >= event.resultIndex) {
+              const delta = stableDelta(committedByIndex.get(i), text);
+              if (delta) this.emitStable(delta);
+              committedByIndex.set(i, text.trim());
+            }
           } else {
+            interimByIndex.set(i, text);
             interim.push(text);
           }
         }
         const partial = joinBrowserResultParts(interim, this.options.language);
         if (partial) this.emitPartial(partial);
+        scheduleInterimCommit();
       };
 
       recognition.onerror = (event) => {
@@ -166,6 +214,10 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       };
 
       recognition.onend = () => {
+        // WebKit sometimes never marks its last hypothesis final. Preserve the
+        // words we actually heard before cycling the recogniser, otherwise the
+        // engine sees only partial text and never dispatches /api/interpret.
+        commitInterim();
         if (!this.wantRunning) {
           this.emitStatus("closed");
           return;
@@ -207,7 +259,9 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     this.wantRunning = false;
     this.recoveryUsed = 0;
     if (this.restartTimer) clearTimeout(this.restartTimer);
+    if (this.interimCommitTimer) clearTimeout(this.interimCommitTimer);
     this.restartTimer = null;
+    this.interimCommitTimer = null;
     const recognition = this.recognition;
     this.recognition = null;
     try {
