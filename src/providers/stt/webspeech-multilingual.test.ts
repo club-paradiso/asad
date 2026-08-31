@@ -61,7 +61,7 @@ describe("WebSpeech multilingual behavior", () => {
     expect(stable).toEqual(["我要延长签证"]);
   });
 
-  it("restarts an utterance recognizer when the browser auto-ends early", async () => {
+  it("restarts an utterance recognizer when the browser auto-ends after speech began", async () => {
     vi.useFakeTimers();
     const provider = new WebSpeechProvider({ language: "zh-CN", utterance: true });
     const connected = provider.connect();
@@ -69,9 +69,29 @@ describe("WebSpeech multilingual behavior", () => {
     recognition.onstart?.();
     await connected;
 
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: { length: 1, 0: result(["我要延长"], false) },
+    });
     recognition.onend?.();
     expect(recognition.start).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(180);
     expect(recognition.start).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not restart forever when an utterance recognizer heard nothing", async () => {
+    vi.useFakeTimers();
+    const provider = new WebSpeechProvider({ language: "zh-CN", utterance: true });
+    const statuses: string[] = [];
+    provider.onStatus((status) => statuses.push(status));
+    const connected = provider.connect();
+    const recognition = Recognition.last!;
+    recognition.onstart?.();
+    await connected;
+
+    recognition.onend?.();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(recognition.start).toHaveBeenCalledTimes(1);
+    expect(statuses).toContain("closed");
   });
 });
