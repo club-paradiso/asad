@@ -42,6 +42,23 @@ export async function GET() {
   const [counterSessions] = await Promise.all([store.stats()]);
   const storage = counterStoreInfo();
 
+  // Diagnostics is explicitly a live-health surface, so report the same
+  // provider preference as /api/interpret. The generic router plan can quite
+  // correctly prefer a one-shot-capable free provider, but Live Mode must put
+  // a provider that can sustain the 45-minute workload first.
+  const liveActive =
+    router.preferred((id) => {
+      if (env.llm.paidTier.has(id)) return true;
+      const caps = capabilitiesFor(id);
+      return (
+        !caps.freeTierPossible ||
+        assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull).viable
+      );
+    }) ?? plan.active;
+  const liveChain = liveActive
+    ? [liveActive, ...plan.chain.filter((id) => id !== liveActive)]
+    : plan.chain;
+
   // Vercel can retain an optional variable with an empty-string value. The
   // parser deliberately rejects an empty model id, but for an optional model
   // override an empty value semantically means "use the provider default".
@@ -50,19 +67,23 @@ export async function GET() {
     return process.env[problem.field]?.trim() !== "";
   });
 
+  const sttCredentialsRequired =
+    env.stt.provider === "deepgram" || env.stt.provider === "openai";
+
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
 
     stt: {
       provider: env.stt.provider,
+      credentialsRequired: sttCredentialsRequired,
       keyConfigured:
         env.stt.provider === "deepgram"
           ? !!env.stt.deepgramKey
           : env.stt.provider === "openai"
             ? !!env.stt.openaiKey
-            : true,
+            : null,
       ephemeralKeysAvailable:
-        env.stt.provider === "deepgram" ? !!env.stt.deepgramProjectId : true,
+        env.stt.provider === "deepgram" ? !!env.stt.deepgramProjectId : null,
       model: env.stt.provider === "deepgram" ? env.stt.deepgramModel : env.stt.openaiModel,
     },
 
@@ -70,8 +91,8 @@ export async function GET() {
       routingMode: plan.mode,
       privacyMode: plan.privacyMode,
       allowPaidFallback: plan.allowPaidFallback,
-      active: plan.active,
-      chain: plan.chain,
+      active: liveActive,
+      chain: liveChain,
       warnings: plan.warnings,
 
       // The gateway's own configuration. Reported whether or not OpenRouter is
@@ -192,18 +213,17 @@ export async function GET() {
       textAvailable: env.bible.provider !== "reference-only",
     },
 
-    // What stands between a public URL and the deployer's provider balance.
-    // The per-instance caveat is stated here rather than implied, because a
-    // limit that claims to be global and is not is worse than no limit.
     protection: {
       accessGate: env.access.enabled,
-      // "enforced" needs a secret that is identical on every instance. Without
-      // one, session tokens key rate limits but cannot refuse a request — see
-      // sessionEnforcement in src/lib/guard.ts.
+      // Session verification and request-rate scope are separate. A deployment
+      // may have shared Redis counters while still lacking a stable signing
+      // secret for session-token enforcement.
       sessionEnforcement: sessionEnforcement(),
       rateLimits: RATE_RULES,
-      scope: "per-instance",
-      note: "Rate limits are held in the memory of one server instance. On a multi-instance or serverless deployment the effective ceiling is the limit multiplied by the number of warm instances. For a hard global ceiling, set a spend limit on the provider key.",
+      scope: storage.shared ? "shared-redis + per-instance fallback" : "per-instance",
+      note: storage.shared
+        ? "Paid-route limits are enforced through shared Redis across Vercel instances, with the in-process limiter retained as a fallback if Redis is unavailable."
+        : "Rate limits are held in the memory of one server instance. On a multi-instance or serverless deployment the effective ceiling is the limit multiplied by the number of warm instances. For a hard global ceiling, configure shared Upstash/Vercel KV storage or set a spend limit on the provider key.",
     },
 
     workload: LIVE_WORKLOAD,
