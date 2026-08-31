@@ -10,6 +10,7 @@
  * short-lived key server-side and this provider receives only that.
  */
 import { SocketSpeechProvider } from "./socket";
+import { deepgramLanguage } from "./language";
 import type { SttProviderId, SttProviderOptions } from "./types";
 
 interface DeepgramAlternative {
@@ -35,9 +36,16 @@ export class DeepgramSpeechProvider extends SocketSpeechProvider {
       throw new Error("No Deepgram token — check STT configuration on the server.");
     }
 
+    const language = deepgramLanguage(this.options.language);
+    if (!language) {
+      throw new Error(
+        `Deepgram does not support the requested Counter language: ${this.options.language ?? "unknown"}`,
+      );
+    }
+
     const params = new URLSearchParams({
       model: credentials.model ?? "nova-3",
-      language: this.options.language?.split("-")[0] ?? "ko",
+      language,
       interim_results: "true",
       punctuate: "true",
       smart_format: "true",
