@@ -108,10 +108,14 @@ export function Composer({
     });
   }, [disabled, draft, voice]);
 
+  const voiceFinishing = voice.phase === "finishing";
+  const voiceActive = voice.listening || voiceFinishing;
+
   const toggleVoice = useCallback(() => {
+    if (voiceFinishing) return;
     if (voice.listening) voice.stop();
     else startVoice();
-  }, [startVoice, voice]);
+  }, [startVoice, voice, voiceFinishing]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("vibrate" in navigator)) return;
@@ -136,7 +140,7 @@ export function Composer({
     <div
       className="border-t border-[var(--line)] bg-[var(--bg-raised)] px-3 pt-3 sm:px-5"
       style={{ paddingBottom: "calc(0.75rem + var(--safe-bottom))" }}
-      aria-busy={busy || voice.listening}
+      aria-busy={busy || voiceActive}
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-3">
         {pendingVoice && (
@@ -177,14 +181,22 @@ export function Composer({
           </div>
         )}
 
-        {(voice.listening || voice.partial) && (
-          <p
-            className="line-clamp-2 text-center text-sm text-[var(--fg-muted)]"
+        {voiceActive && (
+          <div
+            className="rounded-xl border border-[color-mix(in_srgb,var(--accent)_32%,var(--line))] bg-[var(--accent-dim)] px-4 py-3 text-center"
             dir={rtl ? "rtl" : undefined}
             aria-live="polite"
           >
-            {voice.partial || status}
-          </p>
+            <p className="text-sm font-semibold text-[var(--fg)]">{status}</p>
+            {voice.partial && (
+              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--fg-muted)]">
+                {voice.partial}
+              </p>
+            )}
+            {voice.listening && (
+              <p className="mt-1 text-xs text-[var(--fg-dim)]">{voiceStopHint(lang)}</p>
+            )}
+          </div>
         )}
 
         {voice.usedFallback && voice.listening && (
@@ -208,23 +220,47 @@ export function Composer({
           <div className="flex flex-col items-center gap-1.5">
             <button
               type="button"
-              disabled={disabled}
+              disabled={disabled || voiceFinishing}
               onClick={toggleVoice}
-              aria-label={status}
+              aria-label={voice.listening ? voiceStopAriaLabel(lang) : status}
               aria-pressed={voice.listening}
               className={cn(
                 "flex size-20 shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,box-shadow,transform]",
-                "touch-manipulation disabled:pointer-events-none disabled:opacity-40 active:scale-[0.97]",
+                "touch-manipulation disabled:pointer-events-none disabled:opacity-55 active:scale-[0.97]",
                 voice.listening
                   ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)] shadow-[0_0_0_6px_var(--accent-dim)]"
-                  : "border-[color-mix(in_srgb,var(--accent)_55%,var(--line))] bg-[var(--accent-dim)] text-[var(--accent)]",
+                  : voiceFinishing
+                    ? "animate-pulse border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]"
+                    : "border-[color-mix(in_srgb,var(--accent)_55%,var(--line))] bg-[var(--accent-dim)] text-[var(--accent)]",
               )}
             >
-              <MicIcon />
+              {voice.listening ? <StopIcon /> : <MicIcon />}
             </button>
             <span className="min-h-5 text-sm font-semibold text-[var(--fg)]" aria-live="polite">
               {status}
             </span>
+          </div>
+        )}
+
+        {draftSource === "voice" && cleanDraft.length > 0 && (
+          <div
+            className="flex items-center justify-between gap-3 rounded-lg border border-[color-mix(in_srgb,var(--accent)_30%,var(--line))] bg-[var(--accent-dim)] px-3 py-2"
+            dir={rtl ? "rtl" : undefined}
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[var(--accent)]">{voiceReviewLabel(lang)}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-[var(--fg-dim)]">
+                {voiceReviewHint(lang)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={startVoice}
+              disabled={disabled || voiceActive}
+              className="min-h-10 shrink-0 rounded-full border border-[var(--line-strong)] px-3 text-xs font-semibold text-[var(--fg)] disabled:opacity-40"
+            >
+              {copy.speakAgain}
+            </button>
           </div>
         )}
 
@@ -272,7 +308,10 @@ export function Composer({
             enterKeyHint="send"
             autoComplete="off"
             className={cn(
-              "min-w-0 flex-1 rounded-full border border-[var(--line-strong)] bg-[var(--bg-overlay)]",
+              "min-w-0 flex-1 rounded-full border bg-[var(--bg-overlay)]",
+              draftSource === "voice" && cleanDraft.length > 0
+                ? "border-[var(--accent)] shadow-[0_0_0_2px_var(--accent-dim)]"
+                : "border-[var(--line-strong)]",
               "px-4 py-3 text-base text-[var(--fg)] placeholder:text-[var(--fg-dim)]",
               "focus:border-[var(--accent)] focus:outline-none disabled:opacity-40",
             )}
@@ -300,16 +339,6 @@ export function Composer({
             {strings.send}
           </button>
         </form>
-
-        {draftSource === "voice" && cleanDraft.length > 0 && (
-          <p
-            className="text-center text-xs leading-relaxed text-[var(--fg-dim)]"
-            dir={rtl ? "rtl" : undefined}
-            aria-live="polite"
-          >
-            {voiceReviewHint(lang)}
-          </p>
-        )}
       </div>
     </div>
   );
@@ -329,17 +358,63 @@ function editTranscriptLabel(language: string): string {
   return "Edit transcript";
 }
 
+function voiceReviewLabel(language: string): string {
+  if (language.startsWith("ko")) return "음성 인식 결과 · 수정 가능";
+  if (language.startsWith("zh")) return "语音识别结果 · 可修改";
+  if (language.startsWith("ja")) return "音声認識結果 · 編集できます";
+  if (language.startsWith("vi")) return "Kết quả nhận dạng giọng nói · Có thể sửa";
+  if (language.startsWith("th")) return "ผลการรู้จำเสียง · แก้ไขได้";
+  if (language.startsWith("id")) return "Hasil pengenalan suara · Bisa diedit";
+  if (language.startsWith("ru")) return "Результат распознавания · Можно исправить";
+  if (language.startsWith("ar")) return "نتيجة التعرّف على الصوت · قابلة للتعديل";
+  return "Speech transcript · Editable";
+}
+
 function voiceReviewHint(language: string): string {
   if (language.startsWith("ko")) {
-    return "음성 인식 결과를 확인하고, 이름·고유명사나 잘못 인식된 부분을 직접 수정한 뒤 전송하세요.";
+    return "이름·고유명사나 잘못 인식된 부분을 바로 고친 뒤 전송하세요.";
   }
   if (language.startsWith("zh")) {
-    return "请检查语音识别结果，必要时修改姓名、专有名词或识别错误后再发送。";
+    return "请直接修改姓名、专有名词或识别错误后再发送。";
   }
   if (language.startsWith("ja")) {
-    return "音声認識の結果を確認し、人名・固有名詞や誤認識された箇所を必要に応じて修正してから送信してください。";
+    return "人名・固有名詞や誤認識された箇所を直してから送信してください。";
   }
-  return "Review the speech transcript and correct names, proper nouns, or any recognition errors before sending.";
+  if (language.startsWith("vi")) {
+    return "Sửa ngay tên riêng hoặc phần nhận dạng sai trước khi gửi.";
+  }
+  if (language.startsWith("th")) {
+    return "แก้ชื่อ คำเฉพาะ หรือส่วนที่รู้จำผิดก่อนส่ง";
+  }
+  if (language.startsWith("id")) {
+    return "Perbaiki nama, istilah khusus, atau bagian yang salah sebelum mengirim.";
+  }
+  if (language.startsWith("ru")) {
+    return "Исправьте имена, термины и ошибки распознавания перед отправкой.";
+  }
+  if (language.startsWith("ar")) {
+    return "صحّح الأسماء والمصطلحات وأخطاء التعرّف قبل الإرسال.";
+  }
+  return "Correct names, proper nouns, or recognition errors before sending.";
+}
+
+function voiceStopHint(language: string): string {
+  if (language.startsWith("ko")) return "말이 끝났으면 마이크 버튼을 눌러 바로 멈출 수 있어요.";
+  if (language.startsWith("zh")) return "说完后，再点一次麦克风即可立即停止。";
+  if (language.startsWith("ja")) return "話し終えたら、マイクをもう一度押すとすぐ停止できます。";
+  if (language.startsWith("vi")) return "Nói xong, chạm lại nút mic để dừng ngay.";
+  if (language.startsWith("th")) return "พูดจบแล้ว แตะปุ่มไมค์อีกครั้งเพื่อหยุดได้ทันที";
+  if (language.startsWith("id")) return "Setelah selesai bicara, ketuk mikrofon lagi untuk berhenti.";
+  if (language.startsWith("ru")) return "Закончив говорить, нажмите микрофон ещё раз, чтобы остановить запись.";
+  if (language.startsWith("ar")) return "بعد الانتهاء من الكلام، اضغط زر الميكروفون مرة أخرى للإيقاف.";
+  return "When you finish speaking, tap the mic again to stop immediately.";
+}
+
+function voiceStopAriaLabel(language: string): string {
+  if (language.startsWith("ko")) return "음성 입력 중지";
+  if (language.startsWith("zh")) return "停止语音输入";
+  if (language.startsWith("ja")) return "音声入力を停止";
+  return "Stop voice input";
 }
 
 function MicIcon() {
@@ -356,6 +431,14 @@ function MicIcon() {
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5 11a7 7 0 0 0 14 0" />
       <path d="M12 18v3" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-8" fill="currentColor" aria-hidden="true">
+      <rect x="7" y="7" width="10" height="10" rx="2" />
     </svg>
   );
 }
