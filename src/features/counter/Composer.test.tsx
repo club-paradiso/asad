@@ -105,6 +105,21 @@ describe("Counter Composer", () => {
     expect(onSend).toHaveBeenLastCalledWith("체류카드도 보여 주세요", "text");
   });
 
+  it("keeps text typed during speech available after the reviewed voice draft sends", async () => {
+    const onSend = vi.fn();
+    let resolveVoice!: (text: string) => void;
+    voice.start.mockReturnValue(new Promise((resolve) => { resolveVoice = resolve; }));
+    render(<Composer lang="en-US" strings={stringsFor("en-US")} onSend={onSend} />);
+    fireEvent.click(screen.getByRole("button", { name: "Speak" }));
+    const input = screen.getByPlaceholderText("Type your message") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "typed while listening" } });
+    await act(async () => { resolveVoice("My passport expires soon"); });
+    fireEvent.submit(input.closest("form")!);
+    expect(onSend).toHaveBeenCalledWith("My passport expires soon", "voice");
+    fireEvent.click(screen.getByRole("button", { name: "Restore previous text" }));
+    expect(input.value).toBe("typed while listening");
+  });
+
   it("does not submit while a Korean IME composition is being committed", () => {
     const onSend = vi.fn();
     render(<Composer lang="ko-KR" strings={stringsFor("ko-KR")} onSend={onSend} />);
