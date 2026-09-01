@@ -1,532 +1,343 @@
-# tong-yuck
+# 아무튼서로알아들었으면된거아닌가요 (ASAD)
 
-**A real-time AI copilot for human interpreters.** Korean → English.
+> **정확한지는 모르겠고, 아무튼 알아들었어요.**
+>
+> 라이브 통역과 현장 응대를 위한 AI 통역 보조 서비스.
 
-> **Project status:** Active development. The Vercel deployment is intentionally access-controlled; run locally to evaluate the product.
+ASAD는 통역사를 없애거나 사람 사이의 대화를 자동 번역 자막으로 대체하려는 프로젝트가 아닙니다.
 
-The name plays on 통역 — *interpretation*.
+한 사람이 계속 말하는 상황에서는 **통역사가 놓치기 쉬운 맥락, 용어, 고유명사, 성경 구절, 말장난과 문장 구조를 보조**하고, 창구나 현장에서는 **서로 다른 언어를 쓰는 두 사람이 각자의 기기로 대화할 수 있는 짧은 통역 세션**을 만듭니다.
 
-tong-yuck does not translate for you. It sits beside a working simultaneous
-interpreter and carries the load they cannot carry alone: the passage reference
-they half-caught, the term they settled on twenty minutes ago, the name they
-corrected, the pun that is about to arrive and cannot be translated literally.
+프로젝트의 한국어 정식 명칭은 **아무튼서로알아들었으면된거아닌가요**이고, 기술 문맥에서는 짧게 **ASAD**를 사용합니다.
 
-The interpreter stays the listener, the contextual decision-maker, the language
-producer and the ethical decision-maker. The AI is support.
+- **Live Interpretation**: 설교, 강연, 회의처럼 한 명의 발화를 사람이 실시간으로 옮기는 상황
+- **Counter Mode**: 민원실, 안내 데스크, 접수창구처럼 두 사람이 마주 앉아 주고받는 상황
+- **Prep / Booth Preflight / Sessions**: 통역 전 준비, 장비 점검, 세션 복기와 내보내기
 
----
-
-## What makes it different
-
-The product fails if it becomes *Korean speech → English subtitles*. That
-already exists, and it is close to useless in a booth: subtitles assume a reader
-who can go at their own pace, and an interpreter cannot. They are two to five
-seconds behind, already speaking, and they get one fixation per line.
-
-So the whole system is built around that constraint:
-
-- **Temporal locking.** Once a line has probably been said out loud it is
-  immutable. A streaming system that rewrites earlier text is unusable, because
-  the interpreter's mouth is already past it. A serious fix is *appended* as a
-  discreet correction, never applied in place.
-- **Safe vs. anticipated output.** Predicted continuations are visually
-  unmistakable — dimmed, dashed rule, `◦` marker — and vanish cleanly when
-  wrong. Prediction never runs after a completed sentence, which is where
-  confident invention comes from.
-- **Interpreter-ready chunks, not prose.** Short thought units, roughly one
-  breath group, sayable on their own and joining naturally to the next.
-- **Early restructuring.** Korean holds the predicate until the end. tong-yuck
-  offers a safe syntactic scaffold — *"Today, I'd like to talk with you
-  about…"* — so the interpreter can start speaking before the Korean resolves,
-  without inventing the payload.
-- **Cultural and wordplay adaptation.** Mandatory, not decorative. Literal
-  translation is where Korean humour goes to die.
-- **It never invents Scripture.** Verse wording appears only when a provider
-  legally supplied it. Otherwise: the reference, and nothing else.
+> **Project status:** Active development. 실제 서비스 투입 전에는 반드시 `/diagnostics`와 현장 장비 테스트를 확인하세요.
 
 ---
 
-## The console
+## 왜 ASAD인가
 
-```
-┌──────────────────────────────────────────────────────┐ status: live · mode · lag · timer
-│                                                       │
-│   Today we're going to look at...                     │ committed — dimmed, still readable
-│   1 Peter 2:9.                                        │
-│ ▌ So we need to find the right way.                   │ current — full contrast, amber rule
-│ ▌ And speaking of "the way," it's even in my name.    │
-│   ADAPTED  Wordplay adapted — not literal             │
-│ ┆ ◦ we so easily forget who we are.                   │ anticipated — dashed, provisional
-│                                                       │
-├──────────────────────────────────────────────────────┤
-│ 그래서 우리는 길을 잘 찾아야 됩니다. 제 이름에도 길이 있어요.  │ Korean — present, never competing
-├──────────────────────────────────────────────────────┤
-│ WORDPLAY 길  "Gil" means "way"  │ 1 Peter 2:9 │ 부르심 → CALLING │
-├──────────────────────────────────────────────────────┤
-│  FREEZE                             T  한  G  A− A+   │
-└──────────────────────────────────────────────────────┘
-```
+일반적인 음성 번역 UI는 보통 `음성 인식 -> 번역 -> 자막`을 전제로 합니다. 하지만 동시통역과 현장 응대는 그보다 훨씬 까다롭습니다.
 
-Designed as a professional interpreter cockpit, not an AI dashboard: dark,
-large type, minimal eye movement, no chat bubbles, no cards, no decorative
-colour. Colour means state — amber is *now*, cyan is *reference*, and nothing
-is coloured to look nice.
+통역사는 이미 몇 초 뒤처진 채 다음 말을 듣고 있고, 이전 문장을 다시 읽을 시간도 없습니다. 창구에서는 날짜, 시간, 금액, 이름 하나가 틀리는 것만으로도 실제 업무가 꼬일 수 있습니다. 그래서 ASAD는 "문장을 예쁘게 번역하는 것"보다 **현장에서 언제, 무엇을, 얼마나 확실하게 보여줄 것인가**를 더 중요하게 취급합니다.
 
-Verified at iPhone landscape (the primary target), iPhone portrait, iPad
-landscape and laptop. The active line parks at 55% of the reading region on all
-of them.
+### Live의 원칙
+
+- **Temporal locking**: 이미 통역사가 말했을 가능성이 높은 문장은 뒤늦게 조용히 고치지 않습니다. 중요한 수정은 별도 correction으로 붙습니다.
+- **안전한 출력과 예상 출력 분리**: 아직 확정되지 않은 예상은 시각적으로 확정 번역과 구분됩니다.
+- **짧은 발화 단위**: 긴 산문보다 실제로 입 밖에 낼 수 있는 짧은 thought unit을 우선합니다.
+- **한국어 지연 구조 대응**: 술어가 늦게 나오는 한국어 문장을 무작정 기다리지 않고 안전한 문장 골격을 먼저 제시할 수 있습니다.
+- **고유명사 교정**: 한 번 수정한 이름이나 용어를 이후 인식과 표기에 반영합니다.
+- **성경 구절 보호**: 라이선스 없이 성경 본문을 지어내지 않습니다. 기본값은 reference-only입니다.
+
+### Counter의 원칙
+
+- **양쪽 화면에 양쪽 언어를 함께 표시**해 서로 번역 오류를 확인할 수 있게 합니다.
+- **자주 쓰는 빠른 문구는 모델을 거치지 않고 고정 번역**으로 처리할 수 있습니다.
+- **숫자, 날짜, 시간, 금액, 이름 같은 위험 값**을 별도로 확인하기 쉽게 만듭니다.
+- **음성 인식 결과를 보내기 전에 직접 수정**할 수 있습니다. 고유명사나 인명 인식이 틀렸는데 그대로 번역기로 보내는 고전적인 참사를 줄이기 위한 장치입니다.
+- 번역이 실패하면 실패했다고 표시합니다. 번역이 아닌 문자열을 그럴듯한 번역처럼 내보내지 않습니다.
+- 방문자가 세션을 종료하면 방문자 화면은 종료 상태로 전환되고, 직원 측 호스트 화면은 유지됩니다.
 
 ---
 
-## Try it in thirty seconds
+## 주요 화면
+
+| 경로 | 용도 |
+| --- | --- |
+| `/` | ASAD 런처 |
+| `/live` | 라이브 통역 콘솔 |
+| `/counter` | 현장 응대 호스트 화면 |
+| `/c/...` | QR로 참가하는 방문자 화면 |
+| `/prep` | 설교자, 본문, 용어 등 사전 준비 |
+| `/booth-preflight` | 믹서 입력, 신호 레벨, mix-minus 등 부스 사전 점검 |
+| `/sessions` | 저장한 라이브 세션 복기 및 내보내기 |
+| `/diagnostics` | 실제 STT/LLM/보안/스토리지 구성 확인 |
+
+홈 화면은 현재 **라이브 통역**, **현장 응대**, **준비 시트**, **부스 사전 점검**, **지난 세션**으로 진입점을 나눕니다.
+
+---
+
+## Counter Mode 지원 언어
+
+Counter UI는 현재 24개 언어를 제공합니다.
+
+한국어, 영어, 중국어 간체/번체, 일본어, 베트남어, 태국어, 인도네시아어, 러시아어, 우즈베크어, 몽골어, 네팔어, 크메르어, 미얀마어, 타갈로그어, 스페인어, 프랑스어, 독일어, 포르투갈어, 아랍어, 힌디어, 벵골어, 우르두어, 터키어.
+
+방문자 언어 선택기는 각 언어를 **자기 언어 표기(endonym)** 로 보여줍니다. 브라우저 SpeechRecognition 지원 수준은 언어와 브라우저마다 다르며, 일부 언어는 음성보다 텍스트 입력이 더 안정적입니다.
+
+Counter 음성 인식은 기본 인식 경로가 실패했을 때 선택적으로 **Hugging Face Whisper STT fallback**을 사용할 수 있습니다. 민감 프로필에서는 이 폴백이 차단되며, 음성은 짧은 WAV로 메모리에서 처리됩니다.
+
+---
+
+## 30초 만에 실행하기
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000, press **Start interpreting**.
+브라우저에서 다음 주소를 엽니다.
 
-**No API key, no microphone and no network are required.** Demo mode replays a
-scripted Korean sermon through the real pipeline — real stabiliser, real
-temporal locking, real rolling context — so it exercises the same code path as
-a live session. A ribbon names the interpretation problem each beat is
-demonstrating.
+```text
+http://localhost:3000
+```
 
-The demo covers ordinary speech, a delayed predicate, a 40-word sentence, an
-unfinished one, a recogniser self-correction, Scripture, theological
-vocabulary, an idiom, a cultural reference, name wordplay, a proper noun,
-prayer, testimony, rhetorical repetition and humour.
+API 키가 없어도 앱 자체는 실행됩니다. 기본 설정은 외부 유료 API에 의존하지 않도록 설계되어 있고, 라이브 통역은 demo/local 경로로 확인할 수 있습니다.
 
-### What is running when you do that
+환경 변수 템플릿:
 
-**No cloud model.** The repository ships with no API key, and nothing is
-configured by default, so the console runs on the **local interpreter** — a
-deterministic, rule-based path built from the parts of the job that genuinely
-are deterministic:
+```bash
+cp .env.example .env.local
+```
 
-| Runs locally, always | Needs a cloud model |
-| --- | --- |
-| Scripture detection and reference normalisation | Translating arbitrary Korean into English |
-| Glossary and terminology matching | Rendering idiom, humour and wordplay |
-| Cultural-reference and wordplay *detection* | Early syntactic restructuring |
-| Name correction and romanisation | Register and tone |
-| Transcript stabilisation and temporal locking | Counter Mode's free-text translation |
-
-The local path **flags** the hard cases rather than solving them, marks
-anything it cannot support as low confidence, and never invents content. That
-is deliberate — a wrong translation delivered confidently is worse than a
-marked gap — but it is assistance, not interpretation.
-
-Add one free key and the whole right-hand column turns on. `/diagnostics` says
-which provider is live, and the console shows `AI LOCAL` in the status pill
-whenever it is not.
+`.env.local`은 커밋하지 마세요.
 
 ---
 
-## Run tong-yuck for free
+## 무료 라이브 구성
 
-Real live interpretation, no paid API anywhere:
-
-```bash
-# .env.local
-STT_PROVIDER=webspeech        # browser speech recognition — $0
-LLM_ROUTING_MODE=auto-free    # free-tier interpretation — $0
-GEMINI_API_KEY=your-free-key  # from Google AI Studio, no card required
-BIBLE_PROVIDER=reference-only # no network call at all — $0
-```
+실제 마이크 입력을 최대한 무료로 시험하려면 다음과 같이 시작할 수 있습니다.
 
 ```bash
-npm install && npm run dev
+STT_PROVIDER=webspeech
+LLM_ROUTING_MODE=auto-free
+GEMINI_API_KEY=your-free-key
+BIBLE_PROVIDER=reference-only
 ```
 
-Open in **Chrome**, pick **Sermon**, choose **Browser** as the audio source,
-press Start. Check `/diagnostics` to confirm what is actually configured.
+- Web Speech API는 브라우저 의존성이 큽니다. Chrome/Edge가 일반적으로 가장 안정적이고 Safari/iOS는 동작 편차가 있습니다.
+- Gemini 무료 티어는 사용량 제한과 데이터 사용 정책이 있습니다.
+- 민감한 설교, 상담, 개인정보가 포함된 발화를 무료 클라우드 모델에 전송하기 전에 반드시 해당 공급자의 최신 정책을 확인하세요.
+- 클라우드 전송을 원하지 않으면 `LLM_ROUTING_MODE=local`을 사용할 수 있습니다.
+- 훈련 가능성이 있는 공급자를 배제하려면 `LLM_PRIVACY_MODE=strict`을 검토하세요.
 
-**Limitations, stated plainly:**
+자세한 내용은 [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md)를 참고하세요.
 
-- Web Speech is good in Chrome and Edge, partial in Safari, and unreliable on
-  iOS. It also stops on silence and restarts automatically, which can drop a
-  phrase.
-- Gemini's free tier sustains about **two 45-minute sermons a day**
-  (1,000 requests). After that the console keeps running on the local
-  interpreter and the status pill shows `AI LOCAL`.
-- **Privacy: Gemini's free tier may use prompts and responses to improve Google
-  products, including human review.** For sermon content — testimonies, prayer
-  requests, names — that is a real tradeoff. tong-yuck tells you once, in-app,
-  before the first live cloud session, and offers `LLM_ROUTING_MODE=local`
-  (sends nothing) or `LLM_PRIVACY_MODE=strict` (excludes training-capable
-  providers) as alternatives.
+---
 
-Full detail: [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md).
+## 권장 프로덕션 구성
 
-## Going live
-
-Three tiers, and they are not equivalent. Demo mode is a demonstration, not a
-rehearsal.
-
-| | Keys needed | What you get |
-| --- | --- | --- |
-| **Demo** | none | The full pipeline on a recorded Korean sermon. No microphone, no network. For seeing what the console does |
-| **Browser** | one LLM key | On-device recognition plus real interpretation. Free, Chrome-dependent, stops on long silences |
-| **Production** | Deepgram + OpenRouter | Streaming recognition and a pinned live model with latency-oriented routing. What to use for a service you intend to trust |
-
-### Recommended production setup
-
-Copy `.env.example` to `.env.local`. Two keys:
+라이브 서비스를 실제 현장에 투입하려면 `.env.example`의 production preset을 기준으로 구성하는 것을 권장합니다.
 
 ```bash
 STT_PROVIDER=deepgram
 DEEPGRAM_API_KEY=...
-DEEPGRAM_PROJECT_ID=...      # needed to mint short-lived browser keys
+DEEPGRAM_PROJECT_ID=...
+DEEPGRAM_STT_MODEL=nova-3
 
 LLM_ROUTING_MODE=pinned
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=...
-OPENROUTER_PRIMARY_MODEL=google/gemma-4-26b-a4b-it:free
+OPENROUTER_PRIMARY_MODEL=google/gemini-3.7-flash
 
 OPENROUTER_PROVIDER_SORT=latency
 OPENROUTER_DATA_COLLECTION=deny
 OPENROUTER_REQUIRE_PARAMETERS=true
+OPENROUTER_ALLOW_PROVIDER_FALLBACKS=true
 
-APP_ACCESS_KEY=...           # see "Protecting a deployed app"
-SESSION_SECRET=...           # required on Vercel; see the same section
+APP_ACCESS_KEY=...
+SESSION_SECRET=...
 
 BIBLE_PROVIDER=reference-only
 ```
 
-Then, before the service:
+OpenRouter 모델 ID와 공급자 상태는 계속 바뀔 수 있습니다. 배포 전에 실제 요청을 보내 확인하세요.
 
 ```bash
 npm run health:openrouter
 ```
 
-That makes one real request and reports whether the key works, the model slug
-resolves, the routing policy leaves an upstream eligible, and structured output
-validates. Configuration alone cannot tell you any of those.
+ASAD는 라이브 통역에서 모델의 절대 성능만큼이나 **지연 시간과 세션 중 일관성**을 중요하게 봅니다. 같은 세션에서 모델 계열이 계속 바뀌면 용어와 문체가 흔들리므로 pinned routing을 지원합니다.
 
-### Why OpenRouter is configured this way
+---
 
-It is a router, not a vendor, and the `provider` block sent with every request
-is what makes it fit for live work:
+## Counter Mode 공유 저장소
 
-| Setting | Why |
-| --- | --- |
-| `sort=latency` | A perfect answer that arrives after the moment has passed is worth nothing |
-| `data_collection=deny` | Excludes upstreams that may retain or train on what is sent |
-| `require_parameters=true` | Excludes upstreams that would silently drop `response_format` and answer in prose |
-| `allow_fallbacks=true` | Retries on another upstream serving the *same* model. Not model roulette — the model stays pinned so terminology and register hold |
-| `zdr` | Stricter still. If it leaves no eligible upstream the turn fails **visibly** and names the constraint, rather than quietly widening the policy |
+Counter Mode는 직원과 방문자의 두 기기가 같은 짧은 세션을 공유합니다.
 
-The model is pinned for the session on purpose. Switching model families between
-sentences drifts terminology and register, and the interpreter is the one who
-absorbs it mid-sentence.
+로컬 단일 프로세스 개발에서는 메모리 저장소로 동작할 수 있지만, **Vercel처럼 여러 인스턴스가 요청을 처리하는 환경에서는 공유 Redis가 필요합니다.** 그렇지 않으면 호스트와 방문자가 서로 다른 서버 인스턴스에 도착했을 때 세션이 보이지 않을 수 있습니다. 서버리스는 늘 이런 식으로 사람의 평화를 시험합니다.
 
-Model ids are configuration, never code. Set `OPENROUTER_PRIMARY_MODEL` to
-whatever is current and run the health check.
+ASAD는 다음 환경 변수 조합을 자동 인식합니다.
 
-### Protecting a deployed app
+```text
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
+```
 
-`/api/interpret`, `/api/prep`, `/api/counter/message` and `/api/stt/token` all
-spend money. Deployed without a gate they are public endpoints, and
-`/api/stt/token` is the worst of them — it mints recogniser credentials that
-outlive the request.
+또는 Vercel KV 스타일:
 
-Always on, no configuration needed:
+```text
+KV_REST_API_URL
+KV_REST_API_TOKEN
+```
 
-- same-origin enforcement
-- request body ceilings
-- server-issued session tokens in HttpOnly cookies
-- per-session and per-address rate limits, sized from the measured live
-  workload of ~11 calls a minute
+별도 `COUNTER_STORE` 플래그는 필요하지 않습니다. 완전한 Redis URL/token 쌍이 있으면 공유 저장소를 사용하고, 로컬 개발에서는 메모리 fallback을 사용할 수 있습니다.
 
-Set `APP_ACCESS_KEY` and nothing paid answers without it. Any non-empty value
-works; it is a shared secret, not an account system.
+현재 Counter 세션은 짧은 수명을 전제로 하며, 종료 시 세션 데이터를 즉시 삭제하는 흐름을 갖고 있습니다.
 
-**On Vercel, also set `SESSION_SECRET`** (`APP_ACCESS_KEY` doubles as one). It
-must be identical on every instance. Without it the signing key is random per
-process, so a token minted by one instance fails on the next — and enforcing
-sessions under those conditions would not make the deployment stricter, it
-would break it continuously, with the console re-minting a token the following
-request rejects again. So without a stable secret, session tokens degrade to
-keying rate limits per browser and stop gating requests. `/diagnostics` reports
-which mode is in force rather than letting you assume the stronger one.
+자세한 내용은 [`docs/counter-storage.md`](docs/counter-storage.md)를 참고하세요.
 
-**The honest caveat:** rate limits live in the memory of one server instance.
-On Vercel, or anywhere running more than one, the effective ceiling is the limit
-multiplied by the number of warm instances. That is a real bound and it is not a
-global guarantee. For a hard ceiling, set a spend limit on the OpenRouter key.
+---
 
-### Everything else
+## 선택적 Hugging Face STT fallback
 
-Every value is optional; each subsystem degrades independently.
+Counter Mode에서 브라우저/기본 음성 인식이 실패했을 때 서버 측 Hugging Face ASR을 마지막 폴백으로 사용할 수 있습니다.
 
 ```bash
-# local | auto-free | pinned | reliable
-LLM_ROUTING_MODE=auto-free
-LLM_PRIVACY_MODE=standard    # strict excludes providers that may train on you
-LLM_ALLOW_PAID_FALLBACK=false
-
-GEMINI_API_KEY=...           # free tier
-GROQ_API_KEY=...             # free tier, does not train on your data
-ANTHROPIC_API_KEY=...        # paid
-OPENAI_API_KEY=...           # paid
+HF_TOKEN=...
+HF_STT_MODEL=openai/whisper-large-v3-turbo
 ```
 
-Phase 1's `LLM_PROVIDER` / `LLM_API_KEY` still work and report their migration
-path on `/diagnostics`.
+주의:
 
-| Setting | Behaviour |
-| --- | --- |
-| Nothing set | Demo mode. Fully offline, fully functional |
-| `STT_PROVIDER=webspeech` | Live microphone, no key. Chrome is best; Safari is partial |
-| `LLM_PROVIDER=mock` | Scripture, terminology and wordplay still work locally; English assistance is rule-based rather than translated |
-| `BIBLE_PROVIDER=reference-only` | References only. No licence needed, and no possibility of invented wording |
+- `HF_TOKEN`은 반드시 서버 측 secret으로만 두세요. `NEXT_PUBLIC_` 접두사를 붙이면 안 됩니다.
+- ASAD는 Counter turn 하나의 짧은 오디오만 전송하도록 구성되어 있습니다.
+- 특정 민감 서비스 프로필에서는 이 폴백이 차단됩니다.
+- Hugging Face routed inference는 무료 크레딧 이후 과금될 수 있습니다. 무료 전용 운영이라면 계정 측 지출 한도도 함께 설정하세요.
 
-**API keys never reach the browser.** `/api/stt/token` mints a short-lived
-credential; interpretation is proxied through `/api/interpret`.
-
-**Bible translations:** NIV, ESV, NLT, NASB and NKJV are copyrighted and cannot
-be bundled or proxied without your own licence. `public-domain` serves WEB/KJV/ASV;
-`api-bible` uses a translation you are entitled to. The default shows the
-reference alone, which is genuinely useful and carries no risk.
+전략 문서: [`docs/hugging-face-stt-strategy.md`](docs/hugging-face-stt-strategy.md)
 
 ---
 
-## Using it
+## 보안과 개인정보
 
-Two interactions to live: pick a mode, press Start.
+외부 API를 사용하는 배포는 단순한 정적 웹페이지가 아닙니다. `/api/interpret`, `/api/prep`, `/api/counter/message`, `/api/stt/token` 같은 경로는 실제 API 비용이나 민감한 데이터를 다룰 수 있습니다.
 
-| Key | |
-| --- | --- |
-| `Space` | Freeze — display stops, pipeline keeps running |
-| `F` | Follow live |
-| `T` | Teleprompter view |
-| `K` | Korean on/off |
-| `G` | Glossary |
-| `B` | Scripture |
-| `+` / `-` | Text size |
+ASAD는 다음 보호 장치를 사용합니다.
 
-**Lag** — how far behind the speaker you are running — changes transcript
-stabilisation, when the model is triggered, how aggressive anticipation is, and
-how fast a line locks. Fast ≈1s, **Balanced ≈2–3s** (default), Safe ≈4–6s with
-prediction off entirely.
+- same-origin 검증
+- 요청 본문 크기 제한
+- 서버 발급 세션 토큰
+- 세션/주소 단위 rate limit
+- 공유 Redis가 구성된 경우 serverless 인스턴스 전체에 걸친 공유 rate limit과 portable session enforcement
+- `APP_ACCESS_KEY`를 통한 비공개 배포 게이트
+- `SESSION_SECRET`을 통한 다중 인스턴스 세션 서명 일관성
+- API 키를 브라우저에 직접 노출하지 않는 서버 프록시 구조
 
-**Sermon mode** adds Scripture detection, theological terminology, church
-register and wordplay handling. **General mode** applies no theological
-assumptions — meetings, lectures, interviews, public service.
+Vercel이나 다중 인스턴스 환경에서는 `SESSION_SECRET` 또는 이를 대신할 `APP_ACCESS_KEY`를 안정적으로 설정해야 합니다.
 
-**Correct a name once** (settings → *Correct a name or term*) and it is
-absolute: the past transcript is rewritten, every future mention is corrected
-before anything sees it, the romanisation is bound, and it appears in the
-post-session review as a term to pre-load next time.
+Counter Mode의 Redis 공유 저장소를 사용하면 활성 대화 상태가 관리형 Redis에 잠시 저장된다는 점도 고려해야 합니다. 민감한 기관에서 사용할 경우 Redis 프로젝트 접근 권한과 secret 관리까지 포함해 운영 정책을 세워야 합니다.
 
-**Prep** (`/prep`) is optional. Fill it in and the speaker's name romanises
-once and stays consistent, terminology hints go to the recogniser so proper
-nouns survive, and the model starts the session knowing what it is listening to.
+상세 문서:
 
-**Sessions** (`/sessions`) only stores what you explicitly asked it to store —
-"Save this session" is off by default. Export as TXT, Markdown or JSON. Audio
-is never retained.
+- [`docs/privacy.md`](docs/privacy.md)
+- [`docs/prep-privacy.md`](docs/prep-privacy.md)
+- [`docs/counter-storage.md`](docs/counter-storage.md)
 
 ---
 
-## Counter Mode — 현장 응대
+## 성경 본문
 
-A second surface for a different job. The console is for an interpreter working
-a room; Counter Mode is for staff at a desk with a stranger in front of them
-who does not share their language.
-
-Open `/counter` on the iPad or the spare phone on the desk, pick the staff
-language, press **QR 코드 띄우기**. The visitor scans the code, picks their
-language from a list written in their own script, and starts talking — chat or
-push-to-talk voice, on their own phone, with nothing installed.
-
-Four decisions carry it, and all four exist because field translators produce
-too many errors, not too few translations:
-
-- **Both languages are on both screens, always.** Every bubble shows the
-  viewer's language large and the other language underneath, fully legible.
-  That is what lets either party catch an error; a single-language screen gives
-  neither of them any way to.
-- **Quick phrases never touch a model.** The twenty-odd things a counter says
-  all day are pre-written in ~17 languages and delivered by lookup. No latency,
-  no variance, no mistranslation on the fortieth repetition.
-- **Numbers, times, dates, money and names are flagged.** They are highlighted
-  in the translation and one tap sends just those values back for verbal
-  read-back. `3시` heard as `13시` is the error that actually costs someone
-  their appointment.
-- **A failed translation says so.** There is no local fallback that fakes one.
-  A counter is exactly the wrong place to show something that is not a
-  translation as though it were.
-
-Open-weight models by default (`LLM_COUNTER_PREFER_OPEN=true`) — Groq's
-`gpt-oss-120b`, OpenRouter's Llama. The counter's workload is ~2,400 tokens per
-minute against Groq's 6,000 TPM free tier, so unlike the live console it fits
-in a free tier comfortably, and Groq does not train on inputs on either tier.
-
-24 languages offered; the interface itself is translated into 17 and falls back
-to English rather than Korean beyond that. `/diagnostics` lists exactly which
-language gets what. Full design note: [docs/counter-mode.md](docs/counter-mode.md).
-
-Sessions live in one process's memory, expire after four hours idle, and are
-deleted outright when the staff member ends them. Nothing is written to disk.
-
----
-
-## Commands
+기본값은 다음과 같습니다.
 
 ```bash
-npm run dev        # development server
-npm run build      # production build
-npm start          # serve the production build
-npm run lint       # eslint
-npm run typecheck  # tsc --noEmit
-npm test           # vitest
-npm run verify     # everything CI's fast job runs, in one command
-npm run icons      # regenerate PWA icons
-npm run shot       # device screenshots, for the design pass
-npm run e2e        # end-to-end flow check against a running server
+BIBLE_PROVIDER=reference-only
+```
 
-npm run health:openrouter  # prove the gateway works: key, model, policy, schema
-npm run measure:prompt     # size of every live system prompt
+이 모드에서는 성경 구절의 **참조(reference)** 만 정규화하고 표시합니다. NIV, ESV, NLT, NASB, NKJV 등 저작권이 있는 번역본 본문을 라이선스 없이 번들하거나 임의로 생성하지 않습니다.
 
-npm run smoke:llm  # one fixture per configured provider; skips cleanly
-npm run bench:llm  # 34-case interpretation benchmark, JSON + Markdown reports
-                   # (or run it in CI, with no key on your machine — see below)
-npm run bench:live # replay real transcript timing, measure latency
-npm run soak       # 45-minute session: bounded memory, context, no backlog
+사용 가능한 모드:
+
+```text
+reference-only  참조만 표시
+public-domain   공개 도메인 번역 사용
+api-bible       사용자가 권리를 가진 API/번역본 연결
 ```
 
 ---
 
-## Benchmarking without handing anyone a key
+## 기술 스택
 
-Benchmarking needs a real credential, and the obvious ways to supply one are
-all bad: pasting it into a chat, putting it on someone else's machine, or
-committing it.
-
-So the benchmark also runs as an on-demand GitHub Action, with the key read
-from repository secrets. It never leaves GitHub.
-
-1. **Settings → Secrets and variables → Actions → New repository secret.**
-   Add whichever you have: `GEMINI_API_KEY`, `GROQ_API_KEY`,
-   `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`.
-2. **Actions → Benchmark → Run workflow.** Optionally override the Gemini
-   model, and list any providers you are billed for so free-tier ceilings are
-   not applied to them.
-3. Read the result in the run summary; the JSON and Markdown reports are
-   attached as an artifact for 90 days.
-
-It never runs on a schedule or on push — real API calls cost real money, so a
-person decides each time. Providers with no secret are skipped and the report
-says which, rather than quietly reporting on fewer models than you expected.
+- **Next.js 16** App Router
+- **React 19**
+- **TypeScript 6**
+- **Tailwind CSS 4**
+- **Zod**
+- **Vitest + Testing Library**
+- **Playwright** 기반 E2E 도구
+- **Vercel** 배포 대응
+- 선택적 **Upstash Redis / Vercel KV REST** 공유 저장소
+- STT: Demo / Web Speech / Deepgram / OpenAI Realtime + Counter용 선택적 Hugging Face fallback
+- LLM routing: Local / Gemini / Groq / OpenRouter / OpenAI / Anthropic
 
 ---
 
-## Architecture
+## 개발 명령어
 
-```
-audio → SpeechProvider → stabiliser → local detection → rolling context
-      → /api/interpret → Zod validation → chunk store (temporal locking) → console
+```bash
+npm run dev
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
 
-Three vendor-neutral ports — **STT**, **LLM**, **Bible** — so switching
-provider is an environment variable, not a rewrite. The interpretation engine
-is a plain state machine outside React: it has to keep running while the UI is
-frozen, and it has to be testable without rendering anything.
+추가 검증/운영 도구:
 
-Scripture normalisation, glossary matching and cultural detection all run
-**locally**, which is why they survive demo mode and an LLM outage.
+```bash
+npm run e2e
+npm run bench:llm
+npm run bench:live
+npm run smoke:llm
+npm run health:openrouter
+npm run soak -- --minutes 5
+```
 
-- [`docs/architecture.md`](docs/architecture.md) — stack decision, the STT
-  provider comparison, transport, project structure
-- [`docs/interpreter-engine.md`](docs/interpreter-engine.md) — timing, temporal
-  locking, anticipation gating, context compression
-- [`docs/privacy.md`](docs/privacy.md) — what leaves the device, and what
-  cannot be promised
-- [`docs/cost.md`](docs/cost.md) — per-session and monthly estimates
-- [`docs/llm-benchmark.md`](docs/llm-benchmark.md) — provider comparison,
-  measured workload, and what was **not** measured
-- [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md) — the
-  zero-cost setup and its tradeoffs
-- [`docs/repository-audit.md`](docs/repository-audit.md) — what was here before
+`npm run verify`는 lint, typecheck, tests, build와 추가 smoke/soak 검증까지 묶은 강한 검증 경로입니다. 일부 외부 공급자 관련 검증은 환경 변수나 네트워크 구성이 필요할 수 있습니다.
 
 ---
 
-## Deployment
+## 문서
 
-Vercel-ready. `npm run build` produces a standard Next.js output; set the
-environment variables in project settings. Nothing about local development or
-the MVP requires deployment.
+| 문서 | 내용 |
+| --- | --- |
+| [`docs/architecture.md`](docs/architecture.md) | 전체 아키텍처 |
+| [`docs/interpreter-engine.md`](docs/interpreter-engine.md) | 라이브 통역 엔진 |
+| [`docs/sermon-booth.md`](docs/sermon-booth.md) | 설교 통역/부스 운영 |
+| [`docs/counter-mode.md`](docs/counter-mode.md) | Counter Mode 설계 |
+| [`docs/counter-storage.md`](docs/counter-storage.md) | Counter 공유 저장소 |
+| [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md) | 무료 티어 운영 |
+| [`docs/hugging-face-stt-strategy.md`](docs/hugging-face-stt-strategy.md) | HF STT fallback |
+| [`docs/privacy.md`](docs/privacy.md) | 개인정보 및 공급자 데이터 흐름 |
+| [`docs/cost.md`](docs/cost.md) | 비용 모델 |
+| [`docs/llm-benchmark.md`](docs/llm-benchmark.md) | LLM 벤치마크 |
+| [`docs/learning-vault.md`](docs/learning-vault.md) | 비식별 학습 후보 저장 전략 |
+| [`docs/rescue-mode.md`](docs/rescue-mode.md) | 장애/복구 모드 |
 
----
-
-## Limitations
-
-Stated plainly, because a tool used live should not surprise you.
-
-- **Latency and interpreter usefulness are not yet measured.** The evaluation
-  fixtures assert semantic properties and guard against hallucination, but
-  end-to-end latency against a live model, and whether a working interpreter
-  finds it genuinely helpful, need a real session. This is the biggest gap.
-- **No real interpreter has used it in a live service.** Every design decision
-  here is reasoned from the constraints of the task; none is yet validated by
-  someone doing the job.
-- **iOS Safari limits background audio.** Recognition will not continue with
-  the screen locked or the app backgrounded. Wake lock is held where supported.
-- **Web Speech mode stops on silence** and restarts automatically; a long
-  pause can drop a phrase. Cloud providers do not have this problem.
-- **Deepgram temporary keys need `DEEPGRAM_PROJECT_ID`.** Without it the route
-  passes the configured key through, marked `ephemeral: false` — see
-  [privacy](docs/privacy.md).
-- **Document ingestion (PDF/DOCX/PPTX) is not implemented.** Paste an outline
-  instead; nothing in the live path should wait on a parser.
-- **Mixer and remote audio input are not implemented,** though the capture
-  layer takes a `MediaStream` so they drop in without changes.
-- **Romanisation does not implement inter-syllable liaison** (종로 → Jongno).
-  Personal names are correct; place names are an approximation you can
-  overwrite.
-- **Prompt caching is requested but unverified.** The system prompt is constant
-  per session and byte-identical across modes, which is what a provider cache
-  needs, and usage accounting asks for `cached_tokens` back. Whether a given
-  upstream actually serves it from cache has not been measured against a real
-  key.
-- **The live model default has not been verified against the live catalogue.**
-  `google/gemma-4-26b-a4b-it:free` is the current Vercel deployment setting, but
-  network policy in the build environment blocked `openrouter.ai`, so the slug
-  was never confirmed to exist. That is exactly what `npm run health:openrouter`
-  is for — run it before trusting the deployment.
-- **OpenRouter integration is tested against mocks, not a live key.** Request
-  construction, routing policy, capability negotiation and strict-routing
-  failure are unit-tested; no credentialed end-to-end run has happened.
-- **Counter Mode sessions do not survive a restart or span instances.** They
-  are held in one process's memory. That is correct for a venue running this as
-  a single Node process, and wrong for a multi-instance or serverless
-  deployment, where a poll may reach a worker that has never seen the session.
-  `/diagnostics` states this; swapping `CounterStore` for a shared
-  implementation is the fix.
-- **Counter Mode voice input depends on the browser.** Several of the languages
-  that turn up most often at a Korean desk — Uzbek, Mongolian, Khmer, Burmese —
-  have no reliable browser speech recognition, so those visitors type. Typing is
-  always available and never a degraded path.
+프로젝트가 `tong-yuck`에서 ASAD로 브랜딩을 전환하는 과정에서 일부 내부 문서나 패키지 메타데이터에는 이전 코드명이 남아 있을 수 있습니다. 기능 설명은 실제 코드와 `/diagnostics`를 최종 기준으로 확인하세요.
 
 ---
 
-## Roadmap
+## 알려진 한계
 
-**Next** — measure latency and interpretation quality against a live model
-using the evaluation fixtures, then put it in front of a working interpreter.
-Everything below is speculation until that happens.
+- 브라우저 SpeechRecognition은 운영체제, 브라우저, 언어별 편차가 큽니다.
+- 무료 LLM/STT 티어는 호출량, 지연 시간, 데이터 정책이 언제든 바뀔 수 있습니다.
+- AI 번역은 날짜, 시간, 금액, 이름, 법률/의료/행정적 의미를 항상 정확하게 보장하지 않습니다.
+- Live는 **사람 통역사를 보조**하기 위한 도구이지 무감독 자동통역을 안전하다고 선언하는 시스템이 아닙니다.
+- Counter Mode에서도 중요한 결정은 양쪽 사용자가 원문과 번역을 함께 확인하는 것을 전제로 합니다.
+- 서버리스 Counter 배포에서 공유 Redis 없이 안정적인 다기기 세션을 기대하면 안 됩니다.
 
-Then: prompt caching · a per-session budget ceiling · document ingestion ·
-mixer and WebRTC audio input · multi-speaker handling · glossary sharing across
-a team · languages beyond Korean→English (the engine is already domain- and
-language-agnostic; the lexicons and Scripture table are the language-specific
-parts).
+---
+
+## 기여
+
+이 저장소는 빠르게 변경되고 있습니다. 변경 전 관련 문서와 테스트를 확인하고, 최소한 아래 검증을 통과시키는 것을 권장합니다.
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+아키텍처나 프라이버시 경계를 바꾸는 PR은 동작만 맞는 것으로 끝내지 말고 관련 `docs/`도 함께 업데이트해 주세요.
 
 ---
 
 ## License
 
-Released under the [MIT License](LICENSE). You may use, modify, distribute, sublicense, and sell the software, provided that you retain the copyright notice and license text. It is provided without warranty.
+MIT License. 자세한 내용은 [`LICENSE`](LICENSE)를 참고하세요.
