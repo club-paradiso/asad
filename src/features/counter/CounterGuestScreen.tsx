@@ -175,6 +175,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
         lang={lang}
         strings={t}
         busy={session.sending}
+        counterCode={code}
         onSend={(text, source) => void session.send({ text, source })}
       />
     </div>

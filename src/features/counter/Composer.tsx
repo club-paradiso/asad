@@ -23,20 +23,24 @@ export function Composer({
   onSend,
   disabled = false,
   busy = false,
+  counterCode,
 }: {
   lang: string;
   strings: CounterStrings;
   onSend: (text: string, source: "voice" | "text") => void;
   disabled?: boolean;
   busy?: boolean;
+  /** Used only by the server to enforce the session's sensitive-data policy. */
+  counterCode?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [draftSource, setDraftSource] = useState<DraftSource>("text");
   const [recoverableText, setRecoverableText] = useState<string | null>(null);
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const draftRef = useRef("");
   const composing = useRef(false);
-  const voice = useVoiceInput(lang);
+  const voice = useVoiceInput(lang, counterCode);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
@@ -48,7 +52,11 @@ export function Composer({
     // next turn be typed immediately while translation is still running, but a
     // dropped request never destroys the only copy of what the person entered.
     const source = draftSource;
-    setRecoverableText(text);
+    // When speech finished over a typed draft, startVoice already preserved
+    // that earlier text. Sending the reviewed transcript must not replace it
+    // with the transcript itself; the operator may restore and send both turns.
+    setRecoverableText((previous) => previous ?? text);
+    draftRef.current = "";
     setDraft("");
     setDraftSource("text");
     setPendingVoice(null);
@@ -58,6 +66,7 @@ export function Composer({
 
   const restoreTypedTurn = useCallback(() => {
     if (!recoverableText) return;
+    draftRef.current = recoverableText;
     setDraft(recoverableText);
     setDraftSource("text");
     setPendingVoice(null);
@@ -77,7 +86,13 @@ export function Composer({
       const spoken = text.trim();
       if (!spoken) return;
 
+      const typedDraft = draftRef.current;
+      const typedWhileListening = typedDraft.trim();
+      if (typedWhileListening) {
+        setRecoverableText((previous) => previous ?? typedDraft);
+      }
       const risks = detectRisks(spoken);
+      draftRef.current = spoken;
       setDraft(spoken);
       setDraftSource("voice");
       setPendingVoice(risks.length > 0 ? { text: spoken, risks } : null);
@@ -225,6 +240,7 @@ export function Composer({
             value={draft}
             onChange={(event) => {
               const value = event.target.value;
+              draftRef.current = value;
               setDraft(value);
               if (!value.trim()) {
                 setDraftSource("text");

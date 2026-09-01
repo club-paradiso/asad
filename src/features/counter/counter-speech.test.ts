@@ -38,7 +38,10 @@ function harness(options?: {
   cloud?: boolean;
   browser?: boolean;
   cloudFailure?: Error;
+  browserFailure?: Error;
   microphoneFailure?: Error;
+  hfText?: string;
+  hf?: boolean;
 }) {
   const providers: FakeProvider[] = [];
   const phases: CounterVoicePhase[] = [];
@@ -55,7 +58,11 @@ function harness(options?: {
       createOptions.push(providerOptions);
       const provider = new FakeProvider(
         providerOptions,
-        providerOptions.provider === "deepgram" ? options?.cloudFailure : undefined,
+        providerOptions.provider === "deepgram"
+          ? options?.cloudFailure
+          : providerOptions.provider === "webspeech"
+            ? options?.browserFailure
+            : undefined,
       );
       providers.push(provider);
       return provider;
@@ -63,12 +70,16 @@ function harness(options?: {
     createMicrophone: ({ onFrame }) => ({
       async start() {
         if (options?.microphoneFailure) throw options.microphoneFailure;
-        onFrame(new ArrayBuffer(4));
+        const frame = new ArrayBuffer(4);
+        new DataView(frame).setInt16(0, 1000, true);
+        onFrame(frame);
       },
       async stop() { microphoneStops += 1; },
     }),
     browserSpeechSupported: () => options?.browser ?? true,
     cloudAudioSupported: () => true,
+    hfFallbackSupported: () => options?.hf ?? !!options?.cloud,
+    transcribeHf: vi.fn(async () => options?.hfText ?? ""),
     connectTimeoutMs: 50,
     stableDelayMs: 0,
   };
@@ -118,6 +129,31 @@ describe("CounterSpeechController", () => {
     await expect(run.controller.listen()).resolves.toEqual({ text: "", failure: "unavailable", usedFallback: false });
     expect(run.providers).toHaveLength(0);
     expect(run.phases.at(-1)).toBe("unavailable");
+  });
+
+  it("uses the bounded batch fallback when browser speech is unavailable", async () => {
+    const run = harness({ cloud: false, browser: false, hf: true, hfText: "여권을 보여 주세요" });
+    const resultPromise = run.controller.listen();
+    await vi.waitFor(() => expect(run.phases).toContain("listening"));
+    run.controller.stop();
+    await expect(resultPromise).resolves.toEqual({
+      text: "여권을 보여 주세요",
+      usedFallback: false,
+    });
+  });
+
+  it("uses HF only after configured cloud and browser speech both fail", async () => {
+    const run = harness({
+      cloud: true,
+      browser: true,
+      hf: true,
+      cloudFailure: new Error("offline"),
+      browserFailure: new Error("speech service unavailable"),
+      hfText: "안녕하세요",
+    });
+    await expect(run.controller.listen()).resolves.toEqual({ text: "안녕하세요", usedFallback: true });
+    expect(run.providers.map((provider) => provider.id)).toEqual(["deepgram", "webspeech"]);
+    expect(run.fallbackCount).toBe(2);
   });
 
   it("does not repeat a denied microphone request through another provider", async () => {

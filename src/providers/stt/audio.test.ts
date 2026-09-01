@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { captureAudioConstraints, observeAudioInputEnd } from "./audio";
+import {
+  captureAudioConstraints,
+  observeAudioInputEnd,
+  pcm16ToWav,
+  Pcm16UtteranceBuffer,
+} from "./audio";
 
 describe("captureAudioConstraints", () => {
   it("requires an explicitly selected booth device exactly", () => {
@@ -44,5 +49,26 @@ describe("observeAudioInputEnd", () => {
     track.dispatchEvent(new Event("ended"));
 
     expect(onEnded).not.toHaveBeenCalled();
+  });
+});
+
+describe("Counter batch WAV encoding", () => {
+  it("writes a canonical 16 kHz mono PCM WAV header", () => {
+    const pcm = new Uint8Array([0, 0, 255, 127]).buffer;
+    const wav = new DataView(pcm16ToWav(pcm));
+    expect(new TextDecoder().decode(new Uint8Array(wav.buffer, 0, 4))).toBe("RIFF");
+    expect(new TextDecoder().decode(new Uint8Array(wav.buffer, 8, 4))).toBe("WAVE");
+    expect(wav.getUint16(22, true)).toBe(1);
+    expect(wav.getUint32(24, true)).toBe(16000);
+    expect(wav.getUint16(34, true)).toBe(16);
+    expect(wav.getUint32(40, true)).toBe(4);
+  });
+
+  it("keeps the utterance buffer bounded and disposable", () => {
+    const buffer = new Pcm16UtteranceBuffer();
+    expect(buffer.append(new Uint8Array([1, 2]).buffer)).toBe(true);
+    expect(new Uint8Array(buffer.toArrayBuffer())).toEqual(new Uint8Array([1, 2]));
+    buffer.clear();
+    expect(buffer.byteLength).toBe(0);
   });
 });

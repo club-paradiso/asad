@@ -47,7 +47,7 @@ describe("Counter Composer", () => {
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByText(/“9월 7일” 맞나요/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "직접 수정" }));
-
+    expect(onSend).not.toHaveBeenCalled();
     const input = screen.getByPlaceholderText("내용을 입력하세요") as HTMLInputElement;
     expect(input.value).toBe("체류기간은 9월 7일까지예요");
     fireEvent.submit(input.closest("form")!);
@@ -104,6 +104,21 @@ describe("Counter Composer", () => {
     fireEvent.submit(form);
     expect(onSend).toHaveBeenCalledTimes(2);
     expect(onSend).toHaveBeenLastCalledWith("체류카드도 보여 주세요", "text");
+  });
+
+  it("keeps text typed during speech available after the reviewed voice draft sends", async () => {
+    const onSend = vi.fn();
+    let resolveVoice!: (text: string) => void;
+    voice.start.mockReturnValue(new Promise((resolve) => { resolveVoice = resolve; }));
+    render(<Composer lang="en-US" strings={stringsFor("en-US")} onSend={onSend} />);
+    fireEvent.click(screen.getByRole("button", { name: "Speak" }));
+    const input = screen.getByPlaceholderText("Type your message") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "typed while listening" } });
+    await act(async () => { resolveVoice("My passport expires soon"); });
+    fireEvent.submit(input.closest("form")!);
+    expect(onSend).toHaveBeenCalledWith("My passport expires soon", "voice");
+    fireEvent.click(screen.getByRole("button", { name: "Restore previous text" }));
+    expect(input.value).toBe("typed while listening");
   });
 
   it("does not submit while a Korean IME composition is being committed", () => {

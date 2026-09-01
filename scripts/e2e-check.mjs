@@ -307,8 +307,8 @@ check(
 );
 
 await guest.waitForTimeout(850);
-const editVoice = guest.getByRole("button", { name: "Edit transcript" });
-await editVoice.waitFor({ state: "visible", timeout: 2500 });
+const confirmVoice = guest.getByRole("button", { name: "Edit transcript" });
+await confirmVoice.waitFor({ state: "visible", timeout: 2500 });
 check(
   "critical voice transcript waits for human review",
   queuedRequests.length === 0 && (await editVoice.isVisible()),
@@ -323,14 +323,20 @@ const guestSend = guest.getByRole("button", { name: "Send" });
 await guestSend.click();
 await guest.waitForTimeout(50);
 check(
-  "reviewed speech submits after the utterance ends",
-  queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
+  "voice transcript remains a draft for correction",
+  queuedRequests.length === 0 && (await guestInput.inputValue()).length > 0,
 );
 
-await guestInput.fill("typed while listening");
-check("Send stays enabled while translation is pending", await guestSend.isEnabled());
+const guestSend = guest.getByRole("button", { name: "Send" });
 await guestSend.click();
 check("typed draft clears immediately when queued", (await guestInput.inputValue()) === "");
+check(
+  "edited speech submits only after the operator sends it",
+  queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
+);
+await guest.getByRole("button", { name: "Restore previous text" }).click();
+check("Send stays enabled while translation is pending", await guestSend.isEnabled());
+await guestSend.click();
 await guest.waitForTimeout(1600);
 check(
   "voice and typed turns can overlap without losing either request",

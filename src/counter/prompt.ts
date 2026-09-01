@@ -146,7 +146,7 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
 
   if (input.inputMode === "voice") {
     lines.push(
-      "SOURCE IS SPEECH-TO-TEXT: Silently fix only obvious spacing, punctuation, and token-boundary artifacts, including obvious segmentation errors. You may repair an ordinary word only when grammar plus recent context make the intended reading clear. Do not guess uncertain names, numbers, dates, document names, visa/status codes, addresses, phone numbers, or identifiers. When uncertain, preserve the source and lower confidence.",
+      "SOURCE IS SPEECH-TO-TEXT: Silently fix only obvious spacing, punctuation, and token-boundary artifacts, including obvious segmentation errors. You may repair an ordinary word only when grammar plus recent context make the intended reading clear. Never silently repair uncertain names, numbers, dates, document names, visa/status codes, addresses, phone numbers, or identifiers. Do not guess them; when uncertain, preserve the source and lower confidence.",
     );
     const voiceGuidance = sourceVoiceGuidance(input.sourceLang);
     if (voiceGuidance) lines.push(voiceGuidance);

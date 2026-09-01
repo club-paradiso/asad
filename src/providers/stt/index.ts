@@ -13,7 +13,8 @@ import { guardedFetch } from "@/lib/session-client";
 import type { SpeechProvider, SttCredentials, SttProviderId, SttProviderOptions } from "./types";
 
 export * from "./types";
-export { MicrophoneCapture } from "./audio";
+export { MicrophoneCapture, Pcm16UtteranceBuffer } from "./audio";
+export { transcribeWithHuggingFace } from "./hf";
 export { DemoSpeechProvider, derivePartials } from "./demo";
 export { WebSpeechProvider } from "./webspeech";
 

@@ -85,6 +85,12 @@ export async function GET() {
       ephemeralKeysAvailable:
         env.stt.provider === "deepgram" ? !!env.stt.deepgramProjectId : null,
       model: env.stt.provider === "deepgram" ? env.stt.deepgramModel : env.stt.openaiModel,
+      hfBatchFallback: {
+        configured: !!env.stt.hfToken,
+        model: env.stt.hfModel,
+        // The token is never serialised; this indicates configuration only.
+        policy: "general-counter-only",
+      },
     },
 
     llm: {
