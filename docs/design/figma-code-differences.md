@@ -3,7 +3,7 @@
 **File:** 아무튼서로알아들었으면된거아닌가요 — Product Design
 **Key:** `5iaJxvMbID1e6vvKTMMPDR`
 **URL:** https://www.figma.com/design/5iaJxvMbID1e6vvKTMMPDR
-**Synced:** 2026-08-29, from `claude/platform-ux-design-system-ine77g`
+**Synced:** 2026-09-01, from `main` / Vercel production
 
 Everywhere the file and the repository disagree, and why. Read this before
 trusting a value read off a Figma layer.
@@ -38,7 +38,7 @@ against a design file.
 Figma uses IBM Plex Mono. Production uses `ui-monospace` — the system mono
 (SF Mono, Menlo, Consolas). Chosen to avoid shipping a fourth font file for
 labels and timecodes. Figma's captions are therefore slightly narrower than
-production's on macOS and slightly wider on Windows.
+production's on macOS and slightly wider than production's on Windows.
 
 ### 3. Two colour modes vs. one CSS attribute
 Figma models the surfaces as two **modes** on the Colour collection (Paper,
