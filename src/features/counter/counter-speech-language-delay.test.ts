@@ -27,6 +27,8 @@ describe("Counter language-aware utterance timing", () => {
       createMicrophone: () => ({ async start() {}, async stop() {} }),
       browserSpeechSupported: () => true,
       cloudAudioSupported: () => false,
+      hfFallbackSupported: () => false,
+      transcribeHf: async () => "",
       connectTimeoutMs: 100,
       stableDelayMs: 1400,
     };
