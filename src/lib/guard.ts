@@ -16,7 +16,9 @@
  *      determined attacker with curl, and is not claimed to.
  *   3. **Body size** — bounds what one accepted request can cost in tokens.
  *   4. **Rate limit** — per session first, then per source address, bounding
- *      what an accepted client can spend over time.
+ *      what an accepted client can spend over time. The in-process limiter is
+ *      always enforced; when the deployment already has Upstash/Vercel KV,
+ *      the same checks are also enforced globally across serverless instances.
  *
  * What this is NOT: an identity system. There are no users, no accounts and no
  * sessions that outlive a browser tab, because none of those would make the
@@ -25,8 +27,10 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { resolveCounterRedisConfig } from "@/counter/store";
 import { appEnv } from "./env";
 import { RequestRateLimiter, type RateLimitRule } from "./rate-limit";
+import { checkSharedRateLimits, type SharedRateLimitCheck } from "./shared-rate-limit";
 
 /* -------------------------------------------------------------------------- */
 /* Session tokens                                                              */
@@ -39,33 +43,30 @@ export const ACCESS_COOKIE = "tong-yuck-access";
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
 /**
- * Signing secret, and what its absence costs.
+ * Stable signing material shared by every serverless instance.
  *
- * Derived from `SESSION_SECRET` (or `APP_ACCESS_KEY`, which doubles as one)
- * when either is set. Otherwise it is random per process.
+ * Explicit configuration wins. When no SESSION_SECRET / APP_ACCESS_KEY is set,
+ * an already-configured Upstash/Vercel KV REST token is safe to use as keying
+ * material after domain-separated derivation. The token itself is never placed
+ * in a cookie, response, Redis key or diagnostic payload.
  *
- * THAT DISTINCTION IS LOAD-BEARING ON SERVERLESS. A per-process secret is fine
- * on a single server. On Vercel — the deployment target this project
- * documents — requests are spread across instances, so a token minted by one
- * instance fails verification on the next. Enforcing sessions under those
- * conditions does not make the deployment stricter; it breaks it, continuously
- * and invisibly, with the console re-minting a token that the following
- * request rejects again.
- *
- * So enforcement is conditional. With a stable secret, a valid session is
- * REQUIRED on the paid routes. Without one, sessions are still issued and
- * still used to key rate limits per browser — which is strictly better than
- * keying on an address shared by everyone behind one NAT — but a verification
- * failure does not refuse the request. Same-origin and per-address limits
- * still apply, and `/diagnostics` says which mode is in force rather than
- * letting a deployer assume the stronger one.
+ * This matters on Vercel: a random per-process signing key means a session
+ * minted by instance A cannot be verified by instance B. Reusing the existing
+ * shared infrastructure secret gives every instance the same derived HMAC key
+ * without asking the deployer to maintain a redundant second secret.
  */
+function stableSessionSeed(): string | null {
+  const explicit = appEnv().access.sessionSecret?.trim();
+  if (explicit) return explicit;
+  return resolveCounterRedisConfig()?.token ?? null;
+}
+
 let signingSecret: Buffer | null = null;
 function secret(): Buffer {
   if (signingSecret) return signingSecret;
-  const configured = appEnv().access.sessionSecret;
-  signingSecret = configured
-    ? createHmac("sha256", "tong-yuck/session").update(configured).digest()
+  const stable = stableSessionSeed();
+  signingSecret = stable
+    ? createHmac("sha256", "asad/session-signing/v1").update(stable).digest()
     : randomBytes(32);
   return signingSecret;
 }
@@ -78,7 +79,7 @@ export type SessionEnforcement =
 
 /** Whether session tokens can be trusted across instances. */
 export const sessionEnforcement = (): SessionEnforcement =>
-  appEnv().access.sessionSecret ? "enforced" : "best-effort";
+  stableSessionSeed() ? "enforced" : "best-effort";
 
 const sign = (payload: string): string =>
   createHmac("sha256", secret()).update(payload).digest("base64url");
@@ -377,6 +378,11 @@ export async function guardInferenceRoute(
   }
 
   const address = clientAddress(request);
+  const sharedChecks: SharedRateLimitCheck[] = [];
+
+  // Keep the process-local limiter even when Redis exists. It is the latency-
+  // free first line and, more importantly, it means a Redis outage cannot turn
+  // "global protection unavailable" into "no protection at all".
   for (const limit of options.limits) {
     const key = limit.by === "session" ? (session ?? `addr:${address}`) : address;
     const verdict = limiterFor(limit.rule).check(`${limit.rule}:${key}`);
@@ -386,6 +392,27 @@ export async function guardInferenceRoute(
         "x-ratelimit-limit": String(verdict.limit),
         "x-ratelimit-remaining": "0",
       });
+    }
+    sharedChecks.push({
+      name: limit.rule,
+      key,
+      rule: RATE_RULES[limit.rule],
+    });
+  }
+
+  // One Redis round-trip covers every rule on this route. When shared storage
+  // is not configured (or briefly unavailable), null means the already-passed
+  // local checks remain the enforcement floor.
+  const sharedVerdicts = await checkSharedRateLimits(sharedChecks);
+  if (sharedVerdicts) {
+    for (const verdict of sharedVerdicts) {
+      if (!verdict.allowed) {
+        return deny(429, "Too many requests. Slow down and try again shortly.", {
+          "retry-after": String(verdict.retryAfterSeconds),
+          "x-ratelimit-limit": String(verdict.limit),
+          "x-ratelimit-remaining": "0",
+        });
+      }
     }
   }
 

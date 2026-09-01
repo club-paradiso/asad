@@ -8,7 +8,6 @@ describe("Counter safe preferences", () => {
       configured: false,
       hostLang: "ko-KR",
       deskLabel: "",
-      profileId: "general",
     });
   });
 
@@ -17,7 +16,6 @@ describe("Counter safe preferences", () => {
       configured: true,
       hostLang: "ko-KR",
       deskLabel: "접수 창구 2",
-      profileId: "immigration",
     });
     expect(Object.keys(window.localStorage)).toEqual([COUNTER_PREFERENCES_STORAGE_KEY]);
     const stored = window.localStorage.getItem(COUNTER_PREFERENCES_STORAGE_KEY) ?? "";
@@ -25,7 +23,6 @@ describe("Counter safe preferences", () => {
       configured: true,
       hostLang: "ko-KR",
       deskLabel: "접수 창구 2",
-      profileId: "immigration",
     });
     expect(stored).not.toMatch(/transcript|translation|messages|audio|room|code|visitor/i);
   });
@@ -35,7 +32,6 @@ describe("Counter safe preferences", () => {
       configured: true,
       hostLang: "en-US",
       deskLabel: "x".repeat(100),
-      profileId: "hotel",
     });
     const stored = JSON.parse(window.localStorage.getItem(COUNTER_PREFERENCES_STORAGE_KEY) ?? "{}") as { deskLabel?: string };
     expect(stored.deskLabel).toHaveLength(60);

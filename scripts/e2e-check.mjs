@@ -310,10 +310,17 @@ await guest.waitForTimeout(850);
 const confirmVoice = guest.getByRole("button", { name: "Edit transcript" });
 await confirmVoice.waitFor({ state: "visible", timeout: 2500 });
 check(
-  "critical voice transcript waits for confirmation",
-  queuedRequests.length === 0 && (await confirmVoice.isVisible()),
+  "critical voice transcript waits for human review",
+  queuedRequests.length === 0 && (await editVoice.isVisible()),
 );
-await confirmVoice.click();
+await editVoice.click();
+check(
+  "recognized speech remains editable before sending",
+  (await guestInput.inputValue()) === "My visa number is 123456",
+);
+
+const guestSend = guest.getByRole("button", { name: "Send" });
+await guestSend.click();
 await guest.waitForTimeout(50);
 check(
   "voice transcript remains a draft for correction",

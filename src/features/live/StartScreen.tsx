@@ -675,28 +675,41 @@ export function readinessRows(input: {
           }
         : { label: "AI", value: config.llm.configured, level: "ready" };
 
+  const disclosure = config?.llm.freeTierDisclosure ?? [];
+  const disclosureAcknowledged =
+    input.consent === "granted" || input.consent === "clear";
+
   const privacy: ReadinessRow = demo
     ? { label: "개인정보", value: "이 기기 밖으로 나가지 않습니다", level: "ready" }
     : !config || input.consent === "checking"
       ? { label: "개인정보", value: "확인 중…", level: "limited" }
-      : config.llm.freeTierDisclosure.length > 0 && input.consent !== "granted"
+      : disclosure.length > 0 && !disclosureAcknowledged
         ? {
             label: "개인정보",
             value: "시작 전에 확인이 필요합니다",
             level: "limited",
-            detail: `말한 내용이 ${config.llm.freeTierDisclosure
+            detail: `말한 내용이 ${disclosure
               .map((p) => p.label)
-              .join(
-                ", ",
-              )}(으)로 전송되고, 해당 업체가 제품 개선에 활용할 수 있습니다. 시작 전에 다시 한 번 확인을 받습니다.`,
+              .join(", ")}(으)로 전송되고, 해당 업체가 제품 개선에 활용할 수 있습니다. 시작 전에 다시 한 번 확인을 받습니다.`,
           }
-        : {
-            label: "개인정보",
-            value: config.llm.modelAvailable
-              ? "제공자가 이 세션으로 학습하지 않습니다"
-              : "이 기기 밖으로 나가지 않습니다",
-            level: "ready",
-          };
+        : disclosure.length > 0
+          ? {
+              label: "개인정보",
+              value: "외부 제공자 정책 확인됨",
+              level: "limited",
+              detail: `말한 내용이 ${disclosure
+                .map((p) => p.label)
+                .join(", ")}(으)로 전송됩니다. ${disclosure
+                .map((p) => p.note)
+                .join(" ")}`,
+            }
+          : {
+              label: "개인정보",
+              value: config.llm.modelAvailable
+                ? "제공자가 이 세션으로 학습하지 않습니다"
+                : "이 기기 밖으로 나가지 않습니다",
+              level: "ready",
+            };
 
   return [audio, recognition, interpretation, privacy];
 }

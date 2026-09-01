@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSpeechProvider } from "./webspeech";
 
-interface Alt { transcript: string }
+interface Alt { transcript: string; confidence?: number }
 interface ResultLike { isFinal: boolean; length: number; [index: number]: Alt }
 interface EventLike { resultIndex: number; results: { length: number; [index: number]: ResultLike } }
 
@@ -21,9 +21,11 @@ class Recognition {
   constructor() { Recognition.last = this; }
 }
 
-const result = (alternatives: string[], isFinal = true): ResultLike => {
+const result = (alternatives: Array<string | Alt>, isFinal = true): ResultLike => {
   const value = { isFinal, length: alternatives.length } as ResultLike;
-  alternatives.forEach((transcript, index) => { value[index] = { transcript }; });
+  alternatives.forEach((alternative, index) => {
+    value[index] = typeof alternative === "string" ? { transcript: alternative } : alternative;
+  });
   return value;
 };
 
@@ -59,6 +61,29 @@ describe("WebSpeech multilingual behavior", () => {
       results: { length: 1, 0: result(["wo yao yan chang qian zheng", "我要延长签证"]) },
     });
     expect(stable).toEqual(["我要延长签证"]);
+  });
+
+  it("uses browser confidence to choose a better Mandarin hypothesis", async () => {
+    const provider = new WebSpeechProvider({ language: "zh-CN", utterance: true });
+    const stable: string[] = [];
+    provider.onStable((text) => stable.push(text));
+
+    const connected = provider.connect();
+    const recognition = Recognition.last!;
+    recognition.onstart?.();
+    await connected;
+
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: {
+        length: 1,
+        0: result([
+          { transcript: "我要严常居留期间", confidence: 0.22 },
+          { transcript: "我要延长居留期间", confidence: 0.91 },
+        ]),
+      },
+    });
+    expect(stable).toEqual(["我要延长居留期间"]);
   });
 
   it("restarts an utterance recognizer when the browser auto-ends after speech began", async () => {

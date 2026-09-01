@@ -20,7 +20,14 @@ import { interpretRequestSchema, interpreterOutputSchema, parseInterpreterOutput
 import { buildLiveUserPrompt, systemPromptFor } from "@/interpreter/prompts/live";
 import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
 import { applyProfile, chooseProfile } from "@/interpreter/context/profiles";
-import { capabilitiesFor, deadlineFor, llmRouter, turnBudgetFor } from "@/providers/llm";
+import {
+  assessFreeTierViability,
+  capabilitiesFor,
+  deadlineFor,
+  llmRouter,
+  turnBudgetFor,
+  type LlmProviderId,
+} from "@/providers/llm";
 import { interpretLocally } from "@/providers/llm/mock";
 import { estimateTokens, telemetry } from "@/lib/telemetry";
 import { guardInferenceRoute } from "@/lib/guard";
@@ -39,6 +46,24 @@ export const dynamic = "force-dynamic";
  * validated.
  */
 const MAX_BODY_BYTES = 32 * 1024;
+
+/**
+ * Live Mode is a continuous workload, not a one-shot chat request. A provider
+ * that can answer one request but will hit its documented free-tier ceiling a
+ * few minutes into a 45-minute sermon is not the preferred live provider.
+ *
+ * Paid providers have no locally imposed free-tier ceiling. Providers without
+ * a documented free tier are also treated as paid-key workloads when a key is
+ * configured. The ordinary router chain remains the fallback if every
+ * sustainable candidate fails.
+ */
+function liveProviderCanSustain(id: LlmProviderId): boolean {
+  if (id === "local") return false;
+  const env = appEnv();
+  if (env.llm.paidTier.has(id)) return true;
+  const caps = capabilitiesFor(id);
+  return !caps.freeTierPossible || assessFreeTierViability(id).viable;
+}
 
 export async function POST(request: Request) {
   const receivedAt = Date.now();
@@ -62,6 +87,7 @@ export async function POST(request: Request) {
   }
   const input = parsed.data;
   const router = llmRouter();
+  const livePreference = (id: LlmProviderId) => liveProviderCanSustain(id);
 
   const localOutput = () =>
     interpretLocally({
@@ -70,7 +96,10 @@ export async function POST(request: Request) {
       allowAnticipation: input.allowAnticipation,
     });
 
-  const preferred = router.preferred();
+  // Prefer a provider whose documented capacity can carry the service. If none
+  // exists, preserve the old router order so the user still gets best-effort
+  // cloud output before the deterministic local floor.
+  const preferred = router.preferred(livePreference) ?? router.preferred();
 
   // No cloud candidate at all: answer locally without pretending otherwise.
   if (!preferred || preferred === "local") {
@@ -135,6 +164,10 @@ export async function POST(request: Request) {
         deadlineMs: deadlineFor({ workflow: "live", lag: input.lag, provider: preferred }),
         estimatedTokens: systemTokens + contextTokens + pendingTokens,
         validate: (response) => parseInterpreterOutput(response.text) !== null,
+        // This preference outranks a sticky provider that is healthy for one
+        // turn but cannot carry the full sermon. The rest of the normal chain
+        // remains available as fallback inside the router.
+        prefer: livePreference,
       },
     );
 

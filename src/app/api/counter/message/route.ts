@@ -15,6 +15,7 @@ import { resolveQuickPhrase } from "@/counter/quick-phrases";
 import { detectRisks } from "@/counter/risks";
 import { extractCriticalValues, validateTranslationIntegrity } from "@/counter/integrity";
 import { translateForCounter } from "@/counter/translate";
+import { detectCounterProfile } from "@/counter/profile-detection";
 import type { CounterMessage } from "@/counter/types";
 import { guardInferenceRoute } from "@/lib/guard";
 import { buildHumanReviewFlags } from "@/learning/review";
@@ -174,11 +175,35 @@ export async function POST(request: Request) {
 
   // Six turns is still compact enough for free-tier models, but gives short
   // multilingual replies enough context to resolve pronouns and omitted subjects.
-  const recent = session.messages.slice(-6).map((m) => ({
+  const recentMessages = session.messages.slice(-6);
+  const recent = recentMessages.map((m) => ({
     from: m.from,
     text: m.originalText,
     lang: m.originalLang,
   }));
+
+  const detectedProfileId = detectCounterProfile({
+    text,
+    deskLabel: session.deskLabel,
+    recent,
+    currentProfileId: session.profileId,
+  });
+  let effectiveProfileId = session.profileId;
+  if (detectedProfileId !== session.profileId) {
+    const updated = await store.update(code, (current) => {
+      // Never let an older concurrent request downgrade a session that has
+      // already entered a sensitive path.
+      current.profileId = detectCounterProfile({
+        text,
+        deskLabel: current.deskLabel,
+        recent: current.messages.slice(-6).map((message) => ({
+          text: message.originalText,
+        })),
+        currentProfileId: current.profileId,
+      });
+    });
+    effectiveProfileId = updated?.profileId ?? detectedProfileId;
+  }
 
   const result = await translateForCounter({
     text,
@@ -189,7 +214,7 @@ export async function POST(request: Request) {
     rephrase: !!rephraseOf,
     action,
     deskLabel: session.deskLabel,
-    profileId: session.profileId,
+    profileId: effectiveProfileId,
   });
 
   const base = {
@@ -249,7 +274,7 @@ export async function POST(request: Request) {
         modelTranslation: message.translatedText,
         sourceLang: message.originalLang,
         targetLang: message.targetLang,
-        profileId: session.profileId,
+        profileId: effectiveProfileId,
         confidence: message.confidence,
         integrity: message.integrity,
         reviewFlags: message.reviewFlags,

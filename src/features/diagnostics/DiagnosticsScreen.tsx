@@ -102,7 +102,13 @@ interface ProviderRow {
 
 interface Payload {
   generatedAt: string;
-  stt: { provider: string; keyConfigured: boolean; ephemeralKeysAvailable: boolean; model: string };
+  stt: {
+    provider: string;
+    credentialsRequired: boolean;
+    keyConfigured: boolean | null;
+    ephemeralKeysAvailable: boolean | null;
+    model: string;
+  };
   llm: {
     routingMode: string;
     privacyMode: string;
@@ -326,11 +332,11 @@ export function DiagnosticsScreen() {
           tone={data.llm.allowPaidFallback ? "warn" : "ok"}
         />
         <Row
-          k="Active provider"
+          k="Active live provider"
           v={data.llm.active ?? "local (no cloud provider)"}
           tone={data.llm.active && data.llm.active !== "local" ? "ok" : "warn"}
         />
-        <Row k="Fallback chain" v={<code className="text-xs">{data.llm.chain.join(" → ")}</code>} />
+        <Row k="Live fallback chain" v={<code className="text-xs">{data.llm.chain.join(" → ")}</code>} />
       </Section>
 
       {data.llm.warnings.length > 0 && (
@@ -592,11 +598,15 @@ export function DiagnosticsScreen() {
 
       <Section title="Speech to text">
         <Row k="Provider" v={<code>{data.stt.provider}</code>} />
-        <Row
-          k="Key configured"
-          v={data.stt.keyConfigured ? "yes" : "no"}
-          tone={data.stt.keyConfigured ? "ok" : "warn"}
-        />
+        {data.stt.credentialsRequired ? (
+          <Row
+            k="Key configured"
+            v={data.stt.keyConfigured ? "yes" : "no"}
+            tone={data.stt.keyConfigured ? "ok" : "warn"}
+          />
+        ) : (
+          <Row k="Credentials" v="not required" tone="ok" />
+        )}
         {data.stt.provider === "deepgram" && (
           <Row
             k="Short-lived browser keys"

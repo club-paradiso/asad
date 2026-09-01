@@ -38,11 +38,12 @@ describe("Counter Composer", () => {
     expect(screen.getByPlaceholderText("내용을 입력하세요")).toBeTruthy();
   });
 
-  it("confirms critical values before sending a spoken turn", async () => {
+  it("requires review before sending a risky spoken turn", async () => {
     const onSend = vi.fn();
     voice.start.mockResolvedValue("체류기간은 9월 7일까지예요");
     render(<Composer lang="ko-KR" strings={stringsFor("ko-KR")} onSend={onSend} />);
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "말하기" })); });
+
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByText(/“9월 7일” 맞나요/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "직접 수정" }));
