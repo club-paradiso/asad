@@ -276,8 +276,8 @@ export class OpenRouterLlmProvider implements LlmProvider {
       body,
       headers: {
         authorization: `Bearer ${this.config.apiKey}`,
-        "HTTP-Referer": this.config.referer ?? "https://github.com/lucanomics/tong-yuck",
-        "X-Title": this.config.title ?? "tong-yuck",
+        "HTTP-Referer": this.config.referer ?? "https://asad-what.vercel.app",
+        "X-Title": this.config.title ?? "ASAD",
       },
       // Belt and braces above the router's own deadline signal.
       timeoutMs: request.signal ? 30_000 : 10_000,
