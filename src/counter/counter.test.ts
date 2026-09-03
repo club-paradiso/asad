@@ -8,6 +8,8 @@ import { buildCounterPrompt } from "./prompt";
 import { parseCounterOutput } from "@/lib/schema";
 import type { CounterMessage } from "./types";
 
+const HOST_TOKEN_HASH = "test-host-token-hash";
+
 describe("room codes", () => {
   it("generates codes of the right shape", () => {
     for (let i = 0; i < 50; i += 1) {
@@ -59,7 +61,11 @@ describe("room codes", () => {
 describe("session store", () => {
   it("creates a waiting session and finds it by code", () => {
     const store = createMemoryStore();
-    const session = store.create({ hostLang: "ko-KR", deskLabel: "접수 2" });
+    const session = store.create({
+      hostLang: "ko-KR",
+      hostTokenHash: HOST_TOKEN_HASH,
+      deskLabel: "접수 2",
+    });
     expect(session.state).toBe("waiting");
     expect(session.guestLang).toBeNull();
     expect(store.get(session.code)?.deskLabel).toBe("접수 2");
@@ -68,7 +74,7 @@ describe("session store", () => {
   it("expires idle sessions", () => {
     let now = 0;
     const store = createMemoryStore(() => now);
-    const session = store.create({ hostLang: "ko-KR" });
+    const session = store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
     now += 4 * 60 * 60 * 1000 + 1;
     expect(store.get(session.code)).toBeUndefined();
   });
@@ -76,7 +82,7 @@ describe("session store", () => {
   it("keeps a session alive while it is being used", () => {
     let now = 0;
     const store = createMemoryStore(() => now);
-    const session = store.create({ hostLang: "ko-KR" });
+    const session = store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
     for (let i = 0; i < 5; i += 1) {
       now += 60 * 60 * 1000;
       expect(store.update(session.code, () => {})).toBeDefined();
@@ -86,7 +92,7 @@ describe("session store", () => {
 
   it("discards a session outright when it ends", () => {
     const store = createMemoryStore();
-    const session = store.create({ hostLang: "ko-KR" });
+    const session = store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
     expect(store.end(session.code)).toBe(true);
     // Nothing about a counter conversation should outlive it on the server.
     expect(store.get(session.code)).toBeUndefined();
@@ -94,7 +100,7 @@ describe("session store", () => {
 
   it("assigns monotonic sequence numbers", () => {
     const store = createMemoryStore();
-    const session = store.create({ hostLang: "ko-KR" });
+    const session = store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
     const seqs: number[] = [];
     store.update(session.code, (s) => {
       for (let i = 0; i < 4; i += 1) {
@@ -106,7 +112,7 @@ describe("session store", () => {
 
   it("bounds message history", () => {
     const store = createMemoryStore();
-    const session = store.create({ hostLang: "ko-KR" });
+    const session = store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
     store.update(session.code, (s) => {
       for (let i = 0; i < 600; i += 1) appendMessage(s, message({ id: `m${i}` }));
     });
@@ -115,7 +121,7 @@ describe("session store", () => {
 
   it("routes each direction to the other party's language", () => {
     const store = createMemoryStore();
-    const session = store.create({ hostLang: "ko-KR" });
+    const session = store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
     store.update(session.code, (s) => {
       s.guestLang = "vi-VN";
     });
@@ -128,8 +134,8 @@ describe("session store", () => {
 
   it("reports counts for diagnostics, never content", () => {
     const store = createMemoryStore();
-    const a = store.create({ hostLang: "ko-KR" });
-    store.create({ hostLang: "ko-KR" });
+    const a = store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
+    store.create({ hostLang: "ko-KR", hostTokenHash: HOST_TOKEN_HASH });
     store.update(a.code, (s) => {
       s.state = "active";
       appendMessage(s, message({ id: "m1" }));

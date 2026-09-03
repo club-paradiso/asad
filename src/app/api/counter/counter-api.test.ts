@@ -21,6 +21,7 @@ import { POST as SEND } from "./message/route";
 import { __setCounterStore, createMemoryStore } from "@/counter/store";
 import { SESSION_COOKIE, issueSessionToken } from "@/lib/guard";
 import type { SessionView } from "@/counter/types";
+import { COUNTER_TOKEN_HEADER } from "@/counter/access";
 
 /**
  * A browser that has loaded the application.
@@ -41,32 +42,77 @@ const post = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
-const patch = (body: unknown) =>
+const participants = new Map<string, { host: string; guest?: string }>();
+
+const patch = (body: { code: string; guestLang: string }) =>
   new Request("http://localhost/api/counter/session", {
     method: "PATCH",
+    headers: participants.get(body.code)?.guest
+      ? { [COUNTER_TOKEN_HEADER]: participants.get(body.code)!.guest! }
+      : undefined,
     body: JSON.stringify(body),
   });
 
-const send = (body: unknown) =>
+const send = (body: { code: string; from: "host" | "guest"; [key: string]: unknown }) =>
   new Request("http://localhost/api/counter/message", {
     method: "POST",
-    headers: authorised(),
-    body: JSON.stringify(body),
+    headers: {
+      ...authorised(),
+      [COUNTER_TOKEN_HEADER]: participants.get(body.code)?.[body.from] ?? "invalid",
+    },
+    body: JSON.stringify(
+      Object.fromEntries(Object.entries(body).filter(([key]) => key !== "from")),
+    ),
   });
 
 const get = (code: string, since = 0) =>
-  new Request(`http://localhost/api/counter/session?code=${code}&since=${since}`);
+  new Request(`http://localhost/api/counter/session?code=${code}&since=${since}`, {
+    headers: { [COUNTER_TOKEN_HEADER]: participants.get(code)?.host ?? "invalid" },
+  });
+
+const remove = (code: string) =>
+  new Request(`http://localhost/api/counter/session?code=${code}`, {
+    method: "DELETE",
+    headers: { [COUNTER_TOKEN_HEADER]: participants.get(code)?.host ?? "invalid" },
+  });
+
+async function createSession(
+  input: { hostLang: string; deskLabel?: string; profileId?: string } = { hostLang: "ko-KR" },
+) {
+  const response = await POST(post(input));
+  const body = (await response.clone().json()) as {
+    session?: SessionView;
+    participantToken?: string;
+  };
+  if (body.session && body.participantToken) {
+    participants.set(body.session.code, { host: body.participantToken });
+  }
+  return { response, ...body };
+}
+
+async function joinSession(code: string, guestLang: string) {
+  const response = await PATCH(patch({ code, guestLang }));
+  const body = (await response.clone().json()) as {
+    session?: SessionView;
+    participantToken?: string;
+  };
+  if (body.participantToken) {
+    const current = participants.get(code);
+    if (current) participants.set(code, { ...current, guest: body.participantToken });
+  }
+  return { response, ...body };
+}
 
 /** Create a session and have a guest join it. Returns the code. */
 async function openSession(guestLang = "en-US"): Promise<string> {
-  const created = await POST(post({ hostLang: "ko-KR" }));
-  const { session } = (await created.json()) as { session: SessionView };
-  await PATCH(patch({ code: session.code, guestLang }));
-  return session.code;
+  const created = await createSession();
+  await joinSession(created.session!.code, guestLang);
+  return created.session!.code;
 }
 
 beforeEach(() => {
   __setCounterStore(createMemoryStore());
+  participants.clear();
   translateForCounter.mockReset();
   translateForCounter.mockResolvedValue({
     ok: true,
@@ -83,12 +129,17 @@ describe("POST /api/counter/session", () => {
     );
     expect(response.status).toBe(201);
 
-    const { session } = (await response.json()) as { session: SessionView };
+    const { session, participantToken } = (await response.json()) as {
+      session: SessionView;
+      participantToken: string;
+    };
     expect(session.state).toBe("waiting");
     expect(session.guestLang).toBeNull();
     expect(session.guestPresent).toBe(false);
     expect(session.deskLabel).toBe("접수 창구 2");
     expect(session.profileId).toBe("immigration");
+    expect(typeof participantToken).toBe("string");
+    expect(JSON.stringify(session)).not.toMatch(/token|hash/i);
   });
 
   it("refuses a language it cannot actually serve", async () => {
@@ -104,23 +155,22 @@ describe("POST /api/counter/session", () => {
 
 describe("PATCH /api/counter/session — the visitor joining", () => {
   it("activates the session and records the language", async () => {
-    const created = await POST(post({ hostLang: "ko-KR" }));
-    const { session } = (await created.json()) as { session: SessionView };
+    const { session } = await createSession();
 
-    const joined = await PATCH(patch({ code: session.code, guestLang: "vi-VN" }));
-    expect(joined.status).toBe(200);
+    const joined = await joinSession(session!.code, "vi-VN");
+    expect(joined.response.status).toBe(200);
 
-    const view = ((await joined.json()) as { session: SessionView }).session;
+    const view = joined.session!;
     expect(view.state).toBe("active");
     expect(view.guestLang).toBe("vi-VN");
     expect(view.guestPresent).toBe(true);
   });
 
   it("accepts the code in whatever form the visitor typed it", async () => {
-    const created = await POST(post({ hostLang: "ko-KR" }));
-    const { session } = (await created.json()) as { session: SessionView };
-    const typed = `ty-${session.code.toLowerCase()}`;
-    expect((await PATCH(patch({ code: typed, guestLang: "en-US" }))).status).toBe(200);
+    const { session } = await createSession();
+    const typed = `ty-${session!.code.toLowerCase()}`;
+    const joined = await PATCH(patch({ code: typed, guestLang: "en-US" }));
+    expect(joined.status).toBe(200);
   });
 
   it("lets a visitor fix a mis-tapped language before they have said anything", async () => {
@@ -128,6 +178,17 @@ describe("PATCH /api/counter/session — the visitor joining", () => {
     const again = await PATCH(patch({ code, guestLang: "km-KH" }));
     expect(again.status).toBe(200);
     expect(((await again.json()) as { session: SessionView }).session.guestLang).toBe("km-KH");
+  });
+
+  it("refuses a second scanner even before the claimed visitor speaks", async () => {
+    const code = await openSession("th-TH");
+    const secondScanner = await PATCH(
+      new Request("http://localhost/api/counter/session", {
+        method: "PATCH",
+        body: JSON.stringify({ code, guestLang: "th-TH" }),
+      }),
+    );
+    expect(secondScanner.status).toBe(409);
   });
 
   it("refuses a different language once the visitor has spoken", async () => {
@@ -165,11 +226,17 @@ describe("GET /api/counter/session — polling", () => {
     expect((await GET(get(code))).headers.get("cache-control")).toBe("no-store");
   });
 
+  it("does not treat the short desk code as permission to read the conversation", async () => {
+    const code = await openSession();
+    const withoutCapability = await GET(
+      new Request(`http://localhost/api/counter/session?code=${code}`),
+    );
+    expect(withoutCapability.status).toBe(401);
+  });
+
   it("404s once the session is gone", async () => {
     const code = await openSession();
-    await DELETE(new Request(`http://localhost/api/counter/session?code=${code}`, {
-      method: "DELETE",
-    }));
+    await DELETE(remove(code));
     expect((await GET(get(code))).status).toBe(404);
   });
 });
@@ -179,22 +246,28 @@ describe("DELETE /api/counter/session", () => {
     const code = await openSession();
     await SEND(send({ code, from: "host", source: "quick-phrase", text: "greeting" }));
 
-    const response = await DELETE(
-      new Request(`http://localhost/api/counter/session?code=${code}`, { method: "DELETE" }),
-    );
+    const response = await DELETE(remove(code));
     expect(await response.json()).toEqual({ ended: true });
     // Not marked ended and retained — gone.
     expect((await GET(get(code))).status).toBe(404);
+  });
+
+  it("does not treat the desk code as permission to end a conversation", async () => {
+    const code = await openSession();
+    const response = await DELETE(
+      new Request(`http://localhost/api/counter/session?code=${code}`, { method: "DELETE" }),
+    );
+    expect(response.status).toBe(401);
+    expect((await GET(get(code))).status).toBe(200);
   });
 });
 
 describe("POST /api/counter/message", () => {
   it("waits for the visitor's language rather than guessing one", async () => {
-    const created = await POST(post({ hostLang: "ko-KR" }));
-    const { session } = (await created.json()) as { session: SessionView };
+    const { session } = await createSession();
 
     const response = await SEND(
-      send({ code: session.code, from: "host", source: "text", text: "안녕하세요" }),
+      send({ code: session!.code, from: "host", source: "text", text: "안녕하세요" }),
     );
     expect(response.status).toBe(409);
     expect(translateForCounter).not.toHaveBeenCalled();
@@ -285,19 +358,18 @@ describe("POST /api/counter/message", () => {
   });
 
   it("uses the stored original for explicit simplify and retry actions", async () => {
-    const created = await POST(post({ hostLang: "ko-KR", profileId: "immigration" }));
-    const { session } = (await created.json()) as { session: SessionView };
-    await PATCH(patch({ code: session.code, guestLang: "en-US" }));
+    const { session } = await createSession({ hostLang: "ko-KR", profileId: "immigration" });
+    await joinSession(session!.code, "en-US");
     const first = await (
       await SEND(
-        send({ code: session.code, from: "host", source: "text", text: "수수료는 50,000원입니다." }),
+        send({ code: session!.code, from: "host", source: "text", text: "수수료는 50,000원입니다." }),
       )
     ).json();
 
     translateForCounter.mockClear();
     const response = await SEND(
       send({
-        code: session.code,
+        code: session!.code,
         from: "host",
         source: "text",
         text: "클라이언트가 바꾼 내용",
@@ -332,6 +404,19 @@ describe("POST /api/counter/message", () => {
     expect(translateForCounter).not.toHaveBeenCalled();
   });
 
+  it("uses the fail-closed privacy route while a general session is still unclassified", async () => {
+    const code = await openSession();
+    translateForCounter.mockClear();
+    await SEND(send({ code, from: "host", source: "text", text: "잠시만 기다려 주세요." }));
+
+    expect(translateForCounter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: "general",
+        forceSensitiveRouting: true,
+      }),
+    );
+  });
+
   it("stores a failure as a failure rather than inventing a translation", async () => {
     translateForCounter.mockResolvedValue({
       ok: false,
@@ -359,6 +444,48 @@ describe("POST /api/counter/message", () => {
     const body = await response.json();
     expect(body.message.originalLang).toBe("ru-RU");
     expect(body.message.targetLang).toBe("ko-KR");
+  });
+
+  it("derives the sender from the capability instead of trusting a claimed role", async () => {
+    const code = await openSession("ru-RU");
+    const response = await SEND(
+      new Request("http://localhost/api/counter/message", {
+        method: "POST",
+        headers: {
+          ...authorised(),
+          [COUNTER_TOKEN_HEADER]: participants.get(code)!.host,
+        },
+        body: JSON.stringify({
+          code,
+          from: "guest",
+          source: "text",
+          text: "직원이 보낸 문장",
+        }),
+      }),
+    );
+    const body = await response.json();
+    expect(body.message.from).toBe("host");
+    expect(body.message.originalLang).toBe("ko-KR");
+  });
+
+  it("keeps staff-only review flags off the visitor response", async () => {
+    translateForCounter.mockResolvedValue({
+      ok: true,
+      output: { translation: "도움이 필요합니다.", confidence: "low" },
+      provider: "test",
+      latencyMs: 30,
+    });
+    const code = await openSession();
+    const guestResponse = await SEND(
+      send({ code, from: "guest", source: "text", text: "I need help." }),
+    );
+    const guestBody = await guestResponse.json();
+    expect(guestBody.message.reviewFlags).toBeUndefined();
+
+    const hostView = ((await (await GET(get(code))).json()) as { session: SessionView }).session;
+    expect(hostView.messages[0].reviewFlags).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "low-confidence" })]),
+    );
   });
 
   it("gives every message a sequence number the poller can order by", async () => {

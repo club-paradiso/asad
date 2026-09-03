@@ -273,9 +273,11 @@ export function LiveConsole({
                 Try again
               </Button>
             )}
-            <Button size="md" tone="quiet" onClick={session.dismissError}>
-              Dismiss
-            </Button>
+            {phase !== "idle" && (
+              <Button size="md" tone="quiet" onClick={session.dismissError}>
+                Dismiss
+              </Button>
+            )}
           </div>
         )}
       </main>

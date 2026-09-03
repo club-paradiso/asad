@@ -9,7 +9,7 @@ import {
   type CounterVoicePhase,
 } from "./counter-speech";
 
-export function useVoiceInput(lang: string, counterCode?: string) {
+export function useVoiceInput(lang: string, counterCode?: string, counterToken?: string) {
   const supported = useCapability(() => CounterSpeechController.isPotentiallyAvailable());
   const [phase, setPhase] = useState<CounterVoicePhase>("idle");
   const [partial, setPartial] = useState("");
@@ -26,7 +26,7 @@ export function useVoiceInput(lang: string, counterCode?: string) {
       onPhase: setPhase,
       onPartial: setPartial,
       onFallback: () => setUsedFallback(true),
-    }, undefined, counterCode);
+    }, undefined, counterCode, counterToken);
     controller.current = next;
 
     try {
@@ -37,7 +37,7 @@ export function useVoiceInput(lang: string, counterCode?: string) {
     } finally {
       controller.current = null;
     }
-  }, [counterCode, lang]);
+  }, [counterCode, counterToken, lang]);
 
   const stop = useCallback(() => controller.current?.stop(), []);
 

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findLanguage } from "@/counter/languages";
 import { detectRisks } from "@/counter/risks";
-import type { RiskSpan } from "@/counter/types";
+import type { CounterMessage, RiskSpan } from "@/counter/types";
 import type { CounterStrings } from "@/counter/ui-strings";
 import { cn } from "@/lib/cn";
 import { useVoiceInput } from "./useVoiceInput";
@@ -16,6 +16,10 @@ interface PendingVoice {
 }
 
 type DraftSource = "voice" | "text";
+interface RecoverableDraft {
+  text: string;
+  source: DraftSource;
+}
 
 export function Composer({
   lang,
@@ -24,23 +28,26 @@ export function Composer({
   disabled = false,
   busy = false,
   counterCode,
+  counterToken,
 }: {
   lang: string;
   strings: CounterStrings;
-  onSend: (text: string, source: "voice" | "text") => void;
+  onSend: (text: string, source: "voice" | "text") => Promise<CounterMessage | null> | void;
   disabled?: boolean;
   busy?: boolean;
   /** Used only by the server to enforce the session's sensitive-data policy. */
   counterCode?: string;
+  /** Session-scoped capability used for Counter speech endpoints. */
+  counterToken?: string | null;
 }) {
   const [draft, setDraft] = useState("");
   const [draftSource, setDraftSource] = useState<DraftSource>("text");
-  const [recoverableText, setRecoverableText] = useState<string | null>(null);
+  const [recoverableDraft, setRecoverableDraft] = useState<RecoverableDraft | null>(null);
   const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef("");
   const composing = useRef(false);
-  const voice = useVoiceInput(lang, counterCode);
+  const voice = useVoiceInput(lang, counterCode, counterToken ?? undefined);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
@@ -55,32 +62,38 @@ export function Composer({
     // When speech finished over a typed draft, startVoice already preserved
     // that earlier text. Sending the reviewed transcript must not replace it
     // with the transcript itself; the operator may restore and send both turns.
-    setRecoverableText((previous) => previous ?? text);
+    const submitted = { text, source } satisfies RecoverableDraft;
+    setRecoverableDraft((previous) => previous ?? submitted);
     draftRef.current = "";
     setDraft("");
     setDraftSource("text");
     setPendingVoice(null);
-    onSend(text, source);
+    const sent = onSend(text, source);
+    if (sent && typeof sent.then === "function") {
+      void sent.then((message) => {
+        if (!message) setRecoverableDraft((previous) => previous ?? submitted);
+      });
+    }
     queueMicrotask(() => inputRef.current?.focus());
   }, [draft, draftSource, disabled, onSend]);
 
   const restoreTypedTurn = useCallback(() => {
-    if (!recoverableText) return;
-    draftRef.current = recoverableText;
-    setDraft(recoverableText);
-    setDraftSource("text");
+    if (!recoverableDraft) return;
+    draftRef.current = recoverableDraft.text;
+    setDraft(recoverableDraft.text);
+    setDraftSource(recoverableDraft.source);
     setPendingVoice(null);
-    setRecoverableText(null);
+    setRecoverableDraft(null);
     queueMicrotask(() => {
       inputRef.current?.focus();
-      const end = recoverableText.length;
+      const end = recoverableDraft.text.length;
       inputRef.current?.setSelectionRange(end, end);
     });
-  }, [recoverableText]);
+  }, [recoverableDraft]);
 
   const startVoice = useCallback(() => {
     if (disabled) return;
-    if (draft.trim()) setRecoverableText(draft);
+    if (draft.trim()) setRecoverableDraft({ text: draft, source: draftSource });
     setPendingVoice(null);
     void voice.start().then((text) => {
       const spoken = text.trim();
@@ -89,7 +102,7 @@ export function Composer({
       const typedDraft = draftRef.current;
       const typedWhileListening = typedDraft.trim();
       if (typedWhileListening) {
-        setRecoverableText((previous) => previous ?? typedDraft);
+        setRecoverableDraft((previous) => previous ?? { text: typedDraft, source: "text" });
       }
       const risks = detectRisks(spoken);
       draftRef.current = spoken;
@@ -106,7 +119,7 @@ export function Composer({
         inputRef.current?.setSelectionRange(end, end);
       });
     });
-  }, [disabled, draft, voice]);
+  }, [disabled, draft, draftSource, voice]);
 
   const voiceFinishing = voice.phase === "finishing";
   const voiceActive = voice.listening || voiceFinishing;
@@ -282,7 +295,7 @@ export function Composer({
                 setDraftSource("text");
                 setPendingVoice(null);
               }
-              if (value.trim()) setRecoverableText(null);
+              if (value.trim()) setRecoverableDraft(null);
             }}
             onCompositionStart={() => {
               composing.current = true;
@@ -316,7 +329,7 @@ export function Composer({
               "focus:border-[var(--accent)] focus:outline-none disabled:opacity-40",
             )}
           />
-          {recoverableText && cleanDraft.length === 0 && (
+          {recoverableDraft && cleanDraft.length === 0 && (
             <button
               type="button"
               onClick={restoreTypedTurn}

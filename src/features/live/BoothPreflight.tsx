@@ -47,11 +47,13 @@ export function BoothPreflight({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const frameRef = useRef<number | null>(null);
   const detachEndObserverRef = useRef<(() => void) | null>(null);
+  const runRef = useRef(0);
 
   const ready = isBoothPreflightReady(signalVerified, mixMinusChecked);
   useEffect(() => onReadyChange?.(ready), [onReadyChange, ready]);
 
   const stopTest = useCallback((updateUi = true) => {
+    runRef.current += 1;
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
     // Detach first so stopping the track ourselves never looks like a device
@@ -78,6 +80,7 @@ export function BoothPreflight({
 
   const startTest = useCallback(async () => {
     stopTest(false);
+    const run = runRef.current;
     setError(null);
     setPhase("requesting");
     setReading(EMPTY_READING);
@@ -99,8 +102,13 @@ export function BoothPreflight({
           autoGainControl: false,
         },
       });
+      if (runRef.current !== run) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       detachEndObserverRef.current = observeAudioInputEnd(stream, () => {
+        if (runRef.current !== run) return;
         setSignalVerified(false);
         setError(
           "점검 중에 오디오 입력이 끊겼습니다. 다시 연결하거나 다른 입력을 고른 뒤 한 번 더 점검해 주세요.",
@@ -118,6 +126,11 @@ export function BoothPreflight({
       const context = new AudioContextCtor();
       contextRef.current = context;
       if (context.state === "suspended") await context.resume();
+      if (runRef.current !== run) {
+        if (context.state !== "closed") void context.close().catch(() => {});
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
 
       const analyser = context.createAnalyser();
       analyser.fftSize = 1024;
@@ -144,6 +157,7 @@ export function BoothPreflight({
       setPhase("listening");
       frameRef.current = requestAnimationFrame(measure);
     } catch (caught) {
+      if (runRef.current !== run) return;
       setSignalVerified(false);
       const message =
         caught instanceof Error && caught.name === "NotAllowedError"

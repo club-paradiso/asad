@@ -1,14 +1,9 @@
 "use client";
 
 /**
- * Public counter screens should not expose infrastructure/provider details.
- *
- * We still query the server for one operational reason: if no translation
- * provider is configured at all, users need a clear failure message instead of
- * discovering it only after they try to send something. A healthy configured
- * provider is intentionally represented as `null` here so neither the visitor
- * nor staff setup screen renders vendor, model-weight, training, retention or
- * logging details.
+ * A visitor sees the provider name and an explicit training warning before
+ * typing anything. Keys, model ids, quotas, routing internals and logs remain
+ * private; the provider's identity and data-use posture do not.
  */
 import { useEffect, useState } from "react";
 import type { AppConfig } from "@/app/api/config/route";
@@ -18,9 +13,7 @@ import { cn } from "@/lib/cn";
 export type CounterDisclosure = AppConfig["counter"];
 
 /**
- * Return disclosure data only when translation is unavailable.
- * Provider details remain available to diagnostics/internal tooling through the
- * config API, but are not promoted on general-user counter surfaces.
+ * Return only the bounded public disclosure shape from `/api/config`.
  */
 export function useCounterDisclosure(): CounterDisclosure | null {
   const [disclosure, setDisclosure] = useState<CounterDisclosure | null>(null);
@@ -31,7 +24,7 @@ export function useCounterDisclosure(): CounterDisclosure | null {
       .then((response) => (response.ok ? response.json() : null))
       .then((value: AppConfig | null) => {
         if (cancelled || !value) return;
-        setDisclosure(value.counter.provider ? null : value.counter);
+        setDisclosure(value.counter);
       })
       .catch(() => {});
     return () => {
@@ -51,7 +44,6 @@ export function ProviderNotice({
   strings: CounterStrings;
   className?: string;
 }) {
-  // Healthy provider details are deliberately hidden from public UI.
   if (!disclosure) return null;
 
   // Only an actionable outage remains visible.
@@ -88,5 +80,16 @@ export function ProviderNotice({
     );
   }
 
-  return null;
+  const template = disclosure.mayTrain ? strings.mayTrain : strings.sentTo;
+  return (
+    <p
+      className={cn(
+        "text-center text-[0.8125rem] leading-relaxed",
+        disclosure.mayTrain ? "text-[var(--warn)]" : "text-[var(--fg-dim)]",
+        className,
+      )}
+    >
+      {template.replace("{provider}", disclosure.provider)}
+    </p>
+  );
 }

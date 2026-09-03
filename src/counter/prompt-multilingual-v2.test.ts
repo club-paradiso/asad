@@ -16,7 +16,8 @@ describe("multilingual Counter prompts", () => {
 
     expect(prompt).toContain("MANDARIN ASR");
     expect(prompt).toContain("homophone substitutions");
-    expect(prompt).toContain("Do not guess uncertain names");
+    expect(prompt).toContain("Never silently repair uncertain names");
+    expect(prompt).toContain("Do not guess them");
     expect(prompt).toContain("Korean 존댓말");
   });
 

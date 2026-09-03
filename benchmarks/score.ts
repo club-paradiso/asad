@@ -353,7 +353,10 @@ export function scoreProvider(
       if (!benchCase.usage) return aggregate;
       aggregate.requestsWithUsage += benchCase.usageReports ?? 1;
       aggregate.inputTokens += benchCase.usage.inputTokens ?? 0;
-      aggregate.cachedInputTokens += benchCase.usage.cachedInputTokens ?? 0;
+      if (benchCase.usage.cachedInputTokens !== undefined) {
+        aggregate.cachedInputTokens += benchCase.usage.cachedInputTokens;
+        aggregate.cacheMeasuredInputTokens += benchCase.usage.inputTokens ?? 0;
+      }
       aggregate.outputTokens += benchCase.usage.outputTokens ?? 0;
       aggregate.totalTokens += benchCase.usage.totalTokens ?? 0;
       return aggregate;
@@ -362,15 +365,18 @@ export function scoreProvider(
       requestsWithUsage: 0,
       inputTokens: 0,
       cachedInputTokens: 0,
+      cacheMeasuredInputTokens: 0,
       outputTokens: 0,
       totalTokens: 0,
       cacheHitRate: null as number | null,
     },
   );
   usage.cacheHitRate =
-    usage.requestsWithUsage > 0 && usage.inputTokens > 0
-      ? usage.cachedInputTokens / usage.inputTokens
+    usage.cacheMeasuredInputTokens > 0
+      ? usage.cachedInputTokens / usage.cacheMeasuredInputTokens
       : null;
+
+  const { cacheMeasuredInputTokens: _cacheMeasuredInputTokens, ...publicUsage } = usage;
 
   return {
     provider,
@@ -380,7 +386,7 @@ export function scoreProvider(
     latency,
     components,
     total: Number(total.toFixed(4)),
-    usage,
+    usage: publicUsage,
     hardFailures,
     disqualified,
     notes,

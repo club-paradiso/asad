@@ -16,7 +16,9 @@ export type PrivacyDisclosureContext = "live" | "prep";
 export type PrivacyDisclosureChoice = "cloud" | "local-only";
 
 const ACK_KEYS: Record<PrivacyDisclosureContext, string> = {
-  live: "tong-yuck:free-tier-privacy-ack",
+  // v2 adds microphone-audio/STT disclosure. A browser that accepted the old
+  // transcript-only notice has not yet accepted that materially broader use.
+  live: "tong-yuck:free-tier-privacy-ack-v2",
   prep: "tong-yuck:prep-free-tier-privacy-ack",
 };
 

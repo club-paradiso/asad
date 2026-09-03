@@ -72,6 +72,25 @@ describe("QR encoder round-trip", () => {
     expect((short.size - 17) % 4).toBe(0);
   });
 
+  it("writes decodable BCH version information for version 7 and above", () => {
+    // 110 byte-mode characters select version 7-M (size 45).
+    const payload = "v".repeat(110);
+    const matrix = encodeQr(payload);
+    expect(matrix.size).toBe(45);
+    expect(decode(payload)).toBe(payload);
+
+    // Version 7's encoded 18-bit value is 0x07C94. The two copies occupy the
+    // mirrored 3×6 areas adjacent to the top-right and bottom-left finders.
+    const expected = 0x07c94;
+    for (let i = 0; i < 18; i += 1) {
+      const bit = ((expected >>> i) & 1) === 1;
+      const edge = matrix.size - 11 + (i % 3);
+      const offset = Math.floor(i / 3);
+      expect(matrix.modules[offset][edge]).toBe(bit);
+      expect(matrix.modules[edge][offset]).toBe(bit);
+    }
+  });
+
   it("refuses oversized input rather than emitting an unscannable code", () => {
     expect(() => encodeQr("x".repeat(1000))).toThrow(/too long/i);
   });

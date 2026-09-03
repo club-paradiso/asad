@@ -62,12 +62,7 @@ export function pickSpeechAlternative(
     const compact = [...text].filter((char) => /[\p{L}\p{N}]/u.test(char));
     if (!compact.length) return -1;
     const expected = compact.filter((char) => script.test(char)).length;
-    const latin = compact.filter((char) => /[A-Za-z]/u.test(char)).length;
-    return (
-      expected / compact.length -
-      (latin / compact.length) * 0.2 +
-      chineseVariantBonus(text, language)
-    );
+    return expected / compact.length + chineseVariantBonus(text, language);
   };
 
   return usable.reduce((best, candidate) =>
@@ -82,8 +77,18 @@ export function joinTranscriptParts(
 ): string {
   const clean = parts.map((part) => part.trim()).filter(Boolean);
   if (!clean.length) return "";
-  const separator = NO_SPACE_BASES.has(baseLanguage(language)) ? "" : " ";
-  return cleanupJoined(clean.join(separator));
+  if (!NO_SPACE_BASES.has(baseLanguage(language))) return cleanupJoined(clean.join(" "));
+  return cleanupJoined(joinNoSpaceLanguageParts(clean));
+}
+
+const latinBoundary = (left: string, right: string): boolean =>
+  /[A-Za-z0-9]$/u.test(left) && /^[A-Za-z0-9]/u.test(right);
+
+function joinNoSpaceLanguageParts(parts: readonly string[]): string {
+  return parts.reduce(
+    (joined, part) => joined + (joined && latinBoundary(joined, part) ? " " : "") + part,
+    "",
+  );
 }
 
 /**
@@ -98,6 +103,8 @@ export function joinBrowserResultParts(
 ): string {
   const clean = parts.map((part) => part.trim()).filter(Boolean);
   if (!clean.length) return "";
-  const separator = BROWSER_RESULT_NO_SPACE_BASES.has(baseLanguage(language)) ? "" : " ";
-  return cleanupJoined(clean.join(separator));
+  if (!BROWSER_RESULT_NO_SPACE_BASES.has(baseLanguage(language))) {
+    return cleanupJoined(clean.join(" "));
+  }
+  return cleanupJoined(joinNoSpaceLanguageParts(clean));
 }

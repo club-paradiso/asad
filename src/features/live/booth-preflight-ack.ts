@@ -12,8 +12,6 @@ import { normalizeBoothAudioDeviceId } from "./booth-audio-preference";
 export const BOOTH_PREFLIGHT_ACK_STORAGE_KEY = "asad:sermon:booth-preflight:v1";
 export const BOOTH_PREFLIGHT_ACK_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 
-const SYSTEM_DEFAULT_KEY = "__system_default__";
-
 interface BoothPreflightAck {
   v: 1;
   device: string;
@@ -29,8 +27,8 @@ function browserSessionStorage(): Storage | null {
   }
 }
 
-function deviceKey(deviceId?: string): string {
-  return normalizeBoothAudioDeviceId(deviceId) || SYSTEM_DEFAULT_KEY;
+function deviceKey(deviceId?: string): string | null {
+  return normalizeBoothAudioDeviceId(deviceId) || null;
 }
 
 export function writeBoothPreflightAcknowledgement(
@@ -39,9 +37,16 @@ export function writeBoothPreflightAcknowledgement(
   storage: Storage | null = browserSessionStorage(),
 ): void {
   if (!storage || !Number.isFinite(now)) return;
+  const device = deviceKey(deviceId);
+  // "System default" is a mutable OS alias, not a physical input identity.
+  // Never carry its verification to another screen or a later default device.
+  if (!device) {
+    clearBoothPreflightAcknowledgement(storage);
+    return;
+  }
   const value: BoothPreflightAck = {
     v: 1,
-    device: deviceKey(deviceId),
+    device,
     checkedAt: now,
   };
   try {
@@ -69,6 +74,8 @@ export function isBoothPreflightAcknowledged(
   storage: Storage | null = browserSessionStorage(),
 ): boolean {
   if (!storage || !Number.isFinite(now)) return false;
+  const device = deviceKey(deviceId);
+  if (!device) return false;
 
   try {
     const raw = storage.getItem(BOOTH_PREFLIGHT_ACK_STORAGE_KEY);
@@ -85,7 +92,7 @@ export function isBoothPreflightAcknowledged(
 
     const age = now - parsed.checkedAt;
     if (age < 0 || age > BOOTH_PREFLIGHT_ACK_MAX_AGE_MS) return false;
-    return parsed.device === deviceKey(deviceId);
+    return parsed.device === device;
   } catch {
     return false;
   }

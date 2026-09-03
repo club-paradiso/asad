@@ -101,6 +101,9 @@ export type SessionState = "waiting" | "active" | "ended";
 export interface CounterSession {
   /** Short human-readable code, e.g. "TY-4821". */
   code: string;
+  /** Hashed participant capabilities. Never returned by `toView`. */
+  hostTokenHash: string;
+  guestTokenHash?: string;
   createdAt: number;
   lastActivityAt: number;
   state: SessionState;
@@ -131,14 +134,30 @@ export interface SessionView {
   guestPresent: boolean;
 }
 
-export const toView = (session: CounterSession, since = 0): SessionView => ({
+export const toView = (
+  session: CounterSession,
+  since = 0,
+  viewer: Participant = "host",
+): SessionView => ({
   code: session.code,
   state: session.state,
   hostLang: session.hostLang,
   guestLang: session.guestLang,
   deskLabel: session.deskLabel,
   profileId: session.profileId ?? "general",
-  messages: session.messages.filter((m) => m.seq > since),
+  messages: session.messages
+    .filter((m) => m.seq > since)
+    .map((message) => toParticipantMessage(message, viewer)),
   seq: session.nextSeq - 1,
   guestPresent: session.guestJoinedAt !== undefined,
 });
+
+/** Human-review metadata is staff-only and must not leak to a visitor device. */
+export function toParticipantMessage(
+  message: CounterMessage,
+  viewer: Participant,
+): CounterMessage {
+  if (viewer === "host" || message.reviewFlags === undefined) return message;
+  const { reviewFlags: _reviewFlags, ...publicMessage } = message;
+  return publicMessage;
+}

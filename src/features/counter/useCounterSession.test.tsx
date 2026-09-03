@@ -13,7 +13,7 @@ vi.mock("@/lib/session-client", () => ({
   useSessionToken: vi.fn(),
 }));
 
-import { useCounterSession } from "./useCounterSession";
+import { retryAfterMs, useCounterSession } from "./useCounterSession";
 
 const originalFetch = globalThis.fetch;
 
@@ -140,5 +140,21 @@ describe("useCounterSession end lifecycle", () => {
     expect(
       fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "DELETE"),
     ).toBe(false);
+  });
+});
+
+describe("Counter send retry timing", () => {
+  it("honours both Retry-After seconds and HTTP dates", () => {
+    expect(retryAfterMs(new Response(null, { headers: { "retry-after": "7" } }), 0)).toBe(7_000);
+    expect(
+      retryAfterMs(
+        new Response(null, { headers: { "retry-after": "Thu, 01 Jan 1970 00:00:09 GMT" } }),
+        2_000,
+      ),
+    ).toBe(7_000);
+  });
+
+  it("caps maliciously large retry advice", () => {
+    expect(retryAfterMs(new Response(null, { headers: { "retry-after": "999999" } }))).toBe(60_000);
   });
 });

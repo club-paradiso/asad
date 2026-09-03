@@ -1,13 +1,23 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __resetEnvCache } from "@/lib/env";
 import { POST } from "./route";
+import { COUNTER_TOKEN_HEADER, issueCounterCapability } from "@/counter/access";
+import { __setCounterStore, createMemoryStore } from "@/counter/store";
 
 const ACCOUNT_KEY = "d".repeat(40);
-const request = (usage: "live" | "counter", language = "vi-VN") =>
+const request = (
+  usage: "live" | "counter",
+  language = "vi-VN",
+  counter?: { code: string; token: string },
+) =>
   new Request("http://localhost/api/stt/token", {
     method: "POST",
-    headers: { "content-type": "application/json", origin: "http://localhost" },
-    body: JSON.stringify({ usage, language }),
+    headers: {
+      "content-type": "application/json",
+      origin: "http://localhost",
+      ...(counter ? { [COUNTER_TOKEN_HEADER]: counter.token } : {}),
+    },
+    body: JSON.stringify({ usage, language, code: counter?.code }),
   });
 
 beforeEach(() => {
@@ -18,11 +28,20 @@ beforeEach(() => {
   process.env.DEEPGRAM_API_KEY = ACCOUNT_KEY;
   delete process.env.DEEPGRAM_PROJECT_ID;
   __resetEnvCache();
+  __setCounterStore(null);
 });
+
+afterEach(() => __setCounterStore(null));
 
 describe("POST /api/stt/token — Counter credential boundary", () => {
   it("never exposes a long-lived account key to Counter Mode", async () => {
-    const body = await (await POST(request("counter"))).json();
+    const store = createMemoryStore();
+    const host = issueCounterCapability();
+    const session = await store.create({ hostLang: "ko-KR", hostTokenHash: host.hash });
+    __setCounterStore(store);
+    const body = await (
+      await POST(request("counter", "vi-VN", { code: session.code, token: host.token }))
+    ).json();
     expect(body.provider).toBe("demo");
     expect(JSON.stringify(body)).not.toContain(ACCOUNT_KEY);
   });

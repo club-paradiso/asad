@@ -236,7 +236,6 @@ export const joinCounterSessionSchema = z.object({
 
 export const counterMessageSchema = z.object({
   code: z.string().trim().min(1).max(16),
-  from: z.enum(["host", "guest"]),
   source: z.enum(["voice", "text", "quick-phrase", "confirm"]).default("text"),
   /** Free text, or a quick-phrase id when `source` is `quick-phrase`. */
   text: z.string().trim().min(1).max(2000),

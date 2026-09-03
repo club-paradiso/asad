@@ -135,7 +135,7 @@ device makes a task harder it comes out; the concept survives that fine.
 
 - **`<Mark>`** — the `?` whose dot is a `✓`. Drawn, not typeset: no face puts a
   tick there. `mono` collapses it to one colour for single-ink reproduction.
-- **`<Wordmark>`** — `full` (two lines + mark) and `compact` (mark + 아서알?).
+- **`<Wordmark>`** — `full` (two-line Korean signature + mark) and `compact` (mark + one-line `ASAD`).
   One `aria-label` for the whole lockup, so a screen reader hears the name
   rather than two fragments and a punctuation mark.
 - **`<SpeechBubbles>`** — bubble A over-explains, bubble B says "ㅇㅇ", a check

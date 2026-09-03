@@ -91,6 +91,7 @@ const rawEnvSchema = z.object({
   LLM_ROUTING_MODE: z.string().trim().toLowerCase().optional(),
   LLM_PRIVACY_MODE: z.string().trim().toLowerCase().optional(),
   LLM_ALLOW_PAID_FALLBACK: z.string().trim().toLowerCase().optional(),
+  LLM_LIVE_REQUIRE_SUSTAINABLE: z.string().trim().toLowerCase().optional(),
   LLM_COUNTER_PREFER_OPEN: z.string().trim().toLowerCase().optional(),
   LLM_PAID_TIER: z.string().trim().toLowerCase().optional(),
 
@@ -171,6 +172,8 @@ export interface AppEnv {
     privacyMode: PrivacyMode;
     /** AUTO-FREE never spends money unless this is explicitly true. */
     allowPaidFallback: boolean;
+    /** Never start a continuous live session on a quota known to expire mid-service. */
+    requireSustainableLive: boolean;
     /**
      * Counter Mode routes to open-weight models first. On by default: it is
      * the stated requirement for the counter, and the providers serving open
@@ -280,6 +283,26 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     if (lenient.success) Object.assign(raw, lenient.data);
   }
 
+  const unprotectedCloudDeployment = source.VERCEL === "1" && !raw.APP_ACCESS_KEY;
+  const cloudCredentialPresent = !!(
+    raw.DEEPGRAM_API_KEY ||
+    raw.HF_TOKEN ||
+    raw.GEMINI_API_KEY ||
+    raw.GROQ_API_KEY ||
+    raw.OPENROUTER_API_KEY ||
+    raw.OPENAI_API_KEY ||
+    raw.ANTHROPIC_API_KEY ||
+    raw.LLM_API_KEY
+  );
+  if (unprotectedCloudDeployment && cloudCredentialPresent) {
+    problems.push({
+      level: "error",
+      field: "APP_ACCESS_KEY",
+      message:
+        "Cloud credentials are disabled on an unprotected Vercel deployment. Set APP_ACCESS_KEY (at least 8 characters) before enabling paid or quota-limited providers.",
+    });
+  }
+
   /* --- STT -------------------------------------------------------------- */
   const sttRequested = raw.STT_PROVIDER ?? "demo";
   const sttValid = ["demo", "webspeech", "deepgram", "openai"] as const;
@@ -316,6 +339,9 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       message: "STT_PROVIDER is openai but no key is set — the console will run in demo mode.",
     });
   }
+  if (unprotectedCloudDeployment && (sttProvider === "deepgram" || sttProvider === "openai")) {
+    sttProvider = "webspeech";
+  }
   /* --- LLM routing ------------------------------------------------------ */
   let routingMode: RoutingMode = "auto-free";
   if (raw.LLM_ROUTING_MODE) {
@@ -344,6 +370,9 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   const allowPaidFallback = BOOLEAN_TRUE.has(raw.LLM_ALLOW_PAID_FALLBACK ?? "");
+  const requireSustainableLive = BOOLEAN_TRUE.has(
+    raw.LLM_LIVE_REQUIRE_SUSTAINABLE ?? "",
+  );
   // Defaults ON, unlike the other flags: the counter is the one surface where
   // open weights were asked for by name.
   const counterPreferOpen = !BOOLEAN_FALSE.has(raw.LLM_COUNTER_PREFER_OPEN ?? "");
@@ -426,7 +455,7 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
 
   const providers = Object.fromEntries(
     LLM_PROVIDER_IDS.map((id) => {
-      const apiKey = keyFor(id);
+      const apiKey = id !== "local" && unprotectedCloudDeployment ? undefined : keyFor(id);
       return [
         id,
         {
@@ -526,18 +555,19 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   return {
     stt: {
       provider: sttProvider,
-      deepgramKey: raw.DEEPGRAM_API_KEY,
+      deepgramKey: unprotectedCloudDeployment ? undefined : raw.DEEPGRAM_API_KEY,
       deepgramProjectId: raw.DEEPGRAM_PROJECT_ID,
       deepgramModel: raw.DEEPGRAM_STT_MODEL ?? "nova-3",
-      openaiKey: raw.OPENAI_API_KEY,
+      openaiKey: unprotectedCloudDeployment ? undefined : raw.OPENAI_API_KEY,
       openaiModel: raw.OPENAI_STT_MODEL ?? "gpt-live-transcribe",
-      hfToken: raw.HF_TOKEN,
+      hfToken: unprotectedCloudDeployment ? undefined : raw.HF_TOKEN,
       hfModel: raw.HF_STT_MODEL ?? "openai/whisper-large-v3-turbo",
     },
     llm: {
       routingMode,
       privacyMode,
       allowPaidFallback,
+      requireSustainableLive,
       counterPreferOpen,
       paidTier,
       pinned,

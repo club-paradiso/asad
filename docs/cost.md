@@ -82,9 +82,10 @@ the public-domain provider is free.
 | 8 | $3.52 | $5.44 | $7.20 |
 | 12 | $5.28 | $8.16 | $10.80 |
 
-Plus hosting: **$0** on a Vercel hobby plan for this workload — five dynamic
-route handlers, no database, no background jobs, no media storage. A Pro plan
-($20/month) only becomes relevant for team features or commercial terms.
+Plus hosting: **$0** on a Vercel hobby plan for this workload at personal scale.
+Counter Mode needs a small shared Redis/KV resource on serverless deployments;
+there are no background jobs or media storage. A Pro plan becomes relevant for
+team features or commercial terms rather than this request volume alone.
 
 So a church interpreting three services a week runs at roughly **$8–11/month**
 in API spend.
@@ -123,8 +124,9 @@ in API spend.
 - Single in-flight interpretation request; pending Korean coalesces rather than
   queueing parallel calls.
 - Output capped at 700 tokens per turn, and the schema caps a turn at 8 chunks.
-- A 12-second timeout — a live turn slower than that is already useless, so it
-  is abandoned rather than paid for.
+- Lag-aware live deadlines — 2.5 seconds for Fast, 3.5 seconds for Balanced,
+  and 5 seconds for Safe — abandon responses that are already too late to help
+  rather than paying for a 12-second stall.
 
 ---
 

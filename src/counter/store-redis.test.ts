@@ -142,7 +142,10 @@ describe("Redis counter store", () => {
       source: "upstash",
     });
 
-    const session = await store.create({ hostLang: "ko-KR" });
+    const session = await store.create({
+      hostLang: "ko-KR",
+      hostTokenHash: "test-host-token-hash",
+    });
     expect((await store.get(session.code))?.state).toBe("waiting");
 
     const updated = await store.update(session.code, (current) => {

@@ -98,7 +98,10 @@ const cloudCalls = () =>
   calls.filter((url) => url.includes("/api/interpret") || url.includes("/api/stt/token"));
 
 /** A deployment with a cloud recogniser and a training-capable model. */
-const stubFetch = (disclosure: DisclosureProvider[], configBehaviour: "ok" | "hang" | "fail" = "ok") =>
+const stubFetch = (
+  disclosure: DisclosureProvider[],
+  configBehaviour: "ok" | "hang" | "fail" | "non-ok" = "ok",
+) =>
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -107,6 +110,7 @@ const stubFetch = (disclosure: DisclosureProvider[], configBehaviour: "ok" | "ha
       if (url.includes("/api/config")) {
         if (configBehaviour === "hang") return new Promise<Response>(() => {});
         if (configBehaviour === "fail") throw new Error("offline");
+        if (configBehaviour === "non-ok") return new Response("unavailable", { status: 503 });
         return json({
           stt: { configured: "deepgram", cloudAvailable: true },
           llm: {
@@ -193,6 +197,16 @@ describe("the launcher", () => {
     expect(cloudCalls()).toEqual([]);
   });
 
+  it("also fails closed when the config endpoint returns a non-OK response", async () => {
+    vi.spyOn(WebSpeechProvider, "isSupported").mockReturnValue(true);
+    stubFetch([], "non-ok");
+    render(<StartScreen />);
+
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    expect(screen.getByRole("dialog").textContent).toMatch(/could not be loaded/i);
+    expect(cloudCalls()).toEqual([]);
+  });
+
   it("starts on the interpreter's acknowledgement, which is itself the gesture", async () => {
     stubFetch(PROVIDER);
     render(<StartScreen />);
@@ -223,12 +237,13 @@ describe("the launcher", () => {
     expect(cloudCalls()).toEqual([]);
   });
 
-  it("starts immediately when nothing needs disclosing", async () => {
+  it("discloses microphone-audio processing even when the LLM does not train", async () => {
     stubFetch([]);
     render(<StartScreen />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /통역 시작/ }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    expect(screen.getByRole("dialog").textContent).toMatch(/microphone audio/i);
+    fireEvent.click(screen.getByRole("button", { name: /i understand/i }));
     await waitFor(() => expect(calls.some((url) => url.includes("/api/stt/token"))).toBe(true));
-    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

@@ -20,6 +20,11 @@ describe("session glossary editing", () => {
     expect(makePrepGlossaryItem("은혜", "   ")).toBeNull();
   });
 
+  it("refuses a note that would violate the live request schema", () => {
+    expect(makePrepGlossaryItem("은혜", "grace", "x".repeat(161))).toBeNull();
+    expect(makePrepGlossaryItem("은혜", "grace", "x".repeat(160))?.note).toHaveLength(160);
+  });
+
   it("puts the human override first and removes duplicate headwords", () => {
     const next = makePrepGlossaryItem("대속", "substitutionary atonement")!;
     const items = upsertPrepGlossaryItem(

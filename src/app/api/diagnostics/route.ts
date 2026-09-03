@@ -13,7 +13,7 @@ import { appEnv } from "@/lib/env";
 import { capabilitiesFor, assessFreeTierViability, LIVE_WORKLOAD } from "@/providers/llm/capabilities";
 import { llmRouter } from "@/providers/llm";
 import { OPEN_WEIGHT } from "@/providers/llm/router";
-import { counterStore, counterStoreInfo } from "@/counter/store";
+import { counterStore, counterStoreInfo, type CounterStoreStats } from "@/counter/store";
 import { COUNTER_LANGUAGES } from "@/counter/languages";
 import { QUICK_PHRASES, quickPhraseCoverage } from "@/counter/quick-phrases";
 import { hasStrings } from "@/counter/ui-strings";
@@ -39,25 +39,41 @@ export async function GET() {
   const router = llmRouter();
   const plan = router.plan();
   const store = counterStore();
-  const [counterSessions] = await Promise.all([store.stats()]);
   const storage = counterStoreInfo();
+  let counterSessions: CounterStoreStats | null = null;
+  let storageHealth: "ok" | "unavailable" = "ok";
+  try {
+    counterSessions = await store.stats();
+  } catch {
+    // Diagnostics must remain available precisely when shared storage is the
+    // failing dependency. Counts are optional health data, never a reason to
+    // hide configuration and provider status.
+    storageHealth = "unavailable";
+  }
 
   // Diagnostics is explicitly a live-health surface, so report the same
   // provider preference as /api/interpret. The generic router plan can quite
   // correctly prefer a one-shot-capable free provider, but Live Mode must put
   // a provider that can sustain the 45-minute workload first.
+  const sustainableForLive = (id: (typeof plan.chain)[number]) => {
+    if (id === "local") return false;
+    if (env.llm.paidTier.has(id)) return true;
+    const caps = capabilitiesFor(id);
+    return (
+      !caps.freeTierPossible ||
+      assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull).viable
+    );
+  };
+  const sustainableChain = plan.chain.filter(sustainableForLive);
+  const liveChain = env.llm.requireSustainableLive
+    ? [...sustainableChain, ...plan.chain.filter((id) => id === "local")]
+    : [
+        ...sustainableChain,
+        ...plan.chain.filter((id) => !sustainableChain.includes(id)),
+      ];
   const liveActive =
-    router.preferred((id) => {
-      if (env.llm.paidTier.has(id)) return true;
-      const caps = capabilitiesFor(id);
-      return (
-        !caps.freeTierPossible ||
-        assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull).viable
-      );
-    }) ?? plan.active;
-  const liveChain = liveActive
-    ? [liveActive, ...plan.chain.filter((id) => id !== liveActive)]
-    : plan.chain;
+    liveChain.find((id) => id !== "local") ??
+    (env.llm.requireSustainableLive ? "local" : plan.active);
 
   // Vercel can retain an optional variable with an empty-string value. The
   // parser deliberately rejects an empty model id, but for an optional model
@@ -97,6 +113,7 @@ export async function GET() {
       routingMode: plan.mode,
       privacyMode: plan.privacyMode,
       allowPaidFallback: plan.allowPaidFallback,
+      requireSustainableLive: env.llm.requireSustainableLive,
       active: liveActive,
       chain: liveChain,
       warnings: plan.warnings,
@@ -188,7 +205,11 @@ export async function GET() {
           shared: store.shared,
           configured: storage.configured,
           source: storage.source,
-          warning: storage.warning,
+          health: storageHealth,
+          warning:
+            storageHealth === "unavailable"
+              ? "Counter storage is configured but its health check failed. Session counts are temporarily unavailable."
+              : storage.warning,
         },
         preferOpenWeightModels: env.llm.counterPreferOpen,
         openWeightProviders: openWeight,

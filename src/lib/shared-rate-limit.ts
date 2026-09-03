@@ -4,6 +4,7 @@ import { resolveCounterRedisConfig, type RedisConfig } from "@/counter/store";
 import type { RateLimitRule, RateLimitVerdict } from "./rate-limit";
 
 const KEY_PREFIX = "asad:request-rate:v1:";
+const SHARED_LIMIT_TIMEOUT_MS = 1_200;
 
 const RATE_LIMIT_SCRIPT = `
 local result = {}
@@ -51,21 +52,29 @@ export async function checkSharedRateLimitsWithConfig(
   if (checks.length === 0) return [];
 
   const keys = checks.map((check) => redisKey(check.name, check.key));
-  const response = await fetch(config.url, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${config.token}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify([
-      "EVAL",
-      RATE_LIMIT_SCRIPT,
-      checks.length,
-      ...keys,
-      ...checks.map((check) => check.rule.windowMs),
-    ]),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SHARED_LIMIT_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(config.url, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify([
+        "EVAL",
+        RATE_LIMIT_SCRIPT,
+        checks.length,
+        ...keys,
+        ...checks.map((check) => check.rule.windowMs),
+      ]),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     throw new Error(`Shared rate-limit Redis request failed (${response.status}).`);

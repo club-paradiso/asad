@@ -265,6 +265,7 @@ export function TextInput({
   placeholder?: string;
   korean?: boolean;
   id?: string;
+  maxLength?: number;
 }) {
   return (
     <input

@@ -160,7 +160,7 @@ describe("scenario C · primary free provider returns 429 mid-sermon", () => {
     expect(result.provider).toBe("gemini");
   });
 
-  it("does not let a stale superseded answer overwrite newer English", async () => {
+  it("stops the fallback chain when newer speech supersedes the whole turn", async () => {
     // A slow request is aborted when newer Korean supersedes it; the engine
     // must not apply what it eventually returns.
     const controller = new AbortController();
@@ -182,9 +182,9 @@ describe("scenario C · primary free provider returns 429 mid-sermon", () => {
     );
     controller.abort();
 
-    // It falls through to local rather than hanging or returning stale text.
-    const result = await pending;
-    expect(result.provider).toBe("local");
+    // A caller abort means the whole result is obsolete. It must neither hang
+    // nor spend another provider/local attempt on stale Korean.
+    await expect(pending).rejects.toMatchObject({ kind: "timeout" });
   });
 });
 
