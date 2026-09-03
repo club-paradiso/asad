@@ -48,7 +48,7 @@ import { useLiveSession } from "./useLiveSession";
 import { useBoothAudioInput } from "./useBoothAudioInput";
 import { isBoothPreflightAcknowledged } from "./booth-preflight-ack";
 import { preferredSttSource } from "./sourcePreference";
-import { useCloudConsent } from "./useCloudConsent";
+import { sttDisclosureFor, useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
 import { Readiness, type ReadinessRow } from "./Readiness";
 import { SessionSummary } from "@/features/sessions/SessionSummary";
@@ -91,7 +91,7 @@ const SOURCE_LABEL_KO: Partial<Record<SttProviderId, string>> = {
 const SOURCE_DETAIL_KO: Partial<Record<SttProviderId, string>> = {
   demo: "미리 녹음된 설교 — 마이크도 키도 필요 없고, 오프라인에서도 됩니다",
   webspeech:
-    "기기 안에서 인식합니다 — 키 불필요. 크롬에서 가장 정확하고, 사파리는 일부만 됩니다",
+    "브라우저가 인식을 관리합니다 — 브라우저 제공자의 서버로 음성이 전송될 수 있습니다",
   deepgram: "한국어 스트리밍 — 중간 결과와 용어 힌트를 지원합니다",
   openai: "웹소켓 기반 실시간 인식",
 };
@@ -160,6 +160,7 @@ export function StartScreen() {
       setBoothPreflightVerified(
         settings.mode === "sermon" &&
           canChooseAudioInput &&
+          audioInputs.selectionAvailable &&
           isBoothPreflightAcknowledged(audioDeviceId || undefined),
       );
 
@@ -169,7 +170,7 @@ export function StartScreen() {
     // forever just because nobody navigated away.
     const timer = window.setInterval(refresh, 60_000);
     return () => window.clearInterval(timer);
-  }, [settings.mode, canChooseAudioInput, audioDeviceId]);
+  }, [settings.mode, canChooseAudioInput, audioDeviceId, audioInputs.selectionAvailable]);
 
   const session = useLiveSession({
     mode: settings.mode,
@@ -199,6 +200,7 @@ export function StartScreen() {
         consent: consent.phase,
         audioInputLabel: selectedAudioLabel,
         audioInputSupported: audioInputs.supported,
+        audioInputAvailable: audioInputs.selectionAvailable,
         boothPreflightVerified,
       }),
     [
@@ -208,6 +210,7 @@ export function StartScreen() {
       consent.phase,
       selectedAudioLabel,
       audioInputs.supported,
+      audioInputs.selectionAvailable,
       boothPreflightVerified,
     ],
   );
@@ -292,7 +295,7 @@ export function StartScreen() {
   const beginSession = () => {
     // Belt and braces around the invariant: nothing starts while consent is
     // unresolved or outstanding, whatever the button happens to be doing.
-    if (!consent.mayStart) return;
+    if (!consent.mayStart || (canChooseAudioInput && !audioInputs.selectionAvailable)) return;
     setScreen("live");
     void session.start();
   };
@@ -385,6 +388,11 @@ export function StartScreen() {
                     onChange={(event) => audioInputs.setDeviceId(event.target.value)}
                     className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)]"
                   >
+                    {audioDeviceId && !audioInputs.selectionAvailable ? (
+                      <option value={audioDeviceId} disabled>
+                        이전에 선택한 입력 · 연결 끊김
+                      </option>
+                    ) : null}
                     <option value="">시스템 기본값</option>
                     {audioInputs.devices
                       .filter((device) => device.deviceId !== "default")
@@ -440,12 +448,21 @@ export function StartScreen() {
               </div>
             )}
 
+            {/* On a phone the readiness answers must be read before the action
+                they qualify. The desktop copy stays in the sticky side rail. */}
+            <div className="lg:hidden">
+              <Readiness rows={rows} demo={source === "demo"} />
+            </div>
+
             <Button
               tone="primary"
               size="lg"
               // Disabled only while we genuinely do not yet know what starting would
               // send. That window is short and it is the one the old race lived in.
-              disabled={!consent.mayStart}
+              disabled={
+                !consent.mayStart ||
+                (canChooseAudioInput && !audioInputs.selectionAvailable)
+              }
               onClick={beginSession}
               className="w-full"
             >
@@ -528,7 +545,7 @@ export function StartScreen() {
             </p>
           </div>
 
-          <aside className="min-w-0 lg:py-8">
+          <aside className="hidden min-w-0 lg:block lg:py-8">
             <Readiness rows={rows} demo={source === "demo"} />
           </aside>
         </main>
@@ -589,6 +606,7 @@ export function readinessRows(input: {
   consent?: string;
   audioInputLabel?: string;
   audioInputSupported?: boolean;
+  audioInputAvailable?: boolean;
   boothPreflightVerified?: boolean;
 }): ReadinessRow[] {
   const { config, source } = input;
@@ -615,6 +633,13 @@ export function readinessRows(input: {
             value: "이 브라우저는 오디오 입력 목록을 읽지 못합니다",
             level: "limited",
           }
+        : input.audioInputAvailable === false
+          ? {
+              label: "입력",
+              value: "이전에 선택한 오디오 입력의 연결이 끊겼습니다",
+              level: "blocked",
+              detail: "입력을 다시 연결하거나 시스템 기본값 또는 다른 입력을 선택하세요.",
+            }
         : input.mode === "sermon" && input.boothPreflightVerified !== true
           ? {
               label: "입력",
@@ -640,12 +665,12 @@ export function readinessRows(input: {
     : source === "webspeech"
       ? {
           label: "인식",
-          value: "브라우저 안에서 인식합니다",
+          value: "브라우저가 인식을 관리합니다",
           // Genuinely a limitation, and one that bites mid-service: Safari's
           // recogniser stops on a long silence and has to be restarted.
           level: "limited",
           detail:
-            "크롬에서 가장 정확합니다. 사파리는 일부만 지원하고, 오래 조용하면 멈출 수 있습니다.",
+            "브라우저 제공자의 서버로 음성이 전송될 수 있습니다. 크롬에서 가장 정확하고, 사파리는 일부만 지원하며 오래 조용하면 멈출 수 있습니다.",
         }
       : {
           label: "인식",
@@ -675,7 +700,10 @@ export function readinessRows(input: {
           }
         : { label: "AI", value: config.llm.configured, level: "ready" };
 
-  const disclosure = config?.llm.freeTierDisclosure ?? [];
+  const disclosure = [
+    ...sttDisclosureFor(source),
+    ...(config?.llm.freeTierDisclosure ?? []),
+  ];
   const disclosureAcknowledged =
     input.consent === "granted" || input.consent === "clear";
 
@@ -688,16 +716,16 @@ export function readinessRows(input: {
             label: "개인정보",
             value: "시작 전에 확인이 필요합니다",
             level: "limited",
-            detail: `말한 내용이 ${disclosure
+            detail: `음성과 말한 내용이 ${disclosure
               .map((p) => p.label)
-              .join(", ")}(으)로 전송되고, 해당 업체가 제품 개선에 활용할 수 있습니다. 시작 전에 다시 한 번 확인을 받습니다.`,
+              .join(", ")}(으)로 전송될 수 있습니다. 시작 전에 제공자별 처리 정책을 다시 한 번 확인합니다.`,
           }
         : disclosure.length > 0
           ? {
               label: "개인정보",
               value: "외부 제공자 정책 확인됨",
               level: "limited",
-              detail: `말한 내용이 ${disclosure
+              detail: `음성과 말한 내용이 ${disclosure
                 .map((p) => p.label)
                 .join(", ")}(으)로 전송됩니다. ${disclosure
                 .map((p) => p.note)
@@ -705,9 +733,7 @@ export function readinessRows(input: {
             }
           : {
               label: "개인정보",
-              value: config.llm.modelAvailable
-                ? "제공자가 이 세션으로 학습하지 않습니다"
-                : "이 기기 밖으로 나가지 않습니다",
+              value: "외부 전송 없음",
               level: "ready",
             };
 

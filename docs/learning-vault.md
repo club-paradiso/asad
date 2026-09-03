@@ -30,6 +30,6 @@ Only the staff-side Counter UI shows these flags. The visitor UI does not displa
 
 ## Storage
 
-When the existing Counter Upstash/Vercel KV REST credentials are configured, the vault uses a separate Redis list (`asad:learning:v1:candidates`) capped at 5,000 de-identified candidates with a 180-day TTL. Without shared Redis, development falls back to process memory and is explicitly non-durable.
+When the existing Counter Upstash/Vercel KV REST credentials are configured, the vault uses a separate Redis sorted set (`asad:learning:v2:candidates`) capped at 5,000 de-identified candidates. Each candidate is removed 180 days after its own creation time; new writes do not extend older candidates' retention. Without shared Redis, development falls back to process memory and is explicitly non-durable.
 
 This release intentionally has no public raw-data export endpoint. Training/export tooling should operate on reviewed, de-identified candidates rather than live Counter sessions.

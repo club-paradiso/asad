@@ -85,8 +85,8 @@ export class LlmRouter {
   private readonly breakers = new Map<LlmProviderId, CircuitBreaker>();
   private readonly limits = new Map<LlmProviderId, RateLimitTracker>();
   private readonly instances = new Map<LlmProviderId, LlmProvider>();
-  /** The provider this session settled on. */
-  private sticky?: LlmProviderId;
+  /** Provider affinity keyed by an explicit live/counter session identity. */
+  private readonly sticky = new Map<string, LlmProviderId>();
 
   constructor(
     private readonly env: AppEnv,
@@ -209,8 +209,9 @@ export class LlmRouter {
    *
    * Sticky while healthy; otherwise the first eligible candidate.
    */
-  preferred(prefer?: ProviderFilter): LlmProviderId | null {
-    if (!prefer && this.sticky && this.eligibility(this.sticky).ok) return this.sticky;
+  preferred(prefer?: ProviderFilter, routingKey?: string): LlmProviderId | null {
+    const sticky = routingKey ? this.sticky.get(routingKey) : undefined;
+    if (!prefer && sticky && this.eligibility(sticky).ok) return sticky;
     const candidates = prefer
       ? this.candidates().filter((id) => prefer(id, this.env.llm.providers[id].model))
       : this.candidates();
@@ -277,10 +278,12 @@ export class LlmRouter {
        * on the second choice.
        */
       prefer?: ProviderFilter;
+      /** Session/workflow identity for provider affinity. Omit for one-shot work. */
+      routingKey?: string;
     },
   ): Promise<RouteResult> {
     const attempts: RouteAttempt[] = [];
-    const chain = this.buildChain(options.prefer);
+    const chain = this.buildChain(options.prefer, options.routingKey);
 
     for (const id of chain) {
       const eligibility = this.eligibility(id);
@@ -303,10 +306,9 @@ export class LlmRouter {
       const limiter = this.limiterFor(id);
       const started = this.now();
 
+      const timed = withDeadline(request, options.deadlineMs);
       try {
-        const timed = withDeadline(request, options.deadlineMs);
         const response = await provider.complete(timed.request);
-        timed.dispose();
 
         limiter.observe(response.rateLimit);
         limiter.recordRequest(
@@ -325,7 +327,9 @@ export class LlmRouter {
         // sticky would mean one cloud failure silently ends cloud
         // interpretation for the rest of the session, including after the
         // provider recovers.
-        if (id !== "local") this.sticky = id;
+        if (id !== "local" && options.routingKey) {
+          this.setSticky(options.routingKey, id);
+        }
         attempts.push({
           provider: id,
           model: response.model ?? provider.model,
@@ -360,7 +364,15 @@ export class LlmRouter {
         });
 
         // The sticky provider just failed; the next healthy one takes over.
-        if (this.sticky === id) this.sticky = undefined;
+        if (options.routingKey && this.sticky.get(options.routingKey) === id) {
+          this.sticky.delete(options.routingKey);
+        }
+
+        // A turn-level abort means the result is no longer useful. Per-provider
+        // deadlines may fall through, but a caller abort must stop the chain.
+        if (request.signal?.aborted) throw llmError;
+      } finally {
+        timed.dispose();
       }
     }
 
@@ -369,18 +381,30 @@ export class LlmRouter {
   }
 
   /** Cloud candidates, then always the local interpreter as the floor. */
-  private buildChain(prefer?: ProviderFilter): LlmProviderId[] {
+  private buildChain(prefer?: ProviderFilter, routingKey?: string): LlmProviderId[] {
     const candidates = this.candidates();
+    const sticky = routingKey ? this.sticky.get(routingKey) : undefined;
     // An explicit preference outranks stickiness: stickiness exists to keep
     // terminology consistent within one live session, which is not a reason to
     // send a counter turn to a proprietary model.
     const front = prefer
       ? candidates.filter((id) => prefer(id, this.env.llm.providers[id].model))
-      : this.sticky && this.eligibility(this.sticky).ok
-        ? [this.sticky]
+      : sticky && this.eligibility(sticky).ok
+        ? [sticky]
         : [];
     const rest = candidates.filter((id) => !front.includes(id));
     return [...front, ...rest, "local"];
+  }
+
+  private setSticky(key: string, provider: LlmProviderId): void {
+    // Refresh insertion order and bound attacker-controlled session keys.
+    this.sticky.delete(key);
+    this.sticky.set(key, provider);
+    while (this.sticky.size > 2_000) {
+      const oldest = this.sticky.keys().next().value as string | undefined;
+      if (!oldest) break;
+      this.sticky.delete(oldest);
+    }
   }
 
   /* --- Introspection ---------------------------------------------------- */
@@ -444,7 +468,7 @@ export class LlmRouter {
   reset(): void {
     this.breakers.clear();
     this.limits.clear();
-    this.sticky = undefined;
+    this.sticky.clear();
   }
 }
 
@@ -458,7 +482,8 @@ function withDeadline(request: LlmRequest, deadlineMs: number) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), deadlineMs);
   const onAbort = () => controller.abort();
-  request.signal?.addEventListener("abort", onAbort, { once: true });
+  if (request.signal?.aborted) controller.abort(request.signal.reason);
+  else request.signal?.addEventListener("abort", onAbort, { once: true });
 
   return {
     request: { ...request, signal: controller.signal },

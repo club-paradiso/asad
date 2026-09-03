@@ -64,6 +64,11 @@ await page.screenshot({ path: join(outDir, "home.png") });
 
 // --- Live session ---------------------------------------------------------
 await page.goto(`${base}/live`, { waitUntil: "networkidle" });
+const privacyDialog = page.getByRole("dialog", { name: /This setup sends what is said/ });
+if (await privacyDialog.isVisible().catch(() => false)) {
+  await privacyDialog.getByRole("button", { name: "Use local-only mode" }).click();
+  check("live privacy gate offers a working local-only path", true);
+}
 await page.getByRole("radio", { name: /^데모/ }).click();
 await page.getByRole("button", { name: "데모 실행" }).click();
 await page.waitForTimeout(3000);
@@ -311,9 +316,9 @@ const confirmVoice = guest.getByRole("button", { name: "Edit transcript" });
 await confirmVoice.waitFor({ state: "visible", timeout: 2500 });
 check(
   "critical voice transcript waits for human review",
-  queuedRequests.length === 0 && (await editVoice.isVisible()),
+  queuedRequests.length === 0 && (await confirmVoice.isVisible()),
 );
-await editVoice.click();
+await confirmVoice.click();
 check(
   "recognized speech remains editable before sending",
   (await guestInput.inputValue()) === "My visa number is 123456",
@@ -323,18 +328,16 @@ const guestSend = guest.getByRole("button", { name: "Send" });
 await guestSend.click();
 await guest.waitForTimeout(50);
 check(
-  "voice transcript remains a draft for correction",
-  queuedRequests.length === 0 && (await guestInput.inputValue()).length > 0,
-);
-
-const guestSend = guest.getByRole("button", { name: "Send" });
-await guestSend.click();
-check("typed draft clears immediately when queued", (await guestInput.inputValue()) === "");
-check(
-  "edited speech submits only after the operator sends it",
-  queuedRequests.length === 1 && queuedRequests[0]?.source === "voice",
+  "reviewed speech submits only after the operator sends it",
+  queuedRequests.length === 1 &&
+    queuedRequests[0]?.source === "voice" &&
+    (await guestInput.inputValue()) === "",
 );
 await guest.getByRole("button", { name: "Restore previous text" }).click();
+check(
+  "text typed while listening can be restored",
+  (await guestInput.inputValue()) === "typed while listening",
+);
 check("Send stays enabled while translation is pending", await guestSend.isEnabled());
 await guestSend.click();
 await guest.waitForTimeout(1600);

@@ -12,6 +12,11 @@ import { counterStore } from "@/counter/store";
 import { isSensitiveCounterProfile } from "@/counter/profiles";
 import { findLanguage } from "@/counter/languages";
 import { MAX_COUNTER_UTTERANCE_BYTES } from "@/providers/stt/audio";
+import {
+  COUNTER_TOKEN_HEADER,
+  counterTokenFrom,
+  participantForToken,
+} from "@/counter/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +32,7 @@ type HfPayload = { audio?: unknown; language?: unknown; code?: unknown };
 export async function POST(request: Request) {
   const guarded = await guardInferenceRoute(request, {
     requireSession: true,
+    deferredCredentialHeader: COUNTER_TOKEN_HEADER,
     maxBodyBytes: MAX_BODY_BYTES,
     limits: [{ rule: "sttHf", by: "session" }, { rule: "sttHf", by: "address" }],
   });
@@ -48,6 +54,9 @@ export async function POST(request: Request) {
   const code = typeof body.code === "string" ? normaliseCode(body.code) : null;
   const session = code ? await counterStore().get(code) : undefined;
   if (!session) return error(403, "Voice fallback is not available for this session.");
+  if (!participantForToken(session, counterTokenFrom(request))) {
+    return error(401, "Counter session authorisation required.");
+  }
   if (isSensitiveCounterProfile(session.profileId)) {
     return error(403, "Voice fallback is not available for this service.");
   }

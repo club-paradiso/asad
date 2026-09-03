@@ -53,6 +53,29 @@ interface ConfigShape {
   llm?: { freeTierDisclosure?: DisclosureProvider[] };
 }
 
+/** Every non-demo recogniser may send microphone audio outside the device. */
+export function sttDisclosureFor(source: SttProviderId): DisclosureProvider[] {
+  switch (source) {
+    case "demo":
+      return [];
+    case "webspeech":
+      return [{
+        label: "Browser speech-recognition service",
+        note: "The Web Speech API may send microphone audio to your browser vendor's recognition service. Browsers do not guarantee that recognition stays on this device.",
+      }];
+    case "deepgram":
+      return [{
+        label: "Deepgram speech recognition",
+        note: "Microphone audio is streamed to Deepgram to create the Korean transcript.",
+      }];
+    case "openai":
+      return [{
+        label: "OpenAI speech recognition",
+        note: "Microphone audio is streamed to OpenAI to create the Korean transcript.",
+      }];
+  }
+}
+
 /**
  * Resolve the phase from what is known.
  *
@@ -94,7 +117,10 @@ export function useCloudConsent(source: SttProviderId): CloudConsent {
   // `resolvePhase` already short-circuits demo, so nothing is lost by letting
   // both of these follow the source rather than lead it.
   const acknowledged = useCapability(hasAcknowledged, true);
-  const [disclosure, setDisclosure] = useState<DisclosureProvider[] | undefined>(undefined);
+  const [resolvedDisclosure, setResolvedDisclosure] = useState<{
+    source: SttProviderId;
+    providers: DisclosureProvider[];
+  } | null>(null);
   const [decision, setDecision] = useState<"granted" | "declined" | null>(null);
 
   // A decision belongs to the source it was made about. Switching to a
@@ -128,10 +154,19 @@ export function useCloudConsent(source: SttProviderId): CloudConsent {
     if (acknowledged) return;
 
     fetch("/api/config", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((config: ConfigShape | null) => {
+      .then((response) => {
+        if (!response.ok) throw new Error(`Config failed (${response.status}).`);
+        return response.json() as Promise<ConfigShape>;
+      })
+      .then((config) => {
         if (cancelled) return;
-        setDisclosure(config?.llm?.freeTierDisclosure ?? []);
+        setResolvedDisclosure({
+          source,
+          providers: [
+            ...sttDisclosureFor(source),
+            ...(config.llm?.freeTierDisclosure ?? []),
+          ],
+        });
       })
       .catch(() => {
         // The config endpoint failed, so we do not know what would be
@@ -140,12 +175,16 @@ export function useCloudConsent(source: SttProviderId): CloudConsent {
         // exists to prevent — so an unknown posture is treated as one that
         // needs saying out loud.
         if (!cancelled) {
-          setDisclosure([
-            {
-              label: "Cloud interpretation provider",
-              note: "This deployment's privacy details could not be loaded, so the provider that will receive the transcript is unknown. Continue only if you are willing to send this session to it.",
-            },
-          ]);
+          setResolvedDisclosure({
+            source,
+            providers: [
+              ...sttDisclosureFor(source),
+              {
+                label: "Cloud interpretation provider",
+                note: "This deployment's privacy details could not be loaded, so the provider that will receive the transcript is unknown. Continue only if you are willing to send this session to it.",
+              },
+            ],
+          });
         }
       });
 
@@ -153,6 +192,9 @@ export function useCloudConsent(source: SttProviderId): CloudConsent {
       cancelled = true;
     };
   }, [source, acknowledged]);
+
+  const disclosure =
+    resolvedDisclosure?.source === source ? resolvedDisclosure.providers : undefined;
 
   const phase: ConsentPhase =
     decision ?? resolvePhase({ source, acknowledged, disclosure });

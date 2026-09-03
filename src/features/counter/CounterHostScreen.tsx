@@ -32,13 +32,14 @@ import { counterPreferencesStore } from "./preferences";
 
 export function CounterHostScreen() {
   const [code, setCode] = useState<string | null>(null);
+  const [participantToken, setParticipantToken] = useState<string | null>(null);
   const [preferences, setPreferences] = useLocalStore(counterPreferencesStore);
   const [editingPreferences, setEditingPreferences] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
 
-  const session = useCounterSession(code, "host");
+  const session = useCounterSession(code, participantToken);
   const hostLang = preferences.hostLang;
   const deskLabel = preferences.deskLabel;
   const t = stringsFor(hostLang);
@@ -56,11 +57,16 @@ export function CounterHostScreen() {
           deskLabel: deskLabel.trim() || undefined,
         }),
       });
-      const data = (await response.json()) as { session?: SessionView; error?: string };
-      if (!response.ok || !data.session) {
+      const data = (await response.json()) as {
+        session?: SessionView;
+        participantToken?: string;
+        error?: string;
+      };
+      if (!response.ok || !data.session || !data.participantToken) {
         setStartError("현장응대를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
+      setParticipantToken(data.participantToken);
       setCode(data.session.code);
       setEditingPreferences(false);
     } catch {
@@ -74,6 +80,7 @@ export function CounterHostScreen() {
   const next = useCallback(async () => {
     await session.end();
     setCode(null);
+    setParticipantToken(null);
     setShowCode(false);
     void start();
   }, [session, start]);
@@ -171,7 +178,8 @@ export function CounterHostScreen() {
             strings={t}
             busy={session.sending}
             counterCode={code}
-            onSend={(text, source) => void session.send({ text, source })}
+            counterToken={participantToken}
+            onSend={(text, source) => session.send({ text, source })}
           />
         </>
       )}
@@ -525,7 +533,17 @@ function SetupScreen({
         </p>
       )}
 
-      {disclosure && !disclosure.provider && (
+      {disclosure?.provider ? (
+        <div className="rounded-md border border-[var(--line)] bg-[var(--bg-raised)] px-3.5 py-3 text-xs leading-relaxed">
+          <p className={disclosure.mayTrain ? "text-[var(--warn)]" : "text-[var(--fg-muted)]"}>
+            번역 제공자: {disclosure.provider}
+            {disclosure.mayTrain ? " · 무료 등급의 제품 개선 활용 가능" : " · 학습 활용 없음"}
+          </p>
+          {disclosure.note && (
+            <p className="mt-1 text-[var(--fg-dim)]">{disclosure.note}</p>
+          )}
+        </div>
+      ) : disclosure ? (
         <div className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3.5 py-3 text-xs leading-relaxed">
           <p className="text-[var(--danger)]">
             지금은 새 문장을 번역할 수 없습니다.
@@ -535,7 +553,7 @@ function SetupScreen({
             사용할 수 있습니다.
           </p>
         </div>
-      )}
+      ) : null}
 
       <button
         type="button"

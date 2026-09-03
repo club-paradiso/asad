@@ -188,10 +188,13 @@ async function runCase(
       inputTokens: (total.inputTokens ?? 0) + (current.inputTokens ?? 0),
       outputTokens: (total.outputTokens ?? 0) + (current.outputTokens ?? 0),
       totalTokens: (total.totalTokens ?? 0) + (current.totalTokens ?? 0),
-      cachedInputTokens:
-        (total.cachedInputTokens ?? 0) + (current.cachedInputTokens ?? 0),
+      ...(current.cachedInputTokens !== undefined && total.cachedInputTokens !== undefined
+        ? { cachedInputTokens: total.cachedInputTokens + current.cachedInputTokens }
+        : {}),
     }),
-    {},
+    usages.every((current) => current.cachedInputTokens !== undefined)
+      ? { cachedInputTokens: 0 }
+      : {},
   );
   return usages.length > 0
     ? { ...result, usage, usageReports: usages.length }

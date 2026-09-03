@@ -14,11 +14,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { guardedFetch, useSessionToken } from "@/lib/session-client";
+import { guardedFetch } from "@/lib/session-client";
+import { COUNTER_TOKEN_HEADER } from "@/counter/access-shared";
 import type {
   CounterMessage,
   CounterMessageAction,
-  Participant,
   SessionView,
 } from "@/counter/types";
 
@@ -51,9 +51,21 @@ const newMessageRequestId = (): string => {
 const retryableStatus = (status: number): boolean =>
   status === 408 || status === 425 || status === 429 || status >= 500;
 
-export function useCounterSession(code: string | null, role: Participant) {
-  // Both sides reach a model, so both need authorising before they type.
-  useSessionToken();
+export function retryAfterMs(response: Response, now = Date.now()): number | null {
+  const raw = response.headers.get("retry-after")?.trim();
+  if (!raw) return null;
+  const seconds = Number(raw);
+  const delay = Number.isFinite(seconds)
+    ? seconds * 1000
+    : Date.parse(raw) - now;
+  if (!Number.isFinite(delay)) return null;
+  return Math.min(60_000, Math.max(0, Math.ceil(delay)));
+}
+
+export function useCounterSession(
+  code: string | null,
+  participantToken: string | null,
+) {
   const router = useRouter();
 
   const [session, setSession] = useState<SessionView | null>(null);
@@ -87,11 +99,14 @@ export function useCounterSession(code: string | null, role: Participant) {
   }, [router]);
 
   const poll = useCallback(async () => {
-    if (!code || stopped.current) return;
+    if (!code || !participantToken || stopped.current) return;
     try {
       const response = await fetch(
         `/api/counter/session?code=${encodeURIComponent(code)}&since=${cursor.current}`,
-        { cache: "no-store" },
+        {
+          cache: "no-store",
+          headers: { [COUNTER_TOKEN_HEADER]: participantToken },
+        },
       );
       if (response.status === 404) {
         // The other participant ended the consultation (or the session expired).
@@ -115,10 +130,10 @@ export function useCounterSession(code: string | null, role: Participant) {
       // A dropped poll is normal on venue wifi; the next one recovers.
       setConnected(false);
     }
-  }, [code, merge]);
+  }, [code, participantToken, merge]);
 
   useEffect(() => {
-    if (!code) return;
+    if (!code || !participantToken) return;
     stopped.current = false;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -146,12 +161,12 @@ export function useCounterSession(code: string | null, role: Participant) {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [code, poll]);
+  }, [code, participantToken, poll]);
 
   const send = useCallback(
     (input: SendInput): Promise<CounterMessage | null> => {
       const text = input.text.trim();
-      if (!code || !text || stopped.current) return Promise.resolve(null);
+      if (!code || !participantToken || !text || stopped.current) return Promise.resolve(null);
 
       pendingSends.current += 1;
       setSending(true);
@@ -165,10 +180,12 @@ export function useCounterSession(code: string | null, role: Participant) {
 
       const run = async () => {
         let lastError = "Network problem — check the connection and try again.";
+        let serverRetryDelay: number | null = null;
 
         try {
           for (let attempt = 0; attempt < SEND_RETRY_DELAYS_MS.length; attempt += 1) {
-            const delay = SEND_RETRY_DELAYS_MS[attempt];
+            const delay = serverRetryDelay ?? SEND_RETRY_DELAYS_MS[attempt];
+            serverRetryDelay = null;
             if (delay > 0) await sleep(delay);
 
             if (stopped.current) {
@@ -182,8 +199,9 @@ export function useCounterSession(code: string | null, role: Participant) {
                 headers: {
                   "content-type": "application/json",
                   "x-asad-message-id": requestId,
+                  [COUNTER_TOKEN_HEADER]: participantToken,
                 },
-                body: JSON.stringify({ code, from: role, ...input, text }),
+                body: JSON.stringify({ code, ...input, text }),
               });
               const data = (await response.json().catch(() => ({}))) as {
                 message?: CounterMessage;
@@ -199,6 +217,7 @@ export function useCounterSession(code: string | null, role: Participant) {
 
               lastError = data.error ?? `Could not send that (${response.status}).`;
               const mayRetry = retryableStatus(response.status);
+              if (response.status === 429) serverRetryDelay = retryAfterMs(response);
               if (!mayRetry || attempt === SEND_RETRY_DELAYS_MS.length - 1) {
                 setError(lastError);
                 resolveResult(null);
@@ -232,7 +251,7 @@ export function useCounterSession(code: string | null, role: Participant) {
 
       return result;
     },
-    [code, role, merge],
+    [code, participantToken, merge],
   );
 
   const end = useCallback(
@@ -241,16 +260,17 @@ export function useCounterSession(code: string | null, role: Participant) {
       setConnected(false);
       stopped.current = true;
 
-      if (!code) {
+      if (!code || !participantToken) {
         if (options.leave) leaveCounterMode();
         return;
       }
       await fetch(`/api/counter/session?code=${encodeURIComponent(code)}`, {
         method: "DELETE",
+        headers: { [COUNTER_TOKEN_HEADER]: participantToken },
       }).catch(() => {});
       if (options.leave) leaveCounterMode();
     },
-    [code, leaveCounterMode],
+    [code, participantToken, leaveCounterMode],
   );
 
   return {

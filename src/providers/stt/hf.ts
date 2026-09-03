@@ -1,6 +1,7 @@
 /** Browser client for the server-owned Hugging Face Counter fallback. */
 import { pcm16ToWav } from "./audio";
 import { guardedFetch } from "@/lib/session-client";
+import { COUNTER_TOKEN_HEADER } from "@/counter/access-shared";
 
 const REQUEST_TIMEOUT_MS = 42_000; // allows a cold model start without hanging forever
 
@@ -9,6 +10,7 @@ export interface HfTranscriptionRequest {
   language: string;
   /** A Counter session code lets the server enforce its profile policy. */
   code?: string;
+  counterToken?: string;
 }
 
 export class HfTranscriptionError extends Error {
@@ -34,7 +36,10 @@ export async function transcribeWithHuggingFace(input: HfTranscriptionRequest): 
   try {
     const response = await guardedFetch("/api/stt/hf", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(input.counterToken ? { [COUNTER_TOKEN_HEADER]: input.counterToken } : {}),
+      },
       body: JSON.stringify({
         audio: arrayBufferToBase64(pcm16ToWav(input.pcm16)),
         language: input.language,

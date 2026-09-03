@@ -3,13 +3,18 @@ import { __resetEnvCache } from "@/lib/env";
 import { __setCounterStore, createMemoryStore } from "@/counter/store";
 import { pcm16ToWav } from "@/providers/stt/audio";
 import { POST, decodeAudio, parseHfTranscription, requestHfTranscription } from "./route";
+import { COUNTER_TOKEN_HEADER, issueCounterCapability } from "@/counter/access";
 
 const TOKEN = "h".repeat(32);
 const wav = Buffer.from(pcm16ToWav(new Uint8Array(1600).buffer)).toString("base64");
 
-const request = (body: Record<string, unknown>) => new Request("http://localhost/api/stt/hf", {
+const request = (body: Record<string, unknown>, counterToken?: string) => new Request("http://localhost/api/stt/hf", {
   method: "POST",
-  headers: { "content-type": "application/json", origin: "http://localhost" },
+  headers: {
+    "content-type": "application/json",
+    origin: "http://localhost",
+    ...(counterToken ? { [COUNTER_TOKEN_HEADER]: counterToken } : {}),
+  },
   body: JSON.stringify(body),
 });
 
@@ -37,23 +42,37 @@ describe("HF Counter STT boundary", () => {
 
   it("does not call HF for a sensitive Counter profile", async () => {
     const store = createMemoryStore();
-    const session = await store.create({ hostLang: "ko-KR", profileId: "refugee" });
+    const host = issueCounterCapability();
+    const session = await store.create({
+      hostLang: "ko-KR",
+      hostTokenHash: host.hash,
+      profileId: "refugee",
+    });
     // Use the same store as the route rather than accepting a client profile.
     __setCounterStore(store);
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);
-    const response = await POST(request({ audio: wav, language: "ko-KR", code: session.code }));
+    const response = await POST(
+      request({ audio: wav, language: "ko-KR", code: session.code }, host.token),
+    );
     expect(response.status).toBe(403);
     expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("accepts a guarded general session and never exposes the HF token", async () => {
     const store = createMemoryStore();
-    const session = await store.create({ hostLang: "ko-KR", profileId: "general" });
+    const host = issueCounterCapability();
+    const session = await store.create({
+      hostLang: "ko-KR",
+      hostTokenHash: host.hash,
+      profileId: "general",
+    });
     __setCounterStore(store);
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ text: "안녕하세요" }), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
-    const response = await POST(request({ audio: wav, language: "ko-KR", code: session.code }));
+    const response = await POST(
+      request({ audio: wav, language: "ko-KR", code: session.code }, host.token),
+    );
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toEqual({ text: "안녕하세요" });

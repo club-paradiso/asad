@@ -30,12 +30,12 @@ describe("booth preflight acknowledgement", () => {
     expect(isBoothPreflightAcknowledged("other-device", now + 60_000, storage)).toBe(false);
   });
 
-  it("keeps System default distinct from an explicitly selected input", () => {
+  it("never carries an acknowledgement for the mutable System default alias", () => {
     const storage = memoryStorage();
     const now = 1_000_000;
     writeBoothPreflightAcknowledgement(undefined, now, storage);
 
-    expect(isBoothPreflightAcknowledged(undefined, now + 1, storage)).toBe(true);
+    expect(isBoothPreflightAcknowledged(undefined, now + 1, storage)).toBe(false);
     expect(isBoothPreflightAcknowledged("usb-mixer", now + 1, storage)).toBe(false);
   });
 

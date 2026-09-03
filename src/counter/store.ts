@@ -18,6 +18,7 @@ export const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 /** Bound per-session memory/storage; a counter conversation is not a transcript archive. */
 export const MAX_MESSAGES = 500;
 const UPDATE_RETRIES = 8;
+const REDIS_REQUEST_TIMEOUT_MS = 2_500;
 const REDIS_KEY_PREFIX = "tong-yuck:counter:session:v1:";
 
 type Awaitable<T> = T | Promise<T>;
@@ -33,6 +34,7 @@ export interface CounterStore {
   readonly shared: boolean;
   create(input: {
     hostLang: string;
+    hostTokenHash: string;
     deskLabel?: string;
     profileId?: CounterProfileId;
   }): Awaitable<CounterSession>;
@@ -63,6 +65,7 @@ class MemoryCounterStore implements CounterStore {
 
   create(input: {
     hostLang: string;
+    hostTokenHash: string;
     deskLabel?: string;
     profileId?: CounterProfileId;
   }): CounterSession {
@@ -75,6 +78,7 @@ class MemoryCounterStore implements CounterStore {
     const at = this.now();
     const session: CounterSession = {
       code,
+      hostTokenHash: input.hostTokenHash,
       createdAt: at,
       lastActivityAt: at,
       state: "waiting",
@@ -189,15 +193,23 @@ class RedisCounterStore implements CounterStore {
   }
 
   private async command<T>(args: Array<string | number>): Promise<T> {
-    const response = await fetch(this.config.url, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${this.config.token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(args),
-      cache: "no-store",
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REDIS_REQUEST_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(this.config.url, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.config.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(args),
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!response.ok) {
       throw new Error(`Counter Redis request failed (${response.status}).`);
@@ -210,6 +222,7 @@ class RedisCounterStore implements CounterStore {
 
   async create(input: {
     hostLang: string;
+    hostTokenHash: string;
     deskLabel?: string;
     profileId?: CounterProfileId;
   }): Promise<CounterSession> {
@@ -218,6 +231,7 @@ class RedisCounterStore implements CounterStore {
       const at = this.now();
       const session: CounterSession = {
         code,
+        hostTokenHash: input.hostTokenHash,
         createdAt: at,
         lastActivityAt: at,
         state: "waiting",

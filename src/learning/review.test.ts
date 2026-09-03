@@ -13,6 +13,18 @@ describe("human review flags", () => {
     expect(flags.some((flag) => flag.kind === "self-harm-language")).toBe(true);
   });
 
+  it.each([
+    ["我要杀你", "explicit-threat"],
+    ["я тебя убью", "explicit-threat"],
+    ["te voy a matar", "explicit-threat"],
+    ["死にたい", "self-harm-language"],
+    ["je veux mourir", "self-harm-language"],
+    ["أريد أن أموت", "self-harm-language"],
+  ] as const)("flags an explicit multilingual safety phrase: %s", (sourceText, kind) => {
+    expect(buildHumanReviewFlags({ sourceText, confidence: "high" }))
+      .toEqual(expect.arrayContaining([expect.objectContaining({ kind })]));
+  });
+
   it("does not flag ordinary use of violent vocabulary without an explicit threat pattern", () => {
     const flags = buildHumanReviewFlags({
       sourceText: "The movie was about a murder investigation.",

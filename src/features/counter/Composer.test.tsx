@@ -121,6 +121,38 @@ describe("Counter Composer", () => {
     expect(input.value).toBe("typed while listening");
   });
 
+  it("restores a submitted voice transcript with its voice source", async () => {
+    const onSend = vi.fn();
+    voice.start.mockResolvedValue("spoken turn");
+    render(<Composer lang="en-US" strings={stringsFor("en-US")} onSend={onSend} />);
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Speak" })); });
+    const input = screen.getByPlaceholderText("Type your message") as HTMLInputElement;
+    fireEvent.submit(input.closest("form")!);
+    expect(onSend).toHaveBeenLastCalledWith("spoken turn", "voice");
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore previous text" }));
+    fireEvent.submit(input.closest("form")!);
+    expect(onSend).toHaveBeenLastCalledWith("spoken turn", "voice");
+  });
+
+  it("keeps a failed typed send recoverable after newer typing cleared the undo copy", async () => {
+    let resolveSend!: (value: null) => void;
+    const onSend = vi.fn(() => new Promise<null>((resolve) => { resolveSend = resolve; }));
+    render(<Composer lang="en-US" strings={stringsFor("en-US")} onSend={onSend} />);
+    const input = screen.getByPlaceholderText("Type your message") as HTMLInputElement;
+    const form = input.closest("form")!;
+
+    fireEvent.change(input, { target: { value: "first turn" } });
+    fireEvent.submit(form);
+    fireEvent.change(input, { target: { value: "newer draft" } });
+    fireEvent.change(input, { target: { value: "" } });
+    await act(async () => resolveSend(null));
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore previous text" }));
+    expect(input.value).toBe("first turn");
+  });
+
   it("does not submit while a Korean IME composition is being committed", () => {
     const onSend = vi.fn();
     render(<Composer lang="ko-KR" strings={stringsFor("ko-KR")} onSend={onSend} />);

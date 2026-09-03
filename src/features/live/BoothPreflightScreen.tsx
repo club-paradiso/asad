@@ -56,6 +56,11 @@ export function BoothPreflightScreen() {
             disabled={!audioInput.supported}
             className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)] disabled:opacity-50"
           >
+            {audioInput.deviceId && !audioInput.selectionAvailable ? (
+              <option value={audioInput.deviceId} disabled>
+                이전에 선택한 입력 · 연결 끊김
+              </option>
+            ) : null}
             <option value="">시스템 기본값</option>
             {audioInput.devices
               .filter((device) => device.deviceId !== "default")
@@ -72,7 +77,7 @@ export function BoothPreflightScreen() {
       </section>
 
       <BoothPreflight
-        key={audioInput.deviceId || "system-default"}
+        key={`${audioInput.deviceId || "system-default"}:${audioInput.selectionAvailable ? "available" : "missing"}`}
         inputLabel={audioInput.selectedLabel}
         deviceId={audioInput.deviceId || undefined}
         onPermissionGranted={() => void audioInput.refresh()}

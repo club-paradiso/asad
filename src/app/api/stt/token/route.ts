@@ -18,6 +18,13 @@ import { appEnv } from "@/lib/env";
 import { guardInferenceRoute } from "@/lib/guard";
 import { findLanguage } from "@/counter/languages";
 import type { SttCredentials } from "@/providers/stt/types";
+import {
+  COUNTER_TOKEN_HEADER,
+  counterTokenFrom,
+  participantForToken,
+} from "@/counter/access";
+import { normaliseCode } from "@/counter/codes";
+import { counterStore } from "@/counter/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,17 +35,34 @@ const TEMP_KEY_TTL_SECONDS = 60 * 90; // one long service
 export async function POST(request: Request) {
   const guarded = await guardInferenceRoute(request, {
     requireSession: true,
+    deferredCredentialHeader: COUNTER_TOKEN_HEADER,
     maxBodyBytes: 1024,
     limits: [{ rule: "sttToken", by: "session" }, { rule: "sttToken", by: "address" }],
   });
   if (!guarded.ok) return guarded.response;
 
-  const body = (guarded.body ?? {}) as { language?: unknown; usage?: unknown };
+  const body = (guarded.body ?? {}) as {
+    language?: unknown;
+    usage?: unknown;
+    code?: unknown;
+  };
   const requestedLanguage =
     typeof body.language === "string" && findLanguage(body.language)
       ? body.language
       : "ko-KR";
-  const counterTurn = body.usage === "counter";
+  const suppliedCounterToken = counterTokenFrom(request);
+  let counterTurn = body.usage === "counter" || !!suppliedCounterToken;
+  if (counterTurn) {
+    const code = typeof body.code === "string" ? normaliseCode(body.code) : null;
+    const counterSession = code ? await counterStore().get(code) : undefined;
+    if (!counterSession || !participantForToken(counterSession, suppliedCounterToken)) {
+      return NextResponse.json(
+        { error: "Counter session authorisation required." },
+        { status: 401 },
+      );
+    }
+    counterTurn = true;
+  }
 
   // Read the PARSED environment. The raw values were read here directly, which
   // meant this route and the rest of the application could disagree about

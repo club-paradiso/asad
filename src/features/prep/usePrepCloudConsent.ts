@@ -46,10 +46,6 @@ export function usePrepCloudConsent() {
   const [decision, setDecision] = useState<"granted" | "declined" | null>(null);
 
   useEffect(() => {
-    // Once this workflow's cloud disclosure has been accepted, another config
-    // round-trip is not required merely to decide whether the button may act.
-    if (acknowledged) return;
-
     let cancelled = false;
     fetch("/api/config", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
@@ -81,7 +77,7 @@ export function usePrepCloudConsent() {
     return () => {
       cancelled = true;
     };
-  }, [acknowledged]);
+  }, []);
 
   const phase: PrepConsentPhase =
     decision ?? resolvePrepConsent({ acknowledged, modelAvailable, disclosure });

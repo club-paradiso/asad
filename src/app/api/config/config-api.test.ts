@@ -69,6 +69,15 @@ describe("GET /api/config — the LLM state the launcher shows", () => {
     expect(llm.capacityNote).toMatch(/over|limit/i);
   });
 
+  it("keeps an unsustainable provider available to Counter while refusing it for Live", async () => {
+    const { llm, counter } = await config({
+      GROQ_API_KEY: KEY,
+      LLM_LIVE_REQUIRE_SUSTAINABLE: "true",
+    });
+    expect(llm.modelAvailable).toBe(false);
+    expect(counter.provider).toBe("Groq");
+  });
+
   it("raises no capacity warning for a provider with the headroom", async () => {
     const { llm } = await config({ GEMINI_API_KEY: KEY });
     expect(llm.sustainsLiveSermon).toBe(true);

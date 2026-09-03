@@ -23,6 +23,11 @@ import type { CounterPromptInput } from "./prompt";
  */
 export const COUNTER_DEADLINE_MS = 6000;
 
+// Sensitive turns need the same circuit-breaker and quota memory as ordinary
+// turns. Recreating this router per request repeatedly probes an unavailable
+// provider and makes every turn pay the full outage latency.
+let sensitiveRouter: LlmRouter | null = null;
+
 export interface TranslationResult {
   ok: boolean;
   output?: CounterOutput;
@@ -39,13 +44,16 @@ export interface TranslationResult {
  * a preference: it is a hard routing boundary. If OpenRouter is unavailable,
  * the turn fails rather than sending refugee/judicial content to another cloud.
  */
-function routerForCounter(input: CounterPromptInput): {
+type CounterRoutingInput = CounterPromptInput & { forceSensitiveRouting?: boolean };
+
+function routerForCounter(input: CounterRoutingInput): {
   router: LlmRouter;
   sensitive: boolean;
   policyError?: string;
 } {
   const env = appEnv();
-  const sensitive = isSensitiveCounterProfile(input.profileId);
+  const sensitive =
+    !!input.forceSensitiveRouting || isSensitiveCounterProfile(input.profileId);
   if (!sensitive) return { router: llmRouter(), sensitive: false };
 
   if (
@@ -71,11 +79,16 @@ function routerForCounter(input: CounterPromptInput): {
     },
   };
 
-  return { router: new LlmRouter(sensitiveEnv), sensitive: true };
+  return { router: (sensitiveRouter ??= new LlmRouter(sensitiveEnv)), sensitive: true };
 }
 
+/** Test seam. */
+export const __resetSensitiveCounterRouter = () => {
+  sensitiveRouter = null;
+};
+
 export async function translateForCounter(
-  input: CounterPromptInput,
+  input: CounterRoutingInput & { routingKey?: string },
 ): Promise<TranslationResult> {
   const started = Date.now();
   const { router, sensitive, policyError } = routerForCounter(input);
@@ -116,6 +129,7 @@ export async function translateForCounter(
         deadlineMs: COUNTER_DEADLINE_MS,
         validate: (response) => parseCounterOutput(response.text) !== null,
         prefer,
+        routingKey: input.routingKey,
       },
     );
 

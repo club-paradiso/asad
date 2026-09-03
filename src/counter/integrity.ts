@@ -26,6 +26,32 @@ const MONTHS: Record<string, number> = {
   december: 12,
 };
 
+const LOCAL_MONTHS: Record<string, number> = {
+  ...MONTHS,
+  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7,
+  agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+  janvier: 1, février: 2, fevrier: 2, mars: 3, avril: 4, mai: 5, juin: 6,
+  juillet: 7, août: 8, aout: 8, septembre: 9, octobre: 10, novembre: 11, décembre: 12,
+  yanvarya: 1, января: 1, fevralya: 2, февраля: 2, marta: 3, марта: 3,
+  aprelya: 4, апреля: 4, maya: 5, мая: 5, iyunya: 6, июня: 6, iyulya: 7,
+  июля: 7, avgusta: 8, августа: 8, sentyabrya: 9, сентября: 9, oktyabrya: 10,
+  октября: 10, noyabrya: 11, ноября: 11, dekabrya: 12, декабря: 12,
+  januari: 1, februari: 2, maret: 3, mei: 5, juni: 6, juli: 7, agustus: 8,
+  oktober: 10, november: 11, desember: 12,
+  ocak: 1, şubat: 2, subat: 2, mart: 3, nisan: 4, mayıs: 5, mayis: 5,
+  haziran: 6, temmuz: 7, ağustos: 8, agustos: 8, eylül: 9, eylul: 9,
+  ekim: 10, kasım: 11, kasim: 11, aralık: 12, aralik: 12,
+  يناير: 1, فبراير: 2, مارس: 3, أبريل: 4, ابريل: 4, مايو: 5, يونيو: 6,
+  يوليو: 7, أغسطس: 8, اغسطس: 8, سبتمبر: 9, أكتوبر: 10, اكتوبر: 10,
+  نوفمبر: 11, ديسمبر: 12,
+  जनवरी: 1, फ़रवरी: 2, फरवरी: 2, मार्च: 3, अप्रैल: 4, मई: 5, जून: 6,
+  जुलाई: 7, अगस्त: 8, सितंबर: 9, सितम्बर: 9, अक्टूबर: 10, नवंबर: 11,
+  नवम्बर: 11, दिसंबर: 12, दिसम्बर: 12,
+};
+
+const localMonth = (raw: string): number | undefined =>
+  LOCAL_MONTHS[raw.normalize("NFKC").toLocaleLowerCase("und").replace(/[.'’]/g, "")];
+
 const CURRENCY: Record<string, string> = {
   "₩": "KRW",
   원: "KRW",
@@ -116,7 +142,7 @@ function nameKey(raw: string): string {
   return raw.normalize("NFKC").toLocaleLowerCase("en-US").replace(/[^\p{L}\p{N}]/gu, "");
 }
 
-export function extractCriticalValues(text: string): CriticalValue[] {
+export function extractCriticalValues(text: string, language?: string): CriticalValue[] {
   if (!text.trim()) return [];
   const claimed = new Array<boolean>(text.length).fill(false);
   const values: Candidate[] = [];
@@ -148,7 +174,7 @@ export function extractCriticalValues(text: string): CriticalValue[] {
 
   collect(
     "money",
-    /(?:[₩$€£¥]\s*[+-]?\d[\d\s,.]*|[+-]?\d[\d\s,.]*\s*(?:원|KRW|달러|USD|EUR|GBP|JPY|엔|위안|CNY))\b/giu,
+    /(?:[₩$€£¥]\s*[+-]?\d[\d\s,.]*|[+-]?\d[\d\s,.]*\s*(?:(?:원|달러|엔|위안)|(?:KRW|USD|EUR|GBP|JPY|CNY)\b))/giu,
     (raw) => moneyKey(raw),
   );
 
@@ -157,6 +183,39 @@ export function extractCriticalValues(text: string): CriticalValue[] {
   );
   collect("date", /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g, (_raw, match) =>
     dateKey(Number(match[1]), Number(match[2]), Number(match[3])),
+  );
+  collect(
+    "date",
+    /(?<!\d)(\d{1,2})[-./](\d{1,2})[-./](\d{4})(?!\d)/g,
+    (_raw, match) => {
+      const monthFirst = language?.toLowerCase() === "en-us";
+      return dateKey(
+        Number(match[3]),
+        Number(monthFirst ? match[1] : match[2]),
+        Number(monthFirst ? match[2] : match[1]),
+      );
+    },
+  );
+  collect(
+    "date",
+    /(?<!\p{L})(\d{1,2})\s+(?:de\s+)?([\p{L}.'’]+)\s+(?:de\s+)?(\d{4})(?!\d)/giu,
+    (_raw, match) => {
+      const month = localMonth(match[2]);
+      return month ? dateKey(Number(match[3]), month, Number(match[1])) : null;
+    },
+  );
+  collect(
+    "date",
+    /(?<!\p{L})([\p{L}.'’]+)\s+(\d{1,2})[,]?\s+(\d{4})(?!\d)/giu,
+    (_raw, match) => {
+      const month = localMonth(match[1]);
+      return month ? dateKey(Number(match[3]), month, Number(match[2])) : null;
+    },
+  );
+  collect(
+    "date",
+    /ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})/giu,
+    (_raw, match) => dateKey(Number(match[3]), Number(match[2]), Number(match[1])),
   );
   collect(
     "date",
@@ -236,9 +295,11 @@ const matches = (source: CriticalValue, target: CriticalValue, targetText: strin
 export function validateTranslationIntegrity(
   sourceText: string,
   targetText: string,
+  sourceLanguage?: string,
+  targetLanguage?: string,
 ): TranslationIntegrity {
-  const source = extractCriticalValues(sourceText);
-  const target = extractCriticalValues(targetText);
+  const source = extractCriticalValues(sourceText, sourceLanguage);
+  const target = extractCriticalValues(targetText, targetLanguage);
   const used = new Set<number>();
   const issues: IntegrityIssue[] = [];
 

@@ -22,4 +22,12 @@ describe("learning redaction", () => {
     expect(result.text).toContain("[URL]");
     expect(result.text).not.toContain("ABC1234567");
   });
+
+  it("removes labelled Hangul names and honorific forms", () => {
+    const result = redactForLearning("제 이름은 김민수이고 박서연 씨가 보호자입니다.");
+    expect(result.text).not.toContain("김민수");
+    expect(result.text).not.toContain("박서연");
+    expect(result.text.match(/\[NAME\]/g)).toHaveLength(2);
+    expect(result.kinds).toContain("name");
+  });
 });

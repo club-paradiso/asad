@@ -41,12 +41,13 @@ import { cn } from "@/lib/cn";
 
 export function CounterGuestScreen({ code }: { code: string }) {
   const [lang, setLang] = useState<string | null>(null);
+  const [participantToken, setParticipantToken] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
   // Only poll once a language is chosen: before that there is nothing to show
   // and no reason to announce a visitor who has not arrived.
-  const session = useCounterSession(lang ? code : null, "guest");
+  const session = useCounterSession(lang ? code : null, participantToken);
 
   const join = useCallback(
     async (chosen: string) => {
@@ -55,14 +56,24 @@ export function CounterGuestScreen({ code }: { code: string }) {
       try {
         const response = await fetch("/api/counter/session", {
           method: "PATCH",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...(participantToken
+              ? { "x-asad-counter-token": participantToken }
+              : {}),
+          },
           body: JSON.stringify({ code, guestLang: chosen }),
         });
-        const data = (await response.json()) as { session?: SessionView; error?: string };
-        if (!response.ok || !data.session) {
+        const data = (await response.json()) as {
+          session?: SessionView;
+          participantToken?: string;
+          error?: string;
+        };
+        if (!response.ok || !data.session || !data.participantToken) {
           setJoinError(data.error ?? "Could not join this session.");
           return;
         }
+        setParticipantToken(data.participantToken);
         setLang(chosen);
       } catch {
         setJoinError("Could not reach the server. Check the connection.");
@@ -70,7 +81,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
         setJoining(false);
       }
     },
-    [code],
+    [code, participantToken],
   );
 
   const finish = useCallback(async () => {
@@ -176,7 +187,8 @@ export function CounterGuestScreen({ code }: { code: string }) {
         strings={t}
         busy={session.sending}
         counterCode={code}
-        onSend={(text, source) => void session.send({ text, source })}
+        counterToken={participantToken}
+        onSend={(text, source) => session.send({ text, source })}
       />
     </div>
   );

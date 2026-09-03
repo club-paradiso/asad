@@ -97,7 +97,8 @@ export async function GET() {
   // The router is the authority on what a live turn would reach: it accounts
   // for every provider, the routing mode, the privacy mode, breaker state and
   // quota pressure.
-  const active = liveActive ?? plan.active;
+  const active =
+    liveActive ?? (env.llm.requireSustainableLive ? null : plan.active);
   const modelAvailable = active !== null && active !== "local";
 
   // Connected is not the same as sufficient. Say which.

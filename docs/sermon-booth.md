@@ -139,7 +139,8 @@ A successful preflight proves only the local ASAD capture path. It does not repl
 A completed Preflight is handed to the Sermon launcher as short-lived operational evidence, not as a permanent preference.
 
 - the acknowledgement lives only in same-tab `sessionStorage`;
-- it is scoped to the exact selected audio device, including System default as its own case;
+- it is scoped to an explicitly selected physical audio device; the mutable
+  **System default** alias is deliberately never carried as verified;
 - it stores only the opaque device id and check timestamp;
 - it expires after four hours;
 - losing readiness or changing the Preflight input clears it immediately;

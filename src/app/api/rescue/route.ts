@@ -23,7 +23,7 @@ import {
   llmRouter,
   turnBudgetFor,
 } from "@/providers/llm";
-import { guardInferenceRoute } from "@/lib/guard";
+import { guardInferenceRoute, readCookie, SESSION_COOKIE } from "@/lib/guard";
 import { estimateTokens, telemetry } from "@/lib/telemetry";
 
 export const runtime = "nodejs";
@@ -55,7 +55,9 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
   const router = llmRouter();
-  const preferred = router.preferred();
+  const sessionToken = readCookie(request, SESSION_COOKIE);
+  const routingKey = sessionToken ? `live:${sessionToken}` : undefined;
+  const preferred = router.preferred(undefined, routingKey);
 
   if (!preferred || preferred === "local") {
     return NextResponse.json({
@@ -126,6 +128,7 @@ export async function POST(request: Request) {
         }),
         estimatedTokens,
         validate: (response) => parseInterpreterOutput(response.text) !== null,
+        routingKey,
       },
     );
 

@@ -20,6 +20,13 @@ import type { CounterMessage } from "@/counter/types";
 import { guardInferenceRoute } from "@/lib/guard";
 import { buildHumanReviewFlags } from "@/learning/review";
 import { recordLearningCandidate } from "@/learning/vault";
+import { randomUUID } from "node:crypto";
+import {
+  COUNTER_TOKEN_HEADER,
+  counterTokenFrom,
+  participantForToken,
+} from "@/counter/access";
+import { toParticipantMessage } from "@/counter/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,12 +34,13 @@ export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 16 * 1024;
 const MESSAGE_ID_RE = /^[A-Za-z0-9._:-]{8,96}$/;
 
-let counter = 0;
-const nextId = () => `m${Date.now().toString(36)}${(counter += 1).toString(36)}`;
+// IDs must remain unique when two Vercel workers write in the same millisecond.
+const nextId = () => `m_${randomUUID()}`;
 
 export async function POST(request: Request) {
   const guarded = await guardInferenceRoute(request, {
     requireSession: true,
+    deferredCredentialHeader: COUNTER_TOKEN_HEADER,
     maxBodyBytes: MAX_BODY_BYTES,
     limits: [{ rule: "counter", by: "session" }, { rule: "counter", by: "address" }],
   });
@@ -61,7 +69,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { from, source, rephraseOf, action, actionOf } = parsed.data;
+  const from = participantForToken(session, counterTokenFrom(request));
+  if (!from) {
+    return NextResponse.json({ error: "Session authorisation required." }, { status: 401 });
+  }
+
+  const { source, rephraseOf, action, actionOf } = parsed.data;
   let text = parsed.data.text;
 
   if (clientRequestId) {
@@ -70,7 +83,7 @@ export async function POST(request: Request) {
     );
     if (duplicate) {
       return NextResponse.json({
-        message: duplicate,
+        message: toParticipantMessage(duplicate, from),
         viaModel: duplicate.source !== "quick-phrase" && duplicate.source !== "confirm",
         duplicate: true,
       });
@@ -140,7 +153,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
       }
       return NextResponse.json({
-        message: persisted.message,
+        message: toParticipantMessage(persisted.message, from),
         viaModel: false,
         duplicate: persisted.duplicate,
       });
@@ -167,7 +180,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
     }
     return NextResponse.json({
-      message: persisted.message,
+      message: toParticipantMessage(persisted.message, from),
       viaModel: false,
       duplicate: persisted.duplicate,
     });
@@ -189,21 +202,27 @@ export async function POST(request: Request) {
     currentProfileId: session.profileId,
   });
   let effectiveProfileId = session.profileId;
-  if (detectedProfileId !== session.profileId) {
-    const updated = await store.update(code, (current) => {
-      // Never let an older concurrent request downgrade a session that has
-      // already entered a sensitive path.
-      current.profileId = detectCounterProfile({
-        text,
-        deskLabel: current.deskLabel,
-        recent: current.messages.slice(-6).map((message) => ({
-          text: message.originalText,
-        })),
-        currentProfileId: current.profileId,
-      });
+  // Always re-evaluate inside the atomic mutation. A concurrent sensitive turn
+  // may have upgraded the session after this request's initial read; skipping
+  // the mutation merely because this stale snapshot looked unchanged would
+  // let the ambiguous turn use the general policy.
+  const updated = await store.update(code, (current) => {
+    current.profileId = detectCounterProfile({
+      text,
+      deskLabel: current.deskLabel,
+      recent: current.messages.slice(-6).map((message) => ({
+        text: message.originalText,
+      })),
+      currentProfileId: current.profileId,
     });
-    effectiveProfileId = updated?.profileId ?? detectedProfileId;
-  }
+  });
+  effectiveProfileId = updated?.profileId ?? detectedProfileId;
+  // An exact keyword match can promote a session into a specialised profile,
+  // but lack of a match is not proof that an utterance is non-sensitive—most
+  // supported languages cannot be exhaustively enumerated. Keep an unresolved
+  // general session on the strict, single-provider privacy path until a
+  // concrete non-sensitive desk/conversation profile is established.
+  const forceSensitiveRouting = effectiveProfileId === "general";
 
   const result = await translateForCounter({
     text,
@@ -215,6 +234,8 @@ export async function POST(request: Request) {
     action,
     deskLabel: session.deskLabel,
     profileId: effectiveProfileId,
+    forceSensitiveRouting,
+    routingKey: `counter:${code}`,
   });
 
   const base = {
@@ -239,8 +260,13 @@ export async function POST(request: Request) {
         confidence: result.output!.confidence,
         note: result.output!.note,
         risks: detectRisks(result.output!.translation),
-        criticalValues: extractCriticalValues(text),
-        integrity: validateTranslationIntegrity(text, result.output!.translation),
+        criticalValues: extractCriticalValues(text, originalLang),
+        integrity: validateTranslationIntegrity(
+          text,
+          result.output!.translation,
+          originalLang,
+          targetLang,
+        ),
       }
     : {
         ...base,
@@ -267,7 +293,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
 
-  if (!persisted.duplicate && message.status === "done") {
+  if (!persisted.duplicate && message.status === "done" && !forceSensitiveRouting) {
     try {
       await recordLearningCandidate({
         sourceText: message.originalText,
@@ -285,7 +311,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    message: persisted.message,
+    message: toParticipantMessage(persisted.message, from),
     viaModel: true,
     duplicate: persisted.duplicate,
     provider: result.provider,

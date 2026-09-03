@@ -28,7 +28,10 @@ export function useBoothAudioInput(enabled = true) {
     const restore = window.setTimeout(() => {
       const preferred = readPreferredBoothAudioDeviceId();
       const resolved = resolvePreferredBoothAudioDeviceId(preferred, audioInputs.devices);
-      if (resolved) setDeviceIdState(resolved);
+      // Preserve a remembered but missing exact device as an unavailable
+      // selection. Falling back to System default here can silently capture a
+      // laptop or interpreter microphone that was never preflighted.
+      if (preferred) setDeviceIdState(resolved || preferred);
     }, 0);
 
     return () => window.clearTimeout(restore);
@@ -45,14 +48,17 @@ export function useBoothAudioInput(enabled = true) {
       // Korean, because every surface that renders this label is a launcher
       // surface. Real device labels come from the OS and stay whatever the OS
       // calls them — only the fallback is ours to name.
-      "시스템 기본값",
+      (deviceId ? "선택한 입력을 찾을 수 없음" : "시스템 기본값"),
     [audioInputs.devices, deviceId],
   );
+  const selectionAvailable =
+    !deviceId || audioInputs.devices.some((device) => device.deviceId === deviceId);
 
   return {
     ...audioInputs,
     deviceId,
     selectedLabel,
+    selectionAvailable,
     setDeviceId,
   };
 }

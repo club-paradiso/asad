@@ -73,6 +73,21 @@ describe("launcher booth preflight readiness", () => {
 
     expect(input.level).toBe("ready");
   });
+
+  it("blocks a remembered input after that physical device disappears", () => {
+    const [input] = readinessRows({
+      config: null,
+      mode: "sermon",
+      source: "deepgram",
+      audioInputLabel: "선택한 입력을 찾을 수 없음",
+      audioInputSupported: true,
+      audioInputAvailable: false,
+      boothPreflightVerified: true,
+    });
+
+    expect(input).toMatchObject({ level: "blocked" });
+    expect(input.value).toMatch(/연결이 끊겼습니다/);
+  });
 });
 
 describe("launcher privacy readiness", () => {

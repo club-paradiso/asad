@@ -8,10 +8,22 @@ import { redactForLearning } from "./privacy";
 import { hasSafetyReviewFlag } from "./review";
 import type { HumanReviewFlag, LearningCandidate } from "./types";
 
-const REDIS_KEY = "asad:learning:v1:candidates";
+const REDIS_KEY = "asad:learning:v2:candidates";
 const MAX_CANDIDATES = 5_000;
 const RETENTION_SECONDS = 180 * 24 * 60 * 60;
 const MEMORY_MAX = 500;
+const REDIS_TIMEOUT_MS = 2_500;
+
+const STORE_CANDIDATE_SCRIPT = `
+redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[3])
+local count = redis.call('ZCARD', KEYS[1])
+local max = tonumber(ARGV[4])
+if count > max then
+  redis.call('ZREMRANGEBYRANK', KEYS[1], 0, count - max - 1)
+end
+return 1
+`;
 
 const memoryCandidates: LearningCandidate[] = [];
 
@@ -21,15 +33,23 @@ interface RedisResponse<T> {
 }
 
 async function redisCommand<T>(config: RedisConfig, args: Array<string | number>): Promise<T> {
-  const response = await fetch(config.url, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${config.token}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(args),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(config.url, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(args),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) throw new Error(`Learning Vault Redis request failed (${response.status}).`);
   const body = (await response.json()) as RedisResponse<T>;
@@ -102,9 +122,18 @@ export async function recordLearningCandidate(
 
   const redis = resolveCounterRedisConfig();
   if (redis) {
-    await redisCommand<number>(redis, ["LPUSH", REDIS_KEY, JSON.stringify(candidate)]);
-    await redisCommand<string>(redis, ["LTRIM", REDIS_KEY, 0, MAX_CANDIDATES - 1]);
-    await redisCommand<number>(redis, ["EXPIRE", REDIS_KEY, RETENTION_SECONDS]);
+    // A key-level TTL reset on every insert lets an old candidate live forever
+    // under steady traffic. Scores make retention apply to each candidate.
+    await redisCommand<number>(redis, [
+      "EVAL",
+      STORE_CANDIDATE_SCRIPT,
+      1,
+      REDIS_KEY,
+      candidate.createdAt,
+      JSON.stringify(candidate),
+      candidate.createdAt - RETENTION_SECONDS * 1000,
+      MAX_CANDIDATES,
+    ]);
     return { stored: true, durable: true };
   }
 

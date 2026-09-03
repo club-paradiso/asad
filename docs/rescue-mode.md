@@ -60,9 +60,9 @@ The Rescue endpoint:
 
 Importantly, the local deterministic live interpreter is **not** used to fake a Rescue translation of the whole window. If a model cannot perform the dedicated recovery task, no Rescue cue is safer than a semantically wrong one.
 
-## UI contract for a future implementation
+## Live UI contract
 
-The eventual live control should be intentionally simple:
+The wired live control is intentionally simple:
 
 - a large `RESCUE` action and keyboard shortcut `R`;
 - one temporary, visually distinct recovery cue;
@@ -90,12 +90,7 @@ Implemented and tested:
 - isolated `/api/rescue` inference path;
 - server-side output narrowing (no anticipation, maximum two recovery chunks);
 - fail-closed behaviour when Rescue inference is unavailable;
-- regression tests locking those semantics and request bounds.
-
-Still intentionally not wired into the live cockpit:
-
-- the `RESCUE` / `R` interaction;
+- regression tests locking those semantics and request bounds;
+- the `RESCUE` / `R` live interaction;
 - transient recovery-cue presentation and expiry;
-- client request lifecycle that guarantees normal live listening continues untouched.
-
-Those are UI/session orchestration changes, not prompt work, and should be wired only after the isolated endpoint is stable.
+- an abortable client lifecycle that leaves the normal live engine untouched.

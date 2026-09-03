@@ -232,6 +232,24 @@ function buildMatrix(codewords: number[], version: number, mask: number): Cell[]
     if (matrix[n - 1 - i][8] === null) place(n - 1 - i, 8, 0);
   }
 
+  // Versions 7+ carry their version number twice, protected by BCH(18,6).
+  // These 36 modules are function modules: reserve them before the data snake
+  // or a longer deployment URL will overwrite its own version information.
+  if (version >= 7) {
+    let remainder = version;
+    for (let i = 0; i < 12; i += 1) {
+      remainder = (remainder << 1) ^ ((remainder >>> 11) * 0x1f25);
+    }
+    const versionInfo = (version << 12) | remainder;
+    for (let i = 0; i < 18; i += 1) {
+      const bit = ((versionInfo >>> i) & 1) as Cell;
+      const edge = n - 11 + (i % 3);
+      const offset = Math.floor(i / 3);
+      place(offset, edge, bit);
+      place(edge, offset, bit);
+    }
+  }
+
   // Data, snaking up and down in two-column strips.
   let bitIndex = 0;
   let upward = true;

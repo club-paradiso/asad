@@ -19,6 +19,7 @@ import {
   type SttProviderId,
 } from "@/providers/stt";
 import { joinTranscriptParts } from "@/providers/stt/transcript";
+import { findLanguage } from "@/counter/languages";
 
 export type CounterVoicePhase =
   | "idle"
@@ -46,7 +47,11 @@ interface MicrophoneHandle {
 }
 
 export interface CounterSpeechDependencies {
-  fetchCredentials(language: string): Promise<SttCredentials | null>;
+  fetchCredentials(
+    language: string,
+    access?: { code: string; token: string },
+    signal?: AbortSignal,
+  ): Promise<SttCredentials | null>;
   createProvider(options: CreateSttOptions): SpeechProvider;
   createMicrophone(options: {
     onFrame: (frame: ArrayBuffer) => void;
@@ -55,13 +60,19 @@ export interface CounterSpeechDependencies {
   browserSpeechSupported(): boolean;
   cloudAudioSupported(): boolean;
   hfFallbackSupported(): boolean;
-  transcribeHf(input: { pcm16: ArrayBuffer; language: string; code?: string }): Promise<string>;
+  transcribeHf(input: {
+    pcm16: ArrayBuffer;
+    language: string;
+    code?: string;
+    counterToken?: string;
+  }): Promise<string>;
   connectTimeoutMs: number;
   stableDelayMs: number;
 }
 
 const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
-  fetchCredentials: (language) => fetchSttCredentials(language, undefined, "counter"),
+  fetchCredentials: (language, access, signal) =>
+    fetchSttCredentials(language, signal, "counter", access),
   createProvider: (options) => createSpeechProvider(options),
   createMicrophone: (options) => new MicrophoneCapture(options),
   browserSpeechSupported: () => WebSpeechProvider.isSupported(),
@@ -132,6 +143,7 @@ export class CounterSpeechController {
     },
     private readonly dependencies: CounterSpeechDependencies = DEFAULT_DEPENDENCIES,
     private readonly counterCode?: string,
+    private readonly counterToken?: string,
   ) {}
 
   static isPotentiallyAvailable(
@@ -147,10 +159,33 @@ export class CounterSpeechController {
     this.handlers.onPartial("");
 
     let credentials: SttCredentials | null = null;
+    const credentialController = new AbortController();
+    let stoppedBeforeConnect = false;
+    this.active = {
+      stop: () => {
+        stoppedBeforeConnect = true;
+        credentialController.abort();
+        this.handlers.onPhase("finishing");
+      },
+      cancel: () => {
+        stoppedBeforeConnect = true;
+        credentialController.abort();
+      },
+    };
     try {
-      credentials = await this.dependencies.fetchCredentials(this.language);
+      credentials = await this.dependencies.fetchCredentials(
+        this.language,
+        this.counterCode && this.counterToken
+          ? { code: this.counterCode, token: this.counterToken }
+          : undefined,
+        credentialController.signal,
+      );
     } catch {
       // Credentials are an optimisation. Browser speech remains a valid path.
+    }
+    this.active = null;
+    if (stoppedBeforeConnect || this.disposed) {
+      return this.complete("", false, "stopped");
     }
 
     const cloud = cloudProvider(credentials);
@@ -170,7 +205,8 @@ export class CounterSpeechController {
       }
     }
 
-    if (this.dependencies.browserSpeechSupported()) {
+    const languageSupportsBrowserSpeech = findLanguage(this.language)?.speechSupported ?? true;
+    if (languageSupportsBrowserSpeech && this.dependencies.browserSpeechSupported()) {
       try {
         const text = await this.attempt("webspeech");
         return this.complete(text, usedFallback);
@@ -266,6 +302,10 @@ export class CounterSpeechController {
     };
 
     provider.onPartial((text) => {
+      // A new interim means the speaker continued. Do not let the previous
+      // stable segment's silence timer finalize in the middle of this phrase.
+      if (stableTimer) clearTimeout(stableTimer);
+      stableTimer = null;
       partialText = text.trim();
       this.handlers.onPartial(joinTranscriptParts([stableText, partialText], this.language));
     });
@@ -410,10 +450,15 @@ export class CounterSpeechController {
       if (stopped && !heardSpeech) throw new AttemptError("stopped");
       if (!heardSpeech || audio.byteLength === 0) return "";
       this.handlers.onPhase("finishing");
+      // Release the microphone before the potentially slow batch request. A
+      // finished turn must never keep capturing while audio is in flight.
+      await microphone.stop().catch(() => {});
+      microphone = null;
       return await this.dependencies.transcribeHf({
         pcm16: audio.toArrayBuffer(),
         language: this.language,
         code: this.counterCode,
+        counterToken: this.counterToken,
       });
     } finally {
       if (silenceTimer) clearTimeout(silenceTimer);

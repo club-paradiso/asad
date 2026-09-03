@@ -163,11 +163,12 @@ because the person at risk is not the operator. A visitor at a counter is asked
 to type medical symptoms, immigration status or money problems into a device
 they did not choose, in a language they cannot audit.
 
-- **Nothing is persisted.** A counter session lives in the server process's
-  memory, holds no more than 500 messages, expires four hours after the last
-  activity, and is **deleted outright** — not marked ended — when the staff
-  member closes it. Nothing is written to disk, to a database, or to
-  `localStorage` on either device.
+- **Nothing becomes a transcript archive.** Local development keeps sessions
+  in process memory; production may keep the session JSON in shared Redis so
+  both serverless participants reach the same conversation. It holds no more
+  than 500 messages, expires four hours after the last activity, and is
+  **deleted outright** — not marked ended — when either participant closes it.
+  Nothing is written to disk or to `localStorage` on either device.
 - **The visitor is told who will see their words before they say anything**, on
   the join screen, in their own language: the provider's name, and an explicit
   warning when that provider's free tier may use submissions for training. The
@@ -180,9 +181,10 @@ they did not choose, in a language they cannot audit.
   flagged values verbatim.
 - **Open-weight models by default** (`LLM_COUNTER_PREFER_OPEN=true`). With the
   recommended Groq configuration, no training occurs on either tier.
-- **A join link is a private conversation** and the page carries
-  `robots: noindex`. Room codes are 4 characters from an unambiguous alphabet
-  (390,625 combinations) and are only useful while the session is live.
+- **A join link locates a private conversation** and the page carries
+  `robots: noindex`. After joining, each participant receives a separate
+  unguessable session capability; the four-character room code alone cannot
+  poll, send, impersonate staff, or end the conversation.
 - The QR code is generated **in the browser**, so the join URL never reaches an
   image service or any third party.
 - A visitor may correct a mis-tapped language freely until they send their
@@ -320,4 +322,3 @@ The route guard reads request headers, cookies and body size. It records
 counters keyed by session token or source address. It never inspects, stores or
 logs transcript content, and the rate-limit state holds integers and timestamps
 only.
-

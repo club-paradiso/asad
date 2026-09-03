@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { GlossaryItem } from "@/types";
 import { Button, Label, TextInput } from "@/components/ui/primitives";
 
+export const PREP_GLOSSARY_NOTE_MAX_LENGTH = 160;
+
 export function makePrepGlossaryItem(
   korean: string,
   english: string,
@@ -12,7 +14,11 @@ export function makePrepGlossaryItem(
   const cleanKorean = korean.trim();
   const cleanEnglish = english.trim();
   const cleanNote = note?.trim();
-  if (!cleanKorean || !cleanEnglish) return null;
+  if (
+    !cleanKorean ||
+    !cleanEnglish ||
+    (cleanNote?.length ?? 0) > PREP_GLOSSARY_NOTE_MAX_LENGTH
+  ) return null;
   return {
     korean: cleanKorean,
     english: cleanEnglish,
@@ -84,7 +90,10 @@ export function SessionGlossaryEditor({
     if (editingKorean === item.korean) reset();
   };
 
-  const valid = !!korean.trim() && !!english.trim();
+  const valid =
+    !!korean.trim() &&
+    !!english.trim() &&
+    note.trim().length <= PREP_GLOSSARY_NOTE_MAX_LENGTH;
 
   return (
     <section className="flex flex-col gap-3 border-t border-[var(--line)] pt-5">
@@ -118,8 +127,12 @@ export function SessionGlossaryEditor({
           <TextInput
             value={note}
             onChange={setNote}
+            maxLength={PREP_GLOSSARY_NOTE_MAX_LENGTH}
             placeholder="Use this wording throughout today's sermon"
           />
+          <span className="text-[0.6875rem] text-[var(--fg-dim)]">
+            {note.length}/{PREP_GLOSSARY_NOTE_MAX_LENGTH}
+          </span>
         </label>
         <div className="flex flex-wrap gap-2 sm:col-span-2">
           <Button size="sm" tone="neutral" type="button" disabled={!valid} onClick={save}>

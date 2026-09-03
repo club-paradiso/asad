@@ -10,6 +10,7 @@ import { DeepgramSpeechProvider } from "./deepgram";
 import { OpenAiSpeechProvider } from "./openai";
 import { WebSpeechProvider } from "./webspeech";
 import { guardedFetch } from "@/lib/session-client";
+import { COUNTER_TOKEN_HEADER } from "@/counter/access-shared";
 import type { SpeechProvider, SttCredentials, SttProviderId, SttProviderOptions } from "./types";
 
 export * from "./types";
@@ -56,7 +57,7 @@ export const STT_PROVIDER_INFO: Record<
   },
   webspeech: {
     label: "Browser",
-    detail: "On-device recognition — no key needed. Best in Chrome; partial in Safari",
+    detail: "Browser-managed recognition — may use the browser vendor's cloud service; no key needed",
     needsKey: false,
     needsMic: true,
   },
@@ -84,11 +85,15 @@ export async function fetchSttCredentials(
   language?: string,
   signal?: AbortSignal,
   usage: "live" | "counter" = "live",
+  counterAccess?: { code: string; token: string },
 ): Promise<SttCredentials | null> {
   const response = await guardedFetch("/api/stt/token", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ language, usage }),
+    headers: {
+      "content-type": "application/json",
+      ...(counterAccess ? { [COUNTER_TOKEN_HEADER]: counterAccess.token } : {}),
+    },
+    body: JSON.stringify({ language, usage, code: counterAccess?.code }),
     signal,
   });
   if (!response.ok) return null;

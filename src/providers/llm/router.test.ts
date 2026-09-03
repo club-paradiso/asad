@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LlmRouter, OPEN_WEIGHT } from "./router";
 import { isOpenWeightModel } from "./capabilities";
 import { CircuitBreaker } from "./circuit-breaker";
@@ -14,6 +14,40 @@ const env = (vars: Record<string, string>): AppEnv =>
 const KEY = "x".repeat(24);
 
 describe("routing modes", () => {
+  it("fails closed for cloud credentials on an unprotected Vercel deployment", () => {
+    const parsed = env({
+      VERCEL: "1",
+      STT_PROVIDER: "deepgram",
+      DEEPGRAM_API_KEY: KEY,
+      OPENROUTER_API_KEY: KEY,
+    });
+
+    expect(parsed.stt.provider).toBe("webspeech");
+    expect(parsed.stt.deepgramKey).toBeUndefined();
+    expect(parsed.llm.providers.openrouter.configured).toBe(false);
+    expect(parsed.problems).toContainEqual(
+      expect.objectContaining({ field: "APP_ACCESS_KEY", level: "error" }),
+    );
+  });
+
+  it("enables protected Vercel cloud providers", () => {
+    const parsed = env({
+      VERCEL: "1",
+      APP_ACCESS_KEY: "private-deployment-key",
+      STT_PROVIDER: "deepgram",
+      DEEPGRAM_API_KEY: KEY,
+      OPENROUTER_API_KEY: KEY,
+    });
+
+    expect(parsed.stt.provider).toBe("deepgram");
+    expect(parsed.llm.providers.openrouter.configured).toBe(true);
+  });
+
+  it("parses the continuous-live sustainability floor independently of Counter", () => {
+    expect(env({ LLM_LIVE_REQUIRE_SUSTAINABLE: "true" }).llm.requireSustainableLive).toBe(true);
+    expect(env({}).llm.requireSustainableLive).toBe(false);
+  });
+
   it("local mode has no cloud candidates at all", () => {
     const router = new LlmRouter(
       env({ LLM_ROUTING_MODE: "local", GEMINI_API_KEY: KEY }),
@@ -278,7 +312,7 @@ describe("rate-limit tracking", () => {
 describe("fallback behaviour", () => {
   /** A router whose provider instances are stubbed. */
   function stubbedRouter(
-    behaviours: Partial<Record<string, () => Promise<{ text: string; latencyMs: number }>>>,
+    behaviours: Partial<Record<string, (request?: { signal?: AbortSignal }) => Promise<{ text: string; latencyMs: number }>>>,
     vars: Record<string, string>,
   ) {
     const router = new LlmRouter(env(vars));
@@ -359,10 +393,69 @@ describe("fallback behaviour", () => {
     );
 
     for (let i = 0; i < 5; i += 1) {
-      const result = await router.complete({ system: "s", user: "u" }, { deadlineMs: 3000 });
+      const result = await router.complete(
+        { system: "s", user: "u" },
+        { deadlineMs: 3000, routingKey: "live:session-a" },
+      );
       // Model roulette between sentences produces inconsistent terminology.
       expect(result.provider).toBe("gemini");
     }
+  });
+
+  it("keeps provider affinity inside one session", async () => {
+    let geminiCalls = 0;
+    const router = stubbedRouter(
+      {
+        gemini: async () => {
+          geminiCalls += 1;
+          if (geminiCalls === 1) throw new LlmError("temporary", "server_error");
+          return { text: VALID, latencyMs: 10 };
+        },
+        groq: ok(VALID),
+      },
+      { LLM_ROUTING_MODE: "auto-free", GEMINI_API_KEY: KEY, GROQ_API_KEY: KEY },
+    );
+
+    const firstA = await router.complete(
+      { system: "s", user: "u" },
+      { deadlineMs: 3000, routingKey: "live:a" },
+    );
+    const firstB = await router.complete(
+      { system: "s", user: "u" },
+      { deadlineMs: 3000, routingKey: "live:b" },
+    );
+    const secondA = await router.complete(
+      { system: "s", user: "u" },
+      { deadlineMs: 3000, routingKey: "live:a" },
+    );
+
+    expect(firstA.provider).toBe("groq");
+    expect(firstB.provider).toBe("gemini");
+    expect(secondA.provider).toBe("groq");
+  });
+
+  it("does not try a fallback after the caller has aborted the whole turn", async () => {
+    const fallback = vi.fn(async () => ({ text: VALID, latencyMs: 10 }));
+    const router = stubbedRouter(
+      {
+        gemini: async (request) => {
+          if (request?.signal?.aborted) throw new LlmError("aborted", "timeout");
+          return { text: VALID, latencyMs: 10 };
+        },
+        groq: fallback,
+      },
+      { LLM_ROUTING_MODE: "auto-free", GEMINI_API_KEY: KEY, GROQ_API_KEY: KEY },
+    );
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      router.complete(
+        { system: "s", user: "u", signal: controller.signal },
+        { deadlineMs: 3000, routingKey: "live:aborted" },
+      ),
+    ).rejects.toThrow(/aborted/i);
+    expect(fallback).not.toHaveBeenCalled();
   });
 
   it("stops asking a provider with an invalid key after one failure", async () => {

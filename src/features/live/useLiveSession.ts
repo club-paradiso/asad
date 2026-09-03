@@ -240,10 +240,15 @@ export function useLiveSession(options: LiveSessionOptions) {
   const teardown = useCallback(async () => {
     if (tickRef.current) clearInterval(tickRef.current);
     tickRef.current = null;
-    await micRef.current?.stop().catch(() => {});
+    // Invalidate ownership before the first await. A track-ended callback can
+    // race with AudioWorklet startup; the startup tail uses the ref identity
+    // as its cancellation check and must see teardown synchronously.
+    const mic = micRef.current;
     micRef.current = null;
-    await providerRef.current?.disconnect().catch(() => {});
+    const provider = providerRef.current;
     providerRef.current = null;
+    await mic?.stop().catch(() => {});
+    await provider?.disconnect().catch(() => {});
   }, []);
 
   const stop = useCallback(async (): Promise<EngineSnapshot> => {

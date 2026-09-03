@@ -32,8 +32,8 @@ export function Wordmark({
         title={BRAND.name}
       >
         <Mark size={16} />
-        <span className="brand-wordmark text-[0.9375rem] tracking-[-0.03em]">
-          {BRAND.secondaryMark}
+        <span className="brand-wordmark whitespace-nowrap text-[0.9375rem] tracking-[-0.03em]">
+          {BRAND.shortName}
         </span>
       </span>
     );

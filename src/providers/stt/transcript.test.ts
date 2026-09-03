@@ -24,6 +24,11 @@ describe("multilingual transcript cleanup", () => {
     expect(pickSpeechAlternative(["passport", "पासपोर्ट"], "hi-IN")).toBe("पासपोर्ट");
   });
 
+  it("does not discard a top-ranked Latin name or confirmation code", () => {
+    expect(pickSpeechAlternative(["AB123", "123"], "zh-CN")).toBe("AB123");
+    expect(pickSpeechAlternative(["Kim Min Su", "Min Su"], "ja-JP")).toBe("Kim Min Su");
+  });
+
   it("keeps the browser's first choice when the language has no script heuristic", () => {
     expect(pickSpeechAlternative(["visa extension", "visa extensions"], "en-US")).toBe(
       "visa extension",
@@ -36,6 +41,15 @@ describe("multilingual transcript cleanup", () => {
       "在留期間を延長したいです",
     );
     expect(joinTranscriptParts(["ขอต่อ", "วีซ่า"], "th-TH")).toBe("ขอต่อวีซ่า");
+  });
+
+  it("retains separators between Latin chunks inside a no-space language", () => {
+    expect(joinTranscriptParts(["我的名字是", "Kim", "Min", "Su"], "zh-CN")).toBe(
+      "我的名字是Kim Min Su",
+    );
+    expect(joinBrowserResultParts(["番号は", "AB", "123"], "ja-JP")).toBe(
+      "番号はAB 123",
+    );
   });
 
   it("preserves Korean browser result-slot joining without removing stable phrase spaces", () => {

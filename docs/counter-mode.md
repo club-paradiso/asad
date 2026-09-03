@@ -199,17 +199,14 @@ medical symptoms, legal problems, immigration status or money.
   a hijack and has to be fixable; once the conversation is under way, a new
   language claim is a second person and is turned away.
 
-### Storage — and its honest limitation
+### Storage
 
-Sessions live in an **in-memory store on the server**, behind a small interface
-so it can be swapped. That is the right call for a single-instance deployment
-and follows the project's no-architecture-astronautics rule.
-
-**It does not survive a restart, and it does not work across multiple
-instances** — including Vercel's serverless functions, where each invocation may
-hit a different worker. For a real multi-instance deployment this needs a shared
-store (Redis, or Supabase). The limitation is surfaced on `/diagnostics` rather
-than left to be discovered in front of a visitor.
+Local development uses the in-memory store. Multi-instance and Vercel
+deployments use the shared Upstash/Vercel KV Redis REST store, with atomic
+compare-and-set updates and the same four-hour idle expiry. Vercel refuses to
+create a QR session if shared storage is missing, so a staff member is never
+shown a code that exists only in one serverless worker. `/diagnostics` reports
+the active backend and stays available even when the Redis health check fails.
 
 ### Transport
 
@@ -224,8 +221,10 @@ where long-lived SSE connections do not.
 A counter conversation is more sensitive than a sermon, and the design reflects
 that:
 
-- **Nothing is persisted.** No transcript is written to disk or database.
-  The session exists in memory and is discarded on end or timeout.
+- **Nothing becomes a retained transcript.** Production can hold the active
+  session in shared Redis for serverless continuity, but it is discarded on
+  end or after the four-hour idle timeout and is never written to browser
+  storage or disk.
 - **Quick phrases never reach a model** — they are local lookups.
 - **The visitor is told**, on the join screen before they say anything, which
   provider will see their words — in their own language, from

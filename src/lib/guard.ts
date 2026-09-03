@@ -336,6 +336,12 @@ export interface GuardOptions {
   maxBodyBytes: number;
   /** Whether a valid session token is required. Paid routes: yes. */
   requireSession?: boolean;
+  /**
+   * A route-owned capability that is verified after the bounded JSON body is
+   * read. Its presence may pass the generic app gate, but the route MUST reject
+   * it before doing paid work if its own verification fails.
+   */
+  deferredCredentialHeader?: string;
 }
 
 export type GuardResult =
@@ -358,7 +364,11 @@ export async function guardInferenceRoute(
     response: NextResponse.json({ error }, { status, headers }),
   });
 
-  if (!hasAccess(request)) {
+  const deferredCredential = options.deferredCredentialHeader
+    ? request.headers.get(options.deferredCredentialHeader)?.trim()
+    : undefined;
+
+  if (!hasAccess(request) && !deferredCredential) {
     return deny(401, "This deployment is private. Enter the access key to continue.");
   }
 
@@ -370,7 +380,8 @@ export async function guardInferenceRoute(
   if (
     options.requireSession &&
     sessionEnforcement() === "enforced" &&
-    !verifySessionToken(session)
+    !verifySessionToken(session) &&
+    !deferredCredential
   ) {
     // 401 rather than 403: the client's correct response is to mint a token
     // and retry once, which the console does automatically.
@@ -384,7 +395,9 @@ export async function guardInferenceRoute(
   // free first line and, more importantly, it means a Redis outage cannot turn
   // "global protection unavailable" into "no protection at all".
   for (const limit of options.limits) {
-    const key = limit.by === "session" ? (session ?? `addr:${address}`) : address;
+    const key = limit.by === "session"
+      ? (deferredCredential ?? session ?? `addr:${address}`)
+      : address;
     const verdict = limiterFor(limit.rule).check(`${limit.rule}:${key}`);
     if (!verdict.allowed) {
       return deny(429, "Too many requests. Slow down and try again shortly.", {

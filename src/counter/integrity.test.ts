@@ -47,6 +47,37 @@ describe("translation integrity", () => {
     );
   });
 
+  it.each([
+    "ngày 7 tháng 9 năm 2026",
+    "7 сентября 2026 г.",
+    "7 de septiembre de 2026",
+    "7 septembre 2026",
+    "7 Eylül 2026",
+    "7 سبتمبر 2026",
+    "07.09.2026",
+  ])("recognizes a supported localized date: %s", (translated) => {
+    expect(validateTranslationIntegrity("기한은 2026-09-07입니다.", translated).status).toBe("verified");
+  });
+
+  it("interprets numeric dates using the target locale", () => {
+    expect(
+      validateTranslationIntegrity(
+        "기한은 2026-09-07입니다.",
+        "The deadline is 09/07/2026.",
+        "ko-KR",
+        "en-US",
+      ).status,
+    ).toBe("verified");
+    expect(
+      validateTranslationIntegrity(
+        "기한은 2026-09-07입니다.",
+        "La fecha límite es el 07/09/2026.",
+        "ko-KR",
+        "es-ES",
+      ).status,
+    ).toBe("verified");
+  });
+
   it("detects a changed date", () => {
     const result = validateTranslationIntegrity(
       "기한은 2026년 9월 7일입니다.",
@@ -70,6 +101,7 @@ describe("translation integrity", () => {
   it("understands equivalent currency and decimal formatting", () => {
     expect(validateTranslationIntegrity("수수료는 ₩50,000입니다.", "The fee is 50,000 KRW.").status).toBe("verified");
     expect(validateTranslationIntegrity("무게는 1.5kg입니다.", "The weight is 1,5 kg.").status).toBe("verified");
+    expect(validateTranslationIntegrity("수수료는 50,000원입니다.", "The fee is 50,000 KRW.").status).toBe("verified");
   });
 
   it("normalizes phone and document-code punctuation", () => {

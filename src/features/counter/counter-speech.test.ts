@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CreateSttOptions, SpeechProvider, SttStatus } from "@/providers/stt";
+import type { CreateSttOptions, SpeechProvider, SttCredentials, SttStatus } from "@/providers/stt";
 import {
   CounterSpeechController,
   type CounterSpeechDependencies,
@@ -42,6 +42,7 @@ function harness(options?: {
   microphoneFailure?: Error;
   hfText?: string;
   hf?: boolean;
+  language?: string;
 }) {
   const providers: FakeProvider[] = [];
   const phases: CounterVoicePhase[] = [];
@@ -84,7 +85,7 @@ function harness(options?: {
     stableDelayMs: 0,
   };
   const controller = new CounterSpeechController(
-    "ko-KR",
+    options?.language ?? "ko-KR",
     {
       onPhase: (phase) => phases.push(phase),
       onPartial: () => {},
@@ -156,6 +157,22 @@ describe("CounterSpeechController", () => {
     expect(run.fallbackCount).toBe(2);
   });
 
+  it("routes a language marked unsupported by browser speech directly to HF", async () => {
+    const run = harness({
+      language: "uz-UZ",
+      cloud: false,
+      browser: true,
+      hf: true,
+      hfText: "Pasportim kerak",
+    });
+    const resultPromise = run.controller.listen();
+    await vi.waitFor(() => expect(run.phases).toContain("listening"));
+    run.controller.stop();
+
+    await expect(resultPromise).resolves.toMatchObject({ text: "Pasportim kerak" });
+    expect(run.providers).toHaveLength(0);
+  });
+
   it("does not repeat a denied microphone request through another provider", async () => {
     const run = harness({ cloud: true, browser: true, microphoneFailure: new DOMException("denied", "NotAllowedError") });
     await expect(run.controller.listen()).resolves.toEqual({ text: "", failure: "permission", usedFallback: false });
@@ -170,6 +187,37 @@ describe("CounterSpeechController", () => {
     run.controller.stop();
     await expect(resultPromise).resolves.toEqual({ text: "I need help with my visa", usedFallback: false });
     expect(run.phases).toContain("finishing");
+  });
+
+  it("cancels the previous silence timer when speech resumes", async () => {
+    const run = harness({ cloud: false, browser: true });
+    run.dependencies.stableDelayMs = 25;
+    let settled = false;
+    const resultPromise = run.controller.listen().finally(() => { settled = true; });
+    await vi.waitFor(() => expect(run.providers).toHaveLength(1));
+
+    run.providers[0].emitStable("first part");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    run.providers[0].emitPartial("continuing");
+    await new Promise((resolve) => setTimeout(resolve, 35));
+    expect(settled).toBe(false);
+
+    run.providers[0].emitStable("final part");
+    await expect(resultPromise).resolves.toMatchObject({ text: "first part final part" });
+  });
+
+  it("can stop while recogniser credentials are still loading", async () => {
+    const run = harness({ cloud: true, browser: true });
+    run.dependencies.fetchCredentials = vi.fn(
+      (_language, _access, signal) => new Promise<SttCredentials | null>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      }),
+    );
+
+    const resultPromise = run.controller.listen();
+    run.controller.stop();
+    await expect(resultPromise).resolves.toMatchObject({ failure: "stopped" });
+    expect(run.providers).toHaveLength(0);
   });
 
   it("reports no speech without disabling a later typed turn", async () => {

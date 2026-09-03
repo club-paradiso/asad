@@ -30,7 +30,7 @@ import {
 } from "@/providers/llm";
 import { interpretLocally } from "@/providers/llm/mock";
 import { estimateTokens, telemetry } from "@/lib/telemetry";
-import { guardInferenceRoute } from "@/lib/guard";
+import { guardInferenceRoute, readCookie, SESSION_COOKIE } from "@/lib/guard";
 import { escalationDecision, escalationImproves } from "@/providers/llm/escalation";
 import { createQualityProvider } from "@/providers/llm/factory";
 import { appEnv } from "@/lib/env";
@@ -87,6 +87,8 @@ export async function POST(request: Request) {
   }
   const input = parsed.data;
   const router = llmRouter();
+  const sessionToken = readCookie(request, SESSION_COOKIE);
+  const routingKey = sessionToken ? `live:${sessionToken}` : undefined;
   const livePreference = (id: LlmProviderId) => liveProviderCanSustain(id);
 
   const localOutput = () =>
@@ -96,10 +98,14 @@ export async function POST(request: Request) {
       allowAnticipation: input.allowAnticipation,
     });
 
-  // Prefer a provider whose documented capacity can carry the service. If none
-  // exists, preserve the old router order so the user still gets best-effort
-  // cloud output before the deterministic local floor.
-  const preferred = router.preferred(livePreference) ?? router.preferred();
+  // Prefer a provider whose documented capacity can carry the service. A
+  // deployment may explicitly require that floor so a 50-request free tier
+  // never starts a sermon it is guaranteed to abandon four minutes later.
+  const preferred =
+    router.preferred(livePreference, routingKey) ??
+    (appEnv().llm.requireSustainableLive
+      ? null
+      : router.preferred(undefined, routingKey));
 
   // No cloud candidate at all: answer locally without pretending otherwise.
   if (!preferred || preferred === "local") {
@@ -168,6 +174,7 @@ export async function POST(request: Request) {
         // turn but cannot carry the full sermon. The rest of the normal chain
         // remains available as fallback inside the router.
         prefer: livePreference,
+        routingKey,
       },
     );
 
