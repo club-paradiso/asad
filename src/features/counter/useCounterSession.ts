@@ -92,6 +92,18 @@ export function useCounterSession(
   const sendQueue = useRef<Promise<void>>(Promise.resolve());
   const pendingSends = useRef(0);
 
+  // A different room code is a different consultation, and the desk moves
+  // between them without ever remounting: "다음 손님" ends one session and opens
+  // the next on the same screen. Everything scoped to the old code goes with
+  // it, before a frame of the last visitor can be painted into the new one.
+  const [activeCode, setActiveCode] = useState(code);
+  if (activeCode !== code) {
+    setActiveCode(code);
+    setSession(null);
+    setMessages([]);
+    setEndedBy(null);
+  }
+
   /** Merge a batch, replacing by id so a resend does not duplicate. */
   const merge = useCallback((incoming: CounterMessage[]) => {
     if (incoming.length === 0) return;
@@ -149,6 +161,11 @@ export function useCounterSession(
   useEffect(() => {
     if (!code || !participantToken) return;
     stopped.current = false;
+    // The cursor belongs to the code that produced it. Every session numbers
+    // its messages from 1, so carrying one over asks the server for turns
+    // "after" seq 7 of a conversation that has not reached seq 7 — silently
+    // dropping the new visitor's opening messages.
+    cursor.current = 0;
     let timer: ReturnType<typeof setTimeout>;
 
     const tick = async () => {
