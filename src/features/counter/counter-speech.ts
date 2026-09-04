@@ -83,6 +83,11 @@ const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
   stableDelayMs: 1400,
 };
 
+// 16 kHz mono PCM16 is ~32 KB/s. Six seconds exceeds the provider connection
+// deadline, so an ordinary startup can keep every syllable without unbounded
+// memory growth. The buffer exists only until the streaming socket is ready.
+const PRECONNECT_AUDIO_MAX_BYTES = 192_000;
+
 function utteranceDelay(language: string, baseDelay: number): number {
   // Tests and explicit callers may deliberately request an immediate finish.
   if (baseDelay <= 100) return baseDelay;
@@ -270,10 +275,42 @@ export class CounterSpeechController {
     });
 
     let microphone: MicrophoneHandle | null = null;
-    let connected = false;
+    let providerReady = false;
+    let captureReady = !provider.needsAudio;
+    let listeningAnnounced = false;
     let stableText = "";
     let partialText = "";
     let stableTimer: ReturnType<typeof setTimeout> | null = null;
+    const preconnectFrames: ArrayBuffer[] = [];
+    let preconnectBytes = 0;
+
+    const announceListening = () => {
+      if (listeningAnnounced || !providerReady || !captureReady) return;
+      listeningAnnounced = true;
+      this.handlers.onPhase("listening");
+    };
+    const flushPreconnectAudio = () => {
+      if (!providerReady || !provider.needsAudio || !preconnectFrames.length) return;
+      for (const frame of preconnectFrames) provider.sendAudio(frame);
+      preconnectFrames.length = 0;
+      preconnectBytes = 0;
+    };
+    const acceptAudio = (frame: ArrayBuffer) => {
+      if (providerReady) {
+        provider.sendAudio(frame);
+        return;
+      }
+      // People speak as soon as they tap. Keep the startup audio locally while
+      // the provider socket is connecting, then flush it in original order.
+      // The connection timeout is shorter than this bounded buffer window.
+      const copy = frame.slice(0);
+      preconnectFrames.push(copy);
+      preconnectBytes += copy.byteLength;
+      while (preconnectBytes > PRECONNECT_AUDIO_MAX_BYTES && preconnectFrames.length > 1) {
+        const dropped = preconnectFrames.shift();
+        preconnectBytes -= dropped?.byteLength ?? 0;
+      }
+    };
 
     let resolveConnected!: () => void;
     let rejectConnected!: (error: Error) => void;
@@ -292,7 +329,7 @@ export class CounterSpeechController {
     const currentText = () => joinTranscriptParts([stableText, partialText], this.language);
     const fail = (error: unknown) => {
       const attemptError = normaliseAttemptError(error);
-      if (connected) rejectUtterance(attemptError);
+      if (providerReady) rejectUtterance(attemptError);
       else rejectConnected(attemptError);
     };
     const finish = () => {
@@ -324,12 +361,13 @@ export class CounterSpeechController {
     provider.onError(fail);
     provider.onStatus((status) => {
       if (status === "listening") {
-        connected = true;
+        providerReady = true;
+        flushPreconnectAudio();
         resolveConnected();
-        this.handlers.onPhase("listening");
+        announceListening();
       } else if (status === "error") {
         fail(new AttemptError("failed"));
-      } else if (status === "closed" && connected) {
+      } else if (status === "closed" && providerReady) {
         finish();
       }
     });
@@ -340,7 +378,7 @@ export class CounterSpeechController {
       stop: () => {
         stopped = true;
         this.handlers.onPhase("finishing");
-        if (connected) finish();
+        if (providerReady) finish();
         else rejectConnected(new AttemptError("stopped"));
         void provider.disconnect().catch(() => {});
       },
@@ -348,7 +386,7 @@ export class CounterSpeechController {
         stopped = true;
         cancelled = true;
         const error = new AttemptError("stopped");
-        if (connected) resolveUtterance("");
+        if (providerReady) resolveUtterance("");
         else rejectConnected(error);
         void provider.disconnect().catch(() => {});
         void microphone?.stop().catch(() => {});
@@ -356,30 +394,46 @@ export class CounterSpeechController {
     };
 
     try {
-      await withTimeout(
+      // Start the provider and microphone together. If the human speaks before
+      // the socket reaches `listening`, acceptAudio buffers those frames locally
+      // instead of deleting the first word of the sentence. Browser-managed
+      // Web Speech has no app-owned audio stream and simply follows its own
+      // start lifecycle.
+      const connection = withTimeout(
         Promise.all([provider.connect(), connectedPromise]).then(() => undefined),
         this.dependencies.connectTimeoutMs,
       );
 
+      let capture: Promise<void> = Promise.resolve();
       if (provider.needsAudio) {
         microphone = this.dependencies.createMicrophone({
-          onFrame: (frame) => provider.sendAudio(frame),
+          onFrame: acceptAudio,
           onError: fail,
         });
-        try {
-          await microphone.start();
-        } catch (error) {
-          throw normaliseAttemptError(error);
-        }
+        capture = microphone.start().then(
+          () => {
+            captureReady = true;
+            announceListening();
+          },
+          (error) => {
+            throw normaliseAttemptError(error);
+          },
+        );
       }
 
-      if (stopped && !connected) throw new AttemptError("stopped");
+      await Promise.all([connection, capture]);
+      flushPreconnectAudio();
+      announceListening();
+
+      if (stopped && !providerReady) throw new AttemptError("stopped");
       const transcript = await utterancePromise;
       if (cancelled) throw new AttemptError("stopped");
       return transcript;
     } finally {
       if (stableTimer) clearTimeout(stableTimer);
       stableTimer = null;
+      preconnectFrames.length = 0;
+      preconnectBytes = 0;
       await microphone?.stop().catch(() => {});
       await provider.disconnect().catch(() => {});
       this.active = null;

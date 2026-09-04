@@ -29,12 +29,14 @@ import { Mark } from "@/components/brand/Mark";
 import { buildConfirmationText } from "@/counter/risks";
 import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
+import { getMicrophonePermissionState, prefetchSttCredentials } from "@/providers/stt";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
 import { CounterEndedScreen } from "./CounterEndedScreen";
 import { QuickPhraseBar } from "./QuickPhraseBar";
 import { ProviderNotice, useCounterDisclosure } from "./ProviderNotice";
+import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { sessionEndCopy } from "./session-end-copy";
 import { useClientValue } from "@/hooks/useClientValue";
 import { cn } from "@/lib/cn";
@@ -53,6 +55,10 @@ export function CounterGuestScreen({ code }: { code: string }) {
     async (chosen: string) => {
       setJoining(true);
       setJoinError(null);
+      // This read never opens the microphone. If the visitor explicitly prepared
+      // voice input, use that fact to finish STT network preparation before the
+      // conversation exposes a mic button. Text-only visitors never pay that wait.
+      const microphoneState = getMicrophonePermissionState();
       try {
         const response = await fetch("/api/counter/session", {
           method: "PATCH",
@@ -73,6 +79,11 @@ export function CounterGuestScreen({ code }: { code: string }) {
           setJoinError(data.error ?? "Could not join this session.");
           return;
         }
+        const sttReady = prefetchSttCredentials(chosen, {
+          code,
+          token: data.participantToken,
+        });
+        if ((await microphoneState) === "granted") await sttReady;
         setParticipantToken(data.participantToken);
         setLang(chosen);
       } catch {
@@ -282,14 +293,7 @@ function LanguagePicker({
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-5 px-4 py-7">
       <header className="flex flex-col items-center gap-3 text-center">
-        {/* The only screen in the product a person outside the organisation
-            ever sees, and it used to carry no identity at all — just a grid of
-            language names and a code stamped with a brand name we retired.
-            The mark goes here, small: they are choosing a language, not
-            admiring a logo. */}
         <Mark size={28} title="아무튼서로알아들었으면된거아닌가요" />
-        {/* Multilingual on purpose: this line has to be read by someone who has
-            not yet told us what they read. */}
         <div>
           <h1 className="text-xl font-semibold text-[var(--fg)]">
             Choose your language
@@ -327,9 +331,6 @@ function LanguagePicker({
       </div>
 
       {error && (
-        /* Shape as well as hue: this is read by someone who does not share a
-           language with the staff member, and red-on-its-own is the one
-           signal that carries nothing at all for a colour-blind reader. */
         <p
           role="alert"
           className="flex items-start justify-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-center text-sm text-[var(--danger)]"
@@ -358,8 +359,8 @@ function LanguagePicker({
         <p className="mb-2 text-center text-xs text-[var(--fg-dim)]">
           {t.pickLanguageHint}
         </p>
-        {/* Named before the first word is typed, not after. */}
         <ProviderNotice disclosure={disclosure} strings={t} className="mb-2.5" />
+        <VoiceReadinessButton lang={selected} className="mb-2.5" />
         <button
           type="button"
           disabled={joining}
