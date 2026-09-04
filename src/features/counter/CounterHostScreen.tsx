@@ -70,7 +70,7 @@ export function CounterHostScreen() {
       }
       // Credential prewarming opens no media device. It is safe to do even for
       // text-only staff while microphone permission stays an explicit choice.
-      prefetchSttCredentials(hostLang, {
+      void prefetchSttCredentials(hostLang, {
         code: data.session.code,
         token: data.participantToken,
       });
@@ -336,15 +336,12 @@ function JoinPanel({
   waiting: boolean;
   onDismiss?: () => void;
 }) {
-  // Read straight from the browser rather than through an effect, so the code
-  // is painted in the first pass — the QR is the whole point of this screen.
   const origin = useClientValue(
     () => (typeof window === "undefined" ? "" : window.location.origin),
     "",
   );
 
   const url = origin ? joinUrl(origin, code) : "";
-  // Strip the scheme: a visitor typing it in does not need "https://".
   const typedAddress = url.replace(/^https?:\/\//, "");
 
   return (
@@ -358,8 +355,6 @@ function JoinPanel({
         </p>
       </div>
 
-      {/* Sized to be read across a counter, at an angle, in bad light — the
-          limit is the shorter viewport edge, not a fixed pixel count. */}
       <div className="w-full max-w-[min(70vw,26rem)] tall:max-w-[min(56vh,26rem)]">
         {url ? (
           <QrCode
@@ -425,8 +420,6 @@ function SetupScreen({
   onEdit: () => void;
 }) {
   const disclosure = useCounterDisclosure();
-  // Korean and English first: between them they cover almost every desk that
-  // would run this, and the rest is a normal alphabetical-ish list.
   const languages = useMemo(
     () => [...COUNTER_LANGUAGES].sort((a, b) => rank(a.code) - rank(b.code)),
     [],
