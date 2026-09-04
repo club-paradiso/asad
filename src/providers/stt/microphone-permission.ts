@@ -42,13 +42,20 @@ export async function getMicrophonePermissionState(): Promise<MicrophonePermissi
 }
 
 export async function ensureMicrophonePermission(): Promise<MicrophonePermissionReadiness> {
-  const current = await getMicrophonePermissionState();
-  if (current === "granted" || current === "denied" || current === "unavailable") {
-    return current;
+  if (grantedInPage) return "granted";
+  const mediaDevices =
+    typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
+  if (!mediaDevices?.getUserMedia) return "unavailable";
+
+  const known = await queryMicrophonePermission();
+  if (known === "granted") {
+    grantedInPage = true;
+    return "granted";
   }
+  if (known === "denied") return "denied";
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await mediaDevices.getUserMedia({ audio: true });
     // This probe exists only to complete the browser permission flow. The real
     // recogniser opens its own capture path once STT is ready.
     for (const track of stream.getTracks()) track.stop();
