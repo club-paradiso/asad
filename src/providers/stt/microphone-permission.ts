@@ -1,13 +1,14 @@
 /**
- * Counter microphone permission handshake.
+ * Counter microphone permission helpers.
  *
- * The first mic tap should not make the user guess whether ASAD is already
- * listening while a browser permission sheet is still on screen. We request
- * permission from the same explicit tap, immediately release the probe stream,
- * and let the pending voice action continue only after the browser has decided.
- * No audio frames are read, buffered, uploaded, or persisted here.
+ * Permission can be prepared explicitly before a conversation, but it is never
+ * required to enter one. Text-only users should not see a native microphone
+ * prompt they did not ask for. When voice is chosen, the same helper completes
+ * the browser handshake and immediately releases its probe stream. No audio
+ * frames are read, buffered, uploaded, or persisted by this module.
  */
 export type MicrophonePermissionReadiness = "granted" | "denied" | "unavailable";
+export type MicrophonePermissionState = MicrophonePermissionReadiness | "prompt";
 
 let grantedInPage = false;
 
@@ -24,17 +25,26 @@ async function queryMicrophonePermission(): Promise<PermissionState | null> {
   }
 }
 
-export async function ensureMicrophonePermission(): Promise<MicrophonePermissionReadiness> {
+/** Read the current permission posture without causing a browser prompt. */
+export async function getMicrophonePermissionState(): Promise<MicrophonePermissionState> {
   if (grantedInPage) return "granted";
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
     return "unavailable";
   }
 
   const known = await queryMicrophonePermission();
-  if (known === "denied") return "denied";
   if (known === "granted") {
     grantedInPage = true;
     return "granted";
+  }
+  if (known === "denied") return "denied";
+  return "prompt";
+}
+
+export async function ensureMicrophonePermission(): Promise<MicrophonePermissionReadiness> {
+  const current = await getMicrophonePermissionState();
+  if (current === "granted" || current === "denied" || current === "unavailable") {
+    return current;
   }
 
   try {
