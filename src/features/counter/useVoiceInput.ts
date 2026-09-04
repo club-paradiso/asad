@@ -23,7 +23,7 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
 
   const prewarm = useCallback(() => {
     if (!counterCode || !counterToken) return;
-    prefetchSttCredentials(lang, { code: counterCode, token: counterToken });
+    void prefetchSttCredentials(lang, { code: counterCode, token: counterToken });
   }, [counterCode, counterToken, lang]);
 
   const start = useCallback(async (): Promise<string> => {
@@ -95,8 +95,9 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
       controller.current = null;
       preparing.current = false;
       cancelledWhilePreparing.current = false;
-      // Prepare only the next short-lived credential. If it is not used soon it
-      // expires from the in-memory prefetch cache and the normal fetch path wins.
+      // Prepare the next one-shot credential in the background. Providers with
+      // an explicit expiry can keep it ready longer; opaque credentials retain
+      // the conservative short window in the STT module.
       prewarm();
     }
   }, [counterCode, counterToken, lang, prewarm]);
