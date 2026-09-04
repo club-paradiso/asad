@@ -3,6 +3,7 @@
 /** React binding for the one-utterance Counter speech controller. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCapability } from "@/hooks/useCapability";
+import { ensureMicrophonePermission, prefetchSttCredentials } from "@/providers/stt";
 import {
   CounterSpeechController,
   type CounterVoiceFailure,
@@ -16,36 +17,61 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
   const [failure, setFailure] = useState<CounterVoiceFailure | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
   const controller = useRef<CounterSpeechController | null>(null);
+  const preparing = useRef(false);
+  const cancelledWhilePreparing = useRef(false);
   const lastPartial = useRef("");
 
+  const prewarm = useCallback(() => {
+    if (!counterCode || !counterToken) return;
+    prefetchSttCredentials(lang, { code: counterCode, token: counterToken });
+  }, [counterCode, counterToken, lang]);
+
   const start = useCallback(async (): Promise<string> => {
-    if (controller.current) return "";
+    if (controller.current || preparing.current) return "";
+    preparing.current = true;
+    cancelledWhilePreparing.current = false;
     setFailure(null);
     setUsedFallback(false);
     setPartial("");
+    setPhase("connecting");
     lastPartial.current = "";
 
-    const next = new CounterSpeechController(
-      lang,
-      {
-        onPhase: setPhase,
-        onPartial: (text) => {
-          // Keep a private in-memory copy even after the controller clears the
-          // live preview on completion. If the provider dies after recognising
-          // useful speech, the editable composer can recover that text instead
-          // of making the visitor repeat the entire turn.
-          if (text.trim()) lastPartial.current = text;
-          setPartial(text);
-        },
-        onFallback: () => setUsedFallback(true),
-      },
-      undefined,
-      counterCode,
-      counterToken,
-    );
-    controller.current = next;
-
     try {
+      // Normally Counter setup has already completed this permission handshake.
+      // Keep it here as a one-tap fallback for direct links, expired browser
+      // grants, and browsers that cannot be preflighted reliably. The recording
+      // action continues automatically after the native permission sheet closes.
+      const permission = await ensureMicrophonePermission();
+      if (cancelledWhilePreparing.current) {
+        setPhase("idle");
+        return "";
+      }
+      if (permission === "denied") {
+        setFailure("permission");
+        setPhase("idle");
+        return "";
+      }
+
+      const next = new CounterSpeechController(
+        lang,
+        {
+          onPhase: setPhase,
+          onPartial: (text) => {
+            // Keep a private in-memory copy even after the controller clears the
+            // live preview on completion. If the provider dies after recognising
+            // useful speech, the editable composer can recover that text instead
+            // of making the visitor repeat the entire turn.
+            if (text.trim()) lastPartial.current = text;
+            setPartial(text);
+          },
+          onFallback: () => setUsedFallback(true),
+        },
+        undefined,
+        counterCode,
+        counterToken,
+      );
+      controller.current = next;
+
       const result = await next.listen();
       setFailure(result.failure ?? null);
       setUsedFallback(result.usedFallback);
@@ -67,25 +93,43 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
       return "";
     } finally {
       controller.current = null;
+      preparing.current = false;
+      cancelledWhilePreparing.current = false;
+      // Prepare only the next short-lived credential. If it is not used soon it
+      // expires from the in-memory prefetch cache and the normal fetch path wins.
+      prewarm();
     }
-  }, [counterCode, counterToken, lang]);
+  }, [counterCode, counterToken, lang, prewarm]);
 
-  const stop = useCallback(() => controller.current?.stop(), []);
+  const stop = useCallback(() => {
+    if (controller.current) {
+      controller.current.stop();
+      return;
+    }
+    if (preparing.current) {
+      cancelledWhilePreparing.current = true;
+      setPhase("finishing");
+    }
+  }, []);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    prewarm();
+    return () => {
+      cancelledWhilePreparing.current = true;
       controller.current?.dispose();
       controller.current = null;
-    },
+    };
     // A participant language/capability change must also terminate the old
     // recogniser so the next tap cannot continue with stale STT credentials.
-    [counterCode, counterToken, lang],
-  );
+  }, [counterCode, counterToken, lang, prewarm]);
 
   return {
     supported: supported && phase !== "unavailable",
     phase,
-    listening: phase === "listening" || phase === "connecting",
+    /** True only once the recogniser really is ready to hear speech. */
+    listening: phase === "listening",
+    /** Includes permission/provider preparation so a second tap can cancel. */
+    active: phase === "connecting" || phase === "listening",
     partial,
     failure,
     usedFallback,
