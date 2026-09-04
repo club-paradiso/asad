@@ -24,7 +24,6 @@ export function VoiceReadinessButton({
 
   useEffect(() => {
     let cancelled = false;
-    setChecking(true);
     void getMicrophonePermissionState().then((next) => {
       if (cancelled) return;
       setState(next);
