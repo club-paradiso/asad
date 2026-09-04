@@ -29,6 +29,7 @@ import { Mark } from "@/components/brand/Mark";
 import { buildConfirmationText } from "@/counter/risks";
 import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
+import { ensureMicrophonePermission } from "@/providers/stt";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
@@ -53,6 +54,11 @@ export function CounterGuestScreen({ code }: { code: string }) {
     async (chosen: string) => {
       setJoining(true);
       setJoinError(null);
+      // Permission belongs to setup, not to the first spoken syllable. Start the
+      // native browser handshake from this explicit Start tap while the session
+      // request runs in parallel. The probe stream is immediately released and
+      // no audio is read or sent by the permission helper.
+      const microphoneReady = ensureMicrophonePermission();
       try {
         const response = await fetch("/api/counter/session", {
           method: "PATCH",
@@ -73,6 +79,10 @@ export function CounterGuestScreen({ code }: { code: string }) {
           setJoinError(data.error ?? "Could not join this session.");
           return;
         }
+        // Do not enter the conversation while a browser permission sheet is
+        // still covering it. Denial never blocks typing; useVoiceInput reports
+        // the microphone state only if the visitor later chooses voice.
+        await microphoneReady;
         setParticipantToken(data.participantToken);
         setLang(chosen);
       } catch {
