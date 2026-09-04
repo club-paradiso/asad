@@ -156,18 +156,19 @@ async function requestSttCredentials(
 /**
  * Start the Counter credential request before the user taps the mic.
  *
- * The result is one-shot. Opaque credentials expire from the in-memory prefetch
+ * The returned promise lets an explicitly voice-prepared entry flow wait for
+ * readiness before revealing its microphone button, while text-only flows can
+ * deliberately ignore it. Opaque credentials expire from the in-memory prefetch
  * after 20 seconds; a credential with an explicit expiry may remain ready for
- * up to five minutes, but never beyond its own safe lifetime. Network/provider
- * errors are swallowed because prewarming is only an optimisation.
+ * up to five minutes, but never beyond its own safe lifetime.
  */
 export function prefetchSttCredentials(
   language: string,
   counterAccess: CounterAccess,
-): void {
+): Promise<SttCredentials | null> {
   const key = prefetchKey(language, "counter", counterAccess);
   const existing = prefetchedCredentials.get(key);
-  if (existing && prefetchFresh(existing)) return;
+  if (existing && prefetchFresh(existing)) return existing.promise;
   if (existing?.cleanupTimer) clearTimeout(existing.cleanupTimer);
 
   const entry: PrefetchedCredentials = {
@@ -184,6 +185,7 @@ export function prefetchSttCredentials(
     });
   prefetchedCredentials.set(key, entry);
   schedulePrefetchCleanup(key, entry);
+  return entry.promise;
 }
 
 function aborted(signal?: AbortSignal): never {
