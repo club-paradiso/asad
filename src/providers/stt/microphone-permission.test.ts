@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __resetMicrophonePermissionReadiness,
   ensureMicrophonePermission,
+  getMicrophonePermissionState,
 } from "./microphone-permission";
 
 const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
@@ -27,7 +28,17 @@ afterEach(() => {
   __resetMicrophonePermissionReadiness();
 });
 
-describe("ensureMicrophonePermission", () => {
+describe("microphone permission readiness", () => {
+  it("can inspect a prompt state without opening the microphone", async () => {
+    const getUserMedia = vi.fn();
+    const query = vi.fn(async () => ({ state: "prompt" as PermissionState }));
+    setNavigatorProperty("mediaDevices", { getUserMedia });
+    setNavigatorProperty("permissions", { query });
+
+    await expect(getMicrophonePermissionState()).resolves.toBe("prompt");
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
   it("requests a prompt once and immediately releases the probe stream", async () => {
     const stop = vi.fn();
     const getUserMedia = vi.fn(async () => ({ getTracks: () => [{ stop }] }));
@@ -50,6 +61,7 @@ describe("ensureMicrophonePermission", () => {
     setNavigatorProperty("mediaDevices", { getUserMedia });
     setNavigatorProperty("permissions", { query });
 
+    await expect(getMicrophonePermissionState()).resolves.toBe("granted");
     await expect(ensureMicrophonePermission()).resolves.toBe("granted");
     expect(getUserMedia).not.toHaveBeenCalled();
   });
@@ -60,6 +72,7 @@ describe("ensureMicrophonePermission", () => {
     setNavigatorProperty("mediaDevices", { getUserMedia });
     setNavigatorProperty("permissions", { query });
 
+    await expect(getMicrophonePermissionState()).resolves.toBe("denied");
     await expect(ensureMicrophonePermission()).resolves.toBe("denied");
     expect(getUserMedia).not.toHaveBeenCalled();
   });
