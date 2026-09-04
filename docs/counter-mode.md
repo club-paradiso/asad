@@ -199,6 +199,25 @@ medical symptoms, legal problems, immigration status or money.
   a hijack and has to be fixable; once the conversation is under way, a new
   language claim is a second person and is turned away.
 
+### Ending
+
+Either side's End deletes the session on the server; the other side learns of it
+from a poll that comes back 404. Both browsers then leave on their own after
+~300ms — long enough for the terminal state to paint, short enough to feel
+automatic. A finished consultation left on screen is the failure this prevents:
+the visitor's phone still showing someone's business, and a desk device that
+looks busy when it is free.
+
+- **Visitor**: the tab closes where the browser permits it. A script may only
+  close a window a script opened, and a QR/deep-link tab has no opener, so the
+  usual path is `location.replace` to `/counter/ended` — which also drops the
+  dead consultation URL out of history, so Back cannot reopen it.
+- **Staff**: back to `/`. The next visitor is started fresh, with a new code.
+
+"다음 손님" ends the session by the same route but is a *local* end, and
+deliberately keeps the staff member on the desk device. That is the whole reason
+the client tracks who hung up rather than only that someone did.
+
 ### Storage
 
 Local development uses the in-memory store. Multi-instance and Vercel
