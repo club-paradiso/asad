@@ -21,13 +21,14 @@ import { Label } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useClientValue } from "@/hooks/useClientValue";
 import { useLocalStore } from "@/lib/local-store";
-import { ensureMicrophonePermission, prefetchSttCredentials } from "@/providers/stt";
+import { prefetchSttCredentials } from "@/providers/stt";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
 import { QuickPhraseBar } from "./QuickPhraseBar";
 import { QrCode } from "./QrCode";
 import { useCounterDisclosure } from "./ProviderNotice";
+import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { cn } from "@/lib/cn";
 import { counterPreferencesStore } from "./preferences";
 
@@ -49,10 +50,6 @@ export function CounterHostScreen() {
     setStarting(true);
     setStartError(null);
     setPreferences({ ...preferences, configured: true });
-    // The setup button is the right moment for the browser permission sheet.
-    // Doing this before the conversation means the later mic button can mean
-    // what people assume it means: start listening now.
-    const microphoneReady = ensureMicrophonePermission();
     try {
       const response = await fetch("/api/counter/session", {
         method: "POST",
@@ -71,14 +68,12 @@ export function CounterHostScreen() {
         setStartError("현장응대를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
+      // Credential prewarming opens no media device. It is safe to do even for
+      // text-only staff while microphone permission stays an explicit choice.
       prefetchSttCredentials(hostLang, {
         code: data.session.code,
         token: data.participantToken,
       });
-      // Do not paint the conversation underneath an unresolved native prompt.
-      // Permission denial never blocks the session because typed input remains
-      // a complete fallback path.
-      await microphoneReady;
       setParticipantToken(data.participantToken);
       setCode(data.session.code);
       setEditingPreferences(false);
@@ -470,6 +465,8 @@ function SetupScreen({
           </p>
         )}
 
+        <VoiceReadinessButton lang={hostLang} />
+
         <button
           type="button"
           onClick={onStart}
@@ -567,6 +564,8 @@ function SetupScreen({
           </p>
         </div>
       ) : null}
+
+      <VoiceReadinessButton lang={hostLang} />
 
       <button
         type="button"
