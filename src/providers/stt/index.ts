@@ -86,17 +86,50 @@ type CounterAccess = { code: string; token: string };
 
 interface PrefetchedCredentials {
   createdAt: number;
+  maxAgeMs: number;
   promise: Promise<SttCredentials | null>;
+  cleanupTimer: ReturnType<typeof setTimeout> | null;
 }
 
-// Counter tokens are intentionally short-lived. Prewarming is only meant to
-// hide the network round trip between a person entering the conversation and
-// tapping the mic a few seconds later, not to stockpile recogniser sessions.
-const PREFETCH_MAX_AGE_MS = 20_000;
+// Unknown/opaque credentials get only a short speculative cache. Providers that
+// return an explicit expiry (Deepgram does for its scoped temporary key) can be
+// kept ready longer, but still only for a bounded window and never through the
+// final five seconds of their declared lifetime.
+const PREFETCH_DEFAULT_MAX_AGE_MS = 20_000;
+const PREFETCH_EXPIRING_MAX_AGE_MS = 5 * 60_000;
+const PREFETCH_EXPIRY_SAFETY_MS = 5_000;
 const prefetchedCredentials = new Map<string, PrefetchedCredentials>();
 
 function prefetchKey(language: string | undefined, usage: SttUsage, access?: CounterAccess) {
   return [usage, language?.trim().toLowerCase() ?? "", access?.code ?? "", access?.token ?? ""].join("|");
+}
+
+function prefetchFresh(entry: PrefetchedCredentials): boolean {
+  return Date.now() - entry.createdAt < entry.maxAgeMs;
+}
+
+function schedulePrefetchCleanup(key: string, entry: PrefetchedCredentials) {
+  if (entry.cleanupTimer) clearTimeout(entry.cleanupTimer);
+  const elapsed = Date.now() - entry.createdAt;
+  const remaining = Math.max(0, entry.maxAgeMs - elapsed);
+  entry.cleanupTimer = setTimeout(() => {
+    if (prefetchedCredentials.get(key) === entry) prefetchedCredentials.delete(key);
+  }, remaining);
+}
+
+function updatePrefetchLifetime(
+  key: string,
+  entry: PrefetchedCredentials,
+  credentials: SttCredentials | null,
+) {
+  if (credentials?.expiresAt) {
+    const usableLifetime = Math.max(
+      0,
+      credentials.expiresAt - entry.createdAt - PREFETCH_EXPIRY_SAFETY_MS,
+    );
+    entry.maxAgeMs = Math.min(PREFETCH_EXPIRING_MAX_AGE_MS, usableLifetime);
+  }
+  if (prefetchedCredentials.get(key) === entry) schedulePrefetchCleanup(key, entry);
 }
 
 async function requestSttCredentials(
@@ -123,9 +156,10 @@ async function requestSttCredentials(
 /**
  * Start the Counter credential request before the user taps the mic.
  *
- * The result is one-shot and expires from this in-memory cache quickly. Network
- * or provider errors are swallowed here because prewarming is an optimisation;
- * the real recording path still performs its normal fetch/fallback.
+ * The result is one-shot. Opaque credentials expire from the in-memory prefetch
+ * after 20 seconds; a credential with an explicit expiry may remain ready for
+ * up to five minutes, but never beyond its own safe lifetime. Network/provider
+ * errors are swallowed because prewarming is only an optimisation.
  */
 export function prefetchSttCredentials(
   language: string,
@@ -133,17 +167,23 @@ export function prefetchSttCredentials(
 ): void {
   const key = prefetchKey(language, "counter", counterAccess);
   const existing = prefetchedCredentials.get(key);
-  if (existing && Date.now() - existing.createdAt < PREFETCH_MAX_AGE_MS) return;
+  if (existing && prefetchFresh(existing)) return;
+  if (existing?.cleanupTimer) clearTimeout(existing.cleanupTimer);
 
-  const promise = requestSttCredentials(language, undefined, "counter", counterAccess).catch(
-    () => null,
-  );
-  const entry = { createdAt: Date.now(), promise } satisfies PrefetchedCredentials;
+  const entry: PrefetchedCredentials = {
+    createdAt: Date.now(),
+    maxAgeMs: PREFETCH_DEFAULT_MAX_AGE_MS,
+    promise: Promise.resolve(null),
+    cleanupTimer: null,
+  };
+  entry.promise = requestSttCredentials(language, undefined, "counter", counterAccess)
+    .catch(() => null)
+    .then((credentials) => {
+      updatePrefetchLifetime(key, entry, credentials);
+      return credentials;
+    });
   prefetchedCredentials.set(key, entry);
-
-  setTimeout(() => {
-    if (prefetchedCredentials.get(key) === entry) prefetchedCredentials.delete(key);
-  }, PREFETCH_MAX_AGE_MS);
+  schedulePrefetchCleanup(key, entry);
 }
 
 function aborted(signal?: AbortSignal): never {
@@ -182,10 +222,16 @@ export async function fetchSttCredentials(
     const key = prefetchKey(language, usage, counterAccess);
     const entry = prefetchedCredentials.get(key);
     prefetchedCredentials.delete(key);
+    if (entry?.cleanupTimer) clearTimeout(entry.cleanupTimer);
 
-    if (entry && Date.now() - entry.createdAt < PREFETCH_MAX_AGE_MS) {
+    if (entry && prefetchFresh(entry)) {
       const prefetched = await consumePrefetched(entry, signal);
-      if (!prefetched?.expiresAt || prefetched.expiresAt > Date.now() + 5_000) return prefetched;
+      if (
+        !prefetched?.expiresAt ||
+        prefetched.expiresAt > Date.now() + PREFETCH_EXPIRY_SAFETY_MS
+      ) {
+        return prefetched;
+      }
     }
   }
 
