@@ -122,16 +122,18 @@ export function Composer({
   }, [disabled, draft, draftSource, voice]);
 
   const voiceFinishing = voice.phase === "finishing";
-  const voiceActive = voice.listening || voiceFinishing;
+  const voiceActive = voice.active || voiceFinishing;
 
   const toggleVoice = useCallback(() => {
     if (voiceFinishing) return;
-    if (voice.listening) voice.stop();
+    if (voice.active) voice.stop();
     else startVoice();
   }, [startVoice, voice, voiceFinishing]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("vibrate" in navigator)) return;
+    // Haptic feedback is the physical signal that capture is genuinely ready.
+    // Do not vibrate while permission/provider setup is merely connecting.
     if (voice.phase === "listening") navigator.vibrate(12);
     if (voice.phase === "finishing") navigator.vibrate(8);
   }, [voice.phase]);
@@ -235,19 +237,19 @@ export function Composer({
               type="button"
               disabled={disabled || voiceFinishing}
               onClick={toggleVoice}
-              aria-label={voice.listening ? voiceStopAriaLabel(lang) : status}
+              aria-label={voice.active ? voiceStopAriaLabel(lang) : status}
               aria-pressed={voice.listening}
               className={cn(
                 "flex size-20 shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,box-shadow,transform]",
                 "touch-manipulation disabled:pointer-events-none disabled:opacity-55 active:scale-[0.97]",
                 voice.listening
                   ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)] shadow-[0_0_0_6px_var(--accent-dim)]"
-                  : voiceFinishing
+                  : voice.active || voiceFinishing
                     ? "animate-pulse border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]"
                     : "border-[color-mix(in_srgb,var(--accent)_55%,var(--line))] bg-[var(--accent-dim)] text-[var(--accent)]",
               )}
             >
-              {voice.listening ? <StopIcon /> : <MicIcon />}
+              {voice.listening ? <StopIcon /> : voice.active ? <PreparingIcon /> : <MicIcon />}
             </button>
             <span className="min-h-5 text-sm font-semibold text-[var(--fg)]" aria-live="polite">
               {status}
@@ -444,6 +446,15 @@ function MicIcon() {
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5 11a7 7 0 0 0 14 0" />
       <path d="M12 18v3" />
+    </svg>
+  );
+}
+
+function PreparingIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-8 animate-spin" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+      <path d="M12 4a8 8 0 0 1 8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
