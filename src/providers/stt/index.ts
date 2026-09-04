@@ -20,7 +20,9 @@ export { DemoSpeechProvider, derivePartials } from "./demo";
 export { WebSpeechProvider } from "./webspeech";
 export {
   ensureMicrophonePermission,
+  getMicrophonePermissionState,
   type MicrophonePermissionReadiness,
+  type MicrophonePermissionState,
 } from "./microphone-permission";
 
 export interface CreateSttOptions extends SttProviderOptions {
