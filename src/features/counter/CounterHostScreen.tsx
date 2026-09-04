@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useClientValue } from "@/hooks/useClientValue";
 import { useLocalStore } from "@/lib/local-store";
-import { ensureMicrophonePermission } from "@/providers/stt";
+import { ensureMicrophonePermission, prefetchSttCredentials } from "@/providers/stt";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
@@ -71,6 +71,10 @@ export function CounterHostScreen() {
         setStartError("현장응대를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
+      prefetchSttCredentials(hostLang, {
+        code: data.session.code,
+        token: data.participantToken,
+      });
       // Do not paint the conversation underneath an unresolved native prompt.
       // Permission denial never blocks the session because typed input remains
       // a complete fallback path.
