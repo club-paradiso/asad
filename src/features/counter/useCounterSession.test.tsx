@@ -47,6 +47,9 @@ describe("useCounterSession end lifecycle", () => {
     const { result } = renderHook(() => useCounterSession("AC34", "guest"));
 
     await waitFor(() => expect(result.current.ended).toBe(true));
+    // The surfaces exit automatically on a remote end, so they have to be able
+    // to tell it apart from this device's own End button.
+    expect(result.current.endedBy).toBe("remote");
     expect(result.current.connected).toBe(false);
     expect(replace).not.toHaveBeenCalled();
 
@@ -80,6 +83,7 @@ describe("useCounterSession end lifecycle", () => {
     });
 
     expect(result.current.ended).toBe(true);
+    expect(result.current.endedBy).toBe("self");
     expect(replace).toHaveBeenCalledWith("/");
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/counter/session?code=AC34",
@@ -110,8 +114,16 @@ describe("useCounterSession end lifecycle", () => {
     });
 
     expect(result.current.ended).toBe(true);
+    expect(result.current.endedBy).toBe("self");
     expect(result.current.connected).toBe(false);
     expect(replace).not.toHaveBeenCalled();
+
+    // A poll already in flight when End was tapped must not report the session
+    // as live again: that would cancel the exit the surface has scheduled.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    });
+    expect(result.current.endedBy).toBe("self");
   });
 
   it("does not mistake a mobile page lifecycle event for an explicit hang-up", async () => {

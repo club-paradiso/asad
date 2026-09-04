@@ -39,6 +39,17 @@ export interface EndOptions {
   leave?: boolean;
 }
 
+/**
+ * Who hung up.
+ *
+ * `"self"` is this device's own End button; `"remote"` is the session being
+ * gone from the server — the other participant ended it, or it expired. The
+ * surfaces need the difference: an automatic exit is right when the
+ * conversation was taken away, and wrong when this device ended it in order to
+ * stay and start the next one.
+ */
+export type CounterEndReason = "self" | "remote";
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const newMessageRequestId = (): string => {
@@ -73,8 +84,8 @@ export function useCounterSession(
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState(false);
-  /** The session is gone from the server: ended, or expired. */
-  const [ended, setEnded] = useState(false);
+  /** Null while the session is live; otherwise how it finished. */
+  const [endedBy, setEndedBy] = useState<CounterEndReason | null>(null);
 
   const cursor = useRef(0);
   const stopped = useRef(false);
@@ -92,9 +103,10 @@ export function useCounterSession(
   }, []);
 
   const leaveCounterMode = useCallback(() => {
-    // Browsers generally refuse to close tabs they did not open themselves.
-    // The explicit staff-side "End Counter Mode" action returns to the app.
-    // Visitor-side soft-close behavior lives in CounterGuestScreen instead.
+    // Browsers generally refuse to close tabs they did not open themselves, so
+    // leaving Counter Mode means going back to the app. This is the immediate
+    // path for an explicit End button; the automatic exit after the other side
+    // hangs up is scheduled by the surfaces through `scheduleCounterExit`.
     router.replace("/");
   }, [router]);
 
@@ -110,9 +122,8 @@ export function useCounterSession(
       );
       if (response.status === 404) {
         // The other participant ended the consultation (or the session expired).
-        // Raise a terminal state only. The host keeps the ASAD shell, while the
-        // visitor surface decides how to close/replace its own browser page.
-        setEnded(true);
+        // Raise a terminal state only; each surface decides how it leaves.
+        setEndedBy("remote");
         setConnected(false);
         stopped.current = true;
         return;
@@ -120,11 +131,14 @@ export function useCounterSession(
       if (!response.ok) throw new Error(`Poll failed (${response.status})`);
 
       const data = (await response.json()) as { session: SessionView };
+      // A poll already in flight when this device hung up must not resurrect
+      // the conversation: the exit the surfaces schedule keys off this state.
+      if (stopped.current) return;
       setSession(data.session);
       merge(data.session.messages);
       cursor.current = Math.max(cursor.current, data.session.seq);
       setConnected(true);
-      setEnded(false);
+      setEndedBy(null);
       setError(null);
     } catch {
       // A dropped poll is normal on venue wifi; the next one recovers.
@@ -256,7 +270,7 @@ export function useCounterSession(
 
   const end = useCallback(
     async (options: EndOptions = {}) => {
-      setEnded(true);
+      setEndedBy("self");
       setConnected(false);
       stopped.current = true;
 
@@ -279,7 +293,8 @@ export function useCounterSession(
     error,
     sending,
     connected,
-    ended,
+    ended: endedBy !== null,
+    endedBy,
     send,
     end,
     refresh: poll,

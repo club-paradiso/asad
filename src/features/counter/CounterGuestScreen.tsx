@@ -38,6 +38,7 @@ import { QuickPhraseBar } from "./QuickPhraseBar";
 import { ProviderNotice, useCounterDisclosure } from "./ProviderNotice";
 import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { sessionEndCopy } from "./session-end-copy";
+import { scheduleCounterExit } from "./counter-exit";
 import { useClientValue } from "@/hooks/useClientValue";
 import { cn } from "@/lib/cn";
 
@@ -205,35 +206,23 @@ export function CounterGuestScreen({ code }: { code: string }) {
   );
 }
 
+/**
+ * The visitor's exit.
+ *
+ * Reached whichever side hung up. The phone closes its tab where the browser
+ * allows it, and otherwise replaces the dead consultation URL — `replace`, not
+ * `push`, so Back cannot reopen a session the server has already deleted.
+ */
 function GuestSessionClosing({ lang }: { lang: string }) {
-  useEffect(() => {
-    const destination = `/counter/ended?lang=${encodeURIComponent(lang)}`;
-
-    // A browser only permits scripts to close tabs/windows that were opened by
-    // script. QR/deep-link tabs normally have no opener, so do not trigger a
-    // browser warning by attempting an impossible close. When closing is
-    // permitted, try it after the terminal state has painted once.
-    const closeTimer = window.setTimeout(() => {
-      if (window.opener) {
-        try {
-          window.close();
-        } catch {
-          // The deterministic location.replace fallback below handles refusal.
-        }
-      }
-    }, 180);
-
-    // location.replace removes the dead consultation URL from browser history,
-    // so Back cannot reopen a session that has already been deleted.
-    const replaceTimer = window.setTimeout(() => {
-      if (!window.closed) window.location.replace(destination);
-    }, 650);
-
-    return () => {
-      window.clearTimeout(closeTimer);
-      window.clearTimeout(replaceTimer);
-    };
-  }, [lang]);
+  useEffect(
+    () =>
+      scheduleCounterExit({
+        tryClose: true,
+        leave: () =>
+          window.location.replace(`/counter/ended?lang=${encodeURIComponent(lang)}`),
+      }),
+    [lang],
+  );
 
   return <CounterEndedScreen lang={lang} />;
 }

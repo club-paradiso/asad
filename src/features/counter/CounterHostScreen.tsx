@@ -10,8 +10,9 @@
  *
  * Three states, and no more: set up once, show the code, talk.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { COUNTER_LANGUAGES, findLanguage } from "@/counter/languages";
 import { formatCode, joinUrl } from "@/counter/codes";
 import { buildConfirmationText } from "@/counter/risks";
@@ -31,8 +32,10 @@ import { useCounterDisclosure } from "./ProviderNotice";
 import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { cn } from "@/lib/cn";
 import { counterPreferencesStore } from "./preferences";
+import { scheduleCounterExit } from "./counter-exit";
 
 export function CounterHostScreen() {
+  const router = useRouter();
   const [code, setCode] = useState<string | null>(null);
   const [participantToken, setParticipantToken] = useState<string | null>(null);
   const [preferences, setPreferences] = useLocalStore(counterPreferencesStore);
@@ -45,6 +48,15 @@ export function CounterHostScreen() {
   const hostLang = preferences.hostLang;
   const deskLabel = preferences.deskLabel;
   const t = stringsFor(hostLang);
+
+  // The visitor hanging up — or the session expiring — takes the desk device
+  // off the dead conversation by itself, so nobody has to notice a finished
+  // screen and tidy it up. Only a remote end does this: "다음 손님" also ends
+  // the session, and that one means the staff member is deliberately staying.
+  useEffect(() => {
+    if (session.endedBy !== "remote") return;
+    return scheduleCounterExit({ leave: () => router.replace("/") });
+  }, [session.endedBy, router]);
 
   const start = useCallback(async () => {
     setStarting(true);
@@ -304,7 +316,8 @@ function HostEndedPanel({ onNext }: { onNext: () => void }) {
           민원인과의 대화가 종료되었습니다
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-[var(--fg-muted)]">
-          이 대화 화면은 닫혔습니다. 다음 손님을 시작하면 새 QR 코드와 새 세션이 만들어집니다.
+          이 대화 화면은 닫혔습니다. 잠시 후 처음 화면으로 돌아갑니다. 돌아가지 않으면
+          아래에서 바로 다음 손님을 시작하세요.
         </p>
         <button
           type="button"
