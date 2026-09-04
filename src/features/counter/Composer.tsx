@@ -8,6 +8,7 @@ import type { CounterMessage, RiskSpan } from "@/counter/types";
 import type { CounterStrings } from "@/counter/ui-strings";
 import { cn } from "@/lib/cn";
 import { useVoiceInput } from "./useVoiceInput";
+import { voiceDetailStringsFor } from "./voice-detail-strings";
 import { voiceStringsFor } from "./voice-strings";
 
 interface PendingVoice {
@@ -49,6 +50,7 @@ export function Composer({
   const composing = useRef(false);
   const voice = useVoiceInput(lang, counterCode, counterToken ?? undefined);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
+  const detailCopy = useMemo(() => voiceDetailStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
 
   const submit = useCallback(() => {
@@ -183,7 +185,7 @@ export function Composer({
                   });
                 }}
               >
-                {editTranscriptLabel(lang)}
+                {detailCopy.editTranscript}
               </button>
               <button
                 type="button"
@@ -209,7 +211,7 @@ export function Composer({
               </p>
             )}
             {voice.listening && (
-              <p className="mt-1 text-xs text-[var(--fg-dim)]">{voiceStopHint(lang)}</p>
+              <p className="mt-1 text-xs text-[var(--fg-dim)]">{detailCopy.stopHint}</p>
             )}
           </div>
         )}
@@ -237,7 +239,7 @@ export function Composer({
               type="button"
               disabled={disabled || voiceFinishing}
               onClick={toggleVoice}
-              aria-label={voice.active ? voiceStopAriaLabel(lang) : status}
+              aria-label={voice.active ? detailCopy.stopAria : status}
               aria-pressed={voice.listening}
               className={cn(
                 "flex size-20 shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,box-shadow,transform]",
@@ -263,9 +265,9 @@ export function Composer({
             dir={rtl ? "rtl" : undefined}
           >
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-[var(--accent)]">{voiceReviewLabel(lang)}</p>
+              <p className="text-xs font-semibold text-[var(--accent)]">{detailCopy.reviewLabel}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-[var(--fg-dim)]">
-                {voiceReviewHint(lang)}
+                {detailCopy.reviewHint}
               </p>
             </div>
             <button
@@ -364,72 +366,6 @@ function restoreLabel(language: string): string {
   if (language.startsWith("zh")) return "恢复刚才的输入";
   if (language.startsWith("ja")) return "直前の入力を復元";
   return "Restore previous text";
-}
-
-function editTranscriptLabel(language: string): string {
-  if (language.startsWith("ko")) return "직접 수정";
-  if (language.startsWith("zh")) return "手动修改";
-  if (language.startsWith("ja")) return "手動で修正";
-  return "Edit transcript";
-}
-
-function voiceReviewLabel(language: string): string {
-  if (language.startsWith("ko")) return "음성 인식 결과 · 수정 가능";
-  if (language.startsWith("zh")) return "语音识别结果 · 可修改";
-  if (language.startsWith("ja")) return "音声認識結果 · 編集できます";
-  if (language.startsWith("vi")) return "Kết quả nhận dạng giọng nói · Có thể sửa";
-  if (language.startsWith("th")) return "ผลการรู้จำเสียง · แก้ไขได้";
-  if (language.startsWith("id")) return "Hasil pengenalan suara · Bisa diedit";
-  if (language.startsWith("ru")) return "Результат распознавания · Можно исправить";
-  if (language.startsWith("ar")) return "نتيجة التعرّف على الصوت · قابلة للتعديل";
-  return "Speech transcript · Editable";
-}
-
-function voiceReviewHint(language: string): string {
-  if (language.startsWith("ko")) {
-    return "이름·고유명사나 잘못 인식된 부분을 바로 고친 뒤 전송하세요.";
-  }
-  if (language.startsWith("zh")) {
-    return "请直接修改姓名、专有名词或识别错误后再发送。";
-  }
-  if (language.startsWith("ja")) {
-    return "人名・固有名詞や誤認識された箇所を直してから送信してください。";
-  }
-  if (language.startsWith("vi")) {
-    return "Sửa ngay tên riêng hoặc phần nhận dạng sai trước khi gửi.";
-  }
-  if (language.startsWith("th")) {
-    return "แก้ชื่อ คำเฉพาะ หรือส่วนที่รู้จำผิดก่อนส่ง";
-  }
-  if (language.startsWith("id")) {
-    return "Perbaiki nama, istilah khusus, atau bagian yang salah sebelum mengirim.";
-  }
-  if (language.startsWith("ru")) {
-    return "Исправьте имена, термины и ошибки распознавания перед отправкой.";
-  }
-  if (language.startsWith("ar")) {
-    return "صحّح الأسماء والمصطلحات وأخطاء التعرّف قبل الإرسال.";
-  }
-  return "Correct names, proper nouns, or recognition errors before sending.";
-}
-
-function voiceStopHint(language: string): string {
-  if (language.startsWith("ko")) return "말이 끝났으면 마이크 버튼을 눌러 바로 멈출 수 있어요.";
-  if (language.startsWith("zh")) return "说完后，再点一次麦克风即可立即停止。";
-  if (language.startsWith("ja")) return "話し終えたら、マイクをもう一度押すとすぐ停止できます。";
-  if (language.startsWith("vi")) return "Nói xong, chạm lại nút mic để dừng ngay.";
-  if (language.startsWith("th")) return "พูดจบแล้ว แตะปุ่มไมค์อีกครั้งเพื่อหยุดได้ทันที";
-  if (language.startsWith("id")) return "Setelah selesai bicara, ketuk mikrofon lagi untuk berhenti.";
-  if (language.startsWith("ru")) return "Закончив говорить, нажмите микрофон ещё раз, чтобы остановить запись.";
-  if (language.startsWith("ar")) return "بعد الانتهاء من الكلام، اضغط زر الميكروفون مرة أخرى للإيقاف.";
-  return "When you finish speaking, tap the mic again to stop immediately.";
-}
-
-function voiceStopAriaLabel(language: string): string {
-  if (language.startsWith("ko")) return "음성 입력 중지";
-  if (language.startsWith("zh")) return "停止语音输入";
-  if (language.startsWith("ja")) return "音声入力を停止";
-  return "Stop voice input";
 }
 
 function MicIcon() {
