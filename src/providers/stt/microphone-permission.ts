@@ -27,7 +27,6 @@ async function queryMicrophonePermission(): Promise<PermissionState | null> {
 
 /** Read the current permission posture without causing a browser prompt. */
 export async function getMicrophonePermissionState(): Promise<MicrophonePermissionState> {
-  if (grantedInPage) return "granted";
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
     return "unavailable";
   }
@@ -37,12 +36,17 @@ export async function getMicrophonePermissionState(): Promise<MicrophonePermissi
     grantedInPage = true;
     return "granted";
   }
-  if (known === "denied") return "denied";
-  return "prompt";
+  if (known === "denied") {
+    grantedInPage = false;
+    return "denied";
+  }
+
+  // Browsers that do not expose microphone permission through Permissions API
+  // still benefit from the successful in-page handshake cache.
+  return grantedInPage ? "granted" : "prompt";
 }
 
 export async function ensureMicrophonePermission(): Promise<MicrophonePermissionReadiness> {
-  if (grantedInPage) return "granted";
   const mediaDevices =
     typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
   if (!mediaDevices?.getUserMedia) return "unavailable";
@@ -52,7 +56,11 @@ export async function ensureMicrophonePermission(): Promise<MicrophonePermission
     grantedInPage = true;
     return "granted";
   }
-  if (known === "denied") return "denied";
+  if (known === "denied") {
+    grantedInPage = false;
+    return "denied";
+  }
+  if (grantedInPage) return "granted";
 
   try {
     const stream = await mediaDevices.getUserMedia({ audio: true });
@@ -62,6 +70,7 @@ export async function ensureMicrophonePermission(): Promise<MicrophonePermission
     grantedInPage = true;
     return "granted";
   } catch (error) {
+    grantedInPage = false;
     if (
       error instanceof DOMException &&
       (error.name === "NotAllowedError" || error.name === "SecurityError")
