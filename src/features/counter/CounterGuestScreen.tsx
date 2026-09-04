@@ -29,13 +29,14 @@ import { Mark } from "@/components/brand/Mark";
 import { buildConfirmationText } from "@/counter/risks";
 import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
-import { ensureMicrophonePermission, prefetchSttCredentials } from "@/providers/stt";
+import { prefetchSttCredentials } from "@/providers/stt";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
 import { CounterEndedScreen } from "./CounterEndedScreen";
 import { QuickPhraseBar } from "./QuickPhraseBar";
 import { ProviderNotice, useCounterDisclosure } from "./ProviderNotice";
+import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { sessionEndCopy } from "./session-end-copy";
 import { useClientValue } from "@/hooks/useClientValue";
 import { cn } from "@/lib/cn";
@@ -54,11 +55,6 @@ export function CounterGuestScreen({ code }: { code: string }) {
     async (chosen: string) => {
       setJoining(true);
       setJoinError(null);
-      // Permission belongs to setup, not to the first spoken syllable. Start the
-      // native browser handshake from this explicit Start tap while the session
-      // request runs in parallel. The probe stream is immediately released and
-      // no audio is read or sent by the permission helper.
-      const microphoneReady = ensureMicrophonePermission();
       try {
         const response = await fetch("/api/counter/session", {
           method: "PATCH",
@@ -79,14 +75,10 @@ export function CounterGuestScreen({ code }: { code: string }) {
           setJoinError(data.error ?? "Could not join this session.");
           return;
         }
-        // Start the short-lived STT token request before the conversation is
-        // even painted. By the time a human sees and taps the mic, the network
-        // round trip is usually already finished rather than eating syllable 1.
+        // Network preparation is safe to do for everyone: it opens no media
+        // device and consumes no audio. Microphone permission remains opt-in on
+        // the language screen, so text-only visitors never see a native prompt.
         prefetchSttCredentials(chosen, { code, token: data.participantToken });
-        // Do not enter the conversation while a browser permission sheet is
-        // still covering it. Denial never blocks typing; useVoiceInput reports
-        // the microphone state only if the visitor later chooses voice.
-        await microphoneReady;
         setParticipantToken(data.participantToken);
         setLang(chosen);
       } catch {
@@ -374,6 +366,7 @@ function LanguagePicker({
         </p>
         {/* Named before the first word is typed, not after. */}
         <ProviderNotice disclosure={disclosure} strings={t} className="mb-2.5" />
+        <VoiceReadinessButton lang={selected} className="mb-2.5" />
         <button
           type="button"
           disabled={joining}
