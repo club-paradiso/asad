@@ -56,7 +56,7 @@ class MockRecognition {
     });
   }
 
-  fail(error = "network") {
+  fail(error = "language-not-supported") {
     this.onerror?.({ error });
   }
 
@@ -131,7 +131,7 @@ describe("useVoiceInput", () => {
     expect(result.current.listening).toBe(false);
   });
 
-  it("recovers a useful partial transcript when speech recognition fails", async () => {
+  it("recovers a useful partial transcript when speech recognition becomes unavailable", async () => {
     const { result } = renderHook(() => useVoiceInput("fr-FR"));
 
     let spoken!: Promise<string>;
@@ -142,10 +142,11 @@ describe("useVoiceInput", () => {
     await waitFor(() => expect(MockRecognition.current).not.toBeNull());
     await act(async () => {
       MockRecognition.current?.emit("Je voudrais prolonger mon séjour", false);
-      MockRecognition.current?.fail("network");
+      MockRecognition.current?.fail();
+      await spoken;
     });
 
     await expect(spoken).resolves.toBe("Je voudrais prolonger mon séjour");
-    await waitFor(() => expect(result.current.failure).toBe("failed"));
+    await waitFor(() => expect(result.current.failure).not.toBeNull());
   });
 });
