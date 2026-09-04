@@ -56,6 +56,10 @@ class MockRecognition {
     });
   }
 
+  fail(error = "network") {
+    this.onerror?.({ error });
+  }
+
   end() {
     this.onend?.();
   }
@@ -125,5 +129,23 @@ describe("useVoiceInput", () => {
 
     await expect(spoken).resolves.toBe("I need help with my visa");
     expect(result.current.listening).toBe(false);
+  });
+
+  it("recovers a useful partial transcript when speech recognition fails", async () => {
+    const { result } = renderHook(() => useVoiceInput("fr-FR"));
+
+    let spoken!: Promise<string>;
+    await act(async () => {
+      spoken = result.current.start();
+    });
+
+    await waitFor(() => expect(MockRecognition.current).not.toBeNull());
+    await act(async () => {
+      MockRecognition.current?.emit("Je voudrais prolonger mon séjour", false);
+      MockRecognition.current?.fail("network");
+    });
+
+    await expect(spoken).resolves.toBe("Je voudrais prolonger mon séjour");
+    await waitFor(() => expect(result.current.failure).toBe("failed"));
   });
 });
