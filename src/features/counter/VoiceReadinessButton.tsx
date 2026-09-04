@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { findLanguage } from "@/counter/languages";
 import {
   ensureMicrophonePermission,
   getMicrophonePermissionState,
@@ -17,6 +18,7 @@ export function VoiceReadinessButton({
   className?: string;
 }) {
   const copy = useMemo(() => voiceReadinessStringsFor(lang), [lang]);
+  const rtl = findLanguage(lang)?.rtl ?? false;
   const [state, setState] = useState<MicrophonePermissionState>("prompt");
   const [checking, setChecking] = useState(true);
 
@@ -51,7 +53,9 @@ export function VoiceReadinessButton({
             : "border-[var(--line)] text-[var(--fg-dim)]",
           className,
         )}
-        role={state === "denied" ? "status" : undefined}
+        dir={rtl ? "rtl" : undefined}
+        role="status"
+        aria-live="polite"
       >
         {state === "denied" ? copy.denied : copy.unavailable}
       </div>
@@ -60,7 +64,10 @@ export function VoiceReadinessButton({
 
   const ready = state === "granted";
   return (
-    <div className={cn("rounded-xl border border-[var(--line)] bg-[var(--bg-raised)] p-3", className)}>
+    <div
+      className={cn("rounded-xl border border-[var(--line)] bg-[var(--bg-raised)] p-3", className)}
+      dir={rtl ? "rtl" : undefined}
+    >
       <button
         type="button"
         onClick={() => void prepare()}
