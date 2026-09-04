@@ -29,7 +29,7 @@ import { Mark } from "@/components/brand/Mark";
 import { buildConfirmationText } from "@/counter/risks";
 import { stringsFor } from "@/counter/ui-strings";
 import type { CounterMessage, SessionView } from "@/counter/types";
-import { ensureMicrophonePermission } from "@/providers/stt";
+import { ensureMicrophonePermission, prefetchSttCredentials } from "@/providers/stt";
 import { useCounterSession } from "./useCounterSession";
 import { ConversationView } from "./ConversationView";
 import { Composer } from "./Composer";
@@ -79,6 +79,10 @@ export function CounterGuestScreen({ code }: { code: string }) {
           setJoinError(data.error ?? "Could not join this session.");
           return;
         }
+        // Start the short-lived STT token request before the conversation is
+        // even painted. By the time a human sees and taps the mic, the network
+        // round trip is usually already finished rather than eating syllable 1.
+        prefetchSttCredentials(chosen, { code, token: data.participantToken });
         // Do not enter the conversation while a browser permission sheet is
         // still covering it. Denial never blocks typing; useVoiceInput reports
         // the microphone state only if the visitor later chooses voice.
