@@ -34,48 +34,51 @@ export function VoiceReadinessButton({
   }, []);
 
   const prepare = async () => {
-    if (checking || state === "granted") return;
+    if (checking || state !== "prompt") return;
     setChecking(true);
     const next = await ensureMicrophonePermission();
     setState(next);
     setChecking(false);
   };
 
-  const statusCopy =
-    state === "granted"
-      ? copy.ready
-      : state === "denied"
-        ? copy.denied
-        : state === "unavailable"
-          ? copy.unavailable
-          : copy.hint;
+  if (!checking && (state === "denied" || state === "unavailable")) {
+    return (
+      <div
+        className={cn(
+          "rounded-xl border bg-[var(--bg-raised)] px-3 py-3 text-center text-xs leading-relaxed",
+          state === "denied"
+            ? "border-[color-mix(in_srgb,var(--danger)_45%,var(--line))] text-[var(--danger)]"
+            : "border-[var(--line)] text-[var(--fg-dim)]",
+          className,
+        )}
+        role={state === "denied" ? "status" : undefined}
+      >
+        {state === "denied" ? copy.denied : copy.unavailable}
+      </div>
+    );
+  }
 
+  const ready = state === "granted";
   return (
     <div className={cn("rounded-xl border border-[var(--line)] bg-[var(--bg-raised)] p-3", className)}>
       <button
         type="button"
         onClick={() => void prepare()}
-        disabled={checking || state === "granted" || state === "unavailable"}
+        disabled={checking || ready}
         aria-busy={checking}
         className={cn(
           "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition-colors",
-          state === "granted"
+          ready
             ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]"
             : "border-[var(--line-strong)] text-[var(--fg)]",
           "disabled:cursor-default disabled:opacity-70",
         )}
       >
-        <span aria-hidden>{state === "granted" ? "✓" : "🎙"}</span>
-        <span>{checking ? copy.preparing : state === "granted" ? copy.ready : copy.prepare}</span>
+        <span aria-hidden>{ready ? "✓" : "🎙"}</span>
+        <span>{checking ? copy.preparing : ready ? copy.ready : copy.prepare}</span>
       </button>
-      <p
-        className={cn(
-          "mt-2 text-center text-xs leading-relaxed",
-          state === "denied" ? "text-[var(--danger)]" : "text-[var(--fg-dim)]",
-        )}
-        aria-live="polite"
-      >
-        {statusCopy}
+      <p className="mt-2 text-center text-xs leading-relaxed text-[var(--fg-dim)]" aria-live="polite">
+        {ready ? copy.ready : copy.hint}
       </p>
     </div>
   );
