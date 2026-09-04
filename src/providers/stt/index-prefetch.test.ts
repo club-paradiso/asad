@@ -10,6 +10,12 @@ function response(data: Record<string, unknown>): Response {
   return { ok: true, json: async () => data } as Response;
 }
 
+const flushPromises = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-09-04T00:00:00Z"));
@@ -29,8 +35,8 @@ describe("Counter STT credential prewarm", () => {
     const access = { code: "ABCD", token: "x" };
 
     prefetchSttCredentials("ko-KR", access);
-    await vi.waitFor(() => expect(mocks.guardedFetch).toHaveBeenCalledTimes(1));
-    await Promise.resolve();
+    expect(mocks.guardedFetch).toHaveBeenCalledTimes(1);
+    await flushPromises();
     await vi.advanceTimersByTimeAsync(25_000);
 
     await expect(fetchSttCredentials("ko-KR", undefined, "counter", access)).resolves.toMatchObject({
@@ -45,8 +51,8 @@ describe("Counter STT credential prewarm", () => {
     const access = { code: "EFGH", token: "x" };
 
     prefetchSttCredentials("en-US", access);
-    await vi.waitFor(() => expect(mocks.guardedFetch).toHaveBeenCalledTimes(1));
-    await Promise.resolve();
+    expect(mocks.guardedFetch).toHaveBeenCalledTimes(1);
+    await flushPromises();
     await vi.advanceTimersByTimeAsync(25_000);
 
     await fetchSttCredentials("en-US", undefined, "counter", access);
