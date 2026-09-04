@@ -43,6 +43,12 @@ export interface TranslationResult {
  * Sensitive profiles are pinned to OpenRouter and strict privacy. This is not
  * a preference: it is a hard routing boundary. If OpenRouter is unavailable,
  * the turn fails rather than sending refugee/judicial content to another cloud.
+ *
+ * `forceSensitiveRouting` is retained as a compatibility field for callers
+ * created before profile detection became the policy boundary. It must not turn
+ * an ordinary or merely-unclassified conversation into a single-provider
+ * session: doing that disables the normal provider fallback chain and makes one
+ * vendor/model hiccup look like a language-specific translation outage.
  */
 type CounterRoutingInput = CounterPromptInput & { forceSensitiveRouting?: boolean };
 
@@ -52,8 +58,7 @@ function routerForCounter(input: CounterRoutingInput): {
   policyError?: string;
 } {
   const env = appEnv();
-  const sensitive =
-    !!input.forceSensitiveRouting || isSensitiveCounterProfile(input.profileId);
+  const sensitive = isSensitiveCounterProfile(input.profileId);
   if (!sensitive) return { router: llmRouter(), sensitive: false };
 
   if (

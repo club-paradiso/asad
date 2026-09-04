@@ -47,15 +47,24 @@ export const COUNTER_LANGUAGES: CounterLanguage[] = [
   { code: "tr-TR", endonym: "Türkçe", ko: "터키어", en: "Turkish", speechSupported: true },
 ];
 
-const BY_CODE = new Map(COUNTER_LANGUAGES.map((l) => [l.code, l]));
+const tagKey = (code: string): string => code.trim().toLowerCase();
+const BY_CODE = new Map(COUNTER_LANGUAGES.map((language) => [tagKey(language.code), language]));
 const BY_BASE = new Map<string, CounterLanguage>();
 for (const language of COUNTER_LANGUAGES) {
-  const base = language.code.split("-")[0];
+  const base = tagKey(language.code).split("-")[0];
   if (!BY_BASE.has(base)) BY_BASE.set(base, language);
 }
 
-export const findLanguage = (code: string): CounterLanguage | undefined =>
-  BY_CODE.get(code) ?? BY_BASE.get(code.split("-")[0].toLowerCase());
+/**
+ * BCP-47 tags are case-insensitive. Resolve an exact language+region/script
+ * match before falling back to the base language. Without that ordering,
+ * lowercase `zh-tw` fell through to the first `zh` entry (`zh-CN`) and silently
+ * changed Traditional Chinese into Simplified Chinese.
+ */
+export const findLanguage = (code: string): CounterLanguage | undefined => {
+  const key = tagKey(code);
+  return BY_CODE.get(key) ?? BY_BASE.get(key.split("-")[0]);
+};
 
 export const isSupportedLanguage = (code: string): boolean => !!findLanguage(code);
 

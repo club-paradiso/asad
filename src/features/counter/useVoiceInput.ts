@@ -16,24 +16,55 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
   const [failure, setFailure] = useState<CounterVoiceFailure | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
   const controller = useRef<CounterSpeechController | null>(null);
+  const lastPartial = useRef("");
 
   const start = useCallback(async (): Promise<string> => {
     if (controller.current) return "";
     setFailure(null);
     setUsedFallback(false);
+    setPartial("");
+    lastPartial.current = "";
 
-    const next = new CounterSpeechController(lang, {
-      onPhase: setPhase,
-      onPartial: setPartial,
-      onFallback: () => setUsedFallback(true),
-    }, undefined, counterCode, counterToken);
+    const next = new CounterSpeechController(
+      lang,
+      {
+        onPhase: setPhase,
+        onPartial: (text) => {
+          // Keep a private in-memory copy even after the controller clears the
+          // live preview on completion. If the provider dies after recognising
+          // useful speech, the editable composer can recover that text instead
+          // of making the visitor repeat the entire turn.
+          if (text.trim()) lastPartial.current = text;
+          setPartial(text);
+        },
+        onFallback: () => setUsedFallback(true),
+      },
+      undefined,
+      counterCode,
+      counterToken,
+    );
     controller.current = next;
 
     try {
       const result = await next.listen();
       setFailure(result.failure ?? null);
       setUsedFallback(result.usedFallback);
-      return result.text;
+
+      if (result.text.trim()) return result.text;
+
+      // Permission denial and an explicit stop are intentional hard stops.
+      // For provider/no-speech failures, however, a partial transcript is still
+      // valuable because Composer always hands voice text back for review before
+      // it can be sent. Recovering it improves UX without pretending it is final.
+      if (
+        result.failure !== "permission" &&
+        result.failure !== "stopped" &&
+        lastPartial.current.trim()
+      ) {
+        return lastPartial.current.trim();
+      }
+
+      return "";
     } finally {
       controller.current = null;
     }
@@ -46,7 +77,9 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
       controller.current?.dispose();
       controller.current = null;
     },
-    [],
+    // A participant language/capability change must also terminate the old
+    // recogniser so the next tap cannot continue with stale STT credentials.
+    [counterCode, counterToken, lang],
   );
 
   return {
