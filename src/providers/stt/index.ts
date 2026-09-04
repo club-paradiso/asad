@@ -18,6 +18,10 @@ export { MicrophoneCapture, Pcm16UtteranceBuffer } from "./audio";
 export { transcribeWithHuggingFace } from "./hf";
 export { DemoSpeechProvider, derivePartials } from "./demo";
 export { WebSpeechProvider } from "./webspeech";
+export {
+  ensureMicrophonePermission,
+  type MicrophonePermissionReadiness,
+} from "./microphone-permission";
 
 export interface CreateSttOptions extends SttProviderOptions {
   provider: SttProviderId;
@@ -75,17 +79,29 @@ export const STT_PROVIDER_INFO: Record<
   },
 };
 
-/**
- * Fetch short-lived connection details. Returns `null` when unconfigured.
- *
- * Guarded, because this route mints credentials against a billed recogniser
- * account and the credential outlives the request that obtained it.
- */
-export async function fetchSttCredentials(
+type SttUsage = "live" | "counter";
+type CounterAccess = { code: string; token: string };
+
+interface PrefetchedCredentials {
+  createdAt: number;
+  promise: Promise<SttCredentials | null>;
+}
+
+// Counter tokens are intentionally short-lived. Prewarming is only meant to
+// hide the network round trip between a person entering the conversation and
+// tapping the mic a few seconds later, not to stockpile recogniser sessions.
+const PREFETCH_MAX_AGE_MS = 20_000;
+const prefetchedCredentials = new Map<string, PrefetchedCredentials>();
+
+function prefetchKey(language: string | undefined, usage: SttUsage, access?: CounterAccess) {
+  return [usage, language?.trim().toLowerCase() ?? "", access?.code ?? "", access?.token ?? ""].join("|");
+}
+
+async function requestSttCredentials(
   language?: string,
   signal?: AbortSignal,
-  usage: "live" | "counter" = "live",
-  counterAccess?: { code: string; token: string },
+  usage: SttUsage = "live",
+  counterAccess?: CounterAccess,
 ): Promise<SttCredentials | null> {
   const response = await guardedFetch("/api/stt/token", {
     method: "POST",
@@ -100,4 +116,76 @@ export async function fetchSttCredentials(
   const data = (await response.json()) as Partial<SttCredentials> & { provider?: string };
   if (!data?.provider) return null;
   return data as SttCredentials;
+}
+
+/**
+ * Start the Counter credential request before the user taps the mic.
+ *
+ * The result is one-shot and expires from this in-memory cache quickly. Network
+ * or provider errors are swallowed here because prewarming is an optimisation;
+ * the real recording path still performs its normal fetch/fallback.
+ */
+export function prefetchSttCredentials(
+  language: string,
+  counterAccess: CounterAccess,
+): void {
+  const key = prefetchKey(language, "counter", counterAccess);
+  const existing = prefetchedCredentials.get(key);
+  if (existing && Date.now() - existing.createdAt < PREFETCH_MAX_AGE_MS) return;
+
+  const promise = requestSttCredentials(language, undefined, "counter", counterAccess).catch(
+    () => null,
+  );
+  const entry = { createdAt: Date.now(), promise } satisfies PrefetchedCredentials;
+  prefetchedCredentials.set(key, entry);
+
+  setTimeout(() => {
+    if (prefetchedCredentials.get(key) === entry) prefetchedCredentials.delete(key);
+  }, PREFETCH_MAX_AGE_MS);
+}
+
+function aborted(signal?: AbortSignal): never {
+  throw signal?.reason instanceof Error
+    ? signal.reason
+    : new DOMException("The operation was aborted.", "AbortError");
+}
+
+async function consumePrefetched(
+  entry: PrefetchedCredentials,
+  signal?: AbortSignal,
+): Promise<SttCredentials | null> {
+  if (!signal) return entry.promise;
+  if (signal.aborted) return aborted(signal);
+
+  return await new Promise<SttCredentials | null>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    entry.promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
+/**
+ * Fetch short-lived connection details. Returns `null` when unconfigured.
+ *
+ * Guarded, because this route mints credentials against a billed recogniser
+ * account and the credential outlives the request that obtained it.
+ */
+export async function fetchSttCredentials(
+  language?: string,
+  signal?: AbortSignal,
+  usage: SttUsage = "live",
+  counterAccess?: CounterAccess,
+): Promise<SttCredentials | null> {
+  if (usage === "counter" && counterAccess) {
+    const key = prefetchKey(language, usage, counterAccess);
+    const entry = prefetchedCredentials.get(key);
+    prefetchedCredentials.delete(key);
+
+    if (entry && Date.now() - entry.createdAt < PREFETCH_MAX_AGE_MS) {
+      const prefetched = await consumePrefetched(entry, signal);
+      if (!prefetched?.expiresAt || prefetched.expiresAt > Date.now() + 5_000) return prefetched;
+    }
+  }
+
+  return requestSttCredentials(language, signal, usage, counterAccess);
 }
