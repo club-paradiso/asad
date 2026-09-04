@@ -10,10 +10,8 @@ class DelayedCloudProvider implements SpeechProvider {
   readonly id = "deepgram" as const;
   readonly needsAudio = true;
   sent: ArrayBuffer[] = [];
-  private partial: (text: string) => void = () => {};
   private stable: (text: string) => void = () => {};
   private status: (status: SttStatus) => void = () => {};
-  private error: (error: Error) => void = () => {};
   private releaseConnection: (() => void) | null = null;
 
   connect(): Promise<void> {
@@ -37,10 +35,10 @@ class DelayedCloudProvider implements SpeechProvider {
     this.status("closed");
   }
 
-  onPartial(callback: (text: string) => void) { this.partial = callback; }
+  onPartial(callback: (text: string) => void) { void callback; }
   onStable(callback: (text: string) => void) { this.stable = callback; }
   onStatus(callback: (status: SttStatus) => void) { this.status = callback; }
-  onError(callback: (error: Error) => void) { this.error = callback; }
+  onError(callback: (error: Error) => void) { void callback; }
 
   emitStable(text: string) {
     this.stable(text);
