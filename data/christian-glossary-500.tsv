@@ -78,27 +78,27 @@ No.	Category	Korean	English
 77	구원론	부활	Resurrection
 78	구원론	부활하시다	Rise again
 79	구원론	죽음	Death
-80	구원론	영생	Eternal life
-81	구원론	영원한 생명	Everlasting life
-82	구원론	심판	Judgment
-83	구원론	심판하다	Judge
-84	구원론	의	Righteousness
-85	구원론	의롭다	Righteous
-86	구원론	칭의	Justification
-87	구원론	성화	Sanctification
-88	구원론	영화(구원의 완성)	Glorification
-89	구원론	거듭남	New birth / Regeneration
-90	구원론	중생	Regeneration
-91	구원론	새로운 피조물	New creation
-92	구원론	언약	Covenant
-93	구원론	새 언약	New Covenant
-94	구원론	약속	Promise
-95	구원론	믿음으로 의롭게 되다	Be justified by faith
-96	구원론	하나님의 어린양	Lamb of God
-97	구원론	보혈	The blood of Christ
-98	구원론	속량	Ransom / Redemption
-99	구원론	화목	Reconciliation
-100	구원론	화목제물	Propitiation
+80	구원론	생명	Life
+81	구원론	영생	Eternal life
+82	구원론	영원한 생명	Everlasting life
+83	구원론	심판	Judgment
+84	구원론	심판하다	Judge
+85	구원론	의	Righteousness
+86	구원론	의롭다	Righteous
+87	구원론	칭의	Justification
+88	구원론	성화	Sanctification
+89	구원론	영화(구원의 완성)	Glorification
+90	구원론	거듭남	New birth / Regeneration
+91	구원론	중생	Regeneration
+92	구원론	새로운 피조물	New creation
+93	구원론	언약	Covenant
+94	구원론	새 언약	New Covenant
+95	구원론	약속	Promise
+96	구원론	믿음으로 의롭게 되다	Be justified by faith
+97	구원론	하나님의 어린양	Lamb of God
+98	구원론	보혈	The blood of Christ
+99	구원론	속량	Ransom / Redemption
+100	구원론	화목	Reconciliation
 101	성경	성경	Bible
 102	성경	하나님의 말씀	Word of God
 103	성경	말씀	Scripture / The Word
@@ -173,7 +173,7 @@ No.	Category	Korean	English
 172	교회와 공동체	섬기다	Serve
 173	교회와 공동체	사역	Ministry
 174	교회와 공동체	사역자	Minister / Ministry Leader
-175	교회와 공동체	선교	Mission / Missions
+175	교회와 공동체	선교	Mission
 176	교회와 공동체	선교사	Missionary
 177	교회와 공동체	전도	Evangelism
 178	교회와 공동체	전도하다	Evangelize / Share the Gospel
@@ -219,7 +219,7 @@ No.	Category	Korean	English
 218	예배와 기도	기도회	Prayer Meeting
 219	예배와 기도	중보기도	Intercessory Prayer
 220	예배와 기도	중보하다	Intercede
-221	예배와 기도	기도 제목	Prayer Request / Prayer Point
+221	예배와 기도	기도 제목	Prayer Request
 222	예배와 기도	응답받은 기도	Answered Prayer
 223	예배와 기도	감사기도	Prayer of Thanksgiving
 224	예배와 기도	회개의 기도	Prayer of Repentance
@@ -249,253 +249,253 @@ No.	Category	Korean	English
 248	예배와 기도	평안	Peace
 249	예배와 기도	기쁨	Joy
 250	예배와 기도	감격	Deep Gratitude / Joyful Awe
-251	하나님·삼위일체	신앙생활	Christian Life
-252	하나님·삼위일체	제자	Disciple
-253	하나님·삼위일체	제자도	Discipleship
-254	하나님·삼위일체	예수님을 따르다	Follow Jesus
-255	하나님·삼위일체	순종	Obedience
-256	하나님·삼위일체	순종하다	Obey
-257	하나님·삼위일체	불순종	Disobedience
-258	하나님·삼위일체	충성	Faithfulness
-259	하나님·삼위일체	충성하다	Be Faithful
-260	하나님·삼위일체	헌신	Commitment / Dedication
-261	하나님·삼위일체	헌신하다	Commit Oneself
-262	하나님·삼위일체	희생	Sacrifice
-263	하나님·삼위일체	희생하다	Sacrifice
-264	하나님·삼위일체	섬김	Service
-265	하나님·삼위일체	섬기다	Serve
-266	하나님·삼위일체	겸손	Humility
-267	하나님·삼위일체	겸손하다	Be Humble
-268	하나님·삼위일체	온유	Gentleness
-269	하나님·삼위일체	인내	Perseverance
-270	하나님·삼위일체	오래 참음	Patience / Longsuffering
-271	하나님·삼위일체	절제	Self-control
-272	하나님·삼위일체	거룩한 삶	Holy Life
-273	하나님·삼위일체	경건	Godliness
-274	하나님·삼위일체	경건한 삶	Godly Life
-275	하나님·삼위일체	의로운 삶	Righteous Life
-276	하나님·삼위일체	성숙	Spiritual Maturity
-277	하나님·삼위일체	성장	Spiritual Growth
-278	하나님·삼위일체	변화	Transformation
-279	하나님·삼위일체	새사람	New Self
-280	하나님·삼위일체	옛사람	Old Self
-281	하나님·삼위일체	성령의 열매	Fruit of the Spirit
-282	하나님·삼위일체	사랑	Love
-283	하나님·삼위일체	희락	Joy
-284	하나님·삼위일체	화평	Peace
-285	하나님·삼위일체	오래 참음	Patience
-286	하나님·삼위일체	자비	Kindness
-287	하나님·삼위일체	양선	Goodness
-288	하나님·삼위일체	충성	Faithfulness
-289	하나님·삼위일체	온유	Gentleness
-290	하나님·삼위일체	절제	Self-control
-291	하나님·삼위일체	시험	Temptation
-292	하나님·삼위일체	유혹	Temptation
-293	하나님·삼위일체	시험을 이기다	Overcome Temptation
-294	하나님·삼위일체	영적 싸움	Spiritual Battle
-295	하나님·삼위일체	영적 성장	Spiritual Growth
-296	하나님·삼위일체	믿음의 여정	Journey of Faith
-297	하나님·삼위일체	십자가의 삶	Life of the Cross
-298	하나님·삼위일체	성도의 삶	Life of a Believer
-299	하나님·삼위일체	본이 되다	Be an Example
-300	하나님·삼위일체	끝까지 견디다	Persevere to the End
-301	구원론	영적 전쟁	Spiritual Warfare
-302	구원론	성령의 역사	The Work of the Holy Spirit
-303	구원론	성령의 인도	The Leading of the Holy Spirit
-304	구원론	성령의 충만	The Fullness of the Holy Spirit
-305	구원론	성령 충만하다	Be Filled with the Holy Spirit
-306	구원론	성령의 능력	The Power of the Holy Spirit
-307	구원론	성령의 음성	The Voice of the Holy Spirit
-308	구원론	성령의 감동	The Prompting of the Holy Spirit
-309	구원론	성령의 은사	Spiritual Gifts
-310	구원론	성령의 열매	Fruit of the Spirit
-311	구원론	분별	Discernment
-312	구원론	영적 분별력	Spiritual Discernment
-313	구원론	깨달음	Understanding / Insight
-314	구원론	확신	Assurance / Conviction
-315	구원론	담대함	Boldness
-316	구원론	담대하게	Boldly
-317	구원론	시험에 들다	Fall into Temptation
-318	구원론	고난	Suffering
-319	구원론	환난	Tribulation
-320	구원론	핍박	Persecution
-321	구원론	시험	Trial
-322	구원론	연단	Refinement
-323	구원론	연단받다	Be Refined
-324	구원론	사탄	Satan
-325	구원론	마귀	The Devil
-326	구원론	악한 영	Evil Spirit
-327	구원론	악	Evil
-328	구원론	죄의 유혹	The Temptation of Sin
-329	구원론	거짓	Falsehood
-330	구원론	거짓말	Lie
-331	구원론	속이다	Deceive
-332	구원론	미혹	Deception
-333	구원론	믿음의 방패	Shield of Faith
-334	구원론	구원의 투구	Helmet of Salvation
-335	구원론	진리의 허리띠	Belt of Truth
-336	구원론	의의 흉배	Breastplate of Righteousness
-337	구원론	평안의 복음의 신	Shoes of the Gospel of Peace
-338	구원론	성령의 검	Sword of the Spirit
-339	구원론	하나님의 전신갑주	Full Armor of God
-340	구원론	기도로 무장하다	Be Equipped with Prayer
-341	구원론	깨어 있다	Stay Alert
-342	구원론	깨어 기도하다	Watch and Pray
-343	구원론	승리	Victory
-344	구원론	승리하다	Overcome / Be Victorious
-345	구원론	복음 전도자	Evangelist
-346	구원론	단기선교	Short-term Mission Trip
-347	구원론	해외선교	Overseas Missions
-348	구원론	국내선교	Local Missions
-349	구원론	파송하다	Commission / Send Out
-350	구원론	증인	Witness
-351	성경	증언하다	Testify
-352	성경	간증하다	Share One's Testimony
-353	성경	복음의 능력	The Power of the Gospel
-354	성경	복음의 메시지	The Message of the Gospel
-355	성경	복음 사역	Gospel Ministry
-356	성경	하나님 나라	Kingdom of God
-357	성경	하나님 나라를 세우다	Advance the Kingdom of God
-358	성경	열방	The Nations
-359	성경	민족	People Group / Nation
-360	성경	추수	Harvest
-361	성경	추수할 일꾼	Workers for the Harvest
-362	성경	제자를 삼다	Make Disciples
-363	성경	세례	Baptism
-364	성경	세례를 받다	Be Baptized
-365	성경	침례	Baptism (침례교 문맥)
-366	성경	회심	Conversion
-367	성경	새신자	New Believer
-368	성경	영접	Receiving Christ
-369	성경	영접하다	Receive Christ
-370	성경	초청	Invitation
-371	성경	초청하다	Invite
-372	성경	복음집회	Evangelistic Meeting
-373	성경	선교지	Mission Field
-374	성경	선교팀	Mission Team
-375	성경	복음화	Evangelization
-376	성경	중보선교	Intercessory Missions
-377	성경	복음의 문	Door for the Gospel
-378	성경	복음 전파	Gospel Proclamation
-379	성경	복음의 열매	Fruit of the Gospel
-380	성경	하나님의 나라	Kingdom of God
-381	성경	주님의 제자	Disciple of the Lord
-382	성경	복음에 합당한 삶	Life Worthy of the Gospel
-383	성경	빛과 소금	Salt and Light
-384	성경	세상의 빛	Light of the World
-385	성경	세상의 소금	Salt of the Earth
-386	성경	영혼	Soul
-387	성경	영혼 구원	Saving Souls
-388	성경	영혼을 품다	Have a Heart for Souls
-389	성경	복음의 빚진 자	Debtor to the Gospel
-390	성경	복음에 헌신하다	Devote Oneself to the Gospel
-391	성경	복음의 증인	Witness of the Gospel
-392	성경	복음으로 살다	Live by the Gospel
-393	성경	복음 안에서 하나 되다	Be United in the Gospel
-394	성경	복음으로 변화되다	Be Transformed by the Gospel
-395	성경	복음을 위해 살다	Live for the Gospel
-396	성경	복음의 사명	Mission of the Gospel
-397	성경	복음의 일꾼	Worker of the Gospel
-398	성경	복음의 동역자	Partner in the Gospel
-399	성경	복음의 열정	Passion for the Gospel
-400	성경	복음의 소망	Hope of the Gospel
-401	교회와 공동체	교회의 머리	Head of the Church
-402	교회와 공동체	그리스도의 몸	Body of Christ
-403	교회와 공동체	교회의 사명	Mission of the Church
-404	교회와 공동체	교회의 비전	Vision of the Church
-405	교회와 공동체	교회 공동체	Church Community
-406	교회와 공동체	한 몸	One Body
-407	교회와 공동체	지체	Member of the Body
-408	교회와 공동체	서로 사랑하다	Love One Another
-409	교회와 공동체	서로 섬기다	Serve One Another
-410	교회와 공동체	서로 용서하다	Forgive One Another
-411	교회와 공동체	서로 격려하다	Encourage One Another
-412	교회와 공동체	서로 세우다	Build One Another Up
-413	교회와 공동체	하나 됨	Unity
-414	교회와 공동체	연합	Unity / Fellowship
-415	교회와 공동체	동역	Partnership in Ministry
-416	교회와 공동체	동역자	Co-worker in Christ
-417	교회와 공동체	리더십	Leadership
-418	교회와 공동체	영적 리더십	Spiritual Leadership
-419	교회와 공동체	목회	Pastoral Ministry
-420	교회와 공동체	목회자	Pastor / Minister
-421	교회와 공동체	돌봄	Care
-422	교회와 공동체	목양	Shepherding Ministry
-423	교회와 공동체	양떼	Flock
-424	교회와 공동체	목자	Shepherd
-425	교회와 공동체	영적 가족	Spiritual Family
-426	교회와 공동체	믿음의 공동체	Community of Faith
-427	교회와 공동체	사랑의 공동체	Community of Love
-428	교회와 공동체	은혜의 공동체	Community of Grace
-429	교회와 공동체	섬김의 공동체	Community of Service
-430	교회와 공동체	선교적 공동체	Missional Community
-431	교회와 공동체	지역교회	Local Church
-432	교회와 공동체	세계교회	Global Church
-433	교회와 공동체	교단	Denomination
-434	교회와 공동체	교파	Denomination / Tradition
-435	교회와 공동체	비전	Vision
-436	교회와 공동체	사명 선언	Mission Statement
-437	교회와 공동체	핵심 가치	Core Values
-438	교회와 공동체	예배 공동체	Worshiping Community
-439	교회와 공동체	기도 공동체	Praying Community
-440	교회와 공동체	선교 공동체	Mission Community
-441	교회와 공동체	제자 공동체	Discipleship Community
-442	교회와 공동체	청년 공동체	Young Adult Community
-443	교회와 공동체	다음 세대	Next Generation
-444	교회와 공동체	다음 세대 사역	Next Generation Ministry
-445	교회와 공동체	교회학교	Church School
-446	교회와 공동체	주일학교	Sunday School
-447	교회와 공동체	청소년부	Youth Ministry
-448	교회와 공동체	아동부	Children's Ministry
-449	교회와 공동체	유치부	Preschool Ministry
-450	교회와 공동체	영아부	Infant Ministry
-451	예배와 기도	마음 문을 열다	Open One's Heart
-452	예배와 기도	말씀을 받다	Receive the Word
-453	예배와 기도	말씀에 순종하다	Obey the Word
-454	예배와 기도	말씀을 붙들다	Hold on to the Word
-455	예배와 기도	말씀대로 살다	Live According to the Word
-456	예배와 기도	말씀을 묵상하다	Meditate on the Word
-457	예배와 기도	마음에 새기다	Take to Heart
-458	예배와 기도	기도에 힘쓰다	Devote Oneself to Prayer
-459	예배와 기도	기도로 나아가다	Come Before God in Prayer
-460	예배와 기도	무릎 꿇고 기도하다	Kneel and Pray
-461	예배와 기도	간절히 기도하다	Pray Earnestly
-462	예배와 기도	마음을 다해 기도하다	Pray with All One's Heart
-463	예배와 기도	하나님께 맡기다	Entrust to God
-464	예배와 기도	하나님을 의지하다	Depend on God
-465	예배와 기도	하나님을 바라보다	Look to God
-466	예배와 기도	하나님께 나아가다	Draw Near to God
-467	예배와 기도	하나님을 구하다	Seek God
-468	예배와 기도	하나님을 경험하다	Experience God
-469	예배와 기도	하나님을 만나다	Encounter God
-470	예배와 기도	하나님의 뜻	God's Will
-471	예배와 기도	하나님의 계획	God's Plan
-472	예배와 기도	기쁨	Joy
-473	예배와 기도	평안	Peace
-474	예배와 기도	평강	Peace
-475	예배와 기도	소망	Hope
-476	예배와 기도	감사	Thankfulness
-477	예배와 기도	위로	Comfort
-478	예배와 기도	치유	Healing
-479	예배와 기도	회복	Restoration
-480	예배와 기도	새 힘	Renewed Strength
-481	예배와 기도	결단	Commitment
-482	예배와 기도	결단하다	Make a Commitment
-483	예배와 기도	결단의 시간	Time of Commitment
-484	예배와 기도	초청의 시간	Time of Invitation
-485	예배와 기도	기도의 자리	Place of Prayer
-486	예배와 기도	은혜의 자리	Place of Grace
-487	예배와 기도	예배의 자리	Place of Worship
-488	예배와 기도	함께 기도하다	Pray Together
-489	예배와 기도	함께 예배하다	Worship Together
-490	예배와 기도	함께 찬양하다	Praise Together
-491	예배와 기도	섬김	Service
-492	예배와 기도	봉사	Volunteer Service
-493	예배와 기도	나눔	Sharing
-494	예배와 기도	교제	Fellowship
-495	예배와 기도	축복하다	Bless
-496	예배와 기도	감사하다	Give Thanks
-497	예배와 기도	기도 부탁	Prayer Request
-498	예배와 기도	간증	Testimony
-499	예배와 기도	아멘	Amen
-500	예배와 기도	하나님께 영광	Glory to God
+251	신앙생활과 제자도	신앙생활	Christian Life
+252	신앙생활과 제자도	제자	Disciple
+253	신앙생활과 제자도	제자도	Discipleship
+254	신앙생활과 제자도	예수님을 따르다	Follow Jesus
+255	신앙생활과 제자도	순종	Obedience
+256	신앙생활과 제자도	순종하다	Obey
+257	신앙생활과 제자도	불순종	Disobedience
+258	신앙생활과 제자도	충성	Faithfulness
+259	신앙생활과 제자도	충성하다	Be Faithful
+260	신앙생활과 제자도	헌신	Commitment / Dedication
+261	신앙생활과 제자도	헌신하다	Commit Oneself
+262	신앙생활과 제자도	희생	Sacrifice
+263	신앙생활과 제자도	희생하다	Sacrifice
+264	신앙생활과 제자도	섬김	Service
+265	신앙생활과 제자도	섬기다	Serve
+266	신앙생활과 제자도	겸손	Humility
+267	신앙생활과 제자도	겸손하다	Be Humble
+268	신앙생활과 제자도	온유	Gentleness
+269	신앙생활과 제자도	인내	Perseverance
+270	신앙생활과 제자도	오래 참음	Patience / Longsuffering
+271	신앙생활과 제자도	절제	Self-control
+272	신앙생활과 제자도	거룩한 삶	Holy Life
+273	신앙생활과 제자도	경건	Godliness
+274	신앙생활과 제자도	경건한 삶	Godly Life
+275	신앙생활과 제자도	의로운 삶	Righteous Life
+276	신앙생활과 제자도	성숙	Spiritual Maturity
+277	신앙생활과 제자도	성장	Spiritual Growth
+278	신앙생활과 제자도	변화	Transformation
+279	신앙생활과 제자도	새사람	New Self
+280	신앙생활과 제자도	옛사람	Old Self
+281	신앙생활과 제자도	성령의 열매	Fruit of the Spirit
+282	신앙생활과 제자도	사랑	Love
+283	신앙생활과 제자도	희락	Joy
+284	신앙생활과 제자도	화평	Peace
+285	신앙생활과 제자도	오래 참음	Patience
+286	신앙생활과 제자도	자비	Kindness
+287	신앙생활과 제자도	양선	Goodness
+288	신앙생활과 제자도	충성	Faithfulness
+289	신앙생활과 제자도	온유	Gentleness
+290	신앙생활과 제자도	절제	Self-control
+291	신앙생활과 제자도	시험	Temptation
+292	신앙생활과 제자도	유혹	Temptation
+293	신앙생활과 제자도	시험을 이기다	Overcome Temptation
+294	신앙생활과 제자도	영적 싸움	Spiritual Battle
+295	신앙생활과 제자도	영적 성장	Spiritual Growth
+296	신앙생활과 제자도	믿음의 여정	Journey of Faith
+297	신앙생활과 제자도	십자가의 삶	Life of the Cross
+298	신앙생활과 제자도	성도의 삶	Life of a Believer
+299	신앙생활과 제자도	본이 되다	Be an Example
+300	신앙생활과 제자도	끝까지 견디다	Persevere to the End
+301	영적 전쟁과 성령의 역사	영적 전쟁	Spiritual Warfare
+302	영적 전쟁과 성령의 역사	영적 싸움	Spiritual Battle
+303	영적 전쟁과 성령의 역사	성령의 역사	The Work of the Holy Spirit
+304	영적 전쟁과 성령의 역사	성령의 인도	The Leading of the Holy Spirit
+305	영적 전쟁과 성령의 역사	성령의 충만	The Fullness of the Holy Spirit
+306	영적 전쟁과 성령의 역사	성령 충만하다	Be Filled with the Holy Spirit
+307	영적 전쟁과 성령의 역사	성령의 능력	The Power of the Holy Spirit
+308	영적 전쟁과 성령의 역사	성령의 음성	The Voice of the Holy Spirit
+309	영적 전쟁과 성령의 역사	성령의 감동	The Prompting of the Holy Spirit
+310	영적 전쟁과 성령의 역사	성령의 열매	Fruit of the Spirit
+311	영적 전쟁과 성령의 역사	성령의 은사	Spiritual Gifts
+312	영적 전쟁과 성령의 역사	은사	Spiritual Gift
+313	영적 전쟁과 성령의 역사	분별	Discernment
+314	영적 전쟁과 성령의 역사	영적 분별력	Spiritual Discernment
+315	영적 전쟁과 성령의 역사	지혜	Wisdom
+316	영적 전쟁과 성령의 역사	계시	Revelation
+317	영적 전쟁과 성령의 역사	깨달음	Understanding
+318	영적 전쟁과 성령의 역사	확신	Assurance
+319	영적 전쟁과 성령의 역사	담대함	Boldness
+320	영적 전쟁과 성령의 역사	담대하게	Boldly
+321	영적 전쟁과 성령의 역사	시험	Trial
+322	영적 전쟁과 성령의 역사	유혹	Temptation
+323	영적 전쟁과 성령의 역사	시험에 들다	Fall into Temptation
+324	영적 전쟁과 성령의 역사	시험을 이기다	Overcome Temptation
+325	영적 전쟁과 성령의 역사	고난	Suffering
+326	영적 전쟁과 성령의 역사	환난	Tribulation
+327	영적 전쟁과 성령의 역사	핍박	Persecution
+328	영적 전쟁과 성령의 역사	연단	Refinement
+329	영적 전쟁과 성령의 역사	연단받다	Be Refined
+330	영적 전쟁과 성령의 역사	사탄	Satan
+331	영적 전쟁과 성령의 역사	마귀	The Devil
+332	영적 전쟁과 성령의 역사	악한 영	Evil Spirit
+333	영적 전쟁과 성령의 역사	악	Evil
+334	영적 전쟁과 성령의 역사	죄의 유혹	The Temptation of Sin
+335	영적 전쟁과 성령의 역사	거짓	Falsehood
+336	영적 전쟁과 성령의 역사	거짓말	Lie
+337	영적 전쟁과 성령의 역사	속이다	Deceive
+338	영적 전쟁과 성령의 역사	미혹	Deception
+339	영적 전쟁과 성령의 역사	믿음의 방패	Shield of Faith
+340	영적 전쟁과 성령의 역사	구원의 투구	Helmet of Salvation
+341	영적 전쟁과 성령의 역사	진리의 허리띠	Belt of Truth
+342	영적 전쟁과 성령의 역사	의의 흉배	Breastplate of Righteousness
+343	영적 전쟁과 성령의 역사	평안의 복음의 신	Shoes of the Gospel of Peace
+344	영적 전쟁과 성령의 역사	성령의 검	Sword of the Spirit
+345	영적 전쟁과 성령의 역사	하나님의 전신갑주	Full Armor of God
+346	영적 전쟁과 성령의 역사	기도로 무장하다	Be Equipped with Prayer
+347	영적 전쟁과 성령의 역사	깨어 있다	Stay Alert
+348	영적 전쟁과 성령의 역사	깨어 기도하다	Watch and Pray
+349	영적 전쟁과 성령의 역사	승리	Victory
+350	영적 전쟁과 성령의 역사	승리하다	Overcome / Be Victorious
+351	전도와 선교	전도	Evangelism
+352	전도와 선교	전도하다	Share the Gospel / Evangelize
+353	전도와 선교	복음을 전하다	Preach the Gospel / Share the Gospel
+354	전도와 선교	복음 전도자	Evangelist
+355	전도와 선교	선교	Missions
+356	전도와 선교	선교사	Missionary
+357	전도와 선교	단기선교	Short-term Mission Trip
+358	전도와 선교	해외선교	Overseas Missions
+359	전도와 선교	국내선교	Local Missions
+360	전도와 선교	파송	Commissioning
+361	전도와 선교	파송하다	Commission / Send Out
+362	전도와 선교	사명	Mission
+363	전도와 선교	소명	Calling
+364	전도와 선교	증인	Witness
+365	전도와 선교	증언하다	Testify
+366	전도와 선교	간증	Testimony
+367	전도와 선교	간증하다	Share One's Testimony
+368	전도와 선교	복음의 능력	The Power of the Gospel
+369	전도와 선교	복음의 메시지	The Message of the Gospel
+370	전도와 선교	복음 사역	Gospel Ministry
+371	전도와 선교	하나님 나라	Kingdom of God
+372	전도와 선교	하나님 나라를 세우다	Advance the Kingdom of God
+373	전도와 선교	열방	The Nations
+374	전도와 선교	민족	People Group / Nation
+375	전도와 선교	추수	Harvest
+376	전도와 선교	추수할 일꾼	Workers for the Harvest
+377	전도와 선교	제자를 삼다	Make Disciples
+378	전도와 선교	세례	Baptism
+379	전도와 선교	세례를 받다	Be Baptized
+380	전도와 선교	침례	Baptism (침례교 문맥)
+381	전도와 선교	회심	Conversion
+382	전도와 선교	새신자	New Believer
+383	전도와 선교	영접	Receiving Christ
+384	전도와 선교	영접하다	Receive Christ
+385	전도와 선교	초청	Invitation
+386	전도와 선교	초청하다	Invite
+387	전도와 선교	복음집회	Evangelistic Meeting
+388	전도와 선교	선교지	Mission Field
+389	전도와 선교	선교팀	Mission Team
+390	전도와 선교	복음화	Evangelization
+391	전도와 선교	중보선교	Intercessory Missions
+392	전도와 선교	문화선교	Cultural Missions
+393	전도와 선교	캠퍼스 선교	Campus Ministry
+394	전도와 선교	교회 개척	Church Planting
+395	전도와 선교	개척교회	Church Plant
+396	전도와 선교	미전도종족	Unreached People Group
+397	전도와 선교	선교 헌금	Mission Offering
+398	전도와 선교	선교 비전	Mission Vision
+399	전도와 선교	복음의 증인	Witness of the Gospel
+400	전도와 선교	지상명령	The Great Commission
+401	설교 표현	설교	Sermon
+402	설교 표현	말씀을 전하다	Preach the Word
+403	설교 표현	설교하다	Preach
+404	설교 표현	본문	Scripture Passage
+405	설교 표현	오늘 본문	Today's Scripture
+406	설교 표현	말씀을 나누다	Share the Word
+407	설교 표현	주제	Theme
+408	설교 표현	핵심	Key Point
+409	설교 표현	적용	Application
+410	설교 표현	적용하다	Apply
+411	설교 표현	교훈	Lesson
+412	설교 표현	깨달음	Insight
+413	설교 표현	예화	Illustration
+414	설교 표현	비유	Parable
+415	설교 표현	예시	Example
+416	설교 표현	강조하다	Emphasize
+417	설교 표현	설명하다	Explain
+418	설교 표현	선포하다	Proclaim
+419	설교 표현	권면하다	Exhort / Encourage
+420	설교 표현	도전하다	Challenge
+421	설교 표현	초청하다	Invite
+422	설교 표현	결단	Commitment / Decision
+423	설교 표현	결단하다	Commit / Decide
+424	설교 표현	순종의 결단	Commitment to Obedience
+425	설교 표현	삶의 적용	Life Application
+426	설교 표현	실천	Practice
+427	설교 표현	실천하다	Put into Practice
+428	설교 표현	묵상	Meditation
+429	설교 표현	묵상하다	Meditate
+430	설교 표현	나누다(말씀)	Share
+431	설교 표현	선포	Proclamation
+432	설교 표현	증거	Evidence / Testimony
+433	설교 표현	증거하다	Bear Witness
+434	설교 표현	확신	Conviction
+435	설교 표현	결론	Conclusion
+436	설교 표현	요약	Summary
+437	설교 표현	핵심 메시지	Main Message
+438	설교 표현	도입	Introduction
+439	설교 표현	마무리	Closing
+440	설교 표현	축복의 말씀	Words of Blessing
+441	설교 표현	권면의 말씀	Words of Exhortation
+442	설교 표현	초청의 말씀	Invitation
+443	설교 표현	기도로 마치다	Close in Prayer
+444	설교 표현	함께 기도하다	Pray Together
+445	설교 표현	기도 제목	Prayer Point
+446	설교 표현	아멘으로 화답하다	Respond with "Amen"
+447	설교 표현	삶을 돌아보다	Reflect on Your Life
+448	설교 표현	마음을 열다	Open Your Heart
+449	설교 표현	믿음으로 반응하다	Respond in Faith
+450	설교 표현	결단의 시간	Time of Commitment
+451	청년부 · 삶의 적용 · 관계	삶	Life
+452	청년부 · 삶의 적용 · 관계	인생	Life Journey
+453	청년부 · 삶의 적용 · 관계	일상	Daily Life
+454	청년부 · 삶의 적용 · 관계	습관	Habit
+455	청년부 · 삶의 적용 · 관계	선택	Choice
+456	청년부 · 삶의 적용 · 관계	결정	Decision
+457	청년부 · 삶의 적용 · 관계	자유의지	Free Will
+458	청년부 · 삶의 적용 · 관계	책임	Responsibility
+459	청년부 · 삶의 적용 · 관계	사명	Calling
+460	청년부 · 삶의 적용 · 관계	비전	Vision
+461	청년부 · 삶의 적용 · 관계	꿈	Dream
+462	청년부 · 삶의 적용 · 관계	목적	Purpose
+463	청년부 · 삶의 적용 · 관계	계획	Plan
+464	청년부 · 삶의 적용 · 관계	하나님의 계획	God's Plan
+465	청년부 · 삶의 적용 · 관계	하나님의 뜻	God's Will
+466	청년부 · 삶의 적용 · 관계	기다림	Waiting
+467	청년부 · 삶의 적용 · 관계	인도하심	Guidance
+468	청년부 · 삶의 적용 · 관계	믿음의 여정	Journey of Faith
+469	청년부 · 삶의 적용 · 관계	고난	Suffering
+470	청년부 · 삶의 적용 · 관계	시련	Trial
+471	청년부 · 삶의 적용 · 관계	감사	Thankfulness
+472	청년부 · 삶의 적용 · 관계	기쁨	Joy
+473	청년부 · 삶의 적용 · 관계	평안	Peace
+474	청년부 · 삶의 적용 · 관계	위로	Comfort
+475	청년부 · 삶의 적용 · 관계	소망	Hope
+476	청년부 · 삶의 적용 · 관계	회복	Restoration
+477	청년부 · 삶의 적용 · 관계	치유	Healing
+478	청년부 · 삶의 적용 · 관계	용기	Courage
+479	청년부 · 삶의 적용 · 관계	두려움	Fear
+480	청년부 · 삶의 적용 · 관계	염려	Worry / Anxiety
+481	청년부 · 삶의 적용 · 관계	불안	Anxiety
+482	청년부 · 삶의 적용 · 관계	관계	Relationship
+483	청년부 · 삶의 적용 · 관계	가정	Family
+484	청년부 · 삶의 적용 · 관계	부모	Parents
+485	청년부 · 삶의 적용 · 관계	형제자매	Brothers and Sisters
+486	청년부 · 삶의 적용 · 관계	친구	Friend
+487	청년부 · 삶의 적용 · 관계	이웃	Neighbor
+488	청년부 · 삶의 적용 · 관계	사랑하다	Love
+489	청년부 · 삶의 적용 · 관계	용서하다	Forgive
+490	청년부 · 삶의 적용 · 관계	화해	Reconciliation
+491	청년부 · 삶의 적용 · 관계	섬김	Service
+492	청년부 · 삶의 적용 · 관계	나눔	Sharing
+493	청년부 · 삶의 적용 · 관계	격려	Encouragement
+494	청년부 · 삶의 적용 · 관계	위로하다	Comfort
+495	청년부 · 삶의 적용 · 관계	축복하다	Bless
+496	청년부 · 삶의 적용 · 관계	감사하다	Give Thanks
+497	청년부 · 삶의 적용 · 관계	기도 부탁	Prayer Request
+498	청년부 · 삶의 적용 · 관계	간증	Testimony
+499	청년부 · 삶의 적용 · 관계	아멘	Amen
+500	청년부 · 삶의 적용 · 관계	하나님께 영광	Glory to God
