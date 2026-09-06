@@ -28,11 +28,21 @@ describe("counter interface strings", () => {
     }
   });
 
+  it("covers every language the picker offers", () => {
+    // The picker is written in endonyms, so a visitor can always *find* their
+    // language. Landing in an English interface after choosing it is the part
+    // they cannot ask about, and it was happening for seven of the languages
+    // on the list.
+    for (const language of COUNTER_LANGUAGES) {
+      expect(hasStrings(language.code), language.code).toBe(true);
+    }
+  });
+
   it("falls back to English, not to Korean", () => {
     // A visitor at a Korean counter is likelier to manage some English than
     // some Korean, and the language picker is in endonyms either way.
-    expect(stringsFor("km-KH")).toEqual(stringsFor("en-US"));
-    expect(stringsFor("my-MM").send).toBe("Send");
+    expect(stringsFor("sw-KE")).toEqual(stringsFor("en-US"));
+    expect(stringsFor("is-IS").send).toBe("Send");
   });
 
   it("matches on the base tag when the region differs", () => {
@@ -43,6 +53,17 @@ describe("counter interface strings", () => {
   it("reports coverage honestly", () => {
     expect(hasStrings("vi-VN")).toBe(true);
     expect(hasStrings("vi")).toBe(true);
-    expect(hasStrings("km-KH")).toBe(false);
+    expect(hasStrings("sw-KE")).toBe(false);
+  });
+
+  it("gives Uyghur its own interface rather than an Arabic one", () => {
+    const uyghur = stringsFor("ug-CN");
+    expect(uyghur).not.toEqual(stringsFor("ar-SA"));
+    expect(uyghur).not.toEqual(stringsFor("en-US"));
+    expect(stringsFor("ug")).toEqual(uyghur);
+    // Arabic-script, but not the Arabic language: the two share letters and
+    // nothing else, and routing one to the other is the mistake this entry
+    // exists to prevent.
+    expect(uyghur.send).not.toBe(stringsFor("ar-SA").send);
   });
 });

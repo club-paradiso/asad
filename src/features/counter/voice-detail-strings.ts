@@ -4,6 +4,9 @@ export interface VoiceDetailStrings {
   reviewHint: string;
   stopHint: string;
   stopAria: string;
+  /** A second tap while still preparing discards the turn rather than ending it. */
+  cancelAria: string;
+  dismissError: string;
 }
 
 const EN: VoiceDetailStrings = {
@@ -12,6 +15,8 @@ const EN: VoiceDetailStrings = {
   reviewHint: "Correct names, proper nouns, or recognition errors before sending.",
   stopHint: "When you finish speaking, tap the mic again to stop immediately.",
   stopAria: "Stop voice input",
+  cancelAria: "Cancel voice input",
+  dismissError: "Dismiss",
 };
 
 const COPY: Record<string, VoiceDetailStrings> = {
@@ -21,6 +26,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "이름·고유명사나 잘못 인식된 부분을 바로 고친 뒤 전송하세요.",
     stopHint: "말이 끝났으면 마이크 버튼을 눌러 바로 멈출 수 있어요.",
     stopAria: "음성 입력 중지",
+    cancelAria: "음성 입력 취소",
+    dismissError: "닫기",
   },
   zh: {
     editTranscript: "手动修改",
@@ -28,6 +35,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "请直接修改姓名、专有名词或识别错误后再发送。",
     stopHint: "说完后，再点一次麦克风即可立即停止。",
     stopAria: "停止语音输入",
+    cancelAria: "取消语音输入",
+    dismissError: "关闭",
   },
   ja: {
     editTranscript: "手動で修正",
@@ -35,6 +44,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "人名・固有名詞や誤認識された箇所を直してから送信してください。",
     stopHint: "話し終えたら、マイクをもう一度押すとすぐ停止できます。",
     stopAria: "音声入力を停止",
+    cancelAria: "音声入力をキャンセル",
+    dismissError: "閉じる",
   },
   vi: {
     editTranscript: "Sửa trực tiếp",
@@ -42,6 +53,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Sửa tên riêng hoặc phần nhận dạng sai trước khi gửi.",
     stopHint: "Nói xong, chạm lại nút mic để dừng ngay.",
     stopAria: "Dừng nhập bằng giọng nói",
+    cancelAria: "Huỷ nhập bằng giọng nói",
+    dismissError: "Đóng",
   },
   th: {
     editTranscript: "แก้ไขเอง",
@@ -49,6 +62,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "แก้ชื่อ คำเฉพาะ หรือส่วนที่รู้จำผิดก่อนส่ง",
     stopHint: "พูดจบแล้ว แตะปุ่มไมค์อีกครั้งเพื่อหยุดได้ทันที",
     stopAria: "หยุดการป้อนเสียง",
+    cancelAria: "ยกเลิกการป้อนเสียง",
+    dismissError: "ปิด",
   },
   id: {
     editTranscript: "Edit langsung",
@@ -56,6 +71,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Perbaiki nama, istilah khusus, atau bagian yang salah sebelum mengirim.",
     stopHint: "Setelah selesai bicara, ketuk mikrofon lagi untuk berhenti.",
     stopAria: "Hentikan input suara",
+    cancelAria: "Batalkan input suara",
+    dismissError: "Tutup",
   },
   ru: {
     editTranscript: "Исправить вручную",
@@ -63,6 +80,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Исправьте имена, термины и ошибки распознавания перед отправкой.",
     stopHint: "Закончив говорить, нажмите микрофон ещё раз, чтобы остановить запись.",
     stopAria: "Остановить голосовой ввод",
+    cancelAria: "Отменить голосовой ввод",
+    dismissError: "Закрыть",
   },
   uz: {
     editTranscript: "Qoʻlda tahrirlash",
@@ -70,6 +89,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Yuborishdan oldin ism, atama yoki notoʻgʻri tanilgan qismlarni tuzating.",
     stopHint: "Gap tugagach, toʻxtatish uchun mikrofonni yana bosing.",
     stopAria: "Ovozli kiritishni toʻxtatish",
+    cancelAria: "Ovozli kiritishni bekor qilish",
+    dismissError: "Yopish",
   },
   mn: {
     editTranscript: "Гараар засах",
@@ -77,6 +98,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Илгээхийн өмнө нэр, тусгай нэр томьёо болон буруу таньсан хэсгийг засаарай.",
     stopHint: "Ярьж дуусмагц микрофоныг дахин дарж шууд зогсооно уу.",
     stopAria: "Дуу хоолойн оролтыг зогсоох",
+    cancelAria: "Дуу хоолойн оролтыг цуцлах",
+    dismissError: "Хаах",
   },
   ne: {
     editTranscript: "आफैं सच्याउनुहोस्",
@@ -84,6 +107,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "पठाउनु अघि नाम, विशेष शब्द वा गलत पहिचान भएको भाग सच्याउनुहोस्।",
     stopHint: "बोलिसकेपछि तुरुन्त रोक्न माइक्रोफोन फेरि थिच्नुहोस्।",
     stopAria: "आवाज इनपुट रोक्नुहोस्",
+    cancelAria: "आवाज इनपुट रद्द गर्नुहोस्",
+    dismissError: "बन्द गर्नुहोस्",
   },
   km: {
     editTranscript: "កែដោយផ្ទាល់",
@@ -91,6 +116,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "សូមកែឈ្មោះ ពាក្យពិសេស ឬផ្នែកដែលស្គាល់ខុស មុនពេលផ្ញើ។",
     stopHint: "ពេលនិយាយចប់ សូមចុចមីក្រូហ្វូនម្តងទៀតដើម្បីបញ្ឈប់ភ្លាមៗ។",
     stopAria: "បញ្ឈប់ការបញ្ចូលសំឡេង",
+    cancelAria: "បោះបង់ការបញ្ចូលសំឡេង",
+    dismissError: "បិទ",
   },
   my: {
     editTranscript: "ကိုယ်တိုင်ပြင်ရန်",
@@ -98,6 +125,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "မပို့မီ အမည်၊ သီးသန့်စကားလုံး သို့မဟုတ် မှားယွင်းမှတ်သားထားသည့် အပိုင်းကို ပြင်ပါ။",
     stopHint: "ပြောပြီးပါက မိုက်ခရိုဖုန်းကို ထပ်နှိပ်ပြီး ချက်ချင်းရပ်နိုင်သည်။",
     stopAria: "အသံထည့်သွင်းမှု ရပ်ရန်",
+    cancelAria: "အသံထည့်သွင်းမှု ပယ်ဖျက်ရန်",
+    dismissError: "ပိတ်ရန်",
   },
   tl: {
     editTranscript: "Manu-manong ayusin",
@@ -105,6 +134,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Ayusin ang mga pangalan, espesyal na termino, o maling pagkilala bago ipadala.",
     stopHint: "Kapag tapos ka nang magsalita, i-tap ulit ang mic para huminto agad.",
     stopAria: "Ihinto ang voice input",
+    cancelAria: "Kanselahin ang voice input",
+    dismissError: "Isara",
   },
   es: {
     editTranscript: "Editar manualmente",
@@ -112,6 +143,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Corrija nombres, términos propios o errores de reconocimiento antes de enviar.",
     stopHint: "Cuando termine de hablar, pulse de nuevo el micrófono para detenerlo.",
     stopAria: "Detener entrada por voz",
+    cancelAria: "Cancelar entrada por voz",
+    dismissError: "Cerrar",
   },
   fr: {
     editTranscript: "Modifier manuellement",
@@ -119,6 +152,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Corrigez les noms, termes propres ou erreurs de reconnaissance avant l’envoi.",
     stopHint: "Quand vous avez fini de parler, touchez de nouveau le micro pour arrêter.",
     stopAria: "Arrêter la saisie vocale",
+    cancelAria: "Annuler la saisie vocale",
+    dismissError: "Fermer",
   },
   de: {
     editTranscript: "Manuell bearbeiten",
@@ -126,6 +161,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Korrigiere Namen, Eigennamen oder Erkennungsfehler vor dem Senden.",
     stopHint: "Wenn du fertig gesprochen hast, tippe erneut auf das Mikrofon, um zu stoppen.",
     stopAria: "Spracheingabe stoppen",
+    cancelAria: "Spracheingabe abbrechen",
+    dismissError: "Schließen",
   },
   pt: {
     editTranscript: "Editar manualmente",
@@ -133,6 +170,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Corrija nomes, termos próprios ou erros de reconhecimento antes de enviar.",
     stopHint: "Quando terminar de falar, toque novamente no microfone para parar.",
     stopAria: "Parar entrada por voz",
+    cancelAria: "Cancelar entrada por voz",
+    dismissError: "Fechar",
   },
   ar: {
     editTranscript: "تعديل يدوي",
@@ -140,6 +179,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "صحّح الأسماء والمصطلحات وأخطاء التعرّف قبل الإرسال.",
     stopHint: "بعد الانتهاء من الكلام، اضغط زر الميكروفون مرة أخرى للإيقاف.",
     stopAria: "إيقاف الإدخال الصوتي",
+    cancelAria: "إلغاء الإدخال الصوتي",
+    dismissError: "إغلاق",
   },
   hi: {
     editTranscript: "खुद संपादित करें",
@@ -147,6 +188,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "भेजने से पहले नाम, विशेष शब्द या पहचान की गलतियाँ सुधारें।",
     stopHint: "बोलना पूरा होने पर रोकने के लिए माइक्रोफ़ोन फिर से दबाएँ।",
     stopAria: "वॉइस इनपुट रोकें",
+    cancelAria: "वॉइस इनपुट रद्द करें",
+    dismissError: "बंद करें",
   },
   bn: {
     editTranscript: "নিজে সম্পাদনা করুন",
@@ -154,6 +197,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "পাঠানোর আগে নাম, বিশেষ শব্দ বা শনাক্তকরণের ভুল ঠিক করুন।",
     stopHint: "কথা শেষ হলে থামাতে আবার মাইক্রোফোনে চাপুন।",
     stopAria: "ভয়েস ইনপুট বন্ধ করুন",
+    cancelAria: "ভয়েস ইনপুট বাতিল করুন",
+    dismissError: "বন্ধ করুন",
   },
   ur: {
     editTranscript: "خود ترمیم کریں",
@@ -161,6 +206,8 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "بھیجنے سے پہلے نام، خاص اصطلاحات یا شناخت کی غلطیاں درست کریں۔",
     stopHint: "بات مکمل ہونے پر روکنے کے لیے مائیکروفون دوبارہ دبائیں۔",
     stopAria: "وائس اِن پٹ روکیں",
+    cancelAria: "وائس اِن پٹ منسوخ کریں",
+    dismissError: "بند کریں",
   },
   tr: {
     editTranscript: "Elle düzenle",
@@ -168,6 +215,19 @@ const COPY: Record<string, VoiceDetailStrings> = {
     reviewHint: "Göndermeden önce adları, özel terimleri veya tanıma hatalarını düzeltin.",
     stopHint: "Konuşmanız bittiğinde durdurmak için mikrofona tekrar dokunun.",
     stopAria: "Sesli girişi durdur",
+    cancelAria: "Sesli girişi iptal et",
+    dismissError: "Kapat",
+  },
+  // Uyghur. Interface verbs only — the administrative vocabulary this product
+  // must not invent lives in the glossary, and is deliberately not here.
+  ug: {
+    editTranscript: "قولدا تۈزىتىش",
+    reviewLabel: "ئاۋاز تونۇش نەتىجىسى · تۈزەتكىلى بولىدۇ",
+    reviewHint: "ئەۋەتىشتىن بۇرۇن ئىسىم ياكى خاتا تونۇلغان قىسىمنى تۈزىتىڭ.",
+    stopHint: "سۆزلەپ بولغاندىن كېيىن مىكروفوننى يەنە بېسىپ توختىتىڭ.",
+    stopAria: "ئاۋازلىق كىرگۈزۈشنى توختىتىش",
+    cancelAria: "ئاۋازلىق كىرگۈزۈشنى بىكار قىلىش",
+    dismissError: "تاقاش",
   },
 };
 

@@ -5,6 +5,8 @@ import type {
   IntegrityIssue,
   TranslationIntegrity,
 } from "./types";
+import { isResidenceStatusCode } from "./domain-vocabulary";
+import { compareNegation } from "./negation";
 
 interface Candidate extends CriticalValue {
   start: number;
@@ -172,6 +174,22 @@ export function extractCriticalValues(text: string, language?: string): Critical
     }
   };
 
+  // First, because every later pattern would take a piece of it: the integer
+  // collector reads E-7 as the number 7, at which point E-7 and F-7 compare
+  // equal and a changed visa category passes as verified.
+  collect(
+    "status-code",
+    // A hyphen is optional because speech-to-text writes "E7" as often as
+    // "E-7", and the various Unicode dashes all mean the same thing here.
+    // Boundary is Latin-only: Korean attaches particles straight onto the code
+    // ("D-2에서"), and a Unicode letter boundary would skip every Korean turn.
+    /(?<![A-Za-z0-9])([A-Ha-h])[-\u2010\u2011\u2012\u2013\u2014]?(10|[1-9])(?![A-Za-z0-9])/gu,
+    (_raw, match) =>
+      isResidenceStatusCode(match[1], match[2])
+        ? `${match[1].toUpperCase()}-${match[2]}`
+        : null,
+  );
+
   collect(
     "money",
     /(?:[₩$€£¥]\s*[+-]?\d[\d\s,.]*|[+-]?\d[\d\s,.]*\s*(?:(?:원|달러|엔|위안)|(?:KRW|USD|EUR|GBP|JPY|CNY)\b))/giu,
@@ -302,6 +320,15 @@ export function validateTranslationIntegrity(
   const target = extractCriticalValues(targetText, targetLanguage);
   const used = new Set<number>();
   const issues: IntegrityIssue[] = [];
+
+  // Checked before the values, because a reversed negation is the finding a
+  // reader most needs to see first.
+  const negation = compareNegation(sourceText, targetText, sourceLanguage, targetLanguage);
+  if (negation === "dropped") {
+    issues.push({ kind: "negation", sourceText, targetText, reason: "missing" });
+  } else if (negation === "added") {
+    issues.push({ kind: "negation", sourceText: "", targetText, reason: "added" });
+  }
 
   for (const value of source) {
     const found = target.findIndex(

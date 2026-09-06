@@ -1,5 +1,11 @@
 /** Counter translation prompt: one face-to-face utterance in, one faithful utterance out. */
 import { languageName } from "./languages";
+import {
+  IMMIGRATION_GLOSSARY,
+  RESIDENCE_STATUS_CODES,
+  hasVerifiedGlossary,
+  type GlossaryEntry,
+} from "./domain-vocabulary";
 import { findCounterProfile, type CounterProfileId } from "./profiles";
 
 export const COUNTER_SYSTEM_PROMPT = `You translate a face-to-face conversation at a service counter — a clinic reception, a government office, a help desk. Two people are standing in front of each other and do not share a language.
@@ -22,6 +28,16 @@ RULES
 - Use recent conversation only to resolve pronouns, omitted subjects, and obvious ellipsis. Never use context to invent a name, number, date, status, document, or legal fact.
 - If the source is genuinely ambiguous, translate it faithfully and say so in note.
 - If the source is empty, unintelligible, or just filler, return an empty translation and explain in note.
+
+ADMINISTRATIVE COUNTERS
+Much of this work is immigration, registration and permit business, where a translation that reads well and says something slightly different is the worst possible outcome. In that setting:
+- Never invent a deadline, a due date, a fee, a required document, or a processing time that the speaker did not state.
+- Never invent, upgrade or downgrade a residence status, visa category, or permission. If the source says D-2, the translation says D-2.
+- Preserve conditionals exactly. "If you cannot book before your period of stay expires" must not become "before your period of stay expires".
+- Preserve modality exactly. May, must, can, cannot, should, and is required to are different obligations. Do not turn a possibility into an instruction or an instruction into a suggestion.
+- Preserve who is obliged to act. "You must report" and "we will report" are not interchangeable.
+- Do not resolve an incomplete statement into a complete one. If someone says they changed jobs and does not say whether they reported it, the translation says exactly that much.
+- Keep one name per concept for the whole conversation. A procedure that was called one thing three turns ago is called the same thing now.
 
 CONFIDENCE
 high   — clear source, unambiguous translation.
@@ -49,6 +65,8 @@ export interface CounterPromptInput {
   action?: "simplify" | "retry";
   deskLabel?: string;
   profileId?: CounterProfileId;
+  /** Who is speaking this turn. Selects register guidance, nothing else. */
+  from?: "host" | "guest";
 }
 
 function targetLanguageGuidance(targetLang: string): string | null {
@@ -81,9 +99,73 @@ function targetLanguageGuidance(targetLang: string): string | null {
       return "TARGET WRITING: Use clear modern Khmer suitable for a service counter.";
     case "my-mm":
       return "TARGET WRITING: Use clear modern Burmese suitable for a service counter.";
+    case "ug-cn":
+      return [
+        "TARGET WRITING: Use modern Uyghur in the Perso-Arabic script (ئۇيغۇر ئەرەب يېزىقى).",
+        "Uyghur is a Turkic language written in an Arabic-derived script. It is NOT Arabic, NOT Uzbek, and NOT Turkish. Do not output Arabic, Uzbek, or Turkish, and do not substitute vocabulary from them.",
+        "Keep Latin-script administrative tokens exactly as written and in Latin script — residence status codes such as E-7 or D-10, HiKorea, ARC, phone numbers, passport numbers, and dates in numerals. Do not transliterate them into Arabic script and do not reorder their characters.",
+      ].join(" ");
     default:
       return null;
   }
+}
+
+/**
+ * Terminology the model must not improvise.
+ *
+ * Only the entries the conversation is actually using are sent. A twenty-line
+ * glossary on every turn costs latency for nothing when the turn is "one
+ * moment please", and the point is consistency within a conversation, not
+ * teaching the model a dictionary.
+ */
+function relevantGlossary(input: CounterPromptInput): GlossaryEntry[] {
+  if (input.profileId !== "immigration") return [];
+  const pair = [input.sourceLang, input.targetLang].map((tag) =>
+    tag.split("-")[0].toLowerCase(),
+  );
+  if (!pair.includes("ko") && !pair.includes("en")) return [];
+
+  const haystack = [input.text, ...(input.recent ?? []).map((turn) => turn.text)]
+    .join(" ")
+    .toLowerCase();
+  return IMMIGRATION_GLOSSARY.filter(
+    (entry) => haystack.includes(entry.ko.toLowerCase()) || haystack.includes(entry.en.toLowerCase()),
+  ).slice(0, 8);
+}
+
+/**
+ * Values that must come out the other side byte-identical.
+ *
+ * Naming them explicitly is far more reliable than hoping a general
+ * instruction covers the one token that matters, and it is exactly the set the
+ * integrity check will complain about afterwards if it changed.
+ */
+function verbatimTokens(text: string): string[] {
+  // The boundary is "not adjacent to more Latin text", not "not adjacent to a
+  // letter". Korean attaches particles directly to a Latin token — D-2에서,
+  // ARC를 — and a Unicode letter boundary rejects exactly the sentences this
+  // is for, which is how these tokens went unnamed in Korean prompts.
+  const bounded = (token: string) =>
+    new RegExp(`(?<![A-Za-z0-9])${token}(?![A-Za-z0-9])`, "iu");
+  const tokens = new Set<string>();
+  for (const code of RESIDENCE_STATUS_CODES) {
+    if (bounded(code).test(text)) tokens.add(code);
+  }
+  for (const term of ["HiKorea", "ARC", "1345"]) {
+    if (bounded(term).test(text)) tokens.add(term);
+  }
+  return [...tokens];
+}
+
+/** How this turn should read, given who is speaking. */
+function registerGuidance(from: "host" | "guest" | undefined): string | null {
+  if (from === "host") {
+    return "SPEAKER IS THE STAFF MEMBER: This is official guidance a visitor will act on. Translate it short, plain and administratively exact. Do not make it chatty, reassuring, or idiomatic, and do not soften a requirement into a suggestion. Keep procedure names precise rather than colloquial.";
+  }
+  if (from === "guest") {
+    return "SPEAKER IS THE VISITOR: They may be using a second language imperfectly. Translate what they actually said, tidying grammar only where it does not change meaning. Do not complete their account, do not add a consequence they did not state, and do not make them sound more or less certain than they were.";
+  }
+  return null;
 }
 
 function sourceVoiceGuidance(sourceLang: string): string | null {
@@ -139,7 +221,38 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
     );
   }
 
-  lines.push(`TRANSLATE FROM ${source} INTO ${target}.`);
+  // Stated as an explicit pair rather than left to detection. Uyghur, Uzbek
+  // and Arabic are mutually confusable to a detector — two share a script, two
+  // share a family — and a detector that guesses wrong produces fluent text in
+  // a language the visitor does not read.
+  lines.push(
+    `TRANSLATE FROM ${source} (${input.sourceLang}) INTO ${target} (${input.targetLang}). Do not auto-detect the language; use this pair.`,
+  );
+
+  const register = registerGuidance(input.from);
+  if (register) lines.push(register);
+
+  const glossary = relevantGlossary(input);
+  if (glossary.length) {
+    lines.push(
+      `ADMINISTRATIVE TERMS IN USE (keep these renderings consistent for the whole conversation):\n${glossary
+        .map((entry) => `  ${entry.ko} = ${entry.en}`)
+        .join("\n")}`,
+    );
+  }
+
+  if (!hasVerifiedGlossary(input.targetLang)) {
+    lines.push(
+      "NO ESTABLISHED ADMINISTRATIVE VOCABULARY: This target language has no verified published terminology for Korean immigration procedures. Translate the concept plainly, keep the Latin code or acronym (E-7, ARC, HiKorea) visible alongside it, and use the same wording for the same concept for the rest of this conversation. Do not present an improvised term as if it were the official one.",
+    );
+  }
+
+  const verbatim = verbatimTokens(input.text);
+  if (verbatim.length) {
+    lines.push(
+      `REPRODUCE VERBATIM, IN LATIN SCRIPT, UNCHANGED: ${verbatim.join(", ")}`,
+    );
+  }
 
   const targetGuidance = targetLanguageGuidance(input.targetLang);
   if (targetGuidance) lines.push(targetGuidance);

@@ -45,15 +45,55 @@ export const COUNTER_LANGUAGES: CounterLanguage[] = [
   { code: "bn-BD", endonym: "বাংলা", ko: "벵골어", en: "Bengali", speechSupported: true },
   { code: "ur-PK", endonym: "اردو", ko: "우르두어", en: "Urdu", speechSupported: true, rtl: true },
   { code: "tr-TR", endonym: "Türkçe", ko: "터키어", en: "Turkish", speechSupported: true },
+  // Uyghur is written in the Perso-Arabic script but is a Turkic language and
+  // is NOT Arabic, Uzbek, or Turkish. It is listed with its own tag so nothing
+  // downstream can quietly reroute it to `ar`, `uz`, or `tr` — a mistake that
+  // produces confident, fluent, completely wrong administrative text.
+  { code: "ug-CN", endonym: "ئۇيغۇرچە", ko: "위구르어", en: "Uyghur", speechSupported: false, rtl: true },
 ];
 
-const tagKey = (code: string): string => code.trim().toLowerCase();
+const tagKey = (code: string): string => code.trim().toLowerCase().replace(/_/g, "-");
 const BY_CODE = new Map(COUNTER_LANGUAGES.map((language) => [tagKey(language.code), language]));
 const BY_BASE = new Map<string, CounterLanguage>();
 for (const language of COUNTER_LANGUAGES) {
   const base = tagKey(language.code).split("-")[0];
   if (!BY_BASE.has(base)) BY_BASE.set(base, language);
 }
+
+/**
+ * Tags that a browser, an OS, or a hand-typed configuration really emits, and
+ * which the base-language fallback alone resolves to the wrong entry.
+ *
+ * Two families matter at a Korean counter:
+ *
+ *  - Chinese script subtags. `zh-Hant-TW` and `zh-HK` used to fall through to
+ *    the first `zh` entry, so a Traditional-script visitor was handed
+ *    Simplified Chinese without ever being asked.
+ *  - Uyghur. It has ISO 639-2/3 aliases (`uig`) and is routinely written with
+ *    an explicit script subtag. It must never resolve to Arabic or Uzbek
+ *    merely because it shares a script with one and a language family with
+ *    the other.
+ */
+const TAG_ALIASES: Record<string, string> = {
+  "zh-hant": "zh-TW",
+  "zh-hant-tw": "zh-TW",
+  "zh-hant-hk": "zh-TW",
+  "zh-hant-mo": "zh-TW",
+  "zh-hk": "zh-TW",
+  "zh-mo": "zh-TW",
+  "zh-hans": "zh-CN",
+  "zh-hans-cn": "zh-CN",
+  "zh-hans-sg": "zh-CN",
+  "zh-sg": "zh-CN",
+  cmn: "zh-CN",
+  "fil-ph": "tl-PH",
+  fil: "tl-PH",
+  uig: "ug-CN",
+  "ug-arab": "ug-CN",
+  "ug-arab-cn": "ug-CN",
+  "ug-latn": "ug-CN",
+  "ug-cyrl": "ug-CN",
+};
 
 /**
  * BCP-47 tags are case-insensitive. Resolve an exact language+region/script
@@ -63,8 +103,24 @@ for (const language of COUNTER_LANGUAGES) {
  */
 export const findLanguage = (code: string): CounterLanguage | undefined => {
   const key = tagKey(code);
-  return BY_CODE.get(key) ?? BY_BASE.get(key.split("-")[0]);
+  const alias = TAG_ALIASES[key];
+  if (alias) return BY_CODE.get(tagKey(alias));
+  const direct = BY_CODE.get(key);
+  if (direct) return direct;
+
+  // Strip a script subtag before the base fallback so `xx-Scpt-RR` resolves the
+  // same way `xx-RR` does, instead of only ever reaching the base entry.
+  const parts = key.split("-");
+  if (parts.length >= 3) {
+    const withoutScript = BY_CODE.get(`${parts[0]}-${parts.slice(2).join("-")}`);
+    if (withoutScript) return withoutScript;
+  }
+  return BY_BASE.get(parts[0]);
 };
+
+/** The registry tag for an arbitrary input tag, or the input when unknown. */
+export const normaliseLanguageTag = (code: string): string =>
+  findLanguage(code)?.code ?? code.trim();
 
 export const isSupportedLanguage = (code: string): boolean => !!findLanguage(code);
 

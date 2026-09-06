@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { findLanguage } from "@/counter/languages";
 import {
+  counterVoiceOffered,
   ensureMicrophonePermission,
   getMicrophonePermissionState,
   type MicrophonePermissionState,
@@ -19,10 +20,15 @@ export function VoiceReadinessButton({
 }) {
   const copy = useMemo(() => voiceReadinessStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
+  // Nothing in the stack transcribes some languages. Offering to prepare a
+  // microphone for one of them asks for a permission that can never be spent,
+  // which is both a worse first impression and a worse privacy posture.
+  const offered = counterVoiceOffered(lang);
   const [state, setState] = useState<MicrophonePermissionState>("prompt");
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    if (!offered) return;
     let cancelled = false;
     void getMicrophonePermissionState().then((next) => {
       if (cancelled) return;
@@ -32,7 +38,9 @@ export function VoiceReadinessButton({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [offered]);
+
+  if (!offered) return null;
 
   const prepare = async () => {
     if (checking || state !== "prompt") return;

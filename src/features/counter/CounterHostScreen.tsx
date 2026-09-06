@@ -187,6 +187,7 @@ export function CounterHostScreen() {
             busy={session.sending}
             counterCode={code}
             counterToken={participantToken}
+            profileId={view?.profileId}
             onSend={(text, source) => session.send({ text, source })}
           />
         </>

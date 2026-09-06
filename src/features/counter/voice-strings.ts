@@ -22,7 +22,13 @@ const createFailureCopy = (copy: {
   if (failure === "stopped") return null;
   if (failure === "permission") return copy.permission;
   if (failure === "no-speech") return copy.noSpeech;
-  if (failure === "unavailable") return copy.unavailable;
+  // "No recogniser covers your language" and "this device cannot listen" are
+  // different causes with the same answer for the person holding the phone:
+  // type instead. They share the sentence that already says so, in every
+  // language, rather than adding a twenty-third translation of it.
+  if (failure === "unavailable" || failure === "unsupported-language") {
+    return copy.unavailable;
+  }
   return copy.failed;
 };
 
@@ -417,6 +423,26 @@ const COPY: Record<string, CounterVoiceStrings> = {
       noSpeech: "Hiçbir şey duyulmadı. Tekrar deneyin veya mesajınızı yazın.",
       unavailable: "Bu cihazda sesli giriş kullanılamıyor. Mesajınızı yazın.",
       failed: "Sesli giriş durdu. Tekrar deneyin veya mesajınızı yazın.",
+    }),
+  },
+  // Uyghur. No recogniser in the stack transcribes it, so the copy a visitor
+  // will actually see here is `unavailable` — which is why it says what to do
+  // instead rather than only that something failed.
+  ug: {
+    speak: "سۆزلەش",
+    connecting: "تەييارلىنىۋاتىدۇ…",
+    listening: "ئاڭلاۋاتىمەن",
+    finishing: "ئاڭلىدىم",
+    translating: "تەرجىمە قىلىنىۋاتىدۇ…",
+    fallback: "ئاۋازلىق كىرگۈزۈش ئۆزلۈكىدىن ئالماشتۇرۇلدى. سۆزلەشنى داۋاملاشتۇرۇڭ.",
+    confirmTranscript: (text) => `«${text}» توغرىمۇ؟`,
+    yes: "توغرا",
+    speakAgain: "قايتا سۆزلەش",
+    failure: createFailureCopy({
+      permission: "مىكروفوننى ئىشلەتكىلى بولمىدى. ئىجازەت بېرىڭ ياكى ئۇچۇرنى كىرگۈزۈڭ.",
+      noSpeech: "ھېچنېمە ئاڭلانمىدى. قايتا سىناڭ ياكى ئۇچۇرنى كىرگۈزۈڭ.",
+      unavailable: "ئاۋازلىق كىرگۈزۈشنى ئىشلەتكىلى بولمايدۇ. ئۇچۇرىڭىزنى كىرگۈزۈڭ.",
+      failed: "ئاۋازلىق كىرگۈزۈش توختىدى. قايتا سىناڭ ياكى ئۇچۇرنى كىرگۈزۈڭ.",
     }),
   },
 };

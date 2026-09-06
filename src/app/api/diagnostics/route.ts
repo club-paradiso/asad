@@ -17,6 +17,7 @@ import { counterStore, counterStoreInfo, type CounterStoreStats } from "@/counte
 import { COUNTER_LANGUAGES } from "@/counter/languages";
 import { QUICK_PHRASES, quickPhraseCoverage } from "@/counter/quick-phrases";
 import { hasStrings } from "@/counter/ui-strings";
+import { counterVoiceSupport } from "@/providers/stt/capability";
 import { LLM_PROVIDER_IDS } from "@/providers/llm/types";
 import { telemetry } from "@/lib/telemetry";
 import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
@@ -226,7 +227,12 @@ export async function GET() {
           label: language.en,
           quickPhrases: Math.round(quickPhraseCoverage(language.code) * 100),
           interfaceTranslated: hasStrings(language.code),
-          speechInput: language.speechSupported,
+          // The browser flag alone under-reported this: Uzbek has no browser
+          // recogniser but does have cloud and batch transcription, and read
+          // as "type only" while working fine. Report what the whole stack can
+          // actually do for the language.
+          speechSupport: counterVoiceSupport(language.code),
+          browserSpeech: language.speechSupported,
         })),
         storeLimitation: store.shared
           ? null

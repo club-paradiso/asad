@@ -14,6 +14,20 @@ import { Button, Label, StatusDot } from "@/components/ui/primitives";
 import { useCapability } from "@/hooks/useCapability";
 import { cn } from "@/lib/cn";
 
+/**
+ * Read as "what a visitor speaking this language actually gets".
+ *
+ * `unsupported` is a real answer, not a gap in the table: no configured
+ * recogniser covers the language, so Counter Mode offers typing instead of a
+ * microphone that cannot succeed.
+ */
+const SPEECH_LABEL: Record<string, string> = {
+  native: "streaming",
+  experimental: "streaming (experimental)",
+  "fallback-only": "batch fallback",
+  unsupported: "type only",
+};
+
 interface OpenRouterConfigRow {
   primaryModel: string;
   qualityModel: string | null;
@@ -132,7 +146,8 @@ interface Payload {
       label: string;
       quickPhrases: number;
       interfaceTranslated: boolean;
-      speechInput: boolean;
+      speechSupport: "native" | "experimental" | "fallback-only" | "unsupported";
+      browserSpeech: boolean;
     }>;
     storeLimitation: string;
   };
@@ -663,6 +678,7 @@ export function DiagnosticsScreen() {
                   <th className="py-1 pr-3 font-normal">Quick phrases</th>
                   <th className="py-1 pr-3 font-normal">Interface</th>
                   <th className="py-1 font-normal">Speech input</th>
+
                 </tr>
               </thead>
               <tbody className="text-[var(--fg-muted)]">
@@ -673,7 +689,7 @@ export function DiagnosticsScreen() {
                     <td className="py-1 pr-3">
                       {row.interfaceTranslated ? "translated" : "English"}
                     </td>
-                    <td className="py-1">{row.speechInput ? "yes" : "type only"}</td>
+                    <td className="py-1">{SPEECH_LABEL[row.speechSupport]}</td>
                   </tr>
                 ))}
               </tbody>

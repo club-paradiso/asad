@@ -3,9 +3,12 @@
 /** Counter input zone: voice first, then typing, with no dead-end state. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findLanguage } from "@/counter/languages";
+import type { CounterProfileId } from "@/counter/profiles";
 import { detectRisks } from "@/counter/risks";
+import { normaliseTranscript } from "@/counter/transcript-normalisation";
 import type { CounterMessage, RiskSpan } from "@/counter/types";
 import type { CounterStrings } from "@/counter/ui-strings";
+import { BidiText } from "@/lib/bidi";
 import { cn } from "@/lib/cn";
 import { useVoiceInput } from "./useVoiceInput";
 import { voiceDetailStringsFor } from "./voice-detail-strings";
@@ -30,6 +33,7 @@ export function Composer({
   busy = false,
   counterCode,
   counterToken,
+  profileId,
 }: {
   lang: string;
   strings: CounterStrings;
@@ -40,6 +44,8 @@ export function Composer({
   counterCode?: string;
   /** Session-scoped capability used for Counter speech endpoints. */
   counterToken?: string | null;
+  /** Desk vocabulary. Feeds recogniser hints; never changes what is sent. */
+  profileId?: CounterProfileId;
 }) {
   const [draft, setDraft] = useState("");
   const [draftSource, setDraftSource] = useState<DraftSource>("text");
@@ -48,7 +54,7 @@ export function Composer({
   const inputRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef("");
   const composing = useRef(false);
-  const voice = useVoiceInput(lang, counterCode, counterToken ?? undefined);
+  const voice = useVoiceInput(lang, counterCode, counterToken ?? undefined, profileId);
   const copy = useMemo(() => voiceStringsFor(lang), [lang]);
   const detailCopy = useMemo(() => voiceDetailStringsFor(lang), [lang]);
   const rtl = findLanguage(lang)?.rtl ?? false;
@@ -98,7 +104,10 @@ export function Composer({
     if (draft.trim()) setRecoverableDraft({ text: draft, source: draftSource });
     setPendingVoice(null);
     void voice.start().then((text) => {
-      const spoken = text.trim();
+      // Written-form cleanup only, and always into the editable field rather
+      // than straight into a message: the person who spoke gets the last word
+      // on what they said.
+      const spoken = normaliseTranscript(text, { language: lang }).trim();
       if (!spoken) return;
 
       const typedDraft = draftRef.current;
@@ -121,7 +130,7 @@ export function Composer({
         inputRef.current?.setSelectionRange(end, end);
       });
     });
-  }, [disabled, draft, draftSource, voice]);
+  }, [disabled, draft, draftSource, lang, voice]);
 
   const voiceFinishing = voice.phase === "finishing";
   const voiceActive = voice.active || voiceFinishing;
@@ -167,10 +176,15 @@ export function Composer({
             dir={rtl ? "rtl" : undefined}
           >
             <p className="text-sm font-medium text-[var(--fg)]">
-              {copy.confirmTranscript(pendingVoice.risks.map((risk) => risk.text).join(" · "))}
+              <BidiText
+                text={copy.confirmTranscript(
+                  pendingVoice.risks.map((risk) => risk.text).join(" · "),
+                )}
+                rtl={rtl}
+              />
             </p>
             <p className="mt-1 line-clamp-2 text-xs text-[var(--fg-muted)]">
-              {pendingVoice.text}
+              <BidiText text={pendingVoice.text} rtl={rtl} />
             </p>
             <div className="mt-3 flex gap-2">
               <button
@@ -198,39 +212,48 @@ export function Composer({
           </div>
         )}
 
-        {voiceActive && (
+        {/* What the recogniser has heard so far. The state itself is announced
+            once, under the button — it used to be printed here as well, so the
+            same two words sat twice on a phone screen with no room for them. */}
+        {voiceActive && voice.partial && (
           <div
             className="rounded-xl border border-[color-mix(in_srgb,var(--accent)_32%,var(--line))] bg-[var(--accent-dim)] px-4 py-3 text-center"
             dir={rtl ? "rtl" : undefined}
-            aria-live="polite"
           >
-            <p className="text-sm font-semibold text-[var(--fg)]">{status}</p>
-            {voice.partial && (
-              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--fg-muted)]">
-                {voice.partial}
-              </p>
-            )}
-            {voice.listening && (
-              <p className="mt-1 text-xs text-[var(--fg-dim)]">{detailCopy.stopHint}</p>
-            )}
+            <p className="line-clamp-3 text-sm leading-relaxed text-[var(--fg)]">
+              <BidiText text={voice.partial} rtl={rtl} />
+            </p>
           </div>
         )}
 
-        {voice.usedFallback && voice.listening && (
-          <p className="text-center text-xs text-[var(--fg-dim)]" aria-live="polite">
-            {copy.fallback}
-          </p>
+        {failureCopy && (
+          <div
+            role="alert"
+            dir={rtl ? "rtl" : undefined}
+            className="flex items-start gap-2 rounded-lg border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-sm text-[var(--danger)]"
+          >
+            <p className="min-w-0 flex-1 leading-relaxed">{failureCopy}</p>
+            <button
+              type="button"
+              onClick={voice.dismissError}
+              aria-label={detailCopy.dismissError}
+              title={detailCopy.dismissError}
+              className="-me-2 -my-1 grid size-11 shrink-0 place-items-center rounded-md text-lg leading-none hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
+            >
+              <span aria-hidden>×</span>
+            </button>
+          </div>
         )}
 
-        {failureCopy && (
-          <button
-            type="button"
-            onClick={voice.dismissError}
-            className="block w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-left text-sm text-[var(--danger)]"
-            role="alert"
+        {/* Some languages have no recogniser anywhere in the stack. Saying so
+            once, quietly, beats a microphone button that cannot succeed. */}
+        {voice.languageUnsupported && !failureCopy && (
+          <p
+            className="text-center text-xs leading-relaxed text-[var(--fg-dim)]"
+            dir={rtl ? "rtl" : undefined}
           >
-            {failureCopy}
-          </button>
+            {copy.failure("unsupported-language")}
+          </p>
         )}
 
         {voice.supported && (
@@ -239,8 +262,15 @@ export function Composer({
               type="button"
               disabled={disabled || voiceFinishing}
               onClick={toggleVoice}
-              aria-label={voice.active ? detailCopy.stopAria : status}
+              aria-label={
+                voice.listening
+                  ? detailCopy.stopAria
+                  : voice.active
+                    ? detailCopy.cancelAria
+                    : status
+              }
               aria-pressed={voice.listening}
+              aria-busy={voice.phase === "connecting"}
               className={cn(
                 "flex size-20 shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,box-shadow,transform]",
                 "touch-manipulation disabled:pointer-events-none disabled:opacity-55 active:scale-[0.97]",
@@ -253,9 +283,33 @@ export function Composer({
             >
               {voice.listening ? <StopIcon /> : voice.active ? <PreparingIcon /> : <MicIcon />}
             </button>
-            <span className="min-h-5 text-sm font-semibold text-[var(--fg)]" aria-live="polite">
+            {/* The one live region for voice state. Two of them announced
+                every transition twice. */}
+            <span
+              className={cn(
+                "min-h-5 text-sm font-semibold",
+                voice.listening ? "text-[var(--accent)]" : "text-[var(--fg)]",
+              )}
+              aria-live="polite"
+            >
               {status}
             </span>
+            {voice.listening && (
+              <p
+                className="max-w-xs text-center text-xs leading-relaxed text-[var(--fg-dim)]"
+                dir={rtl ? "rtl" : undefined}
+              >
+                {detailCopy.stopHint}
+              </p>
+            )}
+            {voice.usedFallback && voice.listening && (
+              <p
+                className="max-w-xs text-center text-xs leading-relaxed text-[var(--fg-dim)]"
+                dir={rtl ? "rtl" : undefined}
+              >
+                {copy.fallback}
+              </p>
+            )}
           </div>
         )}
 

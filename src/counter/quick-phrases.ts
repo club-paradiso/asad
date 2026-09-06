@@ -45,6 +45,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "مرحباً. كيف يمكنني مساعدتك؟",
       "hi-IN": "नमस्ते। मैं आपकी क्या मदद कर सकता हूँ?",
       "tr-TR": "Merhaba. Size nasıl yardımcı olabilirim?",
+      "ug-CN": "ياخشىمۇسىز. سىزگە قانداق ياردەم قىلاي؟",
     },
   },
   {
@@ -69,6 +70,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "لحظة من فضلك.",
       "hi-IN": "कृपया एक क्षण प्रतीक्षा करें।",
       "tr-TR": "Bir dakika lütfen.",
+      "ug-CN": "بىر دەم ساقلاپ تۇرۇڭ.",
     },
   },
   {
@@ -93,6 +95,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "هل يمكنك إظهار بطاقة الهوية أو جواز السفر؟",
       "hi-IN": "क्या आप अपना पहचान पत्र या पासपोर्ट दिखा सकते हैं?",
       "tr-TR": "Kimliğinizi veya pasaportunuzu gösterebilir misiniz?",
+      "ug-CN": "كىملىكىڭىزنى ياكى پاسپورتىڭىزنى كۆرسىتىپ قويامسىز؟",
     },
   },
   {
@@ -117,6 +120,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "هل لديك موعد؟",
       "hi-IN": "क्या आपका अपॉइंटमेंट है?",
       "tr-TR": "Randevunuz var mı?",
+      "ug-CN": "ئالدىن بېكىتكەنمىدىڭىز؟",
     },
   },
   {
@@ -141,6 +145,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "سيأتي الموظف المسؤول قريباً.",
       "hi-IN": "संबंधित व्यक्ति जल्द ही आएंगे।",
       "tr-TR": "İlgili kişi birazdan gelecek.",
+      "ug-CN": "مەسئۇل خادىم ھازىر كېلىدۇ.",
     },
   },
   {
@@ -165,6 +170,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "هل يمكنك كتابته هنا؟",
       "hi-IN": "क्या आप इसे यहाँ लिख सकते हैं?",
       "tr-TR": "Buraya yazabilir misiniz?",
+      "ug-CN": "بۇ يەرگە يېزىپ قويامسىز؟",
     },
   },
   {
@@ -189,6 +195,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "فهمت.",
       "hi-IN": "मैं समझ गया।",
       "tr-TR": "Anladım.",
+      "ug-CN": "چۈشەندىم.",
     },
   },
   {
@@ -213,6 +220,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "هل يمكنك تكرار ذلك؟",
       "hi-IN": "क्या आप दोबारा कह सकते हैं?",
       "tr-TR": "Tekrar eder misiniz?",
+      "ug-CN": "يەنە بىر قېتىم ئېيتىپ بېرەمسىز؟",
     },
   },
   {
@@ -237,6 +245,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "أحتاج إلى مساعدة.",
       "hi-IN": "मुझे मदद चाहिए।",
       "tr-TR": "Yardıma ihtiyacım var.",
+      "ug-CN": "ماڭا ياردەم كېرەك.",
     },
   },
   {
@@ -261,6 +270,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "لا أفهم.",
       "hi-IN": "मैं नहीं समझा।",
       "tr-TR": "Anlamıyorum.",
+      "ug-CN": "چۈشەنمىدىم.",
     },
   },
   {
@@ -285,6 +295,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "شكراً لك.",
       "hi-IN": "धन्यवाद।",
       "tr-TR": "Teşekkürler.",
+      "ug-CN": "رەھمەت سىزگە.",
     },
   },
   {
@@ -309,6 +320,7 @@ export const QUICK_PHRASES: QuickPhrase[] = [
       "ar-SA": "تم كل شيء. أتمنى لك يوماً سعيداً.",
       "hi-IN": "सब हो गया। आपका दिन शुभ हो।",
       "tr-TR": "Her şey tamam. İyi günler.",
+      "ug-CN": "ھەممىسى بولدى. خەير خوش.",
     },
   },
 ];
