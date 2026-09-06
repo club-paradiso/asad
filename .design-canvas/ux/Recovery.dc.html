@@ -1,0 +1,186 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    :root {
+      --bg:#06080b; --bg-raised:#0d1117; --bg-overlay:#131a22;
+      --line:#1c232c; --line-strong:#2b3541;
+      --fg:#f4f7fa; --fg-muted:#97a2b0; --fg-dim:#5d6874;
+      --accent:#f0b429; --accent-contrast:#141007; --accent-dim:rgba(240,180,41,0.16);
+      --info:#5ec8d8; --ok:#4ade80; --warn:#e8853b; --danger:#e8635b;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg);
+      font-family:"IBM Plex Sans","Apple SD Gothic Neo","Pretendard",ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased; }
+    a { color:var(--info); } a:hover { color:var(--fg); }
+    .cap { font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-size:0.6875rem; font-weight:500;
+      letter-spacing:0.02em; text-transform:uppercase; color:var(--fg-dim); }
+    .mono { font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; }
+    button { font:inherit; cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none;
+      transition:background-color .15s,border-color .15s,color .15s,transform .1s; }
+    button:active { transform:scale(0.985); }
+  </style>
+</helmet>
+
+<div style="min-height:790px; padding:20px; display:flex; flex-direction:column; gap:18px">
+
+  <div style="display:flex; flex-direction:column; gap:4px">
+    <span class="cap">통역 중 문제가 생겼을 때</span>
+    <p style="margin:0; font-size:1.0625rem; font-weight:600; letter-spacing:-0.015em; line-height:1.4">
+      통역사는 지금 말하는 중입니다. 읽을 시간은 1초입니다.
+    </p>
+  </div>
+
+  <div style="display:flex; gap:6px">
+    <sc-for list="{{cases}}" as="c" hint-placeholder-count="3">
+      <button onClick="{{c.pick}}" style="flex:1 1 0; min-height:44px; border-radius:10px; padding:0 8px;
+        border:1px solid {{c.border}}; background:{{c.bg}}; color:{{c.fg}}; font-size:0.75rem; font-weight:{{c.weight}}">
+        {{c.short}}
+      </button>
+    </sc-for>
+  </div>
+
+  <!-- what ships today -->
+  <div style="display:flex; flex-direction:column; gap:8px">
+    <span class="cap">현재</span>
+    <div style="border:1px solid var(--line); border-radius:12px; background:var(--bg-raised); padding:14px 16px;
+      display:flex; gap:10px; align-items:flex-start">
+      <span aria-hidden="true" style="margin-top:5px; width:8px; height:8px; border-radius:50%; background:var(--danger); flex:none"></span>
+      <p class="mono" style="margin:0; font-size:0.8125rem; line-height:1.55; color:var(--fg-muted)">{{currentText}}</p>
+    </div>
+    <p style="margin:0; font-size:0.75rem; line-height:1.5; color:var(--fg-dim)">
+      한국어 화면에 영어 한 줄. 통역이 지금 어떻게 되고 있는지, 뭘 눌러야 하는지 화면에 없습니다.
+    </p>
+  </div>
+
+  <!-- proposal -->
+  <div style="display:flex; flex-direction:column; gap:8px">
+    <span class="cap">개선안</span>
+    <div style="border:1px solid {{toneBorder}}; border-radius:14px; background:var(--bg-raised); overflow:hidden">
+
+      <div style="display:flex; gap:11px; padding:16px 16px 14px; align-items:flex-start">
+        <span aria-hidden="true" style="margin-top:6px; width:9px; height:9px; border-radius:50%; background:{{toneColour}}; flex:none"></span>
+        <div style="min-width:0; display:flex; flex-direction:column; gap:7px">
+          <p style="margin:0; font-size:0.9375rem; font-weight:600; line-height:1.45; letter-spacing:-0.01em">{{headline}}</p>
+          <p style="margin:0; font-size:0.8125rem; line-height:1.6; color:var(--fg-muted)">{{consequence}}</p>
+        </div>
+      </div>
+
+      <div style="padding:0 16px 14px 42px">
+        <div style="border-left:2px solid {{toneColour}}; padding:2px 0 2px 12px">
+          <p class="cap" style="margin:0 0 3px">통역은 지금</p>
+          <p style="margin:0; font-size:0.8125rem; line-height:1.55; color:var(--fg)">{{stillWorking}}</p>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--line); background:var(--bg-overlay); padding:12px 16px; display:flex; gap:8px">
+        <button onClick="{{act}}" style="flex:1 1 0; min-height:48px; border-radius:12px; border:1px solid var(--accent);
+          background:var(--accent); color:var(--accent-contrast); font-size:0.875rem; font-weight:600">{{primaryLabel}}</button>
+        <button onClick="{{reset}}" style="flex:0 0 auto; min-height:48px; padding:0 16px; border-radius:12px; border:1px solid var(--line-strong);
+          background:transparent; color:var(--fg-muted); font-size:0.875rem">{{secondaryAction}}</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1 1 auto"></div>
+
+  <div style="border-top:1px solid var(--line); padding-top:14px; display:flex; flex-direction:column; gap:5px">
+    <span class="cap">세 줄 규칙</span>
+    <p style="margin:0; font-size:0.8125rem; line-height:1.65; color:var(--fg-muted)">
+      <strong style="color:var(--fg); font-weight:600">무슨 일인지</strong> ·
+      <strong style="color:var(--fg); font-weight:600">한국어 자막은 계속 나오는지</strong> ·
+      <strong style="color:var(--fg); font-weight:600">손가락 하나로 할 수 있는 일</strong>.
+      셋 다 없으면 통역사는 화면을 포기하고 귀에만 의존합니다.
+    </p>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":790}}'>
+const CASES = [
+  {
+    id: "stt",
+    short: "인식 끊김",
+    current: "Speech recognition stopped unexpectedly. Check the connection, then tap Try again.",
+    tone: "danger",
+    headline: "음성 인식이 멈췄습니다",
+    consequence: "새로 들어오는 한국어가 없습니다. 마지막 문장 이후로 화면이 멈춰 있습니다.",
+    stillWorking: "멈춰 있습니다. 지금까지 나온 영어는 그대로 남아 있습니다.",
+    primary: "다시 연결", done: "연결하는 중…",
+    secondary: "종료"
+  },
+  {
+    id: "mic",
+    short: "마이크 권한",
+    current: "Microphone permission was denied. Grant access, then tap Try again.",
+    tone: "danger",
+    headline: "마이크 권한이 거부됐습니다",
+    consequence: "브라우저 설정에서 이 사이트의 마이크를 허용해야 합니다.",
+    stillWorking: "시작되지 않았습니다. 권한을 허용하면 이 화면에서 바로 이어집니다.",
+    primary: "허용하고 시작", done: "권한 요청 중…",
+    secondary: "데모로"
+  },
+  {
+    id: "llm",
+    short: "AI 한도",
+    current: "The free interpretation provider is temporarily rate limited.",
+    tone: "warn",
+    headline: "AI 통역이 한도에 걸렸습니다",
+    consequence: "무료 제공자의 한도입니다. 분당 한도면 곧 돌아오고, 일일 한도면 오늘은 돌아오지 않습니다.",
+    stillWorking: "계속됩니다 — 기기 안의 규칙 기반으로 이어집니다. 성경 구절과 용어는 그대로, 영어 문장은 번역이 아닙니다.",
+    primary: "규칙 기반으로 계속", done: "규칙 기반으로 이어갑니다",
+    secondary: "종료"
+  }
+];
+
+const TONE = {
+  danger: { colour: "#e8635b", border: "rgba(232,99,91,0.42)" },
+  warn:   { colour: "#e8853b", border: "rgba(232,133,59,0.42)" }
+};
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: "stt", acted: false };
+  }
+
+  renderVals() {
+    const active = CASES.find((c) => c.id === this.state.picked) || CASES[0];
+    const tone = TONE[active.tone];
+
+    return {
+      cases: CASES.map((c) => {
+        const on = c.id === this.state.picked;
+        return {
+          short: c.short,
+          bg: on ? "rgba(240,180,41,0.16)" : "transparent",
+          fg: on ? "#f0b429" : "#97a2b0",
+          border: on ? "rgba(240,180,41,0.45)" : "#1c232c",
+          weight: on ? "600" : "400",
+          pick: () => this.setState({ picked: c.id, acted: false })
+        };
+      }),
+      currentText: active.current,
+      headline: active.headline,
+      consequence: active.consequence,
+      stillWorking: active.stillWorking,
+      primaryLabel: this.state.acted ? active.done : active.primary,
+      act: () => this.setState({ acted: true }),
+      reset: () => this.setState({ acted: false }),
+      secondaryAction: active.secondary,
+      toneColour: tone.colour,
+      toneBorder: tone.border
+    };
+  }
+}
+</script>
+</body>
+</html>

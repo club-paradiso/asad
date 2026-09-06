@@ -34,6 +34,37 @@ const LAG_STEER: Record<InterpretRequest["lag"], string> = {
   safe: "LAG: SAFE (~4–6s). Wait for the thought to resolve. Do not predict at all. Accuracy over speed.",
 };
 
+/**
+ * What the engine knows about where it cut, said out loud.
+ *
+ * The stabiliser fires on a completed sentence when it can and on a clock when
+ * it cannot, and the difference is the whole delayed-predicate problem: a
+ * `sentence` unit is a thought the model may finish, while a `timeout` unit is
+ * a thought the SPEAKER has not finished, where a fluent closing sentence is an
+ * invention the interpreter has to talk over. The engine has always known
+ * which it just did; until now it kept that to itself and the model had to
+ * guess from the text.
+ */
+function boundarySteer(request: InterpretRequest): string | null {
+  const lines: string[] = [];
+
+  if (request.continuesPrevious) {
+    lines.push(
+      "CONTINUATION: the previous unit was cut before the speaker resolved it, so the English you returned then is an unfinished scaffold the interpreter is already saying. Carry it on from where it stopped — do not restart the sentence and do not repeat what you already delivered.",
+    );
+  }
+
+  if (request.boundary && request.boundary !== "sentence") {
+    lines.push(
+      "OPEN END: this unit also stops mid-thought — the clock ended it, not the speaker. Commit to the structure, leave the payload unfinished, and mark the trailing chunk low if it depends on Korean that has not arrived.",
+    );
+  } else if (request.boundary === "sentence") {
+    lines.push("CLOSED END: the speaker completed this thought. It is safe to finish the English sentence.");
+  }
+
+  return lines.length ? lines.join("\n") : null;
+}
+
 export function buildLiveUserPrompt(request: InterpretRequest): string {
   const sections: string[] = [];
 
@@ -56,10 +87,24 @@ export function buildLiveUserPrompt(request: InterpretRequest): string {
             .join("\n")}`,
       );
     }
-    if (detected.glossary.length) {
+    // Discourse markers are separated from terminology on purpose. Telling the
+    // model that 그래서 means "so" is worthless; telling it that 결론적으로 is
+    // on the table means the speaker is CLOSING, which settles the English
+    // frame before the Korean predicate arrives.
+    const terms = detected.glossary.filter((g) => !g.register);
+    const markers = detected.glossary.filter((g) => g.register);
+
+    if (terms.length) {
       hints.push(
-        `Terms present in this segment:\n${detected.glossary
+        `Terms present in this segment:\n${terms
           .map((g) => `  ${g.korean} → ${g.english}${g.note ? ` (${g.note})` : ""}`)
+          .join("\n")}`,
+      );
+    }
+    if (markers.length) {
+      hints.push(
+        `Discourse markers present — they name the rhetorical move, so use them to choose the English frame, then compress them out of the output:\n${markers
+          .map((g) => `  ${g.korean} (${g.english})`)
           .join("\n")}`,
       );
     }
@@ -82,6 +127,9 @@ export function buildLiveUserPrompt(request: InterpretRequest): string {
   }
 
   sections.push(LAG_STEER[request.lag]);
+
+  const boundary = boundarySteer(request);
+  if (boundary) sections.push(boundary);
 
   if (!request.allowAnticipation) {
     sections.push("Do not return anticipatedChunks for this turn.");

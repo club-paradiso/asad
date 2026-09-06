@@ -112,6 +112,12 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
     mode: benchCase.mode,
     lag: "balanced",
     pending: benchCase.korean,
+    // Bench cases are whole utterances, and the `incomplete` category is the
+    // one that deliberately is not: score it as the clock-cut unit it is, or
+    // the model is marked down for refusing to finish a sentence the speaker
+    // never finished.
+    boundary: benchCase.category === "incomplete" ? "timeout" : "sentence",
+    continuesPrevious: false,
     context: {
       recentKorean: benchCase.priorKorean ?? [],
       recentEnglish: benchCase.priorEnglish ?? [],

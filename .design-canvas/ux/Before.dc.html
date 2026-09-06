@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+  <style>
+    :root {
+      --bg:#faf7f2; --bg-raised:#ffffff; --bg-overlay:#f2ede4;
+      --line:#e4ddd1; --line-strong:#cbc2b3;
+      --fg:#12100e; --fg-muted:#4a4540; --fg-dim:#6b655e;
+      --accent:#12100e; --accent-contrast:#faf7f2;
+      --ok:#1c7a4f; --warn:#96601a; --danger:#c81e1e;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg);
+      font-family:"IBM Plex Sans","Apple SD Gothic Neo","Pretendard",ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased; }
+    a { color:#1b2a4a; } a:hover { color:var(--fg); }
+    .cap { font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-size:0.6875rem; font-weight:500;
+      letter-spacing:0.02em; text-transform:uppercase; color:var(--fg-dim); }
+    .disp { font-family:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif; font-weight:700; letter-spacing:-0.032em; }
+    .seg { display:flex; border:1px solid var(--line); border-radius:12px; background:var(--bg-overlay); padding:4px; gap:2px; }
+    .seg > span { flex:1 1 0; min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      border-radius:8px; font-size:0.8125rem; color:var(--fg-muted); }
+    .seg > span.on { background:var(--accent); color:var(--accent-contrast); font-weight:600; }
+    .dotring { width:16px; height:16px; border-radius:50%; border:1px solid currentColor; display:inline-grid; place-items:center; }
+    .dotring i { width:6px; height:6px; border-radius:50%; background:currentColor; }
+    .row { display:grid; grid-template-columns:4.5rem minmax(0,1fr); align-items:center; column-gap:16px; }
+  </style>
+</helmet>
+
+<div style="position:relative; padding:20px 20px 16px; display:flex; flex-direction:column; gap:18px">
+
+  <div style="display:flex; align-items:center; justify-content:space-between">
+    <div style="display:flex; align-items:center; gap:10px">
+      <span class="disp" style="font-size:1.05rem">ASAD</span>
+      <span aria-hidden="true" style="width:1px; height:12px; background:var(--line-strong)"></span>
+      <span class="cap">라이브 통역</span>
+    </div>
+    <span class="cap">현재</span>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:16px">
+    <div class="row"><span class="cap">모드</span>
+      <div class="seg"><span class="on"><span class="dotring"><i></i></span>설교</span><span><span class="dotring"></span>일반</span></div>
+    </div>
+    <div class="row"><span class="cap">입력</span>
+      <span style="min-height:44px; display:flex; align-items:center; font-size:0.875rem; color:var(--fg-muted)">시스템 기본값 · 마이크는 브라우저 인식이 제어합니다</span>
+    </div>
+    <div class="row"><span class="cap">인식</span>
+      <div class="seg"><span><span class="dotring"></span>데모</span><span class="on"><span class="dotring"><i></i></span>브라우저</span></div>
+    </div>
+    <div class="row"><span class="cap">지연</span>
+      <div class="seg"><span><span class="dotring"></span>빠름</span><span class="on"><span class="dotring"><i></i></span>균형</span><span><span class="dotring"></span>안전</span></div>
+    </div>
+    <p style="margin:0 0 0 5.5rem; font-size:0.875rem; line-height:1.5; color:var(--fg-muted)">~2–3초 뒤에서 따라갑니다. 평소 쓰는 기본값입니다.</p>
+  </div>
+
+  <div style="border:1px solid var(--line); border-radius:8px; background:var(--bg-raised); padding:12px 16px; font-size:0.875rem; line-height:1.6; color:var(--fg-muted)">
+    <strong style="color:var(--fg); font-weight:600">부스 모드.</strong>
+    통역사와 교회의 동시통역 음향 설비가 이미 있다는 전제로 동작합니다. 통역사를 보조할 뿐, 번역을 회중에게 직접 송출하지는 않습니다.
+  </div>
+
+  <!-- readiness, always fully expanded on mobile -->
+  <div style="border:1px solid var(--line); border-radius:16px; background:var(--bg-raised); overflow:hidden">
+    <div style="display:flex; gap:12px; padding:20px; border-bottom:1px solid var(--line)">
+      <span aria-hidden="true" style="margin-top:6px; width:10px; height:10px; border-radius:50%; background:var(--warn); flex:none"></span>
+      <div>
+        <p class="cap" style="margin:0 0 4px">세션 준비 상태</p>
+        <p style="margin:0; font-size:1rem; font-weight:600; letter-spacing:-0.015em">시작할 수 있지만 확인할 게 있어요</p>
+      </div>
+    </div>
+    <div style="padding:14px 20px; border-bottom:1px solid var(--line)">
+      <p class="cap" style="margin:0 0 3px">입력</p>
+      <p style="margin:0 0 3px; font-size:0.875rem">시스템 기본 마이크</p>
+      <p style="margin:0; font-size:0.8125rem; line-height:1.5; color:var(--fg-dim)">입력 장치는 브라우저 음성 인식이 고릅니다. 교회 믹서를 써야 한다면 예배 전에 시스템 입력을 먼저 지정해 두세요.</p>
+    </div>
+    <div style="padding:14px 20px; border-bottom:1px solid var(--line)">
+      <p class="cap" style="margin:0 0 3px">인식</p>
+      <p style="margin:0 0 3px; font-size:0.875rem">브라우저가 인식을 관리합니다</p>
+      <p style="margin:0; font-size:0.8125rem; line-height:1.5; color:var(--fg-dim)">브라우저 제공자의 서버로 음성이 전송될 수 있습니다. 크롬에서 가장 정확하고, 사파리는 일부만 지원하며 오래 조용하면 멈출 수 있습니다.</p>
+    </div>
+    <div style="padding:14px 20px">
+      <p class="cap" style="margin:0 0 3px">AI</p>
+      <p style="margin:0 0 3px; font-size:0.875rem">Gemini — 사용량 한도</p>
+      <p style="margin:0; font-size:0.8125rem; line-height:1.5; color:var(--fg-dim)">일일 한도 1,000회는 연속 발화 약 89분 분량입니다. 그 뒤로는 기기 안의 통역기로 넘어갑니다.</p>
+    </div>
+  </div>
+
+  <button style="width:100%; min-height:56px; border-radius:12px; border:1px solid var(--accent); background:var(--accent);
+    color:var(--accent-contrast); font-size:1rem; font-weight:600; font-family:inherit">통역 시작</button>
+
+  <div style="border:1px solid var(--line); border-radius:8px; background:var(--bg-raised); min-height:56px; display:flex;
+    align-items:center; justify-content:space-between; gap:16px; padding:12px 16px">
+    <span style="font-size:0.875rem">
+      <strong style="color:var(--accent); font-weight:600">시작 전에 챙길 것</strong>
+      <span style="margin-left:8px; color:var(--fg-muted)">준비 시트 · 지난 세션</span>
+    </span>
+    <svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16" fill="none" style="color:var(--accent); flex:none">
+      <path d="m7.5 4.5 5.5 5.5-5.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <p style="margin:0; border-top:1px solid var(--line); padding-top:16px; font-size:0.8125rem; line-height:1.7; color:var(--fg-dim)">
+    통역 중 단축키 · <strong style="color:var(--fg); font-weight:600">Space</strong> 멈춤 ·
+    <strong style="color:var(--fg); font-weight:600">T</strong> 프롬프터 ·
+    <strong style="color:var(--fg); font-weight:600">K</strong> 한국어 ·
+    <strong style="color:var(--fg); font-weight:600">G</strong> 용어 ·
+    <strong style="color:var(--fg); font-weight:600">+/−</strong> 글자 크기
+  </p>
+
+  <!-- the fold -->
+  <div aria-hidden="true" style="position:absolute; left:0; right:0; top:844px; height:0; border-top:2px dashed #c81e1e"></div>
+  <div style="position:absolute; right:12px; top:850px; font-family:'IBM Plex Mono',monospace; font-size:0.6875rem;
+    letter-spacing:0.02em; color:#c81e1e; background:var(--bg); padding:2px 6px">iPhone 14 화면 끝 — 시작 버튼은 이 아래</div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":1180}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

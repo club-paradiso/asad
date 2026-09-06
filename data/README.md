@@ -5,31 +5,22 @@
 `christian-glossary-500.tsv` is the source-preservation copy of the supplied **기독교 영단어 500개** workbook.
 
 - 500 numbered source rows
-- 5 source categories, 100 rows each
-- 470 unique Korean headwords across 30 duplicated rows
+- 10 source categories, 50 rows each
+- 447 unique Korean headwords across 53 repeated rows
 - duplicate Korean headwords are intentionally preserved here because some rows carry alternate English renderings or context
 
-### This is an archive, not the runtime generator
+### This file and the runtime layer must agree
 
-`src/interpreter/glossary/community-glossary.ts` was **not** generated from this
-file. Both come from the 「기독교 영단어 500개」 workbook, but from different
-editions, and their vocabulary differs in substance rather than in normalization:
+`src/interpreter/glossary/community-glossary.ts` is generated from this file,
+and `src/interpreter/glossary/source-dataset.test.ts` asserts that the two carry
+exactly the same 447 Korean headwords. That assertion is the reason the archive
+is in the repository at all: a workbook and a runtime layer drifting apart
+silently is the failure it exists to catch.
 
-| | rows | unique Korean |
-| --- | ---: | ---: |
-| `christian-glossary-500.tsv` | 500 | 470 |
-| `COMMUNITY_SERMON_GLOSSARY` | 500 | 447 |
-
-371 headwords are shared. 99 exist only here (`세상의 빛`, `세상의 소금`,
-`영혼 구원`, `그리스도의 몸`, `복음의 열매` …) and 76 only in the runtime layer
-(`설교`, `예화`, `적용`, `도입`, `결론`, `지상명령`, `미전도종족` …). Do not
-assert an equality between the two, and do not treat one as the other's
-normalization: which edition ships is a product decision, and today the runtime
-layer is authoritative.
-
-`src/interpreter/glossary/source-dataset.test.ts` therefore checks this file's
-own integrity — row count, numbering, category shape, well-formedness — and
-nothing about the runtime glossary.
+So a new workbook is never a data-only change. Replace the TSV, regenerate
+`community-glossary.ts` from it, and move the counts here and in the test in the
+same commit — otherwise the suite goes red for every branch in the repository,
+which is exactly what happened once already.
 
 ### Runtime use
 
@@ -41,4 +32,8 @@ For speech recognition, `src/interpreter/glossary/stt-hints.ts` selects a small 
 
 ### Updating
 
-When a source workbook changes, preserve its full rows here first, and update the counts above and in `source-dataset.test.ts` to match the file actually committed. Runtime normalization should continue to merge duplicate Korean headwords while retaining alternate English renderings. If a future edition is ever adopted as the runtime source, regenerate `community-glossary.ts` from it in the same change — the two drifting apart silently is what this note exists to prevent.
+When the source workbook changes, preserve its full rows here first, regenerate
+`community-glossary.ts` from them, and update the counts above and in
+`source-dataset.test.ts` to match the file actually committed — all in one
+change. Runtime normalization should continue to merge duplicate Korean
+headwords while retaining alternate English renderings.

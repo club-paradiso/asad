@@ -81,6 +81,19 @@ export const interpretRequestSchema = z.object({
   pending: z.string().min(1).max(4000),
   /** Unstable tail, used only for anticipation. */
   partial: z.string().max(1000).optional(),
+  /**
+   * How this unit was cut, and whether it continues one that was cut open.
+   *
+   * The engine already decides both — `flushReason` names the boundary and the
+   * previous turn's reason says whether the thought resolved — and used to keep
+   * that to itself. A model told only "here is some Korean" cannot know whether
+   * it is starting a thought or finishing one the interpreter has already begun
+   * saying out loud, which is the single decision Korean's delayed predicate
+   * makes hardest.
+   */
+  boundary: z.enum(["sentence", "clause", "quiet", "timeout"]).optional(),
+  /** True when the previous unit was cut before its predicate resolved. */
+  continuesPrevious: z.boolean().default(false),
   context: z.object({
     summary: z.string().max(2000).optional(),
     topic: z.string().max(120).optional(),
