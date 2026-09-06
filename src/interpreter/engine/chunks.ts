@@ -46,6 +46,18 @@ export interface AddSafeResult {
  * Anticipated chunks are cleared first — a prediction is either superseded by
  * the real thing or it was wrong; either way it must not linger next to
  * confirmed text.
+ *
+ * Duplicate suppression is deliberately one-directional: it compares against
+ * what was ALREADY on screen before this turn, never against lines this same
+ * turn is adding. The two cases are not the same thing.
+ *
+ *   across turns — the model re-emitting a line it already delivered, because
+ *     overlapping context asked it to continue. Noise. Dropped.
+ *   within a turn — the model repeating a line because the preacher did. A
+ *     three-fold build is the rhetoric, and `CORE_CONTRACT` tells the model to
+ *     preserve it; suppressing it here deleted the refrain from the English
+ *     stream and left the interpreter delivering one line where the room heard
+ *     three.
  */
 export function addSafeChunks(
   chunks: InterpretationChunk[],
@@ -53,15 +65,14 @@ export function addSafeChunks(
   now: number,
 ): AddSafeResult {
   const base = chunks.filter((c) => c.state !== "anticipated");
-  const recent = base.slice(-DUPLICATE_WINDOW).map((c) => normalise(c.text));
+  const alreadyDelivered = base.slice(-DUPLICATE_WINDOW).map((c) => normalise(c.text));
   const added: InterpretationChunk[] = [];
 
   for (const draft of drafts) {
     const text = draft.text.trim();
     if (!text) continue;
     const key = normalise(text);
-    if (!key || recent.includes(key)) continue;
-    recent.push(key);
+    if (!key || alreadyDelivered.includes(key)) continue;
 
     const chunk: InterpretationChunk = {
       ...draft,

@@ -45,9 +45,15 @@ export function buildLiveUserPrompt(request: InterpretRequest): string {
     const hints: string[] = [];
     if (detected.scripture.length) {
       hints.push(
-        `Scripture detected locally (already normalised — reuse exactly, do not re-derive):\n${detected.scripture
-          .map((s) => `  ${s.koreanRaw ?? ""} → ${s.display}${s.text ? `\n    text (${s.translation}): ${s.text}` : ""}`)
-          .join("\n")}`,
+        `Scripture in play (already normalised — reuse these exact forms, do not re-derive).\n` +
+          `Where verse text is given it is the real translation and you may render it; where it is absent, name the reference and do not recite it:\n${detected.scripture
+            .map(
+              (s) =>
+                `  ${s.koreanRaw ? `${s.koreanRaw} → ` : ""}${s.display}${
+                  s.text ? `\n    text (${s.translation ?? "supplied"}): ${s.text}` : ""
+                }`,
+            )
+            .join("\n")}`,
       );
     }
     if (detected.glossary.length) {
