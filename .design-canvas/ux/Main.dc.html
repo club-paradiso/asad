@@ -1,0 +1,229 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+  <style>
+    :root {
+      --bg:#faf7f2; --bg-raised:#ffffff; --bg-overlay:#f2ede4;
+      --line:#e4ddd1; --line-strong:#cbc2b3;
+      --fg:#12100e; --fg-muted:#4a4540; --fg-dim:#6b655e;
+      --accent:#12100e; --accent-contrast:#faf7f2; --accent-dim:rgba(18,16,14,0.06);
+      --info:#1b2a4a; --ok:#1c7a4f; --warn:#96601a; --danger:#c81e1e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin:0; background:var(--bg); color:var(--fg);
+      font-family:"IBM Plex Sans","Apple SD Gothic Neo","Pretendard","Noto Sans KR",ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    a { color:var(--info); } a:hover { color:var(--fg); }
+    .cap {
+      font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+      font-size:0.6875rem; font-weight:500; letter-spacing:0.02em;
+      text-transform:uppercase; color:var(--fg-dim); font-variant-numeric:tabular-nums;
+    }
+    .disp { font-family:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif; font-weight:700; letter-spacing:-0.032em; }
+    button { font:inherit; cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none;
+      transition:background-color .15s,border-color .15s,color .15s,filter .15s,transform .1s; }
+    button:active { transform:scale(0.985); }
+  </style>
+</helmet>
+
+<div style="min-height:844px; display:flex; flex-direction:column; padding:20px 20px 16px; gap:18px">
+
+  <!-- header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+    <div style="display:flex; align-items:center; gap:10px">
+      <span class="disp" style="font-size:1.05rem">ASAD</span>
+      <span aria-hidden="true" style="width:1px; height:12px; background:var(--line-strong)"></span>
+      <span class="cap">라이브 통역</span>
+    </div>
+    <span class="cap" style="color:var(--fg-dim)">개선안</span>
+  </div>
+
+  <!-- THE resume card -->
+  <div style="border:1px solid var(--line); border-radius:16px; background:var(--bg-raised); box-shadow:0 1px 2px 0 rgba(0,0,0,.05); overflow:hidden">
+    <div style="padding:18px 18px 16px; display:flex; flex-direction:column; gap:14px">
+      <div style="display:flex; flex-direction:column; gap:6px">
+        <span class="cap">지난 세션과 동일하게</span>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+          <span style="font-size:1.0625rem; font-weight:600; letter-spacing:-0.015em">{{summary}}</span>
+        </div>
+        <span style="font-size:0.75rem; line-height:1.4; color:var(--fg-dim)">{{prepLine}}</span>
+      </div>
+
+      <button onClick="{{start}}" style="width:100%; min-height:56px; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+        border-radius:12px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-contrast);
+        font-size:1rem; font-weight:600; box-shadow:0 1px 2px 0 rgba(0,0,0,.05)">
+        <span>{{startLabel}}</span>
+      </button>
+    </div>
+
+    <!-- readiness: one line, opens only when it has to -->
+    <button onClick="{{toggleReady}}" aria-expanded="{{readyOpen}}" style="width:100%; display:flex; align-items:center; gap:10px; padding:13px 18px;
+      background:{{readyBg}}; border:0; border-top:1px solid var(--line); text-align:left; min-height:48px">
+      <span aria-hidden="true" style="width:8px; height:8px; border-radius:50%; flex:none; background:{{readyColour}}"></span>
+      <span style="flex:1 1 auto; font-size:0.8125rem; color:var(--fg-muted)">{{readyLine}}</span>
+      <span style="font-size:0.75rem; color:var(--fg-dim)">{{readyToggleLabel}}</span>
+    </button>
+
+    <sc-if value="{{readyOpen}}" hint-placeholder-val="{{ true }}">
+      <div style="border-top:1px solid var(--line); background:var(--bg-overlay)">
+        <sc-for list="{{rows}}" as="row" hint-placeholder-count="3">
+          <div style="display:flex; gap:10px; padding:11px 18px; border-bottom:1px solid var(--line)">
+            <span aria-hidden="true" style="margin-top:6px; width:6px; height:6px; border-radius:50%; flex:none; background:{{row.colour}}"></span>
+            <div style="min-width:0; display:flex; flex-direction:column; gap:2px">
+              <span class="cap">{{row.label}}</span>
+              <span style="font-size:0.8125rem; color:var(--fg)">{{row.value}}</span>
+              <span style="font-size:0.75rem; line-height:1.45; color:var(--fg-dim)">{{row.detail}}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- settings, folded away -->
+  <div style="border:1px solid var(--line); border-radius:16px; background:var(--bg-raised); box-shadow:0 1px 2px 0 rgba(0,0,0,.05); overflow:hidden">
+    <button onClick="{{toggleSettings}}" aria-expanded="{{settingsOpen}}" style="width:100%; min-height:52px; display:flex; align-items:center; justify-content:space-between;
+      gap:12px; padding:12px 18px; background:transparent; border:0; text-align:left">
+      <span style="font-size:0.875rem; font-weight:500; color:var(--fg)">설정 바꾸기</span>
+      <span style="font-size:0.75rem; color:var(--fg-dim)">{{settingsToggleLabel}}</span>
+    </button>
+
+    <sc-if value="{{settingsOpen}}" hint-placeholder-val="{{ true }}">
+      <div style="border-top:1px solid var(--line); padding:16px 18px; display:flex; flex-direction:column; gap:16px">
+        <sc-for list="{{groups}}" as="group" hint-placeholder-count="3">
+          <div style="display:flex; flex-direction:column; gap:8px">
+            <span class="cap">{{group.label}}</span>
+            <div style="display:flex; border:1px solid var(--line); border-radius:12px; background:var(--bg-overlay); padding:4px; gap:2px">
+              <sc-for list="{{group.options}}" as="opt" hint-placeholder-count="3">
+                <button onClick="{{opt.pick}}" style="flex:1 1 0; min-height:44px; border-radius:8px; border:0; padding:0 10px;
+                  background:{{opt.bg}}; color:{{opt.fg}}; font-size:0.8125rem; font-weight:{{opt.weight}}">
+                  {{opt.label}}
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="flex:1 1 auto"></div>
+
+  <p style="margin:0; border-top:1px solid var(--line); padding-top:14px; font-size:0.75rem; line-height:1.6; color:var(--fg-dim)">
+    통역 중 <strong style="color:var(--fg); font-weight:600">Space</strong> 멈춤 ·
+    <strong style="color:var(--fg); font-weight:600">T</strong> 프롬프터 ·
+    <strong style="color:var(--fg); font-weight:600">K</strong> 한국어 ·
+    <strong style="color:var(--fg); font-weight:600">G</strong> 용어 ·
+    <strong style="color:var(--fg); font-weight:600">+/−</strong> 글자 크기
+  </p>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+const MODE = { sermon: "설교", general: "일반" };
+const LAG  = { fast: "빠름", balanced: "균형", safe: "안전" };
+const SRC  = { webspeech: "브라우저 인식", cloud: "Deepgram", demo: "데모" };
+
+const READY = {
+  webspeech: {
+    level: "limited",
+    line: "시작할 수 있어요 · 확인할 것 1건",
+    rows: [
+      { label: "입력", value: "시스템 기본 마이크", detail: "교회 믹서를 쓰려면 예배 전에 시스템 입력을 먼저 지정해 두세요.", level: "limited" },
+      { label: "인식", value: "브라우저가 인식을 관리합니다", detail: "크롬에서 가장 정확합니다. 사파리는 오래 조용하면 멈출 수 있습니다.", level: "limited" },
+      { label: "AI", value: "Gemini · 45분 예배 감당", detail: "", level: "ready" }
+    ]
+  },
+  cloud: {
+    level: "ready",
+    line: "바로 시작할 수 있어요",
+    rows: [
+      { label: "입력", value: "USB 오디오 인터페이스", detail: "부스 사전 점검 완료 · 12분 전", level: "ready" },
+      { label: "인식", value: "Deepgram 스트리밍", detail: "", level: "ready" },
+      { label: "AI", value: "Gemini · 45분 예배 감당", detail: "", level: "ready" }
+    ]
+  },
+  demo: {
+    level: "ready",
+    line: "녹음된 설교로 연습합니다",
+    rows: [
+      { label: "입력", value: "녹음된 한국어 설교", detail: "마이크를 쓰지 않습니다.", level: "ready" },
+      { label: "인식", value: "녹음에 포함되어 있습니다", detail: "", level: "ready" },
+      { label: "AI", value: "기기 안에서 처리", detail: "네트워크를 쓰지 않습니다.", level: "ready" }
+    ]
+  }
+};
+
+const COLOUR = { ready: "#1c7a4f", limited: "#96601a", blocked: "#c81e1e" };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      mode: "sermon", lag: "balanced", source: "webspeech",
+      readyOpen: false, settingsOpen: false, started: false
+    };
+  }
+
+  group(label, key, entries) {
+    return {
+      label,
+      options: entries.map(([value, text]) => {
+        const on = this.state[key] === value;
+        return {
+          label: text,
+          bg: on ? "#12100e" : "transparent",
+          fg: on ? "#faf7f2" : "#4a4540",
+          weight: on ? "600" : "400",
+          pick: () => this.setState({ [key]: value, started: false })
+        };
+      })
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const ready = READY[s.source];
+    const prep = s.mode === "sermon"
+      ? "준비 시트: 류정길 · 베드로전서 2:9 · 용어 14개"
+      : "준비 시트 없음 — 그대로 시작해도 됩니다";
+
+    return {
+      summary: MODE[s.mode] + " · " + SRC[s.source] + " · " + LAG[s.lag],
+      prepLine: prep,
+      startLabel: s.started
+        ? "시작했습니다 — 콘솔로 이동"
+        : (s.source === "demo" ? "데모 실행" : "통역 시작"),
+      start: () => this.setState({ started: true }),
+
+      readyOpen: s.readyOpen,
+      readyLine: ready.line,
+      readyColour: COLOUR[ready.level],
+      readyBg: s.readyOpen ? "#f2ede4" : "transparent",
+      readyToggleLabel: s.readyOpen ? "접기" : "자세히",
+      toggleReady: () => this.setState({ readyOpen: !s.readyOpen, settingsOpen: false }),
+      rows: ready.rows.map((r) => ({ ...r, colour: COLOUR[r.level] })),
+
+      settingsOpen: s.settingsOpen,
+      settingsToggleLabel: s.settingsOpen ? "접기" : "펼치기",
+      toggleSettings: () => this.setState({ settingsOpen: !s.settingsOpen, readyOpen: false }),
+      groups: [
+        this.group("모드", "mode", [["sermon", "설교"], ["general", "일반"]]),
+        this.group("인식", "source", [["webspeech", "브라우저"], ["cloud", "Deepgram"], ["demo", "데모"]]),
+        this.group("지연", "lag", [["fast", "빠름"], ["balanced", "균형"], ["safe", "안전"]])
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

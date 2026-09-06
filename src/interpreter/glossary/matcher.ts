@@ -75,9 +75,16 @@ export function matchGlossary(
   return matches.sort((a, b) => b.index - a.index);
 }
 
+/** Maximum entries sent to the model — the cap `interpretRequestSchema` allows. */
+export const PROMPT_GLOSSARY_LIMIT = 8;
+
 /**
  * The terms worth showing on the live console: recent matches first, capped,
  * with prep-sheet entries preferred.
+ *
+ * Discourse markers are dropped HERE and only here — an interpreter does not
+ * need to be told that 여러분 means "everyone". See `promptGlossary` for the
+ * model's copy, which keeps them.
  */
 export function liveGlossary(
   recentText: string,
@@ -87,13 +94,32 @@ export function liveGlossary(
 ): GlossaryItem[] {
   return (
     matchGlossary(recentText, mode, extra)
-      // Discourse markers (여러분, 사실은, 그러니까) are useful to the model as
-      // register context but they are noise on the rail — an interpreter does
-      // not need to be told that 여러분 means "everyone".
       .filter((item) => !item.register)
       .slice(0, limit)
       .map(({ index: _index, ...item }) => item)
   );
+}
+
+/**
+ * The terms sent to the interpretation model.
+ *
+ * Same matcher, one deliberate difference: discourse markers stay in. The rail
+ * filter used to run on the model's copy too, so 결론적으로, 예를 들어,
+ * 한편으로는 and 무엇보다 were stripped before the model ever saw them — the
+ * exact words that say which rhetorical move is starting, and therefore which
+ * English frame can be committed to before the Korean predicate lands. They
+ * were being discarded as "noise on the rail", which they are; the rail is not
+ * the only reader.
+ */
+export function promptGlossary(
+  recentText: string,
+  mode: InterpretationMode,
+  extra: GlossaryItem[] = [],
+  limit = PROMPT_GLOSSARY_LIMIT,
+): GlossaryItem[] {
+  return matchGlossary(recentText, mode, extra)
+    .slice(0, limit)
+    .map(({ index: _index, ...item }) => item);
 }
 
 /** Collapse duplicates, keeping the first (highest-priority) occurrence. */

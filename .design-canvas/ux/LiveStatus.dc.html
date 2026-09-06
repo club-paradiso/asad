@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+  <style>
+    :root {
+      --bg:#06080b; --bg-raised:#0d1117; --bg-overlay:#131a22;
+      --line:#1c232c; --line-strong:#2b3541;
+      --fg:#f4f7fa; --fg-muted:#97a2b0; --fg-dim:#5d6874;
+      --accent:#f0b429; --accent-contrast:#141007; --accent-dim:rgba(240,180,41,0.16);
+      --info:#5ec8d8; --info-dim:rgba(94,200,216,0.14); --ok:#4ade80; --warn:#e8853b; --danger:#e8635b;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg);
+      font-family:"IBM Plex Sans","Apple SD Gothic Neo","Pretendard",ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased; }
+    a { color:var(--info); } a:hover { color:var(--fg); }
+    .cap { font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-size:0.6875rem; font-weight:500;
+      letter-spacing:0.02em; text-transform:uppercase; color:var(--fg-dim); }
+    .en { font-size:27px; line-height:1.18; font-weight:500; letter-spacing:-0.011em; text-wrap:pretty; }
+    .ko { font-family:"Apple SD Gothic Neo","Pretendard","Noto Sans KR",ui-sans-serif,system-ui,sans-serif;
+      font-size:14px; line-height:1.38; word-break:keep-all; }
+    button { font:inherit; cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none;
+      transition:background-color .15s,border-color .15s,color .15s; }
+  </style>
+</helmet>
+
+<div style="width:844px; height:446px; display:flex; flex-direction:column">
+<div style="height:390px; display:flex; flex-direction:column; overflow:hidden; border-bottom:1px solid var(--line-strong)">
+
+  <!-- top bar -->
+  <div style="flex:none; height:42px; display:flex; align-items:center; gap:12px; padding:0 14px; border-bottom:1px solid var(--line)">
+    <span aria-hidden="true" style="width:8px; height:8px; border-radius:50%; background:{{healthColour}}; flex:none"></span>
+    <span class="cap">설교 · 균형</span>
+    <span style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; letter-spacing:-0.032em; font-size:0.9375rem; font-variant-numeric:tabular-nums">18:42</span>
+    <span style="flex:1 1 auto"></span>
+
+    <!-- THE change: provenance, not a bare provider name -->
+    <span style="display:inline-flex; align-items:center; gap:6px; border:1px solid {{pillBorder}}; background:{{pillBg}};
+      color:{{pillFg}}; border-radius:8px; padding:5px 9px; font-size:0.75rem; font-weight:600">
+      <span aria-hidden="true" style="width:6px; height:6px; border-radius:50%; background:currentColor"></span>{{pillText}}
+    </span>
+
+  </div>
+
+  <!-- the banner that only exists when it means something -->
+  <sc-if value="{{degraded}}" hint-placeholder-val="{{ true }}">
+    <div style="flex:none; display:flex; align-items:center; gap:10px; padding:9px 14px;
+      background:rgba(232,133,59,0.12); border-bottom:1px solid rgba(232,133,59,0.4)">
+      <span aria-hidden="true" style="width:7px; height:7px; border-radius:50%; background:var(--warn); flex:none"></span>
+      <span style="font-size:0.8125rem; font-weight:600; color:var(--warn)">화면의 영어는 지금 번역이 아닙니다</span>
+      <span style="font-size:0.8125rem; color:var(--fg-muted)">AI 한도 초과 · 성경 구절과 용어는 계속 정확합니다 · 문장은 직접 만드세요</span>
+    </div>
+  </sc-if>
+
+  <div style="flex:1 1 auto; display:flex; min-height:0">
+    <!-- english stream -->
+    <div style="flex:1 1 auto; min-width:0; padding:14px 16px; display:flex; flex-direction:column; gap:10px; overflow:hidden">
+      <sc-for list="{{chunks}}" as="ch" hint-placeholder-count="3">
+        <div style="position:relative; padding-left:14px">
+          <span aria-hidden="true" style="position:absolute; left:0; top:0.28em; bottom:0.28em; width:2px; border-radius:2px; background:{{ch.rule}}"></span>
+          <p class="en" style="margin:0; color:var(--fg); opacity:{{ch.opacity}}">{{ch.text}}</p>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- context rail -->
+    <div style="flex:0 0 226px; border-left:1px solid var(--line); background:var(--bg-raised); padding:12px 14px;
+      display:flex; flex-direction:column; gap:12px; overflow:hidden">
+      <div>
+        <p class="cap" style="margin:0 0 5px">본문 <span style="color:{{railTone}}">{{railBadge}}</span></p>
+        <p style="margin:0; font-size:0.8125rem; font-weight:600; color:var(--info)">1 Peter 2:9</p>
+        <p style="margin:4px 0 0; font-size:0.75rem; line-height:1.5; color:var(--fg-muted)">But you are a chosen race, a royal priesthood…</p>
+      </div>
+      <div style="border-top:1px solid var(--line); padding-top:10px">
+        <p class="cap" style="margin:0 0 6px">용어 <span style="color:{{railTone}}">{{railBadge}}</span></p>
+        <div style="display:flex; flex-wrap:wrap; gap:5px">
+          <span style="border:1px solid var(--line); background:var(--bg-overlay); border-radius:7px; padding:4px 7px; font-size:0.75rem; color:var(--fg-muted)">택하신 족속 → chosen race</span>
+          <span style="border:1px solid var(--line); background:var(--bg-overlay); border-radius:7px; padding:4px 7px; font-size:0.75rem; color:var(--fg-muted)">칭의 → justification</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- korean -->
+  <div style="flex:none; border-top:1px solid var(--line); background:var(--bg-raised); padding:10px 16px; display:flex; gap:10px; align-items:baseline">
+    <span class="cap" style="flex:none">한국어</span>
+    <p class="ko" style="margin:0; color:var(--fg-muted)">
+      너희는 택하신 족속이요 왕 같은 제사장들이라
+      <span style="color:var(--fg-dim)">그러니까 우리가 누구인지를</span>
+    </p>
+  </div>
+</div>
+
+<div style="flex:1 1 auto; display:flex; align-items:center; gap:12px; padding:0 14px; background:var(--bg-overlay)">
+  <span class="cap">프로토타입</span>
+  <button onClick="{{toggle}}" style="min-height:44px; padding:0 16px; border-radius:12px; border:1px solid var(--line-strong);
+    background:transparent; color:var(--fg); font-size:0.8125rem">{{toggleLabel}}</button>
+  <span style="font-size:0.75rem; color:var(--fg-dim)">콘솔 자체는 실제 크기 844×390입니다</span>
+</div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":844,"height":446}}'>
+const HEALTHY = [
+  { text: "You are a chosen people,", state: "committed" },
+  { text: "a royal priesthood.", state: "current" },
+  { text: "so that we would know who we are…", state: "anticipated" }
+];
+
+// What `deterministicOutput` in providers/llm/mock.ts actually emits: a
+// rhetorical frame, the normalised reference, and an honest admission.
+const FALLBACK = [
+  { text: "Today we're going to look at...", state: "committed" },
+  { text: "1 Peter 2:9.", state: "current" },
+  { text: "[no interpretation model — Korean transcript only]", state: "muted" }
+];
+
+const RULE = {
+  committed: "transparent",
+  current: "#f0b429",
+  anticipated: "repeating-linear-gradient(to bottom,#5d6874 0 4px,transparent 4px 8px)",
+  muted: "#e8853b"
+};
+const OPACITY = { committed: "0.52", current: "1", anticipated: "0.78", muted: "0.62" };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { degraded: false };
+  }
+
+  renderVals() {
+    const off = this.state.degraded;
+    const rows = off ? FALLBACK : HEALTHY;
+
+    return {
+      degraded: off,
+      toggle: () => this.setState({ degraded: !off }),
+      toggleLabel: off ? "정상으로" : "폴백 상황 보기",
+
+      healthColour: off ? "#e8853b" : "#4ade80",
+      pillText: off ? "규칙 기반" : "AI 통역 · Gemini",
+      pillFg: off ? "#e8853b" : "#5ec8d8",
+      pillBg: off ? "rgba(232,133,59,0.12)" : "rgba(94,200,216,0.14)",
+      pillBorder: off ? "rgba(232,133,59,0.42)" : "rgba(94,200,216,0.34)",
+
+      chunks: rows.map((c) => ({ text: c.text, rule: RULE[c.state], opacity: OPACITY[c.state] })),
+
+      railBadge: off ? "· 폴백에서도 정확" : "",
+      railTone: "#4ade80"
+    };
+  }
+}
+</script>
+</body>
+</html>

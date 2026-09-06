@@ -30,7 +30,7 @@ import type {
 import { emptyPrepSheet } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
 import { detectScriptureReferences } from "../scripture/detect";
-import { liveGlossary, mergeGlossary } from "../glossary/matcher";
+import { liveGlossary, mergeGlossary, promptGlossary } from "../glossary/matcher";
 import { detectCultural, dedupeNotes } from "../cultural/detect";
 import { buildRollingContext } from "../context/rolling";
 import {
@@ -58,6 +58,7 @@ import {
   restorePending,
   shouldAnticipate,
   touch,
+  type FlushBoundary,
   type StabiliserState,
 } from "./stabiliser";
 
@@ -132,6 +133,12 @@ export class InterpretationEngine {
   private startedAt = 0;
   private inFlight: AbortController | null = null;
   private stopped = false;
+  /**
+   * How the previous unit ended. Anything but `sentence` means the speaker's
+   * thought was still open when the clock forced the call, so the next unit
+   * continues English the interpreter has probably already started saying.
+   */
+  private lastBoundary: FlushBoundary | null = null;
 
   constructor(private readonly options: EngineOptions) {
     this.mode = options.mode;
@@ -156,6 +163,7 @@ export class InterpretationEngine {
   start(): void {
     this.startedAt = this.clock;
     this.stopped = false;
+    this.lastBoundary = null;
     this.stabiliser = { ...emptyStabiliser(), lastEventAt: 0 };
     this.setConnection("connecting");
   }
@@ -277,7 +285,7 @@ export class InterpretationEngine {
   // Interpretation
   // -------------------------------------------------------------------------
 
-  private async flush(reason: NonNullable<ReturnType<typeof flushReason>>): Promise<void> {
+  private async flush(reason: FlushBoundary): Promise<void> {
     const { text: pending, state } = drain(this.stabiliser);
     this.stabiliser = state;
     if (!pending) return;
@@ -302,11 +310,19 @@ export class InterpretationEngine {
       }),
       detected: {
         scripture: detectedScripture,
-        glossary: liveGlossary(pending, this.mode, this.memory.glossary),
+        // The model's copy, not the rail's: discourse markers stay in.
+        glossary: promptGlossary(pending, this.mode, this.memory.glossary),
         culturalNotes: detectCultural(pending, this.memory.entities),
       },
+      boundary: reason,
+      continuesPrevious: this.lastBoundary !== null && this.lastBoundary !== "sentence",
       allowAnticipation,
     };
+
+    // Recorded before the await: a failed turn still cut the Korean where it
+    // cut it, and the unit restored by `restorePending` is the same open
+    // thought the next call has to finish.
+    this.lastBoundary = reason;
 
     const controller = new AbortController();
     this.inFlight = controller;
