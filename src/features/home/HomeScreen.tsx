@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { BRAND } from "@/lib/brand";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { COUNTER_LANGUAGES, findLanguage } from "@/counter/languages";
+import { counterPreferencesStore } from "@/features/counter/preferences";
+import { useLocalStore } from "@/lib/local-store";
+import { BRAND } from "@/lib/brand";
 
 export function HomeScreen() {
   return (
@@ -31,6 +34,8 @@ export function HomeScreen() {
           </section>
 
           <section className="flex min-w-0 flex-col gap-7">
+            <DefaultLanguageSetting />
+
             <div>
               <p className="brand-caption mb-3">지금 할 일</p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -38,14 +43,14 @@ export function HomeScreen() {
                   href="/live"
                   title="라이브 통역"
                   who="한 사람이 말하고, 당신이 옮깁니다"
-                  detail="설교 · 강연 · 회의"
+                  detail="설교 · 강연 · 회의 · 한국어 → 영어"
                   primary
                 />
                 <ModeCard
                   href="/counter"
                   title="현장 응대"
                   who="창구에서 마주 앉아 주고받습니다"
-                  detail="QR · 설치 없음"
+                  detail="선택한 기본 언어 · QR · 설치 없음"
                 />
               </div>
             </div>
@@ -76,6 +81,64 @@ export function HomeScreen() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function DefaultLanguageSetting() {
+  const [preferences, setPreferences] = useLocalStore(counterPreferencesStore);
+  const selected = findLanguage(preferences.hostLang) ?? COUNTER_LANGUAGES[0];
+
+  return (
+    <section
+      aria-labelledby="default-language-label"
+      className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-4 shadow-sm sm:p-5"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+        <div className="min-w-0">
+          <p id="default-language-label" className="brand-caption">
+            기본 언어
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--fg-muted)]">
+            현장 응대에서 직원 언어로 사용합니다.
+          </p>
+        </div>
+
+        <label className="relative block shrink-0 sm:w-56">
+          <span className="sr-only">기본 언어 선택</span>
+          <select
+            value={selected.code}
+            onChange={(event) =>
+              setPreferences({ ...preferences, hostLang: event.target.value })
+            }
+            className="min-h-11 w-full appearance-none rounded-xl border border-[var(--line-strong)] bg-[var(--bg)] py-2.5 pl-3.5 pr-10 text-sm font-semibold text-[var(--fg)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-dim)]"
+          >
+            {COUNTER_LANGUAGES.map((language) => (
+              <option key={language.code} value={language.code}>
+                {language.ko} · {language.endonym}
+              </option>
+            ))}
+          </select>
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            fill="none"
+            className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[var(--fg-dim)]"
+          >
+            <path
+              d="m6.5 8 3.5 3.5L13.5 8"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </label>
+      </div>
+
+      <p className="mt-3 border-t border-[var(--line)] pt-3 text-xs leading-relaxed text-[var(--fg-dim)]">
+        현재 {selected.ko}로 설정됨 · 라이브 통역은 현재 한국어 → 영어 고정
+      </p>
+    </section>
   );
 }
 
