@@ -3,11 +3,12 @@
  *
  * Two jobs:
  *
- *  1. **Demo mode.** When the pending Korean matches a scripted beat, return
- *     that beat's authored interpretation. This is what makes demo mode a real
- *     exercise of the pipeline rather than an animation — the engine, the
- *     stabiliser and the chunk store all run for real, only the network is
- *     absent.
+ *  1. **Demo mode.** When the caller names a script and the pending Korean
+ *     matches one of its beats, return that beat's authored interpretation.
+ *     This is what makes demo mode a real exercise of the pipeline rather than
+ *     an animation — the engine, the stabiliser and the chunk store all run for
+ *     real, only the network is absent. Authored English is reachable ONLY
+ *     through an explicit `scriptId`; a live session must never be shown it.
  *
  *  2. **The no-key path.** With no LLM configured at all, fall back to
  *     rule-based assistance built from the parts that are genuinely
@@ -127,16 +128,26 @@ export function deterministicOutput(
 export interface MockInterpretInput {
   pending: string;
   mode: "sermon" | "general";
-  /** Restrict matching to one script; otherwise every script is searched. */
+  /**
+   * The demo script to match against. Omitting it disables scripted beats
+   * entirely — that is what every live caller does, and it is load-bearing.
+   */
   scriptId?: string;
   allowAnticipation?: boolean;
 }
 
 /** The whole local interpreter, usable from the browser or the server. */
 export function interpretLocally(input: MockInterpretInput): InterpreterOutput {
+  // Scripted beats belong to demo mode and nowhere else. Searching every
+  // script whenever no `scriptId` was supplied made the demo sermon the answer
+  // of first resort on the two paths that never pass one: the browser's
+  // provider-failure fallback and the server's no-key floor. A real preacher
+  // reaching "우리가 오늘 함께 살펴볼 말씀은" was then told, on stage, that the
+  // passage was 1 Peter 2:9 — a Scripture reference nobody had spoken. An
+  // unmatched script is now simply no script.
   const scripts: DemoScript[] = input.scriptId
     ? [DEMO_SCRIPTS[input.scriptId]].filter(Boolean)
-    : Object.values(DEMO_SCRIPTS);
+    : [];
 
   for (const script of scripts) {
     const beats = matchBeats(input.pending, script.beats);

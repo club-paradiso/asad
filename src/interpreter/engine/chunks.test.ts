@@ -162,3 +162,22 @@ describe("long sessions", () => {
     expect(trimmed[trimmed.length - 1].text).toBe(`line ${MAX_CHUNKS_IN_VIEW + 49}`);
   });
 });
+
+describe("deliberate repetition", () => {
+  it("keeps a refrain the model repeats inside one turn", () => {
+    const { chunks } = addSafeChunks(
+      [],
+      [draft("God is faithful."), draft("God is faithful."), draft("God is faithful.")],
+      0,
+    );
+    // The preacher said it three times; the interpreter has to say it three
+    // times. Collapsing it here deletes the rhetoric from the English stream.
+    expect(chunks).toHaveLength(3);
+  });
+
+  it("still drops the same line echoed back on a later turn", () => {
+    let chunks = addSafeChunks([], [draft("God is faithful."), draft("God is faithful.")], 0).chunks;
+    chunks = addSafeChunks(chunks, [draft("God is faithful.")], 900).chunks;
+    expect(chunks).toHaveLength(2);
+  });
+});

@@ -250,4 +250,41 @@ describe("the local floor always answers", () => {
     const english = output.safeChunks.map((c) => c.text).join(" ").toLowerCase();
     expect(english).not.toContain("road in my name");
   });
+
+  /**
+   * The floor is allowed to be thin. It is not allowed to be someone else's
+   * sermon. Without a `scriptId` the local interpreter used to search every
+   * demo script, so a live service that lost its provider mid-sentence was
+   * shown authored demo English — including a Scripture reference the preacher
+   * had not reached yet.
+   */
+  it("never answers a live turn with scripted demo content", () => {
+    const output = interpretLocally({
+      pending: "우리가 오늘 함께 살펴볼 말씀은",
+      mode: "sermon",
+    });
+    const english = output.safeChunks.map((c) => c.text).join(" ");
+    expect(english).not.toContain("1 Peter 2:9");
+    expect(output.bibleReferences ?? []).toHaveLength(0);
+  });
+
+  it("never invents the payload of an unfinished Korean thought", () => {
+    const output = interpretLocally({
+      pending: "제가 오늘 여러분과 함께 나누고 싶은 것은",
+      mode: "sermon",
+    });
+    const english = output.safeChunks.map((c) => c.text).join(" ").toLowerCase();
+    // The scaffold is honest; "who we actually are" was the demo's punchline.
+    expect(english).toContain("today, i'd like to talk with you about...");
+    expect(english).not.toContain("who we actually are");
+  });
+
+  it("still replays a scripted beat when demo mode names the script", () => {
+    const output = interpretLocally({
+      pending: "우리가 오늘 함께 살펴볼 말씀은 베드로전서 2장 9절입니다.",
+      mode: "sermon",
+      scriptId: "demo-1peter-2-9",
+    });
+    expect(output.safeChunks.map((c) => c.text).join(" ")).toContain("1 Peter 2:9.");
+  });
 });

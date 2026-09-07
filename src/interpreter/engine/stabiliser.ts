@@ -14,8 +14,19 @@
  */
 import type { LagConfig } from "./lag";
 
-/** Korean sentence-final endings, plus ordinary terminal punctuation. */
-const SENTENCE_END = /(?:다|요|까|죠|네|군요|습니다|십시오|세요)\s*[.?!。？！]?\s*$|[.?!。？！]\s*$/;
+/**
+ * Korean sentence-final endings, plus ordinary terminal punctuation.
+ *
+ * The single-syllable endings must be ATTACHED to a stem — `[가-힣]` before
+ * them — because a sentence-final ending is a suffix, never a word of its own.
+ * Matching them bare cut mid-phrase on the adverb 다 ("all"): "우리가 살면서
+ * 겪는 모든 일을 우리는 다" ends in 다, is past the trigger length, and was
+ * flushed as a finished thought — handing the model a subject with no
+ * predicate one word before 맡겨야 합니다 arrived. Recognised punctuation is
+ * still a boundary on its own, so "모두 다." stays one.
+ */
+const SENTENCE_END =
+  /(?:습니다|십시오|세요|군요)\s*[.?!。？！]?\s*$|[가-힣](?:다|요|까|죠|네)\s*[.?!。？！]?\s*$|[.?!。？！]\s*$/;
 
 /** Clause boundaries — a usable, if weaker, place to break a thought group. */
 const CLAUSE_END = /(?:고|며|면서|지만|는데|어서|아서|니까|으니|든지|거나)\s*,?\s*$/;
@@ -75,7 +86,10 @@ export const touch = (state: StabiliserState, now: number): StabiliserState => (
   lastEventAt: now,
 });
 
-export type FlushReason = "sentence" | "quiet" | "timeout" | "clause" | null;
+/** A boundary the engine actually acted on. */
+export type FlushBoundary = "sentence" | "quiet" | "timeout" | "clause";
+
+export type FlushReason = FlushBoundary | null;
 
 /**
  * Decide whether the pending Korean should be interpreted now.

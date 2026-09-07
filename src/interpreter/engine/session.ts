@@ -30,7 +30,7 @@ import type {
 import { emptyPrepSheet } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
 import { detectScriptureReferences } from "../scripture/detect";
-import { liveGlossary, mergeGlossary } from "../glossary/matcher";
+import { liveGlossary, mergeGlossary, promptGlossary } from "../glossary/matcher";
 import { detectCultural, dedupeNotes } from "../cultural/detect";
 import { buildRollingContext } from "../context/rolling";
 import {
@@ -58,6 +58,7 @@ import {
   restorePending,
   shouldAnticipate,
   touch,
+  type FlushBoundary,
   type StabiliserState,
 } from "./stabiliser";
 
@@ -98,6 +99,13 @@ export interface EngineOptions {
   now?: () => number;
 }
 
+/**
+ * How many Scripture hints one turn may carry. Matches the cap in
+ * `interpretRequestSchema.detected.scripture`, so a hint is never silently
+ * rejected by the API's own validation.
+ */
+const SCRIPTURE_HINT_LIMIT = 4;
+
 let segmentCounter = 0;
 const nextSegmentId = () => `s${(segmentCounter += 1).toString(36)}`;
 /** Test seam. */
@@ -125,6 +133,12 @@ export class InterpretationEngine {
   private startedAt = 0;
   private inFlight: AbortController | null = null;
   private stopped = false;
+  /**
+   * How the previous unit ended. Anything but `sentence` means the speaker's
+   * thought was still open when the clock forced the call, so the next unit
+   * continues English the interpreter has probably already started saying.
+   */
+  private lastBoundary: FlushBoundary | null = null;
 
   constructor(private readonly options: EngineOptions) {
     this.mode = options.mode;
@@ -149,6 +163,7 @@ export class InterpretationEngine {
   start(): void {
     this.startedAt = this.clock;
     this.stopped = false;
+    this.lastBoundary = null;
     this.stabiliser = { ...emptyStabiliser(), lastEventAt: 0 };
     this.setConnection("connecting");
   }
@@ -270,7 +285,7 @@ export class InterpretationEngine {
   // Interpretation
   // -------------------------------------------------------------------------
 
-  private async flush(reason: NonNullable<ReturnType<typeof flushReason>>): Promise<void> {
+  private async flush(reason: FlushBoundary): Promise<void> {
     const { text: pending, state } = drain(this.stabiliser);
     this.stabiliser = state;
     if (!pending) return;
@@ -279,9 +294,7 @@ export class InterpretationEngine {
     const partial = this.partial?.text ?? "";
     const allowAnticipation = shouldAnticipate(config, reason, partial);
 
-    const detectedScripture = detectScriptureReferences(pending).map(
-      ({ index: _index, ...ref }) => ref,
-    );
+    const detectedScripture = this.scriptureHints(pending);
 
     const request: InterpretRequest = {
       mode: this.mode,
@@ -297,11 +310,19 @@ export class InterpretationEngine {
       }),
       detected: {
         scripture: detectedScripture,
-        glossary: liveGlossary(pending, this.mode, this.memory.glossary),
+        // The model's copy, not the rail's: discourse markers stay in.
+        glossary: promptGlossary(pending, this.mode, this.memory.glossary),
         culturalNotes: detectCultural(pending, this.memory.entities),
       },
+      boundary: reason,
+      continuesPrevious: this.lastBoundary !== null && this.lastBoundary !== "sentence",
       allowAnticipation,
     };
+
+    // Recorded before the await: a failed turn still cut the Korean where it
+    // cut it, and the unit restored by `restorePending` is the same open
+    // thought the next call has to finish.
+    this.lastBoundary = reason;
 
     const controller = new AbortController();
     this.inFlight = controller;
@@ -374,6 +395,45 @@ export class InterpretationEngine {
     if (terms.length) {
       this.memory = rememberKnowledge(this.memory, { glossary: terms });
     }
+  }
+
+  /**
+   * Scripture hints for one interpretation turn.
+   *
+   * Two things the model needs and previously never received:
+   *
+   *  1. **Verse text for a reference detected in this segment.** The prompt
+   *     renders `text` and `SERMON_DELTA` says "Reference only, never wording,
+   *     unless the verse text was supplied to you" — but the request was built
+   *     from a fresh `detectScriptureReferences` call, which never carries
+   *     text. The branch was unreachable, so a verse resolved through
+   *     `/api/bible` sat on the interpreter's screen while the model was still
+   *     forbidden to render it.
+   *
+   *  2. **The passage currently being read.** A preacher names the reference
+   *     once and then reads the verse; from the next segment on, nothing in the
+   *     Korean matches the detector, and the hint disappeared exactly when it
+   *     became useful. The most recently resolved passage is carried forward.
+   *
+   * Only one passage is carried. Verse text is not free — this runs ~11 times
+   * a minute for the length of a service — and the passage in play is the one
+   * being read.
+   */
+  private scriptureHints(pending: string): BibleReference[] {
+    const detected = detectScriptureReferences(pending).map(({ index: _index, ...ref }) => ref);
+
+    const withText = detected.map((ref) => {
+      const resolved = this.scripture.find((r) => r.display === ref.display && r.text);
+      return resolved
+        ? { ...ref, text: resolved.text, translation: resolved.translation }
+        : ref;
+    });
+
+    const carried = this.scripture
+      .filter((r) => r.text && !withText.some((d) => d.display === r.display))
+      .slice(-1);
+
+    return [...withText, ...carried].slice(0, SCRIPTURE_HINT_LIMIT);
   }
 
   private absorbScripture(refs: BibleReference[]): void {

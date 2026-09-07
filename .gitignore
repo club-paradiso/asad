@@ -21,4 +21,8 @@ yarn-error.log*
 # The seeded canvas is a build output of .design-canvas/*.dc.html — it embeds a
 # ~2MB editor payload and is republished from source, never edited in place.
 .design-canvas/*.html
+.design-canvas/**/*.html
 !.design-canvas/*.dc.html
+!.design-canvas/**/*.dc.html
+# Seeded canvases are written to the repo root before publishing.
+/asad-*.html

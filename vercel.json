@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "github": {
+    "silent": true
+  },
   "env": {
     "STT_PROVIDER": "webspeech",
     "LLM_ROUTING_MODE": "reliable",
