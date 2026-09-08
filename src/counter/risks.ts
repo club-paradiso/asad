@@ -9,7 +9,19 @@
  * So these are detected in the TRANSLATED text and surfaced for read-back,
  * rather than trusted. Deterministic and local — no model call, no latency.
  */
+import { isResidenceStatusCode } from "./domain-vocabulary";
 import type { RiskSpan } from "./types";
+
+/**
+ * Residence status codes, checked against the real list rather than a shape.
+ *
+ * "E-7" is worth reading back — it decides which visa someone is applying to
+ * change to. "A-4" is a paper size, so it is not in the list and does not get
+ * highlighted; a confirm prompt that fires on paper sizes teaches people to
+ * ignore confirm prompts.
+ */
+const STATUS_CODE_RE =
+  /(?<![A-Za-z0-9])([A-Ha-h])[-\u2010\u2011\u2012\u2013\u2014]?(10|[1-9])(?![A-Za-z0-9])/gu;
 
 /** Ordered most-specific first; earlier patterns claim their characters. */
 const PATTERNS: Array<{ kind: RiskSpan["kind"]; re: RegExp }> = [
@@ -62,6 +74,17 @@ export function detectRisks(text: string): RiskSpan[] {
     for (let i = start; i < end; i += 1) claimed[i] = true;
     return true;
   };
+
+  // Before the number patterns, which would otherwise claim the digit and
+  // leave the letter — highlighting "7" instead of "E-7".
+  STATUS_CODE_RE.lastIndex = 0;
+  let statusMatch: RegExpExecArray | null;
+  while ((statusMatch = STATUS_CODE_RE.exec(text)) !== null) {
+    if (!isResidenceStatusCode(statusMatch[1], statusMatch[2])) continue;
+    if (claim(statusMatch.index, statusMatch.index + statusMatch[0].length)) {
+      out.push({ text: statusMatch[0], kind: "status-code" });
+    }
+  }
 
   for (const { kind, re } of PATTERNS) {
     re.lastIndex = 0;

@@ -1,17 +1,32 @@
 "use client";
 
 /** React binding for the one-utterance Counter speech controller. */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCapability } from "@/hooks/useCapability";
-import { ensureMicrophonePermission, prefetchSttCredentials } from "@/providers/stt";
+import {
+  counterVoiceOffered,
+  ensureMicrophonePermission,
+  prefetchSttCredentials,
+} from "@/providers/stt";
+import type { CounterProfileId } from "@/counter/profiles";
 import {
   CounterSpeechController,
   type CounterVoiceFailure,
   type CounterVoicePhase,
 } from "./counter-speech";
 
-export function useVoiceInput(lang: string, counterCode?: string, counterToken?: string) {
-  const supported = useCapability(() => CounterSpeechController.isPotentiallyAvailable());
+export function useVoiceInput(
+  lang: string,
+  counterCode?: string,
+  counterToken?: string,
+  profileId?: CounterProfileId,
+) {
+  const deviceCanListen = useCapability(() => CounterSpeechController.isPotentiallyAvailable());
+  // Decided from the capability table, not from a failed attempt. A language
+  // no recogniser covers should never be offered a microphone in the first
+  // place — the visitor would tap it, watch it fail, and learn nothing.
+  const languageCanBeHeard = useMemo(() => counterVoiceOffered(lang), [lang]);
+  const supported = deviceCanListen && languageCanBeHeard;
   const [phase, setPhase] = useState<CounterVoicePhase>("idle");
   const [partial, setPartial] = useState("");
   const [failure, setFailure] = useState<CounterVoiceFailure | null>(null);
@@ -22,12 +37,17 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
   const lastPartial = useRef("");
 
   const prewarm = useCallback(() => {
-    if (!counterCode || !counterToken) return;
+    if (!counterCode || !counterToken || !languageCanBeHeard) return;
     void prefetchSttCredentials(lang, { code: counterCode, token: counterToken });
-  }, [counterCode, counterToken, lang]);
+  }, [counterCode, counterToken, lang, languageCanBeHeard]);
 
   const start = useCallback(async (): Promise<string> => {
     if (controller.current || preparing.current) return "";
+    if (!languageCanBeHeard) {
+      setFailure("unsupported-language");
+      setPhase("unavailable");
+      return "";
+    }
     preparing.current = true;
     cancelledWhilePreparing.current = false;
     setFailure(null);
@@ -69,6 +89,7 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
         undefined,
         counterCode,
         counterToken,
+        { profileId },
       );
       controller.current = next;
 
@@ -100,7 +121,7 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
       // the conservative short window in the STT module.
       prewarm();
     }
-  }, [counterCode, counterToken, lang, prewarm]);
+  }, [counterCode, counterToken, lang, languageCanBeHeard, prewarm, profileId]);
 
   const stop = useCallback(() => {
     if (controller.current) {
@@ -126,6 +147,8 @@ export function useVoiceInput(lang: string, counterCode?: string, counterToken?:
 
   return {
     supported: supported && phase !== "unavailable",
+    /** True when the language itself has no recogniser, not the device. */
+    languageUnsupported: deviceCanListen && !languageCanBeHeard,
     phase,
     /** True only once the recogniser really is ready to hear speech. */
     listening: phase === "listening",

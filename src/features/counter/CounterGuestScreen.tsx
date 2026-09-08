@@ -200,6 +200,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
         busy={session.sending}
         counterCode={code}
         counterToken={participantToken}
+        profileId={view?.profileId}
         onSend={(text, source) => session.send({ text, source })}
       />
     </div>
@@ -344,6 +345,11 @@ function LanguagePicker({
       <div
         className="sticky bottom-0 mt-auto bg-[var(--bg)] pt-3"
         style={{ paddingBottom: "calc(0.75rem + var(--safe-bottom))" }}
+        // Everything below the grid is written in the language the visitor has
+        // highlighted, so it takes that language's direction rather than the
+        // page's — otherwise a right-to-left hint hangs its punctuation and its
+        // warning icon off the wrong end.
+        dir={findLanguage(selected)?.rtl ? "rtl" : "ltr"}
       >
         <p className="mb-2 text-center text-xs text-[var(--fg-dim)]">
           {t.pickLanguageHint}

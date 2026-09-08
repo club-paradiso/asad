@@ -52,8 +52,26 @@ export class DeepgramSpeechProvider extends SocketSpeechProvider {
       encoding: "linear16",
       sample_rate: "16000",
       channels: "1",
-      // Keeps the socket alive through the quiet parts of a service.
-      endpointing: "300",
+      // Endpointing is the silence, in milliseconds, after which Deepgram calls
+      // a segment final.
+      //
+      // A live service is continuous speech, and 300 ms keeps the socket
+      // responsive through its quiet parts. One turn at a counter is nothing
+      // like that. "uh… extension… my visa… May thirty one" is normal there,
+      // and at 300 ms every one of those pauses closes a segment, so a single
+      // sentence arrives as four fragments and smart-formatting never sees the
+      // whole thing — which is exactly where dates and status codes get
+      // mangled. The visitor can always end the turn instantly by tapping
+      // stop, so waiting longer for silence costs them nothing.
+      endpointing: this.options.utterance ? "1000" : "300",
+      ...(this.options.utterance
+        ? {
+            // An explicit "they have stopped talking" signal, computed from
+            // word timings rather than guessed from a client-side timer.
+            utterance_end_ms: "1800",
+            vad_events: "true",
+          }
+        : {}),
     });
 
     // Terminology hints from the prep sheet materially help proper nouns.
@@ -73,6 +91,15 @@ export class DeepgramSpeechProvider extends SocketSpeechProvider {
   protected handleMessage(data: unknown): void {
     const message = data as DeepgramMessage;
     if (message?.type === "Metadata" || message?.type === "SpeechStarted") return;
+
+    // Deepgram's own end-of-utterance verdict, which it derives from the gap
+    // between word timings. In one-utterance mode that is a better answer than
+    // any silence timer this side of the socket could compute, so surface it
+    // as a close and let the controller finalise with what it already has.
+    if (message?.type === "UtteranceEnd") {
+      if (this.options.utterance) this.emitStatus("closed", "utterance-end");
+      return;
+    }
 
     const transcript = message?.channel?.alternatives?.[0]?.transcript?.trim();
     if (!transcript) return;

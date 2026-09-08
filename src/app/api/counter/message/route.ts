@@ -230,6 +230,7 @@ export async function POST(request: Request) {
     targetLang,
     recent,
     inputMode: source === "voice" ? "voice" : "text",
+    from,
     rephrase: !!rephraseOf,
     action,
     deskLabel: session.deskLabel,

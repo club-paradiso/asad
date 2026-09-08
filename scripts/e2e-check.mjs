@@ -351,8 +351,161 @@ check(
 
 await guest.screenshot({ path: join(outDir, "counter-guest-conversation.png") });
 
-// End from the host and ensure the visitor receives the end state.
+// --- UI regression: a phone, a right-to-left script, and no recogniser -----
+//
+// Uyghur is the hardest case the interface has: right-to-left, no speech
+// recogniser anywhere in the stack, and administrative codes that are
+// left-to-right inside a right-to-left sentence. If the layout survives this
+// it survives the rest.
+// A fresh context: the host screen restores its last session from storage, so
+// reusing the first one would never show the join screen again.
+const rtlContext = await browser.newContext({
+  viewport: { width: 1440, height: 900 },
+  colorScheme: "dark",
+});
+const rtlHost = await rtlContext.newPage();
+const rtlGuest = await rtlContext.newPage();
+for (const [label, target] of [["rtl host", rtlHost], ["rtl guest", rtlGuest]]) {
+  target.on("pageerror", (error) => pageProblems.push(`${label} exception: ${error.message}`));
+  target.on("console", (message) => {
+    if (message.type() !== "error" || expectedAfterEnd(message.text())) return;
+    pageProblems.push(`${label} console: ${message.text()}`);
+  });
+}
+
+await rtlHost.goto(`${base}/counter`, { waitUntil: "networkidle" });
+await rtlHost.getByRole("button", { name: "QR 코드 띄우기" }).click();
+await rtlHost.waitForTimeout(1500);
+const rtlCode = (await rtlHost.locator("body").innerText()).match(/AS-([A-Z0-9]{4})/)?.[1];
+
+// An iPhone 12/13/14 viewport, which is what actually gets handed across a desk.
+await rtlGuest.setViewportSize({ width: 390, height: 844 });
+await rtlGuest.goto(`${base}/c/${rtlCode}`, { waitUntil: "networkidle" });
+check(
+  "the picker offers Uyghur in its own script",
+  /ئۇيغۇرچە/.test(await rtlGuest.locator("body").innerText()),
+);
+
+await rtlGuest.getByRole("button", { name: "ئۇيغۇرچە", exact: true }).click();
+// Voice preparation must not be offered for a language nothing can transcribe:
+// it asks for a permission that can never be spent.
+check(
+  "no microphone permission is asked for a typed-only language",
+  (await rtlGuest.getByRole("button", { name: /🎙|Prepare voice input/ }).count()) === 0,
+);
+await rtlGuest.screenshot({ path: join(outDir, "counter-uyghur-picker.png") });
+
+await rtlGuest.locator("button").filter({ hasText: "باشلاش" }).first().click();
+await rtlGuest.waitForTimeout(2500);
+
+const rtlRoot = rtlGuest.locator("div[dir='rtl']").first();
+check("the visitor's screen flips to right-to-left", (await rtlRoot.count()) > 0);
+check(
+  "no microphone button is offered when nothing can transcribe the language",
+  (await rtlGuest.getByRole("button", { name: "سۆزلەش", exact: true }).count()) === 0,
+);
+check(
+  "typing is presented as the normal path instead",
+  (await rtlGuest.getByPlaceholder("ئۇچۇرىڭىزنى كىرگۈزۈڭ").count()) === 1,
+);
+
+// A quick phrase needs no model, so this works on a CI runner with no keys and
+// still produces a real bilingual bubble.
+await rtlHost.waitForTimeout(2000);
+await rtlHost.getByRole("button", { name: /자주 쓰는 문구/ }).click();
+await rtlHost.getByRole("button", { name: "안녕하세요. 무엇을 도와드릴까요?" }).click();
+await rtlGuest.waitForTimeout(2500);
+check(
+  "the visitor reads Uyghur, not Arabic and not English",
+  /ياردەم/.test(await rtlGuest.locator("body").innerText()),
+);
+
+// The bidi case. A message whose Latin codes are not isolated renders
+// "D-10 to D-2" — both codes correct, the sentence reversed.
+await rtlGuest.route("**/api/counter/message", async (route) => {
+  const body = route.request().postDataJSON();
+  if (route.request().method() !== "POST" || body?.source !== "text") {
+    await route.continue();
+    return;
+  }
+  await route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      message: {
+        id: "e2e-rtl",
+        seq: 90,
+        from: "guest",
+        source: "text",
+        originalText: body.text,
+        originalLang: "ug-CN",
+        translatedText: "D-2에서 D-10으로 변경하고 싶습니다. HiKorea 예약, 2026-05-31.",
+        targetLang: "ko-KR",
+        at: Date.now(),
+        status: "done",
+        confidence: "high",
+      },
+      viaModel: true,
+      provider: "e2e",
+      latencyMs: 0,
+    }),
+  });
+});
+
+await rtlGuest
+  .getByPlaceholder("ئۇچۇرىڭىزنى كىرگۈزۈڭ")
+  .fill("مەن D-2 دىن D-10 غا ئۆزگەرتىمەن، HiKorea، 2026-05-31");
+await rtlGuest.getByRole("button", { name: "ئەۋەتىش", exact: true }).click();
+await rtlGuest.waitForTimeout(1800);
+
+const isolated = await rtlGuest.locator("bdi[dir='ltr']").allInnerTexts();
+check(
+  "administrative codes are isolated so they cannot reorder",
+  isolated.includes("D-2") && isolated.includes("D-10") && isolated.includes("HiKorea"),
+  isolated.join(" | "),
+);
+check(
+  "the isolated codes still read in their original order",
+  isolated.indexOf("D-2") < isolated.indexOf("D-10"),
+);
+
+const overflow = await rtlGuest.evaluate(() => ({
+  scroll: document.documentElement.scrollWidth,
+  client: document.documentElement.clientWidth,
+}));
+check(
+  "nothing overflows the phone viewport sideways",
+  overflow.scroll <= overflow.client + 1,
+  `${overflow.scroll} vs ${overflow.client}`,
+);
+
+const sendBox = await rtlGuest.getByRole("button", { name: "ئەۋەتىش", exact: true }).boundingBox();
+check(
+  "Send stays on screen and is big enough to hit",
+  !!sendBox && sendBox.y + sendBox.height <= 844 && sendBox.height >= 44,
+  sendBox ? `y=${Math.round(sendBox.y)} h=${Math.round(sendBox.height)}` : "missing",
+);
+await rtlGuest.screenshot({ path: join(outDir, "counter-uyghur-conversation.png") });
+
+// The same screen on a desktop viewport, to catch a fix that only works small.
+await rtlGuest.setViewportSize({ width: 1440, height: 900 });
+await rtlGuest.waitForTimeout(400);
+const desktopOverflow = await rtlGuest.evaluate(
+  () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+);
+check("the right-to-left layout holds on a desktop viewport too", desktopOverflow);
+await rtlGuest.screenshot({ path: join(outDir, "counter-uyghur-desktop.png") });
+
+// The visitor's in-flight poll will 404 against the session the host just
+// deleted, which is the intended behaviour, not a page error.
 sessionEnded = true;
+await rtlHost.getByRole("button", { name: "종료" }).click();
+await rtlGuest.waitForTimeout(1200);
+await rtlHost.close();
+await rtlGuest.close();
+await rtlContext.close();
+
+// End from the host and ensure the visitor receives the end state.
 await host.getByRole("button", { name: "종료" }).click();
 await guest.waitForTimeout(2600);
 

@@ -11,7 +11,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const replace = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
 
-vi.mock("@/providers/stt", () => ({
+// Spread the real module and override only what touches `navigator`. A
+// hand-listed factory breaks the moment a component imports one more thing
+// from this module, which is a test failure that says nothing about the
+// behaviour under test.
+vi.mock("@/providers/stt", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/providers/stt")>()),
   prefetchSttCredentials: vi.fn(async () => {}),
   getMicrophonePermissionState: vi.fn(async () => "prompt"),
   ensureMicrophonePermission: vi.fn(async () => "granted"),
@@ -20,8 +25,10 @@ vi.mock("@/providers/stt", () => ({
 vi.mock("./useVoiceInput", () => ({
   useVoiceInput: () => ({
     supported: false,
+    languageUnsupported: false,
     phase: "unavailable",
     listening: false,
+    active: false,
     partial: "",
     failure: null,
     usedFallback: false,

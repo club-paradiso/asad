@@ -154,6 +154,12 @@ const COPY: Record<string, CounterSessionEndCopy> = {
     endedDetail: "Bu sayfa otomatik olarak kapanacaktır. Açık kalırsa güvenle kapatabilirsiniz.",
     closing: "Görüşme bitiriliyor…",
   },
+  "ug-CN": {
+    endAction: "سۆزلىشىشنى ئاخىرلاشتۇرۇش",
+    endedTitle: "سۆزلىشىش ئاخىرلاشتى",
+    endedDetail: "بۇ بەت ئۆزلۈكىدىن تاقىلىدۇ. ئېچىلىپ قالسا خاتىرجەم تاقىۋەتسىڭىز بولىدۇ.",
+    closing: "سۆزلىشىش ئاخىرلىشىۋاتىدۇ…",
+  },
 };
 
 export function sessionEndCopy(language: string | null | undefined): CounterSessionEndCopy {

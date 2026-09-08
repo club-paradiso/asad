@@ -15,6 +15,7 @@ import { useEffect, useRef } from "react";
 import type { CounterMessage, Participant, RiskSpan } from "@/counter/types";
 import { findLanguage } from "@/counter/languages";
 import { actionStringsFor, stringsFor, type CounterStrings } from "@/counter/ui-strings";
+import { BidiText } from "@/lib/bidi";
 import { cn } from "@/lib/cn";
 
 /** Highlight the spans worth reading back, without mangling the text. */
@@ -22,8 +23,9 @@ function withRisksHighlighted(
   text: string,
   risks: RiskSpan[] | undefined,
   checkLabel: string,
+  rtl: boolean,
 ) {
-  if (!risks?.length) return text;
+  if (!risks?.length) return <BidiText text={text} rtl={rtl} />;
 
   // Longest first so a date containing a number is not split by it.
   const ordered = [...risks].sort((a, b) => b.text.length - a.text.length);
@@ -50,14 +52,18 @@ function withRisksHighlighted(
     .filter((node) => node !== "")
     .map((node, index) =>
       typeof node === "string" ? (
-        <span key={index}>{node}</span>
+        <span key={index}>
+          <BidiText text={node} rtl={rtl} />
+        </span>
       ) : (
         <mark
           key={index}
           title={checkLabel}
           className="rounded bg-[var(--accent-dim)] px-1 font-semibold text-[var(--accent)] decoration-clone"
         >
-          {node.text}
+          {/* A highlighted span is very often exactly the thing that reorders:
+              a status code, a date, an office number. */}
+          <BidiText text={node.text} rtl={rtl} />
         </mark>
       ),
     );
@@ -117,6 +123,11 @@ export function ConversationView({
           const primaryLang = mine ? message.originalLang : message.targetLang;
           const secondaryLang = mine ? message.targetLang : message.originalLang;
           const failed = message.status === "failed";
+          // The direction each half is actually rendered in, which is what
+          // decides whether its Latin runs need isolating.
+          const primaryRtl = findLanguage(primaryLang)?.rtl ?? false;
+          const secondaryRtl = findLanguage(secondaryLang)?.rtl ?? false;
+          const originalRtl = findLanguage(message.originalLang)?.rtl ?? false;
 
           return (
             <div
@@ -131,14 +142,19 @@ export function ConversationView({
                     : "border-[var(--line)] bg-[var(--bg-raised)]",
                   failed && "border-[color-mix(in_srgb,var(--danger)_50%,transparent)]",
                 )}
-                dir={findLanguage(primaryLang)?.rtl ? "rtl" : rtl ? "ltr" : undefined}
+                dir={
+                  (failed ? originalRtl : primaryRtl) ? "rtl" : rtl ? "ltr" : undefined
+                }
               >
                 {failed ? (
                   <>
                     <p className="text-base leading-snug text-[var(--fg)]">
-                      {message.originalText}
+                      <BidiText text={message.originalText} rtl={originalRtl} />
                     </p>
-                    <p className="mt-1.5 text-xs leading-relaxed text-[var(--danger)]">
+                    <p
+                      className="mt-1.5 text-xs leading-relaxed text-[var(--danger)]"
+                      dir={rtl ? "rtl" : "ltr"}
+                    >
                       {t.translationFailed}.
                     </p>
                   </>
@@ -150,25 +166,34 @@ export function ConversationView({
                         primary,
                         mine ? undefined : message.risks,
                         t.checkThis,
+                        primaryRtl,
                       )}
                     </p>
 
                     {/* Secondary: always present, so either party can spot an error. */}
                     <p
                       className="mt-1.5 border-t border-[var(--line)] pt-1.5 text-sm leading-snug text-[var(--fg-muted)]"
-                      dir={findLanguage(secondaryLang)?.rtl ? "rtl" : undefined}
+                      // Explicit, never inherited. The bubble carries the
+                      // PRIMARY language's direction, so an undefined dir here
+                      // rendered a Korean line right-to-left inside an Uyghur
+                      // bubble and moved its full stop to the wrong end.
+                      dir={secondaryRtl ? "rtl" : "ltr"}
                     >
                       {withRisksHighlighted(
                         secondary,
                         mine ? message.risks : undefined,
                         t.checkThis,
+                        secondaryRtl,
                       )}
                     </p>
                   </>
                 )}
 
                 {message.integrity?.status === "mismatch" && (
-                  <div className="mt-2 rounded-lg border border-[color-mix(in_srgb,var(--warn)_45%,transparent)] bg-[color-mix(in_srgb,var(--warn)_8%,transparent)] p-2 text-xs leading-relaxed text-[var(--warn)]">
+                  <div
+                    dir={rtl ? "rtl" : "ltr"}
+                    className="mt-2 rounded-lg border border-[color-mix(in_srgb,var(--warn)_45%,transparent)] bg-[color-mix(in_srgb,var(--warn)_8%,transparent)] p-2 text-xs leading-relaxed text-[var(--warn)]"
+                  >
                     <p>{actions.integrityWarning}</p>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {message.integrity.issues.slice(0, 4).map((issue, index) => (
@@ -187,6 +212,7 @@ export function ConversationView({
                 {viewerRole === "host" && message.reviewFlags?.length ? (
                   <div
                     role="alert"
+                    dir="ltr"
                     className="mt-2 rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_7%,transparent)] p-2 text-xs leading-relaxed text-[var(--danger)]"
                   >
                     <p className="font-semibold">직원 확인 필요</p>
@@ -202,7 +228,10 @@ export function ConversationView({
                 ) : null}
 
                 {/* Metadata row: only what is actionable. */}
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-[var(--fg-dim)]">
+                <div
+                  dir={rtl ? "rtl" : "ltr"}
+                  className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-[var(--fg-dim)]"
+                >
                   {message.source === "quick-phrase" && (
                     <span className="text-[var(--ok)]">{t.fixedPhrase}</span>
                   )}

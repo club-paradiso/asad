@@ -193,6 +193,16 @@ const COPY: Record<string, VoiceReadinessStrings> = {
     denied: "Mikrofon erişimi engellenmiş. Metin girişi kullanılmaya devam edebilir.",
     unavailable: "Bu cihazda sesli giriş kullanılamıyor. Metin girişi kullanılmaya devam edebilir.",
   },
+  // Uyghur. The readiness card is hidden for languages with no recogniser, so
+  // this exists for the denied/unavailable notices and for completeness.
+  ug: {
+    prepare: "ئاۋازلىق كىرگۈزۈشنى تەييارلاش",
+    preparing: "مىكروفون ئىجازىتى سۈرۈشتۈرۈلۈۋاتىدۇ…",
+    ready: "ئاۋازلىق كىرگۈزۈش تەييار",
+    hint: "ئىختىيارىي. ھازىر مىكروفونغا ئىجازەت بەرسىڭىز كېيىن دەرھال سۆزلىيەلەيسىز.",
+    denied: "مىكروفون ئىجازىتى چەكلەنگەن. تېكىست كىرگۈزۈشنى داۋاملىق ئىشلىتەلەيسىز.",
+    unavailable: "بۇ ئۈسكۈنىدە ئاۋازلىق كىرگۈزۈشنى ئىشلەتكىلى بولمايدۇ. تېكىست كىرگۈزۈشنى داۋاملىق ئىشلىتەلەيسىز.",
+  },
 };
 
 export function voiceReadinessStringsFor(language: string): VoiceReadinessStrings {

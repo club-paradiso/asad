@@ -126,13 +126,31 @@ turn up most often at a Korean desk (Uzbek, Mongolian, Khmer, Burmese) have no
 reliable browser speech recognition, so for those visitors typing *is* the
 path, and it is given equal weight in the layout.
 
-**Interface language.** 24 languages are offered; the interface chrome itself —
-the buttons, the states, the privacy notice — is translated into 17. Beyond
-those it falls back to English, never to Korean: a visitor at a Korean counter
-is likelier to manage some English, and the language picker is in endonyms
-regardless. `/diagnostics` lists per-language what is translated, what quick
-phrase coverage exists and whether speech input works, so the gaps are stated
-rather than averaged into a marketing number.
+**Interface language.** 25 languages are offered, and the interface chrome —
+the buttons, the states, the privacy notice — is now translated into all of
+them. It used to cover 17, so seven languages a visitor could *choose* from the
+picker then handed them an English interface, which is the one thing at a
+counter they cannot ask about. Anything outside the list falls back to English,
+never to Korean: a visitor at a Korean counter is likelier to manage some
+English, and the picker is in endonyms regardless. `/diagnostics` lists
+per-language what is translated, what quick phrase coverage exists and whether
+speech input works, so the gaps are stated rather than averaged into a
+marketing number.
+
+**Speech capability is declared, not discovered.**
+`src/providers/stt/capability.ts` records, per provider and per language,
+whether that recogniser is `native`, `experimental`, `fallback-only` or
+`unsupported`. Counter Mode consults it before opening anything, so a language
+a vendor cannot serve no longer costs a credential request and a full
+connection timeout before falling back — which was happening on every turn, for
+exactly the lower-resource languages least able to afford the wait.
+
+**Uyghur is typed-only, and says so.** No recogniser in the configured stack
+transcribes Uyghur, so no microphone is offered for it and no microphone
+permission is requested. It is written in the Perso-Arabic script but is not
+Arabic, and it is Turkic but is neither Uzbek nor Turkish; the tag normaliser,
+the capability table and the translation prompt each block those three
+mis-routings independently.
 
 ---
 

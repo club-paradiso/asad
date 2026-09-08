@@ -24,6 +24,15 @@ export {
   type MicrophonePermissionReadiness,
   type MicrophonePermissionState,
 } from "./microphone-permission";
+export {
+  cloudSttCandidates,
+  counterSpeechPlan,
+  counterVoiceOffered,
+  counterVoiceSupport,
+  sttLanguageSupport,
+  type CounterSttProvider,
+  type SttLanguageSupport,
+} from "./capability";
 
 export interface CreateSttOptions extends SttProviderOptions {
   provider: SttProviderId;

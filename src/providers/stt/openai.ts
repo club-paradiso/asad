@@ -60,7 +60,18 @@ export class OpenAiSpeechProvider extends SocketSpeechProvider {
           language: this.options.language?.split("-")[0] ?? "ko",
           prompt: (this.options.hints ?? []).slice(0, 40).join(", ") || undefined,
         },
-        turn_detection: { type: "server_vad", silence_duration_ms: 400 },
+        turn_detection: {
+          type: "server_vad",
+          // Counter speech hesitates. 400 ms of silence ends a turn while
+          // someone is still working out how to say "체류자격 변경"; a second
+          // is closer to how long a real pause at a desk actually lasts, and
+          // tapping stop still ends the turn immediately.
+          silence_duration_ms: this.options.utterance ? 900 : 400,
+          // Include the audio just before speech was detected, so the first
+          // syllable of a turn is transcribed rather than used to trigger the
+          // detector and then discarded.
+          prefix_padding_ms: 500,
+        },
       },
     });
   }

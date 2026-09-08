@@ -19,7 +19,10 @@ import {
   type SttProviderId,
 } from "@/providers/stt";
 import { joinTranscriptParts } from "@/providers/stt/transcript";
-import { findLanguage } from "@/counter/languages";
+import { cloudSttCandidates, sttLanguageSupport } from "@/providers/stt/capability";
+import { sttKeyterms } from "@/counter/domain-vocabulary";
+import type { CounterProfileId } from "@/counter/profiles";
+import { VoiceAttemptTrace, type VoiceFailureCategory } from "./voice-diagnostics";
 
 export type CounterVoicePhase =
   | "idle"
@@ -32,6 +35,8 @@ export type CounterVoiceFailure =
   | "permission"
   | "no-speech"
   | "unavailable"
+  /** No configured recogniser covers this language. Typing is the real path. */
+  | "unsupported-language"
   | "failed"
   | "stopped";
 
@@ -70,6 +75,12 @@ export interface CounterSpeechDependencies {
   stableDelayMs: number;
 }
 
+/** Optional context that only sharpens recognition; never required to listen. */
+export interface CounterSpeechContext {
+  /** Desk vocabulary. Drives recogniser keyterms, nothing else. */
+  profileId?: CounterProfileId;
+}
+
 const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
   fetchCredentials: (language, access, signal) =>
     fetchSttCredentials(language, signal, "counter", access),
@@ -80,13 +91,28 @@ const DEFAULT_DEPENDENCIES: CounterSpeechDependencies = {
   hfFallbackSupported: () => MicrophoneCapture.isSupported(),
   transcribeHf: transcribeWithHuggingFace,
   connectTimeoutMs: 4500,
-  stableDelayMs: 1400,
+  // Trailing silence before a turn is treated as finished. Raised from 1.4 s:
+  // people at a counter pause mid-sentence to find a word, and ending their
+  // turn there loses the half of the sentence that carried the date. Tapping
+  // stop still ends the turn instantly, so the extra wait is opt-out.
+  stableDelayMs: 1700,
 };
 
 // 16 kHz mono PCM16 is ~32 KB/s. Six seconds exceeds the provider connection
 // deadline, so an ordinary startup can keep every syllable without unbounded
 // memory growth. The buffer exists only until the streaming socket is ready.
 const PRECONNECT_AUDIO_MAX_BYTES = 192_000;
+
+/**
+ * Hard ceiling on one streaming turn.
+ *
+ * Without it, a provider that stops sending results while audio keeps flowing
+ * leaves the microphone open for as long as the tab lives. That is both a
+ * privacy problem and a dead-end for the visitor, who sees "Listening" and no
+ * way forward. Reaching the ceiling finalises whatever was heard rather than
+ * throwing it away.
+ */
+const MAX_STREAMING_UTTERANCE_MS = 60_000;
 
 function utteranceDelay(language: string, baseDelay: number): number {
   // Tests and explicit callers may deliberately request an immediate finish.
@@ -138,6 +164,7 @@ const cloudProvider = (
 export class CounterSpeechController {
   private active: ActiveAttempt | null = null;
   private disposed = false;
+  private trace: VoiceAttemptTrace | null = null;
 
   constructor(
     private readonly language: string,
@@ -149,6 +176,7 @@ export class CounterSpeechController {
     private readonly dependencies: CounterSpeechDependencies = DEFAULT_DEPENDENCIES,
     private readonly counterCode?: string,
     private readonly counterToken?: string,
+    private readonly context: CounterSpeechContext = {},
   ) {}
 
   static isPotentiallyAvailable(
@@ -160,82 +188,122 @@ export class CounterSpeechController {
   async listen(): Promise<CounterVoiceResult> {
     if (this.active) return { text: "", failure: "stopped", usedFallback: false };
     this.disposed = false;
+    const trace = new VoiceAttemptTrace(this.language);
+    this.trace = trace;
     this.handlers.onPhase("connecting");
     this.handlers.onPartial("");
 
-    let credentials: SttCredentials | null = null;
-    const credentialController = new AbortController();
-    let stoppedBeforeConnect = false;
-    this.active = {
-      stop: () => {
-        stoppedBeforeConnect = true;
-        credentialController.abort();
-        this.handlers.onPhase("finishing");
-      },
-      cancel: () => {
-        stoppedBeforeConnect = true;
-        credentialController.abort();
-      },
-    };
-    try {
-      credentials = await this.dependencies.fetchCredentials(
-        this.language,
-        this.counterCode && this.counterToken
-          ? { code: this.counterCode, token: this.counterToken }
-          : undefined,
-        credentialController.signal,
-      );
-    } catch {
-      // Credentials are an optimisation. Browser speech remains a valid path.
+    // Ask the capability table before opening anything. A language no
+    // configured recogniser covers must not be answered with a microphone
+    // that spins and then fails: typing is the working path, and saying so
+    // immediately is the honest answer.
+    const cloudCandidates = cloudSttCandidates(this.language);
+    const browserSupportsLanguage =
+      sttLanguageSupport("webspeech", this.language) !== "unsupported";
+    const batchSupportsLanguage = sttLanguageSupport("hf", this.language) !== "unsupported";
+    if (!cloudCandidates.length && !browserSupportsLanguage && !batchSupportsLanguage) {
+      trace.finish("unsupported-language");
+      return this.complete("", false, "unsupported-language");
     }
-    this.active = null;
-    if (stoppedBeforeConnect || this.disposed) {
-      return this.complete("", false, "stopped");
+
+    let credentials: SttCredentials | null = null;
+    let usedFallback = false;
+
+    // Only pay for a credential round trip when some cloud recogniser could
+    // actually serve this language.
+    if (cloudCandidates.length && this.dependencies.cloudAudioSupported()) {
+      const credentialController = new AbortController();
+      let stoppedBeforeConnect = false;
+      this.active = {
+        stop: () => {
+          stoppedBeforeConnect = true;
+          credentialController.abort();
+          this.handlers.onPhase("finishing");
+        },
+        cancel: () => {
+          stoppedBeforeConnect = true;
+          credentialController.abort();
+        },
+      };
+      try {
+        credentials = await this.dependencies.fetchCredentials(
+          this.language,
+          this.counterCode && this.counterToken
+            ? { code: this.counterCode, token: this.counterToken }
+            : undefined,
+          credentialController.signal,
+        );
+      } catch {
+        // Credentials are an optimisation. Browser speech remains a valid path.
+      }
+      this.active = null;
+      trace.mark("credential");
+      if (stoppedBeforeConnect || this.disposed) {
+        trace.finish("aborted");
+        return this.complete("", false, "stopped");
+      }
     }
 
     const cloud = cloudProvider(credentials);
-    let usedFallback = false;
-
-    if (cloud && this.dependencies.cloudAudioSupported()) {
+    // The configured vendor and the requested language can disagree. Opening
+    // that socket anyway spends the whole connection deadline learning what
+    // the capability table already knew.
+    const cloudSupport = cloud ? sttLanguageSupport(cloud, this.language) : "unsupported";
+    if (cloud && cloudSupport !== "unsupported" && this.dependencies.cloudAudioSupported()) {
+      trace.provider(cloud, cloudSupport);
       try {
         const text = await this.attempt(cloud, credentials);
+        trace.finish(text.trim() ? undefined : "no-speech");
         return this.complete(text, usedFallback);
       } catch (error) {
         const failure = toFailure(error);
         if (failure === "permission" || failure === "stopped") {
+          trace.finish(failure === "permission" ? "permission" : "aborted");
           return this.complete("", usedFallback, failure);
         }
         usedFallback = true;
+        trace.fallback();
         this.handlers.onFallback?.();
       }
     }
 
-    const languageSupportsBrowserSpeech = findLanguage(this.language)?.speechSupported ?? true;
-    if (languageSupportsBrowserSpeech && this.dependencies.browserSpeechSupported()) {
+    if (browserSupportsLanguage && this.dependencies.browserSpeechSupported()) {
+      trace.provider("webspeech", sttLanguageSupport("webspeech", this.language));
       try {
         const text = await this.attempt("webspeech");
+        trace.finish(text.trim() ? undefined : "no-speech");
         return this.complete(text, usedFallback);
       } catch (error) {
         const failure = toFailure(error);
         if (failure === "permission" || failure === "stopped") {
+          trace.finish(failure === "permission" ? "permission" : "aborted");
           return this.complete("", usedFallback, failure);
         }
         usedFallback = true;
+        trace.fallback();
         this.handlers.onFallback?.();
       }
     }
 
     // Browser recognition is absent in Firefox and iOS Safari. This is a
     // short, one-utterance batch capture — never a hidden continuous upload.
-    if (this.dependencies.hfFallbackSupported()) {
+    if (batchSupportsLanguage && this.dependencies.hfFallbackSupported()) {
+      trace.provider("hf", "fallback-only");
       try {
         const text = await this.attemptHuggingFace();
+        trace.finish(text.trim() ? undefined : "no-speech");
         return this.complete(text, usedFallback);
       } catch (error) {
-        return this.complete("", usedFallback, toFailure(error));
+        const failure = toFailure(error);
+        trace.finish(diagnosticCategory(failure));
+        return this.complete("", usedFallback, failure);
       }
     }
 
+    // Something in the stack can transcribe this language — the guard at the
+    // top of listen() already returned otherwise — so reaching here means this
+    // browser or device could not get to any of it.
+    trace.finish("browser-unsupported");
     return this.complete("", usedFallback, "unavailable");
   }
 
@@ -256,8 +324,11 @@ export class CounterSpeechController {
   ): CounterVoiceResult {
     const clean = text.trim();
     this.handlers.onPartial("");
-    this.handlers.onPhase(failure === "unavailable" ? "unavailable" : "idle");
+    this.handlers.onPhase(
+      failure === "unavailable" || failure === "unsupported-language" ? "unavailable" : "idle",
+    );
     if (!clean && !failure) failure = "no-speech";
+    this.trace = null;
     return { text: clean, failure, usedFallback };
   }
 
@@ -267,11 +338,17 @@ export class CounterSpeechController {
   ): Promise<string> {
     if (this.disposed) throw new AttemptError("stopped");
 
+    const trace = this.trace;
+    // The hint channel every vendor in the stack exposes and Counter Mode was
+    // not using. These are the twenty terms an immigration desk repeats all
+    // day; a generic model gets them wrong far more often than it should.
+    const hints = sttKeyterms(this.language, this.context.profileId);
     const provider = this.dependencies.createProvider({
       provider: providerId,
       language: this.language,
       credentials: credentials ?? undefined,
       utterance: true,
+      ...(hints.length ? { hints } : {}),
     });
 
     let microphone: MicrophoneHandle | null = null;
@@ -281,12 +358,14 @@ export class CounterSpeechController {
     let stableText = "";
     let partialText = "";
     let stableTimer: ReturnType<typeof setTimeout> | null = null;
+    let maxTurnTimer: ReturnType<typeof setTimeout> | null = null;
     const preconnectFrames: ArrayBuffer[] = [];
     let preconnectBytes = 0;
 
     const announceListening = () => {
       if (listeningAnnounced || !providerReady || !captureReady) return;
       listeningAnnounced = true;
+      trace?.mark("listening");
       this.handlers.onPhase("listening");
     };
     const flushPreconnectAudio = () => {
@@ -296,6 +375,7 @@ export class CounterSpeechController {
       preconnectBytes = 0;
     };
     const acceptAudio = (frame: ArrayBuffer) => {
+      trace?.mark("first-audio");
       if (providerReady) {
         provider.sendAudio(frame);
         return;
@@ -335,10 +415,13 @@ export class CounterSpeechController {
     const finish = () => {
       if (stableTimer) clearTimeout(stableTimer);
       stableTimer = null;
+      if (maxTurnTimer) clearTimeout(maxTurnTimer);
+      maxTurnTimer = null;
       resolveUtterance(currentText());
     };
 
     provider.onPartial((text) => {
+      if (text.trim()) trace?.mark("first-partial");
       // A new interim means the speaker continued. Do not let the previous
       // stable segment's silence timer finalize in the middle of this phrase.
       if (stableTimer) clearTimeout(stableTimer);
@@ -362,6 +445,7 @@ export class CounterSpeechController {
     provider.onStatus((status) => {
       if (status === "listening") {
         providerReady = true;
+        trace?.mark("provider-ready");
         flushPreconnectAudio();
         resolveConnected();
         announceListening();
@@ -413,6 +497,7 @@ export class CounterSpeechController {
         capture = microphone.start().then(
           () => {
             captureReady = true;
+            trace?.mark("capture");
             announceListening();
           },
           (error) => {
@@ -424,6 +509,7 @@ export class CounterSpeechController {
       await Promise.all([connection, capture]);
       flushPreconnectAudio();
       announceListening();
+      maxTurnTimer = setTimeout(finish, MAX_STREAMING_UTTERANCE_MS);
 
       if (stopped && !providerReady) throw new AttemptError("stopped");
       const transcript = await utterancePromise;
@@ -432,6 +518,8 @@ export class CounterSpeechController {
     } finally {
       if (stableTimer) clearTimeout(stableTimer);
       stableTimer = null;
+      if (maxTurnTimer) clearTimeout(maxTurnTimer);
+      maxTurnTimer = null;
       preconnectFrames.length = 0;
       preconnectBytes = 0;
       await microphone?.stop().catch(() => {});
@@ -497,6 +585,8 @@ export class CounterSpeechController {
         onError: (error) => rejectCapture(normaliseAttemptError(error)),
       });
       await microphone.start();
+      this.trace?.mark("capture");
+      this.trace?.mark("listening");
       this.handlers.onPhase("listening");
       // A model fallback must not leave a visible spinner running indefinitely.
       maxTimer = setTimeout(finish, 30_000);
@@ -521,6 +611,24 @@ export class CounterSpeechController {
       audio.clear();
       this.active = null;
     }
+  }
+}
+
+/** Map a user-facing failure onto the diagnostic taxonomy. */
+function diagnosticCategory(failure: CounterVoiceFailure): VoiceFailureCategory {
+  switch (failure) {
+    case "permission":
+      return "permission";
+    case "no-speech":
+      return "no-speech";
+    case "stopped":
+      return "aborted";
+    case "unsupported-language":
+      return "unsupported-language";
+    case "unavailable":
+      return "browser-unsupported";
+    default:
+      return "provider";
   }
 }
 

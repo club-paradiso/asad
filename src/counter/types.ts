@@ -26,6 +26,14 @@ export type CriticalValueKind =
   | "time"
   | "phone"
   | "identifier"
+  /**
+   * A Korean residence status such as E-7 or D-10.
+   *
+   * Its own kind because the generic extractors could only see the digit: to
+   * them E-7 and F-7 are the same value, so a translation that changed the
+   * letter — which changes which visa someone holds — passed as verified.
+   */
+  | "status-code"
   | "name";
 
 export interface CriticalValue {
@@ -35,8 +43,18 @@ export interface CriticalValue {
   normalized: string;
 }
 
+/**
+ * `negation` is not a value; it is the presence or absence of one.
+ *
+ * It sits here because dropping it is the single most damaging thing a
+ * translation can do at this desk. "I did not report the change" and "I
+ * reported the change" differ by one word and by whether someone is in
+ * violation, and every numeric check in this file passes either way.
+ */
+export type IntegrityIssueKind = CriticalValueKind | "negation";
+
 export interface IntegrityIssue {
-  kind: CriticalValueKind;
+  kind: IntegrityIssueKind;
   sourceText: string;
   targetText?: string;
   reason: "missing" | "changed" | "added";
@@ -56,7 +74,15 @@ export interface TranslationIntegrity {
  */
 export interface RiskSpan {
   text: string;
-  kind: "number" | "time" | "date" | "money" | "name" | "phone" | "identifier";
+  kind:
+    | "number"
+    | "time"
+    | "date"
+    | "money"
+    | "name"
+    | "phone"
+    | "identifier"
+    | "status-code";
 }
 
 export interface CounterMessage {
