@@ -22,10 +22,10 @@
  *     exclude upstreams that do not support what we sent — so sending a
  *     parameter the model cannot take does not merely 400, it can empty the
  *     candidate pool.
- *  3. **The model is pinned per session.** Provider-level failover for the same
- *     model is fine and desirable. Model-family roulette between sentences is
- *     not: terminology and register drift, and the interpreter is the one who
- *     has to absorb it mid-sentence.
+ *  3. **The primary model is pinned.** Provider-level failover for the same
+ *     model is fine and desirable. Model-level failover is opt-in and only
+ *     happens after the primary errors, so model drift is an outage-recovery
+ *     mechanism rather than normal per-sentence roulette.
  */
 import { LlmError } from "./errors";
 import { postJson } from "./http";
@@ -132,6 +132,11 @@ export function providerRoutingBlock(
 
 export interface OpenRouterBodyInput {
   model: string;
+  /**
+   * Optional model-level recovery chain. OpenRouter tries these in order only
+   * after the primary model errors or is unavailable.
+   */
+  fallbackModels?: readonly string[];
   request: LlmRequest;
   policy: OpenRouterRoutingPolicy;
   /** Resolved once by the caller so tests can inject. */
@@ -139,7 +144,11 @@ export interface OpenRouterBodyInput {
 }
 
 /**
- * Assemble the request body, emitting only what the model can accept.
+ * Assemble the request body, emitting only what the primary model can accept.
+ *
+ * `require_parameters: true` remains in force for every fallback, so OpenRouter
+ * skips an endpoint that cannot honour the parameters rather than silently
+ * dropping structured-output controls.
  *
  * Pure and exported because this is the function that has to be *right*, and
  * "we sent a legal body" is a claim worth asserting in a test rather than
@@ -164,6 +173,20 @@ export function buildOpenRouterBody(input: OpenRouterBodyInput): Record<string, 
     // line in this workload.
     usage: { include: true },
   };
+
+  const fallbackModels = [
+    ...new Set(
+      (input.fallbackModels ?? [])
+        .map((model) => model.trim())
+        .filter((model) => model.length > 0 && model !== input.model),
+    ),
+  ];
+  if (fallbackModels.length > 0) {
+    // OpenRouter treats `model` as the primary and `models` as ordered
+    // model-level fallbacks. Provider failover for each model still happens
+    // according to the provider block above.
+    body.models = fallbackModels;
+  }
 
   // Sampling is not universal. Reasoning-first models reject it outright, and
   // with require_parameters on, sending it to one would empty the pool.
@@ -206,6 +229,8 @@ export function buildOpenRouterBody(input: OpenRouterBodyInput): Record<string, 
 export interface OpenRouterConfig {
   apiKey: string;
   model: string;
+  /** Ordered model-level fallbacks tried only when the primary fails. */
+  fallbackModels?: readonly string[];
   policy: OpenRouterRoutingPolicy;
   baseUrl?: string;
   /** Attribution headers. OpenRouter surfaces these on the account dashboard. */
@@ -266,6 +291,7 @@ export class OpenRouterLlmProvider implements LlmProvider {
   async complete(request: LlmRequest): Promise<LlmResponse> {
     const body = buildOpenRouterBody({
       model: this.config.model,
+      fallbackModels: this.config.fallbackModels,
       request,
       policy: this.config.policy,
       capabilities: this.capabilities,
@@ -328,7 +354,7 @@ export const strictExclusion = (message: string): boolean => {
   return NO_UPSTREAM_HINTS.some((hint) => text.includes(hint));
 };
 
-/** One line naming the constraints in force, for an error a human will read. */
+/** One line naming the constraints in force for an error a human will read. */
 export const describePolicy = (policy: OpenRouterRoutingPolicy): string =>
   [
     policy.zdr ? "zero data retention" : null,
