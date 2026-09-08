@@ -57,9 +57,15 @@ function routerForCounter(input: CounterRoutingInput): {
   sensitive: boolean;
   policyError?: string;
 } {
+  // Resolve the shared router first. It applies the deliberately narrow public
+  // `:free` OpenRouter exception to the cached environment when eligible. A
+  // sensitive turn must inspect that same effective environment rather than
+  // the pre-router fail-closed snapshot, or the first sensitive message after
+  // a cold start incorrectly reports that no protected provider exists.
+  const generalRouter = llmRouter();
   const env = appEnv();
   const sensitive = isSensitiveCounterProfile(input.profileId);
-  if (!sensitive) return { router: llmRouter(), sensitive: false };
+  if (!sensitive) return { router: generalRouter, sensitive: false };
 
   if (
     !env.llm.providers.openrouter.configured ||
