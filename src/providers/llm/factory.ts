@@ -10,6 +10,10 @@ import { AnthropicLlmProvider } from "./anthropic";
 import { GeminiLlmProvider } from "./gemini";
 import { LocalLlmProvider } from "./mock";
 import { OpenRouterLlmProvider } from "./openrouter";
+import {
+  FailoverOpenRouterLlmProvider,
+  freeOpenRouterFallbackModels,
+} from "./openrouter-failover";
 import { OPENAI_COMPATIBLE_VENDORS, createOpenAiCompatible } from "./vendors";
 import type { LlmProvider, LlmProviderId } from "./types";
 import type { AppEnv } from "@/lib/env";
@@ -30,14 +34,27 @@ export function createProvider(id: LlmProviderId, env: AppEnv): LlmProvider | nu
       return new GeminiLlmProvider({ apiKey: config.apiKey, model: config.model });
     case "anthropic":
       return new AnthropicLlmProvider({ apiKey: config.apiKey, model: config.model });
-    case "openrouter":
-      // The gateway, not a vendor: the routing policy is as much a part of the
-      // request as the model id is.
-      return new OpenRouterLlmProvider({
-        apiKey: config.apiKey,
-        model: config.model,
-        policy: env.llm.openrouter.policy,
-      });
+    case "openrouter": {
+      // A concrete :free model can disappear behind a shared upstream 429 even
+      // while OpenRouter itself is healthy. Keep the preferred model first,
+      // then recover through zero-cost models only. Paid-capable primaries get
+      // no implicit model failover here: spending policy remains explicit.
+      const fallbackModels = freeOpenRouterFallbackModels(config.model);
+      return fallbackModels.length
+        ? new FailoverOpenRouterLlmProvider(
+            {
+              apiKey: config.apiKey,
+              model: config.model,
+              policy: env.llm.openrouter.policy,
+            },
+            fallbackModels,
+          )
+        : new OpenRouterLlmProvider({
+            apiKey: config.apiKey,
+            model: config.model,
+            policy: env.llm.openrouter.policy,
+          });
+    }
     case "groq":
     case "openai":
       return createOpenAiCompatible(
