@@ -14,15 +14,18 @@ const currentProductionShape = (overrides: Record<string, string> = {}) => ({
   ...overrides,
 });
 
+const asProcessEnv = (source: Record<string, string>): NodeJS.ProcessEnv =>
+  source as unknown as NodeJS.ProcessEnv;
+
 describe("public free OpenRouter restoration", () => {
   it("restores the explicitly free production provider without enabling paid cloud routes", () => {
     const source = currentProductionShape();
-    const parsed = parseEnv(source as NodeJS.ProcessEnv);
+    const parsed = parseEnv(asProcessEnv(source));
 
     // The central parser stays conservative on public Vercel deployments.
     expect(parsed.llm.providers.openrouter.configured).toBe(false);
 
-    const restored = restorePublicFreeOpenRouter(parsed, source as NodeJS.ProcessEnv);
+    const restored = restorePublicFreeOpenRouter(parsed, asProcessEnv(source));
 
     expect(restored.llm.providers.openrouter.configured).toBe(true);
     expect(restored.llm.providers.openrouter.apiKey).toBe(KEY);
@@ -46,8 +49,8 @@ describe("public free OpenRouter restoration", () => {
     ["different pinned provider", { LLM_PROVIDER: "gemini" }],
   ])("refuses %s on a public deployment", (_label, overrides) => {
     const source = currentProductionShape(overrides);
-    const parsed = parseEnv(source as NodeJS.ProcessEnv);
-    const restored = restorePublicFreeOpenRouter(parsed, source as NodeJS.ProcessEnv);
+    const parsed = parseEnv(asProcessEnv(source));
+    const restored = restorePublicFreeOpenRouter(parsed, asProcessEnv(source));
 
     expect(restored.llm.providers.openrouter.configured).toBe(false);
     expect(restored.llm.providers.openrouter.apiKey).toBeUndefined();
@@ -55,10 +58,10 @@ describe("public free OpenRouter restoration", () => {
 
   it("does nothing when the deployment already has an access gate", () => {
     const source = currentProductionShape({ APP_ACCESS_KEY: "private-deployment-key" });
-    const parsed = parseEnv(source as NodeJS.ProcessEnv);
+    const parsed = parseEnv(asProcessEnv(source));
 
     expect(parsed.llm.providers.openrouter.configured).toBe(true);
-    const restored = restorePublicFreeOpenRouter(parsed, source as NodeJS.ProcessEnv);
+    const restored = restorePublicFreeOpenRouter(parsed, asProcessEnv(source));
     expect(restored.llm.providers.openrouter.configured).toBe(true);
     expect(restored.problems.some((problem) => problem.field === "APP_ACCESS_KEY")).toBe(false);
   });
