@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { appEnv } from "@/lib/env";
 import { clientAddress, hasAccess, isSameOrigin, limiterFor } from "@/lib/guard";
+import { llmRouter } from "@/providers/llm";
 import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
 import { OpenRouterLlmProvider, describePolicy } from "@/providers/llm/openrouter";
 import { toLlmError } from "@/providers/llm/errors";
@@ -95,6 +96,12 @@ export async function GET(request: Request) {
     );
   }
 
+  // Resolve the same effective environment the translation routes use before
+  // inspecting provider configuration. Public deployments may deliberately
+  // restore an explicit non-billable OpenRouter `:free` model; reading raw
+  // `appEnv()` first makes this health endpoint claim the provider is missing
+  // even while Counter Mode is successfully routing to it.
+  llmRouter();
   const env = appEnv();
   const config = env.llm.providers.openrouter;
   const { policy, primaryModel } = env.llm.openrouter;
