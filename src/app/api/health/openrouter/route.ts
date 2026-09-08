@@ -7,12 +7,12 @@
  * parameters this application depends on. All three look identical to a
  * correctly configured deployment right up until a service starts.
  *
- * So this makes ONE real, tiny, structured request and reports what came back.
+ * So this makes ONE small structured health operation and reports what came
+ * back. An explicitly free primary may internally try the zero-cost recovery
+ * chain when its shared upstream is rate-limited.
  *
- * Deliberately NOT called on page load. It costs money, and a health check
- * that runs on every visit is a bill rather than a signal. It is for the
- * diagnostics page, for `npm run health:openrouter`, and for a deployment
- * smoke test.
+ * Deliberately NOT called on page load. It is for the diagnostics page, for
+ * `npm run health:openrouter`, and for a deployment smoke test.
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -20,7 +20,11 @@ import { appEnv } from "@/lib/env";
 import { clientAddress, hasAccess, isSameOrigin, limiterFor } from "@/lib/guard";
 import { llmRouter } from "@/providers/llm";
 import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
-import { OpenRouterLlmProvider, describePolicy } from "@/providers/llm/openrouter";
+import { describePolicy } from "@/providers/llm/openrouter";
+import {
+  FailoverOpenRouterLlmProvider,
+  freeOpenRouterFallbackModels,
+} from "@/providers/llm/openrouter-failover";
 import { toLlmError } from "@/providers/llm/errors";
 
 export const runtime = "nodejs";
@@ -31,11 +35,6 @@ const HEALTH_DEADLINE_MS = 12_000;
 
 /**
  * The smallest structured request that still proves the thing we care about.
- *
- * Not "did it return 200" — that would pass with a model that ignores
- * `response_format` and answers in prose, which is exactly the failure the
- * live path cannot absorb. It has to come back as valid JSON matching a
- * schema.
  */
 const PROBE_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -52,27 +51,21 @@ const probeResultSchema = z.object({ ok: z.boolean(), language: z.string() });
 export interface OpenRouterHealth {
   configured: boolean;
   model: string;
-  /** What the capability registry believes about the configured model. */
   capabilities: {
     family: string;
     structuredOutput: string;
     sampling: string;
     liveSuitable: boolean;
-    /** Populated when the model is a poor fit for the live path. */
     liveWarning?: string;
-    /** Whether these came from the table or from pattern inference. */
     source: string;
   };
   policy: { summary: string; sort: string; dataCollection: string; zdr: boolean };
-  /** Null when no request was attempted. */
   probe: {
     ok: boolean;
     latencyMs?: number;
-    /** The model OpenRouter actually served, which may differ from the ask. */
     servedModel?: string;
-    /** The upstream that served it. Never a key. */
+    requestedModel?: string;
     upstream?: string;
-    /** True when the answer parsed and validated against the probe schema. */
     schemaValid?: boolean;
     error?: string;
     failureKind?: string;
@@ -81,7 +74,6 @@ export interface OpenRouterHealth {
 }
 
 export async function GET(request: Request) {
-  // Same protections as the paid routes: this one makes a real billed call.
   if (!hasAccess(request)) {
     return NextResponse.json({ error: "This deployment is private." }, { status: 401 });
   }
@@ -91,16 +83,11 @@ export async function GET(request: Request) {
   const verdict = limiterFor("health").check(`health:${clientAddress(request)}`);
   if (!verdict.allowed) {
     return NextResponse.json(
-      { error: "Health checks are rate limited; they cost money." },
+      { error: "Health checks are rate limited; try again shortly." },
       { status: 429, headers: { "retry-after": String(verdict.retryAfterSeconds) } },
     );
   }
 
-  // Resolve the same effective environment the translation routes use before
-  // inspecting provider configuration. Public deployments may deliberately
-  // restore an explicit non-billable OpenRouter `:free` model; reading raw
-  // `appEnv()` first makes this health endpoint claim the provider is missing
-  // even while Counter Mode is successfully routing to it.
   llmRouter();
   const env = appEnv();
   const config = env.llm.providers.openrouter;
@@ -133,11 +120,14 @@ export async function GET(request: Request) {
     return NextResponse.json(base, { headers: { "cache-control": "no-store" } });
   }
 
-  const provider = new OpenRouterLlmProvider({
-    apiKey: config.apiKey,
-    model: primaryModel,
-    policy,
-  });
+  const provider = new FailoverOpenRouterLlmProvider(
+    {
+      apiKey: config.apiKey,
+      model: primaryModel,
+      policy,
+    },
+    freeOpenRouterFallbackModels(primaryModel),
+  );
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_DEADLINE_MS);
@@ -161,6 +151,7 @@ export async function GET(request: Request) {
           ok: parsed !== null,
           latencyMs: response.latencyMs,
           servedModel: response.model,
+          requestedModel: provider.lastModel,
           upstream: provider.lastTurn?.upstream,
           schemaValid: parsed !== null,
           error:
@@ -178,8 +169,6 @@ export async function GET(request: Request) {
         ...base,
         probe: {
           ok: false,
-          // The message names the policy when routing excluded every upstream,
-          // which is the failure a deployer is least likely to guess at.
           error: llmError.message,
           failureKind: llmError.kind,
         },
