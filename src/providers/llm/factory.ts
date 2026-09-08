@@ -10,6 +10,7 @@ import { AnthropicLlmProvider } from "./anthropic";
 import { GeminiLlmProvider } from "./gemini";
 import { LocalLlmProvider } from "./mock";
 import { OpenRouterLlmProvider } from "./openrouter";
+import { publicFreeOpenRouterFallbackModels } from "./public-free";
 import { OPENAI_COMPATIBLE_VENDORS, createOpenAiCompatible } from "./vendors";
 import type { LlmProvider, LlmProviderId } from "./types";
 import type { AppEnv } from "@/lib/env";
@@ -32,10 +33,13 @@ export function createProvider(id: LlmProviderId, env: AppEnv): LlmProvider | nu
       return new AnthropicLlmProvider({ apiKey: config.apiKey, model: config.model });
     case "openrouter":
       // The gateway, not a vendor: the routing policy is as much a part of the
-      // request as the model id is.
+      // request as the model id is. The public deployment additionally gets a
+      // tightly constrained `:free` model-level recovery chain; every other
+      // deployment remains pinned to exactly the configured model.
       return new OpenRouterLlmProvider({
         apiKey: config.apiKey,
         model: config.model,
+        fallbackModels: publicFreeOpenRouterFallbackModels(env),
         policy: env.llm.openrouter.policy,
       });
     case "groq":
