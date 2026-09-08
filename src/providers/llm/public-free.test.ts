@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { parseEnv } from "@/lib/env";
-import { restorePublicFreeOpenRouter } from "./public-free";
+import {
+  PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS,
+  publicFreeOpenRouterFallbackModels,
+  restorePublicFreeOpenRouter,
+} from "./public-free";
 
 const KEY = "x".repeat(24);
 
@@ -20,12 +24,13 @@ const asProcessEnv = (source: Record<string, string>): NodeJS.ProcessEnv =>
 describe("public free OpenRouter restoration", () => {
   it("restores the explicitly free production provider without enabling paid cloud routes", () => {
     const source = currentProductionShape();
-    const parsed = parseEnv(asProcessEnv(source));
+    const processEnv = asProcessEnv(source);
+    const parsed = parseEnv(processEnv);
 
     // The central parser stays conservative on public Vercel deployments.
     expect(parsed.llm.providers.openrouter.configured).toBe(false);
 
-    const restored = restorePublicFreeOpenRouter(parsed, asProcessEnv(source));
+    const restored = restorePublicFreeOpenRouter(parsed, processEnv);
 
     expect(restored.llm.providers.openrouter.configured).toBe(true);
     expect(restored.llm.providers.openrouter.apiKey).toBe(KEY);
@@ -38,6 +43,16 @@ describe("public free OpenRouter restoration", () => {
     expect(restored.problems).toContainEqual(
       expect.objectContaining({ field: "APP_ACCESS_KEY", level: "warning" }),
     );
+
+    const fallbacks = publicFreeOpenRouterFallbackModels(restored, processEnv);
+    expect(fallbacks).toEqual([
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "google/gemma-4-31b-it:free",
+    ]);
+    expect(fallbacks).not.toContain(restored.llm.openrouter.primaryModel);
+    expect(PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.every((model) => model.endsWith(":free"))).toBe(
+      true,
+    );
   });
 
   it.each([
@@ -49,20 +64,24 @@ describe("public free OpenRouter restoration", () => {
     ["different pinned provider", { LLM_PROVIDER: "gemini" }],
   ])("refuses %s on a public deployment", (_label, overrides) => {
     const source = currentProductionShape(overrides);
-    const parsed = parseEnv(asProcessEnv(source));
-    const restored = restorePublicFreeOpenRouter(parsed, asProcessEnv(source));
+    const processEnv = asProcessEnv(source);
+    const parsed = parseEnv(processEnv);
+    const restored = restorePublicFreeOpenRouter(parsed, processEnv);
 
     expect(restored.llm.providers.openrouter.configured).toBe(false);
     expect(restored.llm.providers.openrouter.apiKey).toBeUndefined();
+    expect(publicFreeOpenRouterFallbackModels(restored, processEnv)).toEqual([]);
   });
 
   it("does nothing when the deployment already has an access gate", () => {
     const source = currentProductionShape({ APP_ACCESS_KEY: "private-deployment-key" });
-    const parsed = parseEnv(asProcessEnv(source));
+    const processEnv = asProcessEnv(source);
+    const parsed = parseEnv(processEnv);
 
     expect(parsed.llm.providers.openrouter.configured).toBe(true);
-    const restored = restorePublicFreeOpenRouter(parsed, asProcessEnv(source));
+    const restored = restorePublicFreeOpenRouter(parsed, processEnv);
     expect(restored.llm.providers.openrouter.configured).toBe(true);
     expect(restored.problems.some((problem) => problem.field === "APP_ACCESS_KEY")).toBe(false);
+    expect(publicFreeOpenRouterFallbackModels(restored, processEnv)).toEqual([]);
   });
 });

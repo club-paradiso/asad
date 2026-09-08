@@ -21,6 +21,7 @@ import { clientAddress, hasAccess, isSameOrigin, limiterFor } from "@/lib/guard"
 import { llmRouter } from "@/providers/llm";
 import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
 import { OpenRouterLlmProvider, describePolicy } from "@/providers/llm/openrouter";
+import { publicFreeOpenRouterFallbackModels } from "@/providers/llm/public-free";
 import { toLlmError } from "@/providers/llm/errors";
 
 export const runtime = "nodejs";
@@ -52,6 +53,8 @@ const probeResultSchema = z.object({ ok: z.boolean(), language: z.string() });
 export interface OpenRouterHealth {
   configured: boolean;
   model: string;
+  /** Ordered model-level fallbacks actually sent by this deployment. */
+  fallbackModels: readonly string[];
   /** What the capability registry believes about the configured model. */
   capabilities: {
     family: string;
@@ -105,12 +108,14 @@ export async function GET(request: Request) {
   const env = appEnv();
   const config = env.llm.providers.openrouter;
   const { policy, primaryModel } = env.llm.openrouter;
+  const fallbackModels = publicFreeOpenRouterFallbackModels(env);
   const caps = capabilitiesForModel(primaryModel);
   const liveWarning = liveSuitabilityProblem(caps);
 
   const base: OpenRouterHealth = {
     configured: config.configured,
     model: primaryModel,
+    fallbackModels,
     capabilities: {
       family: caps.family,
       structuredOutput: caps.structuredOutput,
@@ -136,6 +141,7 @@ export async function GET(request: Request) {
   const provider = new OpenRouterLlmProvider({
     apiKey: config.apiKey,
     model: primaryModel,
+    fallbackModels,
     policy,
   });
 

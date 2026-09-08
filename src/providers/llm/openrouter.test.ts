@@ -139,6 +139,33 @@ describe("model-compatible parameter emission", () => {
     const body = build("google/gemini-3.7-flash", {}, { ...DEFAULT_ROUTING_POLICY, zdr: true });
     expect(body.provider).toMatchObject({ zdr: true, data_collection: "deny" });
   });
+
+  it("sends ordered model-level fallbacks without duplicating the primary", () => {
+    const primary = "google/gemma-4-26b-a4b-it:free";
+    const body = buildOpenRouterBody({
+      model: primary,
+      fallbackModels: [
+        primary,
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "google/gemma-4-31b-it:free",
+        " ",
+      ],
+      request: request(),
+      policy: DEFAULT_ROUTING_POLICY,
+    });
+
+    expect(body.model).toBe(primary);
+    expect(body.models).toEqual([
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "google/gemma-4-31b-it:free",
+    ]);
+    expect(body.provider).toMatchObject({
+      allow_fallbacks: true,
+      data_collection: "deny",
+      require_parameters: true,
+    });
+  });
 });
 
 describe("strict-routing exclusion", () => {
