@@ -67,22 +67,22 @@ export interface LlmProviderCapabilities {
  *   calls/minute            11.17
  *   tokens/call  full        2,718
  *   tokens/call  compact     2,432
- *   tokens/call  ultra       2,177
- *   sermon (45 min)         ~503 calls, ~1.37M tokens at full
+ *   tokens/call  ultra         850  (refreshed 2026-09-10)
+ *   sermon (45 min)         ~503 calls
  *
- * The important thing this revealed: the system prompt is ~1,700–1,900 of
- * those tokens, so trimming rolling CONTEXT barely moves the total. Context
- * profiles are worth ~20%; the system prompt is the real lever. That is why
- * the output contract is now dropped for providers that enforce the schema
- * natively, and why prompt caching is the highest-value remaining optimisation.
+ * Full/compact remain the older reference measurements. Ultra-compact is
+ * refreshed after its dedicated short system contract landed: the five-minute
+ * harness measured p50 850, p95 934 and max 950 estimated tokens/call. This
+ * is prompt/workload accounting, not a cloud-latency measurement.
  */
 export const LIVE_WORKLOAD = {
   callsPerMinute: 11.17,
   tokensPerCallFull: 2718,
   tokensPerCallCompact: 2432,
-  tokensPerCallUltraCompact: 2177,
+  tokensPerCallUltraCompact: 850,
   sermonMinutes: 45,
   measuredAt: "2026-08-24",
+  ultraCompactMeasuredAt: "2026-09-10",
 } as const;
 
 export const PROVIDER_CAPABILITIES: Record<LlmProviderId, LlmProviderCapabilities> = {
@@ -137,11 +137,10 @@ export const PROVIDER_CAPABILITIES: Record<LlmProviderId, LlmProviderCapabilitie
     usageTelemetry: true,
     rateLimitHeaders: true, // x-ratelimit-* on every response
     maxContextTokens: 131_072,
-    // Measured: even the ultra-compact profile costs ~2,177 tokens/call, and
-    // at 11.17 calls/min that is ~24,300 TPM against a 6,000 free-tier limit.
-    // No context profile rescues this — the system prompt alone exceeds it.
-    // Groq free is therefore a fallback and a benchmark target, not a live
-    // default. Its paid Developer tier (250k+ TPM) is entirely viable.
+    // Refreshed ultra-compact p50 is ~850 tokens/call. At 11.17 calls/min that
+    // is still ~9,500 TPM against a 6,000 free-tier limit, so Groq free
+    // remains unable to sustain the measured live workload. It stays a
+    // fallback/benchmark target rather than a live default.
     recommendedLiveContextTokens: 2200,
     freeTierQuota: { requestsPerMinute: 30, tokensPerMinute: 6000, requestsPerDay: 14_400 },
     freeTierPrivacy: "no-training",
