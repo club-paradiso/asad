@@ -1,0 +1,88 @@
+name: Warning cleanup
+
+on:
+  push:
+    branches:
+      - fix/test-warning-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/test-warning-cleanup
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply warning fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          consent = Path('src/features/live/consent.test.tsx')
+          s = consent.read_text()
+          s = s.replace(
+              'import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";',
+              'import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";',
+              1,
+          )
+          old = '''    fireEvent.click(start);\n    expect(cloudCalls()).toEqual([]);'''
+          new = '''    await act(async () => {\n      fireEvent.click(start);\n      await Promise.resolve();\n    });\n    expect(cloudCalls()).toEqual([]);'''
+          if old not in s:
+              raise SystemExit('consent click target not found')
+          consent.write_text(s.replace(old, new, 1))
+
+          counter = Path('src/features/counter/useCounterSession.test.tsx')
+          s = counter.read_text()
+          old1 = '''    rerender({ code: "BD57" });\n\n    // Cleared in the same render as the code change'''
+          new1 = '''    await act(async () => {\n      rerender({ code: "BD57" });\n    });\n\n    // Cleared in the same render as the code change'''
+          if old1 not in s:
+              raise SystemExit('first counter rerender target not found')
+          s = s.replace(old1, new1, 1)
+          old2 = '''    rerender({ code: "BD57" });\n    expect(result.current.ended).toBe(false);'''
+          new2 = '''    await act(async () => {\n      rerender({ code: "BD57" });\n    });\n    expect(result.current.ended).toBe(false);'''
+          if old2 not in s:
+              raise SystemExit('second counter rerender target not found')
+          counter.write_text(s.replace(old2, new2, 1))
+
+          old_config = Path('vitest.config.ts')
+          new_config = Path('vitest.config.mts')
+          if old_config.exists() and not new_config.exists():
+              old_config.rename(new_config)
+          elif not new_config.exists():
+              raise SystemExit('vitest config not found')
+          PY
+      - name: Install
+        run: npm ci
+      - name: Verify warning cleanup
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/test.log
+          if grep -F 'not wrapped in act' /tmp/test.log; then
+            echo 'React act warning remains' >&2
+            exit 1
+          fi
+          if grep -F "unsupported by `configLoader: 'native'`" /tmp/test.log; then
+            echo 'Vite config warning remains' >&2
+            exit 1
+          fi
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Commit fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/features/live/consent.test.tsx src/features/counter/useCounterSession.test.tsx vitest.config.ts vitest.config.mts
+          if git diff --cached --quiet; then
+            echo 'No fixes to commit.'
+            exit 0
+          fi
+          git commit -m 'test: eliminate React act and Vite config warnings'
+          git push origin HEAD:fix/test-warning-cleanup
