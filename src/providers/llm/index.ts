@@ -8,7 +8,13 @@ import { restorePublicFreeOpenRouter } from "./public-free";
 
 export * from "./types";
 export * from "./capabilities";
-export { enforcesJsonSchema } from "./schema-enforcement";
+// Live/Rescue import `capabilitiesFor` from this barrel specifically. For
+// OpenRouter they need the conservative prompt view, not the provider's broad
+// statement that *some* routed models can enforce schemas.
+export {
+  enforcesJsonSchema,
+  promptCapabilitiesFor as capabilitiesFor,
+} from "./schema-enforcement";
 export { LlmRouter } from "./router";
 export type { ProviderHealth, RouteResult, RouteAttempt } from "./router";
 export { deadlineFor, turnBudgetFor } from "./deadlines";
