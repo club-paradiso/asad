@@ -696,7 +696,7 @@ export function readinessRows(input: {
             value: `${config.llm.configured} — 용량 제한`,
             level: "limited",
             detail:
-              `${config.llm.capacityNote ?? ""} 그 뒤로는 기기 안의 통역기로 이어서 돌아갑니다.`.trim(),
+              `${config.llm.capacityNote ?? ""} 지원되는 데스크톱 Chrome에서는 기기 내 한국어→영어 번역으로 전환되며, 그 외 브라우저에서는 규칙 기반 보조만 남습니다.`.trim(),
           }
         : { label: "AI", value: config.llm.configured, level: "ready" };
 
