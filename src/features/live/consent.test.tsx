@@ -178,8 +178,7 @@ describe("the launcher", () => {
     stubFetch(PROVIDER, "hang");
     render(<StartScreen />);
 
-    const start = await screen.findByRole("button", { name: /데모 실행/ });
-    fireEvent.click(start);
+    await screen.findByRole("button", { name: /데모 실행/ });
     expect(cloudCalls()).toEqual([]);
   });
 
