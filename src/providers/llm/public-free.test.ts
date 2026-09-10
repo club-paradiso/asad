@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseEnv } from "@/lib/env";
 import {
   PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS,
+  isPublicZeroCostOpenRouterModel,
   publicFreeOpenRouterFallbackModels,
   restorePublicFreeOpenRouter,
 } from "./public-free";
@@ -48,15 +49,24 @@ describe("public free OpenRouter restoration", () => {
     expect(fallbacks).toEqual([
       "nvidia/nemotron-3-super-120b-a12b:free",
       "google/gemma-4-31b-it:free",
+      "openrouter/free",
     ]);
     expect(fallbacks).not.toContain(restored.llm.openrouter.primaryModel);
-    expect(PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.every((model) => model.endsWith(":free"))).toBe(
+    expect(PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.every(isPublicZeroCostOpenRouterModel)).toBe(
       true,
     );
   });
 
+  it("admits only explicit :free variants or the exact dynamic free-router alias", () => {
+    expect(isPublicZeroCostOpenRouterModel("google/gemma-4-31b-it:free")).toBe(true);
+    expect(isPublicZeroCostOpenRouterModel("openrouter/free")).toBe(true);
+    expect(isPublicZeroCostOpenRouterModel("openrouter/auto")).toBe(false);
+    expect(isPublicZeroCostOpenRouterModel("google/gemini-3.7-flash")).toBe(false);
+  });
+
   it.each([
     ["paid-capable model", { OPENROUTER_PRIMARY_MODEL: "google/gemini-3.7-flash" }],
+    ["dynamic free router as primary", { OPENROUTER_PRIMARY_MODEL: "openrouter/free" }],
     ["paid fallback", { LLM_ALLOW_PAID_FALLBACK: "true" }],
     ["quality escalation", { OPENROUTER_QUALITY_ESCALATION: "true" }],
     ["collection allowed", { OPENROUTER_DATA_COLLECTION: "allow" }],
