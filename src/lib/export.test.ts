@@ -86,13 +86,13 @@ describe("json export", () => {
 describe("filenames", () => {
   it("is sortable, descriptive and safe", () => {
     expect(sessionFilename(session, "markdown")).toBe(
-      "tong-yuck-2026-08-24-10-00-our-identity-in-christ.md",
+      "asad-2026-08-24-10-00-our-identity-in-christ.md",
     );
   });
 
   it("copes with no title", () => {
     const untitled = { ...session, title: undefined };
-    expect(sessionFilename(untitled, "json")).toMatch(/^tong-yuck-.*-session\.json$/);
+    expect(sessionFilename(untitled, "json")).toMatch(/^asad-.*-session\.json$/);
   });
 });
 
