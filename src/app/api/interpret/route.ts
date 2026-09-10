@@ -15,7 +15,7 @@
  *     every call. It is same-origin, session-bound, body-capped and rate
  *     limited before a provider is ever reached. See `src/lib/guard.ts`.
  */
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { interpretRequestSchema, interpreterOutputSchema, parseInterpreterOutput } from "@/lib/schema";
 import { buildLiveUserPrompt, systemPromptFor } from "@/interpreter/prompts/live";
 import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
@@ -30,6 +30,11 @@ import {
 } from "@/providers/llm";
 import { interpretLocally } from "@/providers/llm/mock";
 import { estimateTokens, telemetry } from "@/lib/telemetry";
+import {
+  persistSharedLatency,
+  serverLatencySample,
+  type SharedLatencySample,
+} from "@/lib/shared-telemetry";
 import { guardInferenceRoute, readCookie, SESSION_COOKIE } from "@/lib/guard";
 import { escalationDecision, escalationImproves } from "@/providers/llm/escalation";
 import { createQualityProvider } from "@/providers/llm/factory";
@@ -86,7 +91,24 @@ export async function POST(request: Request) {
     );
   }
   const input = parsed.data;
+  const sharedLatency: SharedLatencySample[] = [...(input.clientTelemetry ?? [])];
   for (const sample of input.clientTelemetry ?? []) telemetry.recordClientLatency(sample);
+
+  const respond = (body: unknown, init?: ResponseInit) => {
+    const batch = [...sharedLatency];
+    if (batch.length > 0) {
+      after(async () => {
+        await persistSharedLatency(batch);
+      });
+    }
+    return NextResponse.json(body, init);
+  };
+
+  const recordLiveLatency = (sample: Omit<SharedLatencySample, "id">) => {
+    telemetry.recordLatency(sample);
+    sharedLatency.push(serverLatencySample(sample));
+  };
+
   const router = llmRouter();
   const sessionToken = readCookie(request, SESSION_COOKIE);
   const routingKey = sessionToken ? `live:${sessionToken}` : undefined;
@@ -110,7 +132,7 @@ export async function POST(request: Request) {
 
   // No cloud candidate at all: answer locally without pretending otherwise.
   if (!preferred || preferred === "local") {
-    return NextResponse.json({
+    return respond({
       output: localOutput(),
       provider: "local",
       model: "deterministic",
@@ -144,7 +166,7 @@ export async function POST(request: Request) {
 
   /* --- Route ------------------------------------------------------------ */
   const dispatchedAt = Date.now();
-  telemetry.recordLatency({
+  recordLiveLatency({
     stage: "trigger_to_dispatch",
     ms: dispatchedAt - receivedAt,
     provider: preferred,
@@ -188,7 +210,7 @@ export async function POST(request: Request) {
 
     if (!output) {
       // The router's validator should have caught this; belt and braces.
-      return NextResponse.json({
+      return respond({
         output: localOutput(),
         provider: "local",
         model: "deterministic",
@@ -228,13 +250,13 @@ export async function POST(request: Request) {
       }
     }
 
-    telemetry.recordLatency({
+    recordLiveLatency({
       stage: "provider_response",
       ms: result.response.latencyMs,
       provider: result.provider,
       model: result.model,
     });
-    telemetry.recordLatency({
+    recordLiveLatency({
       stage: "server_to_safe",
       ms: Date.now() - receivedAt,
       provider: result.provider,
@@ -251,7 +273,7 @@ export async function POST(request: Request) {
       reported: result.response.usage?.totalTokens !== undefined,
     });
 
-    return NextResponse.json({
+    return respond({
       output: finalOutput,
       provider: result.provider,
       // The model that actually produced what is on screen. When escalation
@@ -268,7 +290,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     telemetry.recordFailure("turn_failed");
-    return NextResponse.json({
+    return respond({
       output: localOutput(),
       provider: "local",
       model: "deterministic",

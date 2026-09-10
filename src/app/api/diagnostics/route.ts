@@ -20,6 +20,7 @@ import { hasStrings } from "@/counter/ui-strings";
 import { counterVoiceSupport } from "@/providers/stt/capability";
 import { LLM_PROVIDER_IDS } from "@/providers/llm/types";
 import { telemetry } from "@/lib/telemetry";
+import { readSharedLatencySnapshot, sharedTelemetryInfo } from "@/lib/shared-telemetry";
 import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/models";
 import { describePolicy } from "@/providers/llm/openrouter";
 import { RATE_RULES, sessionEnforcement } from "@/lib/guard";
@@ -43,6 +44,10 @@ export async function GET() {
   const storage = counterStoreInfo();
   let counterSessions: CounterStoreStats | null = null;
   let storageHealth: "ok" | "unavailable" = "ok";
+  const telemetryStore = sharedTelemetryInfo();
+  const localTelemetry = telemetry.snapshot();
+  let telemetryHealth: "ok" | "local" | "unavailable" = telemetryStore.shared ? "ok" : "local";
+  let sharedLatency: Awaited<ReturnType<typeof readSharedLatencySnapshot>> = null;
   try {
     counterSessions = await store.stats();
   } catch {
@@ -51,6 +56,33 @@ export async function GET() {
     // hide configuration and provider status.
     storageHealth = "unavailable";
   }
+
+  if (telemetryStore.shared) {
+    try {
+      sharedLatency = await readSharedLatencySnapshot();
+      if (!sharedLatency) telemetryHealth = "unavailable";
+    } catch {
+      // Redis is an observability dependency, never a reason to hide the rest
+      // of diagnostics. Fall back to this warm instance and label it honestly.
+      telemetryHealth = "unavailable";
+    }
+  }
+
+  const telemetrySnapshot = {
+    ...localTelemetry,
+    ...(sharedLatency ? { latency: sharedLatency.latency, slo: sharedLatency.slo } : {}),
+    storage: {
+      ...telemetryStore,
+      health: telemetryHealth,
+      sampleCount: sharedLatency?.sampleCount ?? null,
+      latencyScope: sharedLatency
+        ? "shared-redis"
+        : telemetryStore.shared
+          ? "process-fallback"
+          : "process-local",
+      otherMetricsScope: "process-local" as const,
+    },
+  };
 
   // Diagnostics is explicitly a live-health surface, so report the same
   // provider preference as /api/interpret. The generic router plan can quite
@@ -260,7 +292,7 @@ export async function GET() {
     },
 
     workload: LIVE_WORKLOAD,
-    telemetry: telemetry.snapshot(),
+    telemetry: telemetrySnapshot,
     configProblems,
   });
 }
