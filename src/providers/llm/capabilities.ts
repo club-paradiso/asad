@@ -165,16 +165,19 @@ export const PROVIDER_CAPABILITIES: Record<LlmProviderId, LlmProviderCapabilitie
     rateLimitHeaders: true,
     maxContextTokens: 131_072,
     recommendedLiveContextTokens: 2000,
-    // 50/day on an unfunded account is the number that matters: a 45-minute
-    // sermon needs ~340 calls, so it exhausts in roughly seven minutes.
+    // Baseline free account: 20 RPM and 50 free-model requests/day. ASAD's
+    // measured 45-minute workload is ~503 calls, so 50/day lasts only ~4 min.
+    // OpenRouter raises the free-model daily allowance to 1,000 after >= $10
+    // in credits have been purchased; account diagnostics checks that tier
+    // separately instead of pretending this baseline applies to every key.
     freeTierQuota: { requestsPerMinute: 20, requestsPerDay: 50 },
     freeTierPrivacy: "varies",
     paidTierPrivacy: "varies",
     privacyNote:
       "OpenRouter does not store prompts by default, but forwards them to whichever provider it routes to, whose own policy then applies. Account settings control whether training-capable providers may be used.",
     thinkingControl: false,
-    docsUrl: "https://openrouter.ai/docs/api-reference/limits",
-    verifiedAt: "2026-08-24",
+    docsUrl: "https://openrouter.ai/docs/faq",
+    verifiedAt: "2026-09-10",
   },
 
   openai: {
@@ -250,6 +253,7 @@ const OPEN_WEIGHT_MODELS: readonly RegExp[] = [
   /exaone/i,
   /solar-/i,
   /aya-/i,
+  /^nex-agi\/nex-/i,
 ];
 
 export const isOpenWeightModel = (model: string): boolean =>
