@@ -17,11 +17,13 @@ import type {
 } from "@/types";
 import { emptyPrepSheet } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
-import { interpreterOutputSchema } from "@/lib/schema";
 import {
   InterpretationEngine,
+  type ContextualTurnInfo,
   type EngineSnapshot,
   type InterpretResult,
+  type ProvisionalLane,
+  type TurnTiming,
 } from "@/interpreter/engine/session";
 import { buildSttHints } from "@/interpreter/glossary/stt-hints";
 import { interpretLocally } from "@/providers/llm/mock";
@@ -31,6 +33,7 @@ import {
   type BrowserTranslatorSession,
   type BrowserTranslatorStatus,
 } from "@/providers/llm/browser-translator";
+import type { ClientLatencyStage } from "@/lib/schema";
 import {
   MicrophoneCapture,
   createSpeechProvider,
@@ -43,46 +46,34 @@ import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
 import { guardedFetch } from "@/lib/session-client";
 import { ClientLatencyQueue } from "./client-latency";
-import { cloudBypassMsForFailure } from "./cloud-degradation";
+import {
+  abortableSleep,
+  BROWSER_TRANSLATOR_MODEL,
+  BROWSER_TRANSLATOR_PROVIDER,
+  createCloudLane,
+  type CloudLane,
+} from "./cloud-lane";
 
 /** How often the engine's clock advances. 100ms keeps trigger jitter below one tenth of a second. */
 const TICK_MS = 100;
-/** Short retries only. Live work cannot wait through a conventional API backoff. */
-const INTERPRET_RETRY_DELAYS_MS = [0, 350, 900] as const;
 /** Give recognisers a moment to emit their final result after capture is sealed. */
 const FINAL_STT_SETTLE_MS = 160;
 /** Do not let End hang indefinitely on a free model or bad venue network. */
 const FINAL_INFLIGHT_WAIT_MS = 2200;
 const FINAL_FLUSH_WAIT_MS = 2800;
+/** Provisional render times kept for turns whose contextual result is still out. */
+const MAX_PROVISIONAL_RENDER_MARKS = 64;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-const abortableSleep = (ms: number, signal: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException("aborted", "AbortError"));
-      return;
-    }
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException("aborted", "AbortError"));
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
-
-const retryableInterpretStatus = (status: number) =>
-  status === 408 || status === 425 || status === 429 || status >= 500;
-
-const retryAfterMs = (response: Response): number | null => {
-  const raw = response.headers.get("retry-after");
-  if (!raw) return null;
-  const seconds = Number(raw);
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
-};
+/** A chunk update whose React commit time is still to be measured. Ids and clocks only. */
+interface RenderMarker {
+  stage: ClientLatencyStage;
+  stableAt: number;
+  turnId: number;
+  provider?: string;
+  model?: string;
+}
 
 export type SessionPhase = "idle" | "starting" | "running" | "ended";
 
@@ -136,9 +127,9 @@ export function useLiveSession(options: LiveSessionOptions) {
   );
   const mountedRef = useRef(true);
   const clientLatencyRef = useRef(new ClientLatencyQueue());
-  const pendingRenderLatencyRef = useRef<Array<{ stableAt: number; provider?: string; model?: string }>>([]);
-  /** Skip known-doomed cloud turns only while a real on-device translator is ready. */
-  const cloudBypassUntilRef = useRef(0);
+  const pendingRenderLatencyRef = useRef<RenderMarker[]>([]);
+  /** When each turn's provisional English reached the screen, by turn id. */
+  const provisionalRenderedAtRef = useRef(new Map<number, number>());
 
   const script: DemoScript = useMemo(() => demoScriptFor(options.mode), [options.mode]);
 
@@ -156,7 +147,15 @@ export function useLiveSession(options: LiveSessionOptions) {
     const renderedAt = Date.now();
     const markers = pendingRenderLatencyRef.current.splice(0);
     for (const marker of markers) {
-      clientLatencyRef.current.add("stable_to_render", renderedAt - marker.stableAt, marker.provider, marker.model);
+      clientLatencyRef.current.add(marker.stage, renderedAt - marker.stableAt, marker.provider, marker.model);
+      if (marker.stage === "stable_to_provisional_render") {
+        const marks = provisionalRenderedAtRef.current;
+        marks.set(marker.turnId, renderedAt);
+        if (marks.size > MAX_PROVISIONAL_RENDER_MARKS) {
+          const oldest = marks.keys().next().value;
+          if (oldest !== undefined) marks.delete(oldest);
+        }
+      }
     }
   }, [snapshot.chunks]);
 
@@ -220,56 +219,35 @@ export function useLiveSession(options: LiveSessionOptions) {
       });
   }, []);
 
-  /** One interpretation call. Demo mode never touches the network. */
+  /**
+   * The contextual lane. Demo mode never touches the network; everything else
+   * goes through the cloud lane, whose retry, quota-bypass and fallback rules
+   * live in `cloud-lane.ts`.
+   */
+  const cloudLaneRef = useRef<CloudLane | null>(null);
+  /** Built lazily from Start's event handler, never during render. */
+  const cloudLane = useCallback((): CloudLane => {
+    cloudLaneRef.current ??= createCloudLane({
+      fetchImpl: (input, init) => guardedFetch(input, init),
+      browserTranslator: () => browserTranslatorRef.current,
+      local: (request) =>
+        interpretLocally({
+          pending: request.pending,
+          mode: request.mode,
+          allowAnticipation: request.allowAnticipation,
+        }),
+      telemetry: clientLatencyRef.current,
+      onProvider: (provider) => setLastProvider(provider),
+    });
+    return cloudLaneRef.current;
+  }, []);
+
   const interpret = useCallback(
-    async (request: InterpretRequest, signal: AbortSignal): Promise<InterpretResult> => {
-      let firstClientDispatchedAt: number | undefined;
-
-      /**
-       * Prefer the already-prepared browser translator over the deterministic
-       * fallback. Never wait for a model download here: a live turn has a
-       * deadline, and Korean echoed back four seconds late is not translation.
-       */
-      const localFallback = async (reason: string): Promise<InterpretResult> => {
-        const browserTranslator = browserTranslatorRef.current;
-        if (browserTranslator) {
-          const output = await translateWithBrowserTranslator(
-            browserTranslator,
-            request.pending,
-            signal,
-          );
-          if (output) {
-            setLastProvider("browser-on-device");
-            return {
-              output,
-              degraded: true,
-              reason: `${reason} Chrome on-device Korean→English backup was used.`,
-              clientDispatchedAt: firstClientDispatchedAt,
-              provider: "browser-on-device",
-              model: "chrome-translator",
-            };
-          }
-        }
-
-        // Never strand a browser on the deterministic helper. If the on-device
-        // translator is unavailable, cloud remains worth retrying next turn.
-        cloudBypassUntilRef.current = 0;
-        setLastProvider("local");
-        return {
-          output: interpretLocally({
-            pending: request.pending,
-            mode: request.mode,
-            scriptId: optionsRef.current.source === "demo" ? script.id : undefined,
-            allowAnticipation: request.allowAnticipation,
-          }),
-          degraded: true,
-          reason,
-          clientDispatchedAt: firstClientDispatchedAt,
-          provider: "local",
-          model: "deterministic",
-        };
-      };
-
+    async (
+      request: InterpretRequest,
+      signal: AbortSignal,
+      turn: ContextualTurnInfo,
+    ): Promise<InterpretResult> => {
       if (optionsRef.current.source === "demo") {
         // Simulated model latency, so demo mode shows the real rhythm of the
         // console rather than an impossibly instant one.
@@ -286,117 +264,96 @@ export function useLiveSession(options: LiveSessionOptions) {
           model: "deterministic",
         };
       }
-
-      if (
-        browserTranslatorRef.current &&
-        cloudBypassUntilRef.current > Date.now()
-      ) {
-        return localFallback(
-          "Cloud interpretation is cooling down after a quota or rate-limit failure.",
-        );
-      }
-
-      const clientTelemetry = clientLatencyRef.current.batch();
-      const telemetryIds = clientTelemetry.map((sample) => sample.id);
-      const wireRequest: InterpretRequest = clientTelemetry.length > 0 ? { ...request, clientTelemetry } : request;
-
-      let lastFailure = "Interpretation network request failed.";
-
-      for (let attempt = 0; attempt < INTERPRET_RETRY_DELAYS_MS.length; attempt += 1) {
-        if (attempt > 0) {
-          await abortableSleep(INTERPRET_RETRY_DELAYS_MS[attempt], signal);
-        }
-
-        try {
-          if (firstClientDispatchedAt === undefined) firstClientDispatchedAt = Date.now();
-          const response = await guardedFetch("/api/interpret", {
-            method: "POST",
-            signal,
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(wireRequest),
-          });
-
-          if (response.ok) {
-            if (telemetryIds.length > 0) clientLatencyRef.current.acknowledge(telemetryIds);
-            const data = (await response.json()) as {
-              output: unknown;
-              provider?: string;
-              model?: string;
-              degraded?: boolean;
-              reason?: string;
-            };
-            const parsed = interpreterOutputSchema.safeParse(data.output);
-            if (!parsed.success) {
-              return localFallback(
-                "The interpretation response was malformed — using the local backup path.",
-              );
-            }
-
-            // The server intentionally returns HTTP 200 even after every cloud
-            // model fails, because the transcript must keep running. That means
-            // status-code retries alone cannot detect quota exhaustion. Replace
-            // its deterministic Korean-only answer with on-device English when
-            // Chrome has already prepared the translator.
-            if (data.provider === "local") {
-              const bypassMs = cloudBypassMsForFailure({ reason: data.reason });
-              if (browserTranslatorRef.current && bypassMs > 0) {
-                cloudBypassUntilRef.current = Date.now() + bypassMs;
-              }
-              return localFallback(
-                data.reason ?? "The cloud interpretation provider was unavailable.",
-              );
-            }
-
-            cloudBypassUntilRef.current = 0;
-            setLastProvider(data.provider);
-            return {
-              output: parsed.data, degraded: data.degraded, reason: data.reason,
-              clientDispatchedAt: firstClientDispatchedAt, provider: data.provider, model: data.model,
-            };
-          }
-
-          lastFailure =
-            response.status === 429
-              ? "The free interpretation provider is temporarily rate limited."
-              : `Interpretation request failed (${response.status}).`;
-
-          // Once Chrome's translator is ready, retrying a 429 in 350ms merely
-          // buys another 429. Fall back immediately and try cloud after the
-          // cooldown instead of adding dead air to this sentence.
-          if (response.status === 429 && browserTranslatorRef.current) {
-            cloudBypassUntilRef.current =
-              Date.now() + cloudBypassMsForFailure({ status: response.status });
-            return localFallback(`${lastFailure} Using the on-device backup immediately.`);
-          }
-
-          if (
-            !retryableInterpretStatus(response.status) ||
-            attempt === INTERPRET_RETRY_DELAYS_MS.length - 1
-          ) {
-            return localFallback(`${lastFailure} This turn used the local backup path instead.`);
-          }
-
-          // Honour a small Retry-After when present, but never let a server-side
-          // abuse window turn into a long blank patch in a live sermon.
-          const serverDelay = retryAfterMs(response);
-          if (serverDelay && serverDelay <= 1500) {
-            await abortableSleep(serverDelay, signal);
-          }
-        } catch (err) {
-          if (signal.aborted || (err instanceof Error && err.name === "AbortError")) throw err;
-          lastFailure = err instanceof Error ? err.message : "Interpretation network request failed.";
-          if (attempt === INTERPRET_RETRY_DELAYS_MS.length - 1) {
-            return localFallback(
-              `${lastFailure} The connection did not recover, so this turn used the local backup path.`,
-            );
-          }
-        }
-      }
-
-      return localFallback(`${lastFailure} This turn used the local backup path.`);
+      return cloudLane().interpret(request, signal, turn);
     },
-    [script.id],
+    [cloudLane, script.id],
   );
+
+  /**
+   * The provisional lane: Chrome's on-device translator, and only when it is
+   * genuinely ready. `isReady` is answered from the ref synchronously, so a
+   * language pack that is still downloading simply means cloud-first for that
+   * turn. Demo mode has no fast lane; its scripted English is already instant.
+   */
+  const provisionalLane = useMemo<ProvisionalLane>(
+    () => ({
+      isReady: () => optionsRef.current.source !== "demo" && browserTranslatorRef.current !== null,
+      translate: (text, signal) => {
+        const translator = browserTranslatorRef.current;
+        if (!translator) return Promise.resolve(null);
+        return translateWithBrowserTranslator(translator, text, signal);
+      },
+      provider: BROWSER_TRANSLATOR_PROVIDER,
+      model: BROWSER_TRANSLATOR_MODEL,
+    }),
+    [],
+  );
+
+  /**
+   * Turn timings into transcript-free samples. Ids, clocks and labels only.
+   *
+   * `stable_to_safe` / `stable_to_render` keep their meaning — when the turn's
+   * FINAL English reached state / screen. When the contextual lane leaves the
+   * provisional line standing, that final English was the provisional one, so
+   * the sample points at the provisional clock rather than at the moment the
+   * cloud got round to agreeing.
+   */
+  const recordTurnTiming = useCallback((timing: TurnTiming) => {
+    const queue = clientLatencyRef.current;
+    const { stableAt, provider, model, turnId } = timing;
+
+    if (timing.lane === "provisional") {
+      if (!timing.hasSafe) return;
+      queue.add("stable_to_provisional", timing.safeAt - stableAt, provider, model);
+      pendingRenderLatencyRef.current.push({ stage: "stable_to_provisional_render", stableAt, turnId, provider, model });
+      return;
+    }
+
+    if (timing.clientDispatchedAt !== undefined) {
+      queue.add("stable_to_client_dispatch", timing.clientDispatchedAt - stableAt, provider, model);
+    }
+
+    switch (timing.outcome) {
+      case "applied":
+        if (timing.hasSafe) {
+          queue.add("stable_to_safe", timing.safeAt - stableAt, provider, model);
+          pendingRenderLatencyRef.current.push({ stage: "stable_to_render", stableAt, turnId, provider, model });
+        }
+        break;
+      case "refined":
+        queue.add("stable_to_safe", timing.safeAt - stableAt, provider, model);
+        pendingRenderLatencyRef.current.push({ stage: "stable_to_render", stableAt, turnId, provider, model });
+        if (timing.provisionalAppliedAt !== undefined) {
+          queue.add("provisional_to_refinement", timing.safeAt - timing.provisionalAppliedAt, provider, model);
+        }
+        break;
+      case "kept":
+      case "discarded": {
+        // The provisional line is the final line.
+        if (timing.provisionalAppliedAt !== undefined) {
+          queue.add("stable_to_safe", timing.provisionalAppliedAt - stableAt, BROWSER_TRANSLATOR_PROVIDER, BROWSER_TRANSLATOR_MODEL);
+          const renderedAt = provisionalRenderedAtRef.current.get(turnId);
+          if (renderedAt !== undefined) {
+            queue.add("stable_to_render", renderedAt - stableAt, BROWSER_TRANSLATOR_PROVIDER, BROWSER_TRANSLATOR_MODEL);
+            provisionalRenderedAtRef.current.delete(turnId);
+          }
+        }
+        if (timing.outcome === "discarded") {
+          queue.add("refinement_discarded_committed", timing.safeAt - stableAt, provider, model);
+        }
+        break;
+      }
+      case "stale":
+        queue.add("contextual_result_stale", timing.safeAt - stableAt, provider, model);
+        break;
+      default:
+        break;
+    }
+
+    if (timing.hasAnticipated) {
+      queue.add("stable_to_anticipated", timing.safeAt - stableAt, provider, model);
+    }
+  }, []);
 
   const resolveBible = useCallback(async (reference: BibleReference) => {
     const response = await fetch(`/api/bible?ref=${encodeURIComponent(reference.display)}`);
@@ -469,27 +426,20 @@ export function useLiveSession(options: LiveSessionOptions) {
     setDemoBeat(null);
     setLastProvider(undefined);
     setSnapshot(emptySnapshot());
+    pendingRenderLatencyRef.current = [];
+    provisionalRenderedAtRef.current.clear();
 
     const engine = new InterpretationEngine({
       mode: current.mode,
       lag: current.lag,
       prep: current.prep ?? emptyPrepSheet(),
       interpret,
+      provisional: provisionalLane,
       resolveBible:
         current.source !== "demo" && current.resolveScripture !== false ? resolveBible : undefined,
       onTurnTiming: (timing) => {
         if (current.source === "demo") return;
-        const queue = clientLatencyRef.current;
-        if (timing.clientDispatchedAt !== undefined) {
-          queue.add("stable_to_client_dispatch", timing.clientDispatchedAt - timing.stableAt, timing.provider, timing.model);
-        }
-        if (timing.hasSafe) {
-          queue.add("stable_to_safe", timing.safeAt - timing.stableAt, timing.provider, timing.model);
-          pendingRenderLatencyRef.current.push({ stableAt: timing.stableAt, provider: timing.provider, model: timing.model });
-        }
-        if (timing.hasAnticipated) {
-          queue.add("stable_to_anticipated", timing.safeAt - timing.stableAt, timing.provider, timing.model);
-        }
+        recordTurnTiming(timing);
       },
       onChange: setSnapshot,
     });
@@ -622,7 +572,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         setPhase("idle");
       }
     }
-  }, [phase, interpret, prepareBrowserTranslator, resolveBible, script, teardown]);
+  }, [phase, interpret, prepareBrowserTranslator, provisionalLane, recordTurnTiming, resolveBible, script, teardown]);
 
   // Push setting changes into the running engine rather than restarting it.
   useEffect(() => {

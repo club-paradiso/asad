@@ -28,6 +28,12 @@ export const LIVE_LATENCY_STAGES = [
   "stable_to_safe",
   "stable_to_anticipated",
   "stable_to_render",
+  "stable_to_provisional",
+  "stable_to_provisional_render",
+  "provisional_to_refinement",
+  "refinement_discarded_committed",
+  "contextual_result_stale",
+  "provisional_failed",
 ] as const satisfies readonly LatencyStage[];
 
 const LIVE_LATENCY_STAGE_SET = new Set<string>(LIVE_LATENCY_STAGES);

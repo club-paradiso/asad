@@ -26,11 +26,17 @@ const ChunkLine = forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
 ) {
   const anticipated = chunk.state === "anticipated";
   const correction = !!chunk.correctsChunkId;
+  // Fast on-device English the contextual lane may still replace. Marked so
+  // the interpreter knows the line is provisional, and so a test can prove
+  // the two lanes without reading any text.
+  const provisional = chunk.provisional === true && chunk.state === "current";
 
   return (
     <div
       ref={ref}
       data-chunk-state={chunk.state}
+      data-turn-id={chunk.turnId}
+      data-provisional={chunk.provisional === true ? "true" : undefined}
       className={cn(
         "relative pl-4 py-1.5 chunk-enter",
         anticipated
@@ -69,6 +75,14 @@ const ChunkLine = forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
             title="Correction to an earlier line"
           >
             ↺
+          </span>
+        )}
+        {provisional && (
+          <span
+            className="mr-2 align-middle text-[0.5em] text-[var(--fg-dim)]"
+            title="Provisional on-device English — may still be refined"
+          >
+            ≈
           </span>
         )}
         {chunk.text}

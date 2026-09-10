@@ -21,6 +21,13 @@ export const clientLatencyStageSchema = z.enum([
   "stable_to_safe",
   "stable_to_anticipated",
   "stable_to_render",
+  // Two-lane stages. Durations and counts only; a stage name is not content.
+  "stable_to_provisional",
+  "stable_to_provisional_render",
+  "provisional_to_refinement",
+  "refinement_discarded_committed",
+  "contextual_result_stale",
+  "provisional_failed",
 ]);
 
 export const clientLatencySampleSchema = z.object({

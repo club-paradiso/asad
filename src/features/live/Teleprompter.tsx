@@ -47,7 +47,17 @@ export function Teleprompter({
             // on screen to balance against.
             "text-[calc(var(--english-size)*var(--font-scale)*1.18)]",
           )}
+          data-provisional={current?.provisional && current.state === "current" ? "true" : undefined}
         >
+          {current?.provisional && current.state === "current" && (
+            <span
+              aria-hidden
+              className="mr-2 align-middle text-[0.4em] text-[var(--fg-dim)]"
+              title="Provisional on-device English — may still be refined"
+            >
+              ≈
+            </span>
+          )}
           {current?.text ?? "…"}
           {current?.confidence === "low" && (
             <span className="ml-2 align-super text-[0.4em] text-[var(--warn)]">?</span>
