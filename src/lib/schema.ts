@@ -15,6 +15,29 @@ export const modeSchema = z.enum(["sermon", "general"]);
 
 export const lagSchema = z.enum(["fast", "balanced", "safe"]);
 
+/** Browser-measured live latency. Never contains transcript content. */
+export const clientLatencyStageSchema = z.enum([
+  "stable_to_client_dispatch",
+  "stable_to_safe",
+  "stable_to_anticipated",
+  "stable_to_render",
+]);
+
+export const clientLatencySampleSchema = z.object({
+  id: z.string().min(1).max(80).regex(/^[A-Za-z0-9:_-]+$/),
+  stage: clientLatencyStageSchema,
+  ms: z.number().finite().nonnegative().max(120_000),
+  provider: z.string().min(1).max(80).optional(),
+  model: z.string().min(1).max(160).optional(),
+});
+
+export type ClientLatencyStage = z.infer<typeof clientLatencyStageSchema>;
+export type ClientLatencySample = z.infer<typeof clientLatencySampleSchema>;
+
+export const clientTelemetryBatchSchema = z.object({
+  samples: z.array(clientLatencySampleSchema).min(1).max(24),
+});
+
 export const chunkDraftSchema = z.object({
   text: z.string().min(1).max(400),
   confidence: confidenceSchema.default("medium"),
@@ -124,6 +147,8 @@ export const interpretRequestSchema = z.object({
       culturalNotes: z.array(culturalNoteSchema).max(4).default([]),
     })
     .optional(),
+  /** Completed client timings from earlier turns, piggybacked without another request. */
+  clientTelemetry: z.array(clientLatencySampleSchema).max(24).optional(),
   allowAnticipation: z.boolean().default(true),
 });
 

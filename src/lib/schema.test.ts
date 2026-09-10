@@ -90,6 +90,16 @@ describe("interpret request validation", () => {
     if (result.success) expect(result.data.allowAnticipation).toBe(true);
   });
 
+  it("accepts bounded transcript-free client latency samples", () => {
+    const result = interpretRequestSchema.safeParse({ ...base, clientTelemetry: [{ id: "c1-1", stage: "stable_to_render", ms: 1840, provider: "openrouter" }] });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid client latency stages", () => {
+    const result = interpretRequestSchema.safeParse({ ...base, clientTelemetry: [{ id: "c1-1", stage: "raw_transcript", ms: 20 }] });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects an empty pending buffer", () => {
     expect(interpretRequestSchema.safeParse({ ...base, pending: "" }).success).toBe(false);
   });

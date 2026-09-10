@@ -42,6 +42,7 @@ import {
 import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
 import { guardedFetch } from "@/lib/session-client";
+import { ClientLatencyQueue } from "./client-latency";
 
 /** How often the engine's clock advances. 100ms keeps trigger jitter below one tenth of a second. */
 const TICK_MS = 100;
@@ -133,6 +134,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     null,
   );
   const mountedRef = useRef(true);
+  const clientLatencyRef = useRef(new ClientLatencyQueue());
+  const pendingRenderLatencyRef = useRef<Array<{ stableAt: number; provider?: string; model?: string }>>([]);
 
   const script: DemoScript = useMemo(() => demoScriptFor(options.mode), [options.mode]);
 
@@ -144,6 +147,30 @@ export function useLiveSession(options: LiveSessionOptions) {
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
+
+  useEffect(() => {
+    if (pendingRenderLatencyRef.current.length === 0) return;
+    const renderedAt = Date.now();
+    const markers = pendingRenderLatencyRef.current.splice(0);
+    for (const marker of markers) {
+      clientLatencyRef.current.add("stable_to_render", renderedAt - marker.stableAt, marker.provider, marker.model);
+    }
+  }, [snapshot.chunks]);
+
+  const flushClientTelemetry = useCallback(() => {
+    if (optionsRef.current.source === "demo") return;
+    const samples = clientLatencyRef.current.batch();
+    if (samples.length === 0) return;
+    const ids = samples.map((sample) => sample.id);
+    void guardedFetch("/api/telemetry/live", {
+      method: "POST",
+      keepalive: true,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ samples }),
+    }).then((response) => {
+      if (response.ok) clientLatencyRef.current.acknowledge(ids);
+    }).catch(() => {});
+  }, []);
 
   /**
    * Begin Chrome's local ko→en translator while the Start click still carries
@@ -193,6 +220,8 @@ export function useLiveSession(options: LiveSessionOptions) {
   /** One interpretation call. Demo mode never touches the network. */
   const interpret = useCallback(
     async (request: InterpretRequest, signal: AbortSignal): Promise<InterpretResult> => {
+      let firstClientDispatchedAt: number | undefined;
+
       /**
        * Prefer the already-prepared browser translator over the deterministic
        * fallback. Never wait for a model download here: a live turn has a
@@ -212,6 +241,9 @@ export function useLiveSession(options: LiveSessionOptions) {
               output,
               degraded: true,
               reason: `${reason} Chrome on-device Korean→English backup was used.`,
+              clientDispatchedAt: firstClientDispatchedAt,
+              provider: "browser-on-device",
+              model: "chrome-translator",
             };
           }
         }
@@ -226,6 +258,9 @@ export function useLiveSession(options: LiveSessionOptions) {
           }),
           degraded: true,
           reason,
+          clientDispatchedAt: firstClientDispatchedAt,
+          provider: "local",
+          model: "deterministic",
         };
       };
 
@@ -241,8 +276,14 @@ export function useLiveSession(options: LiveSessionOptions) {
             scriptId: script.id,
             allowAnticipation: request.allowAnticipation,
           }),
+          provider: "local",
+          model: "deterministic",
         };
       }
+
+      const clientTelemetry = clientLatencyRef.current.batch();
+      const telemetryIds = clientTelemetry.map((sample) => sample.id);
+      const wireRequest: InterpretRequest = clientTelemetry.length > 0 ? { ...request, clientTelemetry } : request;
 
       let lastFailure = "Interpretation network request failed.";
 
@@ -252,17 +293,20 @@ export function useLiveSession(options: LiveSessionOptions) {
         }
 
         try {
+          if (firstClientDispatchedAt === undefined) firstClientDispatchedAt = Date.now();
           const response = await guardedFetch("/api/interpret", {
             method: "POST",
             signal,
             headers: { "content-type": "application/json" },
-            body: JSON.stringify(request),
+            body: JSON.stringify(wireRequest),
           });
 
           if (response.ok) {
+            if (telemetryIds.length > 0) clientLatencyRef.current.acknowledge(telemetryIds);
             const data = (await response.json()) as {
               output: unknown;
               provider?: string;
+              model?: string;
               degraded?: boolean;
               reason?: string;
             };
@@ -285,7 +329,10 @@ export function useLiveSession(options: LiveSessionOptions) {
             }
 
             setLastProvider(data.provider);
-            return { output: parsed.data, degraded: data.degraded, reason: data.reason };
+            return {
+              output: parsed.data, degraded: data.degraded, reason: data.reason,
+              clientDispatchedAt: firstClientDispatchedAt, provider: data.provider, model: data.model,
+            };
           }
 
           lastFailure =
@@ -354,6 +401,7 @@ export function useLiveSession(options: LiveSessionOptions) {
       const finalSnapshot = emptySnapshot();
       setSnapshot(finalSnapshot);
       setPhase("ended");
+      flushClientTelemetry();
       return finalSnapshot;
     }
 
@@ -374,8 +422,9 @@ export function useLiveSession(options: LiveSessionOptions) {
     const finalSnapshot = engine.snapshot();
     setSnapshot(finalSnapshot);
     setPhase("ended");
+    flushClientTelemetry();
     return finalSnapshot;
-  }, [teardown]);
+  }, [flushClientTelemetry, teardown]);
 
   const start = useCallback(async () => {
     if (phase === "running" || phase === "starting") return;
@@ -399,6 +448,20 @@ export function useLiveSession(options: LiveSessionOptions) {
       interpret,
       resolveBible:
         current.source !== "demo" && current.resolveScripture !== false ? resolveBible : undefined,
+      onTurnTiming: (timing) => {
+        if (current.source === "demo") return;
+        const queue = clientLatencyRef.current;
+        if (timing.clientDispatchedAt !== undefined) {
+          queue.add("stable_to_client_dispatch", timing.clientDispatchedAt - timing.stableAt, timing.provider, timing.model);
+        }
+        if (timing.hasSafe) {
+          queue.add("stable_to_safe", timing.safeAt - timing.stableAt, timing.provider, timing.model);
+          pendingRenderLatencyRef.current.push({ stableAt: timing.stableAt, provider: timing.provider, model: timing.model });
+        }
+        if (timing.hasAnticipated) {
+          queue.add("stable_to_anticipated", timing.safeAt - timing.stableAt, timing.provider, timing.model);
+        }
+      },
       onChange: setSnapshot,
     });
     engineRef.current = engine;
@@ -550,9 +613,10 @@ export function useLiveSession(options: LiveSessionOptions) {
       mountedRef.current = false;
       browserTranslatorRef.current?.destroy();
       browserTranslatorRef.current = null;
+      flushClientTelemetry();
       void teardown();
     },
-    [teardown],
+    [flushClientTelemetry, teardown],
   );
 
   const correct = useCallback((from: string, to: string, english?: string) => {

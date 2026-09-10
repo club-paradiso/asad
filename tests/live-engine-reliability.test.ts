@@ -61,6 +61,27 @@ describe("live interpretation reliability", () => {
     expect(recoveredState.chunks.some((chunk) => chunk.text === "Recovered English")).toBe(true);
   });
 
+  it("measures one turn from the original stable event without server clock math", async () => {
+    let now = 1000;
+    let timing: import("@/interpreter/engine/session").TurnTiming | null = null;
+    const engine = new InterpretationEngine({
+      mode: "sermon", lag: "balanced", now: () => now, onChange: () => {},
+      onTurnTiming: (next) => { timing = next; },
+      interpret: async () => ({ output: output("Measured English"), clientDispatchedAt: now, provider: "test-provider", model: "test-model" }),
+    });
+    engine.start();
+    engine.handleStable("이 문장은 안정화 시점부터 측정됩니다.");
+    now += 900;
+    engine.tick();
+    await vi.waitFor(() => expect(timing).not.toBeNull());
+    const measured = timing as unknown as import("@/interpreter/engine/session").TurnTiming;
+    expect(measured.stableAt).toBe(1000);
+    expect(measured.clientDispatchedAt).toBe(1900);
+    expect(measured.safeAt).toBe(1900);
+    expect(measured.hasSafe).toBe(true);
+    expect(measured.provider).toBe("test-provider");
+  });
+
   it("flushes final stable speech immediately during graceful shutdown", async () => {
     const now = 0;
     let snapshot: EngineSnapshot | null = null;

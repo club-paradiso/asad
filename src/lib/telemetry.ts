@@ -10,18 +10,24 @@
  * see docs/privacy.md.
  */
 
+import type { ClientLatencySample } from "@/lib/schema";
+
 /** The stages the live path is measured across. */
 export type LatencyStage =
+  /** Browser stable event → the first network dispatch for that turn. */
+  | "stable_to_client_dispatch"
   /** Server received request → provider dispatch. */
   | "trigger_to_dispatch"
   /** Request dispatched → complete validated provider response. */
   | "provider_response"
   /** Server received request → validated safe English ready to return. */
   | "server_to_safe"
-  /** Stabilised Korean → safe English available to render. */
+  /** Browser stable event → validated safe chunks applied to engine state. */
   | "stable_to_safe"
-  /** Stabilised Korean → anticipated English available to render. */
-  | "stable_to_anticipated";
+  /** Browser stable event → anticipated chunks applied to engine state. */
+  | "stable_to_anticipated"
+  /** Browser stable event → React committed the safe chunk update. */
+  | "stable_to_render";
 
 export interface LatencySample {
   stage: LatencyStage;
@@ -81,8 +87,8 @@ export function summarise(values: number[]): Percentiles {
  * recorded as missing them.
  */
 export const LATENCY_SLO = {
-  /** Stabilised Korean → safe English on screen. */
-  stable_to_safe: { p50: 2500, p95: 4500 },
+  /** Stabilised Korean → safe English committed on screen. */
+  stable_to_render: { p50: 2500, p95: 4500 },
   /** Provider round trip alone. */
   provider_response: { p50: 1500, p95: 3000 },
 } as const;
@@ -95,24 +101,46 @@ export interface SloVerdict {
   p95Met: boolean;
 }
 
-/** Bounded ring buffer — a 70-minute session must not grow without limit. */
-const MAX_SAMPLES = 600;
+/** Enough latency slots for every stage of one 45-minute service, still bounded. */
+const MAX_LATENCY_SAMPLES = 3_600;
+const MAX_TOKEN_SAMPLES = 600;
+const MAX_CLIENT_SAMPLE_IDS = 2_000;
 
 export class TelemetryRecorder {
   private latency: LatencySample[] = [];
   private tokens: TokenSample[] = [];
   private failures = new Map<string, number>();
+  private clientSampleIds = new Set<string>();
+  private clientSampleIdOrder: string[] = [];
   private schemaAttempts = 0;
   private schemaFailures = 0;
 
   recordLatency(sample: Omit<LatencySample, "at"> & { at?: number }): void {
     this.latency.push({ ...sample, at: sample.at ?? Date.now() });
-    if (this.latency.length > MAX_SAMPLES) this.latency.shift();
+    if (this.latency.length > MAX_LATENCY_SAMPLES) this.latency.shift();
+  }
+
+  /** Record a browser sample once even when an HTTP retry replays its batch. */
+  recordClientLatency(sample: ClientLatencySample): boolean {
+    if (this.clientSampleIds.has(sample.id)) return false;
+    this.clientSampleIds.add(sample.id);
+    this.clientSampleIdOrder.push(sample.id);
+    if (this.clientSampleIdOrder.length > MAX_CLIENT_SAMPLE_IDS) {
+      const oldest = this.clientSampleIdOrder.shift();
+      if (oldest) this.clientSampleIds.delete(oldest);
+    }
+    this.recordLatency({
+      stage: sample.stage,
+      ms: Math.round(sample.ms),
+      provider: sample.provider,
+      model: sample.model,
+    });
+    return true;
   }
 
   recordTokens(sample: Omit<TokenSample, "at"> & { at?: number }): void {
     this.tokens.push({ ...sample, at: sample.at ?? Date.now() });
-    if (this.tokens.length > MAX_SAMPLES) this.tokens.shift();
+    if (this.tokens.length > MAX_TOKEN_SAMPLES) this.tokens.shift();
   }
 
   recordFailure(kind: string): void {
@@ -171,11 +199,13 @@ export class TelemetryRecorder {
   snapshot() {
     return {
       latency: {
+        stable_to_client_dispatch: this.stage("stable_to_client_dispatch"),
         trigger_to_dispatch: this.stage("trigger_to_dispatch"),
         provider_response: this.stage("provider_response"),
         server_to_safe: this.stage("server_to_safe"),
         stable_to_safe: this.stage("stable_to_safe"),
         stable_to_anticipated: this.stage("stable_to_anticipated"),
+        stable_to_render: this.stage("stable_to_render"),
       },
       slo: this.sloVerdicts(),
       tokens: this.tokenSummary(),
@@ -188,6 +218,8 @@ export class TelemetryRecorder {
     this.latency = [];
     this.tokens = [];
     this.failures.clear();
+    this.clientSampleIds.clear();
+    this.clientSampleIdOrder = [];
     this.schemaAttempts = 0;
     this.schemaFailures = 0;
   }
