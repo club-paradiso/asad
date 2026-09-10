@@ -1,5 +1,8 @@
 import type { AppEnv, EnvProblem } from "@/lib/env";
 
+/** OpenRouter accepts at most three entries in the `models` fallback array. */
+export const OPENROUTER_MAX_MODEL_FALLBACKS = 3;
+
 /**
  * Verified zero-cost recovery floor for the public deployment.
  *
@@ -7,17 +10,15 @@ import type { AppEnv, EnvProblem } from "@/lib/env";
  * they are never used by paid-capable deployments. OpenRouter tries them only
  * after the configured primary model errors (for example, an upstream 429).
  *
- * `openrouter/free` is intentionally last. Unlike the explicit model variants,
- * it lets OpenRouter select from the currently available free pool while still
- * filtering for request requirements such as structured output. It is a useful
- * final escape hatch when several named free models share an upstream outage.
+ * `openrouter/free` is deliberately near the front of the recovery list. It is
+ * never a healthy-session primary, but when the pinned primary is down it can
+ * select a currently available free model matching the request requirements.
  */
 export const PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS = [
   "nex-agi/nex-n2.5-mini:free",
+  "openrouter/free",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "openrouter/free",
 ] as const;
 
 /**
@@ -54,9 +55,9 @@ function isSafePublicFreeConfiguration(
  * Return the model-level fallback chain for the exact public/free exception.
  *
  * Every candidate is independently constrained to a zero-cost OpenRouter model
- * identifier. This is intentionally separate from provider-level failover:
- * OpenRouter first tries another upstream for the same model, then may advance
- * through this list if the model itself is unavailable or rate-limited.
+ * identifier. The result is capped here at the gateway's three-model API limit
+ * so adding a recovery candidate cannot turn every production request into a
+ * deterministic HTTP 400.
  */
 export function publicFreeOpenRouterFallbackModels(
   env: AppEnv,
@@ -68,7 +69,7 @@ export function publicFreeOpenRouterFallbackModels(
   const primary = env.llm.openrouter.primaryModel;
   return PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.filter(
     (model) => model !== primary && isPublicZeroCostOpenRouterModel(model),
-  );
+  ).slice(0, OPENROUTER_MAX_MODEL_FALLBACKS);
 }
 
 /**

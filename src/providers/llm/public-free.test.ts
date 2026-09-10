@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseEnv } from "@/lib/env";
 import {
+  OPENROUTER_MAX_MODEL_FALLBACKS,
   PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS,
   isPublicZeroCostOpenRouterModel,
   publicFreeOpenRouterFallbackModels,
@@ -47,15 +48,34 @@ describe("public free OpenRouter restoration", () => {
 
     const fallbacks = publicFreeOpenRouterFallbackModels(restored, processEnv);
     expect(fallbacks).toEqual([
+      "openrouter/free",
       "nvidia/nemotron-3-super-120b-a12b:free",
       "google/gemma-4-31b-it:free",
-      "google/gemma-4-26b-a4b-it:free",
-      "openrouter/free",
     ]);
+    expect(fallbacks).toHaveLength(OPENROUTER_MAX_MODEL_FALLBACKS);
     expect(fallbacks).not.toContain(restored.llm.openrouter.primaryModel);
     expect(PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.every(isPublicZeroCostOpenRouterModel)).toBe(
       true,
     );
+  });
+
+  it("never exceeds OpenRouter's three-model fallback API ceiling", () => {
+    const source = currentProductionShape({
+      OPENROUTER_PRIMARY_MODEL: "some-vendor/another-free-model:free",
+    });
+    const processEnv = asProcessEnv(source);
+    const restored = restorePublicFreeOpenRouter(parseEnv(processEnv), processEnv);
+    const fallbacks = publicFreeOpenRouterFallbackModels(restored, processEnv);
+
+    expect(PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.length).toBeGreaterThan(
+      OPENROUTER_MAX_MODEL_FALLBACKS,
+    );
+    expect(fallbacks).toHaveLength(OPENROUTER_MAX_MODEL_FALLBACKS);
+    expect(fallbacks).toEqual([
+      "nex-agi/nex-n2.5-mini:free",
+      "openrouter/free",
+      "nvidia/nemotron-3-super-120b-a12b:free",
+    ]);
   });
 
   it("admits only explicit :free variants or the exact dynamic free-router alias", () => {
