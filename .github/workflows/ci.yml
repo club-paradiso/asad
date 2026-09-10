@@ -82,6 +82,12 @@ jobs:
       - name: Soak (5 simulated minutes)
         run: npm run soak -- --minutes 5
 
+      # The two-lane engine against mocked delayed lanes: bounded cloud
+      # concurrency, bounded coalescing, no lost Korean, no rewritten history.
+      # Simulated time only; it measures no real translator and no real cloud.
+      - name: Two-lane soak (5 simulated minutes)
+        run: npm run soak:two-lane -- --minutes 5
+
   # The checks a unit test cannot make: does the built app actually work in a
   # browser. Kept as a separate job so a failure here is legible on its own,
   # and because it needs Chromium, which the fast job has no use for.
@@ -133,6 +139,12 @@ jobs:
 
       - name: Quota degradation bypass checks
         run: npm run e2e:live-quota-bypass -- http://localhost:3000
+
+      # Mocked window.Translator + delayed /api/interpret through the real
+      # /live UI. Proves the application's two-lane semantics; it does not
+      # exercise Chrome's downloadable Korean→English language pack.
+      - name: Two-lane provisional/refinement checks
+        run: npm run e2e:live-two-lane -- http://localhost:3000 ./e2e-out
 
       # The screenshots are the point when a check fails: they show what the
       # page actually looked like, which no assertion message can.

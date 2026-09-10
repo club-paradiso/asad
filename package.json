@@ -18,11 +18,13 @@
     "e2e": "node scripts/e2e-check.mjs",
     "e2e:live-fallback": "node scripts/e2e-live-fallback.mjs",
     "e2e:live-quota-bypass": "node scripts/e2e-live-quota-bypass.mjs",
+    "e2e:live-two-lane": "node scripts/e2e-live-two-lane.mjs",
     "bench:llm": "tsx scripts/bench-llm.mjs",
     "bench:gemini": "tsx scripts/bench-llm.mjs --only gemini --stdout markdown --no-write",
     "smoke:llm": "tsx scripts/smoke-llm.mjs",
     "bench:live": "tsx scripts/bench-live.mjs",
     "soak": "tsx scripts/soak.mjs",
+    "soak:two-lane": "tsx scripts/soak-two-lane.mjs",
     "health:openrouter": "tsx scripts/health-openrouter.mjs",
     "measure:prompt": "tsx scripts/measure-prompt.mjs"
   },

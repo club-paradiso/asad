@@ -1,0 +1,117 @@
+{
+  "minutes": 45,
+  "lag": "balanced",
+  "segments": 499,
+  "interpretationCalls": 481,
+  "callsPerMinute": 10.69,
+  "latency": {
+    "providerResponse": {
+      "count": 481,
+      "p50": 0,
+      "p90": 1,
+      "p95": 1,
+      "max": 1,
+      "mean": 0
+    },
+    "stableToSafe": {
+      "count": 466,
+      "p50": 200,
+      "p90": 800,
+      "p95": 1000,
+      "max": 2401,
+      "mean": 305
+    }
+  },
+  "tokens": {
+    "perCall": {
+      "count": 481,
+      "p50": 851,
+      "p90": 905,
+      "p95": 930,
+      "max": 960,
+      "mean": 854
+    },
+    "sessionTotal": 410839,
+    "profileCounts": {
+      "ultra-compact": 481
+    }
+  },
+  "fallbacks": 481,
+  "rateLimitEvents": 0,
+  "providersUsed": {
+    "local": 481
+  },
+  "bounds": {
+    "finalChunks": 400,
+    "finalSegments": 499,
+    "peakContextTokens": 960,
+    "maxInFlight": 1
+  },
+  "slo": {
+    "stableToSafeP50Met": true,
+    "stableToSafeP95Met": true,
+    "providerP50Met": true,
+    "providerP95Met": true
+  },
+  "twoLane": {
+    "simulation": {
+      "provisionalDelayMs": 120,
+      "cloudDelayMs": {
+        "min": 400,
+        "max": 3200
+      },
+      "spikeRate": 0.06,
+      "spikeMs": 5000,
+      "cloudFailureRate": 0.03,
+      "translatorFailureRate": 0.02,
+      "seed": 20260910
+    },
+    "stableToProvisional": {
+      "count": 487,
+      "p50": 400,
+      "p90": 400,
+      "p95": 1200,
+      "max": 1200,
+      "mean": 451
+    },
+    "stableToContextual": {
+      "count": 55,
+      "p50": 1000,
+      "p90": 4367,
+      "p95": 5867.000000000931,
+      "max": 10000,
+      "mean": 1759
+    },
+    "provisionalToRefinement": {
+      "count": 43,
+      "p50": 400,
+      "p90": 600,
+      "p95": 600,
+      "max": 800,
+      "mean": 493
+    },
+    "lanes": {
+      "turns": 499,
+      "provisionalApplied": 487,
+      "provisionalFailed": 12,
+      "provisionalSuperseded": 0,
+      "provisionalStale": 0,
+      "contextualDispatched": 481,
+      "contextualApplied": 12,
+      "contextualRefined": 43,
+      "contextualKept": 20,
+      "contextualDiscardedCommitted": 391,
+      "contextualStale": 0,
+      "contextualFailed": 15,
+      "coalescedTurns": 409,
+      "coalesceOverflowDrops": 0,
+      "maxPendingTurns": 2,
+      "maxCloudInFlight": 1,
+      "maxProvisionalInFlight": 1
+    },
+    "cloudFailuresInjected": 15,
+    "translatorFailuresInjected": 12,
+    "uncoveredKorean": 0,
+    "committedRewrites": 0
+  }
+}
