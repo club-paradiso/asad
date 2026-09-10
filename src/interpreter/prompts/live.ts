@@ -28,10 +28,10 @@ export const systemPromptFor = (
 
 /** Per-lag steer, appended to the user turn. */
 const LAG_STEER: Record<InterpretRequest["lag"], string> = {
-  fast: "LAG: FAST (~1s). Emit early and short. Prediction is welcome; the interpreter accepts correction risk.",
+  fast: "LAG: FAST (~1s). Emit early, short chunks. Anticipation is allowed.",
   balanced:
-    "LAG: BALANCED (~2–3s). Emit complete thought units. Predict only when the Korean is clearly mid-thought.",
-  safe: "LAG: SAFE (~4–6s). Wait for the thought to resolve. Do not predict at all. Accuracy over speed.",
+    "LAG: BALANCED (~2–3s). Emit complete thought units; anticipate only a clear mid-thought.",
+  safe: "LAG: SAFE (~4–6s). No anticipation. Accuracy first.",
 };
 
 /**
@@ -50,16 +50,16 @@ function boundarySteer(request: InterpretRequest): string | null {
 
   if (request.continuesPrevious) {
     lines.push(
-      "CONTINUATION: the previous unit was cut before the speaker resolved it, so the English you returned then is an unfinished scaffold the interpreter is already saying. Carry it on from where it stopped — do not restart the sentence and do not repeat what you already delivered.",
+      "CONTINUATION: continue the unfinished English scaffold from the previous turn. Do not restart or repeat delivered English.",
     );
   }
 
   if (request.boundary && request.boundary !== "sentence") {
     lines.push(
-      "OPEN END: this unit also stops mid-thought — the clock ended it, not the speaker. Commit to the structure, leave the payload unfinished, and mark the trailing chunk low if it depends on Korean that has not arrived.",
+      "OPEN END: this unit is still mid-thought. Keep the English structurally open; do not invent missing payload. Mark dependent trailing chunks low.",
     );
   } else if (request.boundary === "sentence") {
-    lines.push("CLOSED END: the speaker completed this thought. It is safe to finish the English sentence.");
+    lines.push("CLOSED END: the speaker completed the thought; finish the English sentence.");
   }
 
   return lines.length ? lines.join("\n") : null;

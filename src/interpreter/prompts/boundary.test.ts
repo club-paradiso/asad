@@ -40,7 +40,8 @@ describe("boundary steer", () => {
   it("says the thought is open when the clock ended the unit", () => {
     const prompt = buildLiveUserPrompt(request({ boundary: "timeout" }));
     expect(prompt).toContain("OPEN END");
-    expect(prompt).toContain("the clock ended it, not the speaker");
+    expect(prompt).toContain("mid-thought");
+    expect(prompt).toContain("do not invent missing payload");
     expect(prompt).not.toContain("CLOSED END");
   });
 
@@ -49,7 +50,7 @@ describe("boundary steer", () => {
       request({ boundary: "sentence", continuesPrevious: true }),
     );
     expect(prompt).toContain("CONTINUATION");
-    expect(prompt).toContain("do not restart the sentence");
+    expect(prompt).toMatch(/Do not restart.*repeat delivered English/i);
     // The previous unit was open; this one closed it. Both facts are stated.
     expect(prompt).toContain("CLOSED END");
   });
