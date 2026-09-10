@@ -26,14 +26,24 @@ export function enforcesJsonSchema(
 /**
  * Capabilities as consumed by the live prompt builder.
  *
- * Existing live routes ask only for provider-level capabilities and therefore
- * do not have the pinned OpenRouter model at hand. Be conservative there:
- * OpenRouter can request structured output, but the configured model may only
- * support `json_object`, so the prompt must retain its field-level JSON
- * contract. Native model-specific response_format construction still happens
- * independently inside the OpenRouter adapter.
+ * For a direct provider, provider-level schema support is enough. OpenRouter is
+ * different because the configured model determines whether the gateway can
+ * actually send `response_format: json_schema`. Read the configured model id
+ * when it is available; otherwise fail conservative and retain the prose
+ * contract. This keeps Live and Rescue in sync without making either route
+ * duplicate model-capability logic.
  */
-export function promptCapabilitiesFor(provider: LlmProviderId) {
+export function promptCapabilitiesFor(
+  provider: LlmProviderId,
+  openRouterPrimaryModel: string | undefined =
+    process.env.OPENROUTER_PRIMARY_MODEL?.trim() ||
+    process.env.OPENROUTER_LLM_MODEL?.trim() ||
+    undefined,
+) {
   const caps = providerCapabilitiesFor(provider);
-  return provider === "openrouter" ? { ...caps, structuredOutput: false } : caps;
+  if (provider !== "openrouter") return caps;
+  return {
+    ...caps,
+    structuredOutput: enforcesJsonSchema("openrouter", openRouterPrimaryModel),
+  };
 }
