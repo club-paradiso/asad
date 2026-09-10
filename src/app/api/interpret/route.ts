@@ -157,6 +157,7 @@ export async function POST(request: Request) {
   // every one of ~11 calls a minute.
   const system = systemPromptFor(input.mode, {
     schemaEnforced: caps.structuredOutput,
+    ultraCompact: decision.profile === "ultra-compact",
   });
   const user = buildLiveUserPrompt(budgeted);
 
