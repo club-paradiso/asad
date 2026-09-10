@@ -30,13 +30,8 @@ jobs:
 
           route = Path('src/app/api/interpret/route.ts')
           s = route.read_text()
-          old = '''  const system = systemPromptFor(input.mode, {
-            schemaEnforced: caps.structuredOutput,
-          });'''
-          new = '''  const system = systemPromptFor(input.mode, {
-            schemaEnforced: caps.structuredOutput,
-            ultraCompact: decision.profile === "ultra-compact",
-          });'''
+          old = '  const system = systemPromptFor(input.mode, {\n    schemaEnforced: caps.structuredOutput,\n  });'
+          new = '  const system = systemPromptFor(input.mode, {\n    schemaEnforced: caps.structuredOutput,\n    ultraCompact: decision.profile === "ultra-compact",\n  });'
           if old not in s:
               raise SystemExit('interpret route patch target not found')
           route.write_text(s.replace(old, new, 1))
@@ -44,10 +39,7 @@ jobs:
           harness = Path('benchmarks/live-harness.ts')
           s = harness.read_text()
           old = '    const system = systemPromptFor(request.mode);'
-          new = '''    const system = systemPromptFor(request.mode, {
-              schemaEnforced: caps.structuredOutput,
-              ultraCompact: decision.profile === "ultra-compact",
-            });'''
+          new = '    const system = systemPromptFor(request.mode, {\n      schemaEnforced: caps.structuredOutput,\n      ultraCompact: decision.profile === "ultra-compact",\n    });'
           if old not in s:
               raise SystemExit('live harness patch target not found')
           harness.write_text(s.replace(old, new, 1))
