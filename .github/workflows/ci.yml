@@ -10,9 +10,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  # So a run can be kicked by hand without an empty commit. Every previous
-  # attempt to re-trigger this workflow needed a push, which is a poor way to
-  # debug CI.
   workflow_dispatch:
 
 permissions:
@@ -27,89 +24,53 @@ jobs:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     env:
-      # `playwright` is a devDependency for the e2e and screenshot scripts,
-      # neither of which CI runs. Skipping its browser download keeps `npm ci`
-      # from spending a couple of minutes fetching Chromium for nothing.
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-
     steps:
-      # Printed before anything can go wrong, so a failing run always says
-      # where it got to. Cheap, and it is what was missing when this workflow
-      # was failing at startup with no output at all.
       - name: Runner facts
         run: |
           echo "runner: $RUNNER_OS $RUNNER_ARCH"
           echo "event:  $GITHUB_EVENT_NAME"
           echo "sha:    $GITHUB_SHA"
-
-      # v5, not v4: the runner now forces v4 onto Node 24 and warns that its
-      # Node 20 target is deprecated. v5 targets Node 24 natively.
       - uses: actions/checkout@v7
-
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-
       - name: Install
         run: |
           node -v
           npm -v
           npm ci
-
       - name: Lint
         run: npm run lint
-
       - name: Typecheck
         run: npm run typecheck
-
       - name: Test
         run: npm test
-
       - name: Build
         run: npm run build
-
-      # Runs against the local interpreter only when no key is configured,
-      # which is the CI case. It verifies the harness itself still works.
       - name: LLM smoke test (local only, no credentials)
         run: npm run smoke:llm
-
-      # A short soak proves the bounded-growth invariants on every PR without
-      # making CI slow.
       - name: Soak (5 simulated minutes)
         run: npm run soak -- --minutes 5
 
-  # The checks a unit test cannot make: does the built app actually work in a
-  # browser. Kept as a separate job so a failure here is legible on its own,
-  # and because it needs Chromium, which the fast job has no use for.
   e2e:
     name: End-to-end flow
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     steps:
       - uses: actions/checkout@v7
-
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-
       - name: Install
         run: npm ci
-
-      # This job is the one place Chromium is wanted, so it is installed here
-      # rather than on every `npm ci` in the repository.
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-
       - name: Build
         run: npm run build
-
-      # Started detached and waited for, rather than slept at: a fixed sleep is
-      # either too short on a slow runner or wasted time on a fast one.
       - name: Start the server
         run: |
           npm start -- --port 3000 > /tmp/server.log 2>&1 &
@@ -123,12 +84,8 @@ jobs:
           echo "server never came up"
           cat /tmp/server.log
           exit 1
-
       - name: End-to-end checks
         run: npm run e2e -- http://localhost:3000 ./e2e-out
-
-      # The screenshots are the point when a check fails: they show what the
-      # page actually looked like, which no assertion message can.
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v7
@@ -137,7 +94,6 @@ jobs:
           path: e2e-out/
           if-no-files-found: warn
           retention-days: 7
-
       - name: Server log
         if: failure()
         run: cat /tmp/server.log
