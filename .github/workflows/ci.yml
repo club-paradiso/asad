@@ -128,6 +128,9 @@ jobs:
       - name: End-to-end checks
         run: npm run e2e -- http://localhost:3000 ./e2e-out
 
+      - name: Forced browser fallback checks
+        run: npm run e2e:live-fallback -- http://localhost:3000 ./e2e-out
+
       # The screenshots are the point when a check fails: they show what the
       # page actually looked like, which no assertion message can.
       - name: Upload screenshots
