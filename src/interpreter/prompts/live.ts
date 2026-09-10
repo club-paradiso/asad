@@ -6,6 +6,7 @@
  * — the rolling context has already been compressed before it gets here.
  */
 import type { InterpretRequest } from "@/lib/schema";
+import { compactSystemPrompt } from "./compact";
 import { generalSystemPrompt } from "./general";
 import { sermonSystemPrompt } from "./sermon";
 import { contextBlock } from "./shared";
@@ -14,17 +15,22 @@ import { contextBlock } from "./shared";
  * The system prompt for a live turn.
  *
  * `schemaEnforced` drops the prose restatement of the JSON shape when the
- * provider is validating against `INTERPRETER_JSON_SCHEMA` itself. Measured at
- * ~230 tokens saved per call — which matters at eleven calls a minute for
- * forty-five minutes.
+ * provider validates against `INTERPRETER_JSON_SCHEMA` itself.
+ *
+ * `ultraCompact` is deliberately explicit rather than inferred here. Context
+ * budgeting belongs to the router; prompt assembly only renders the contract
+ * it was asked for. This keeps rescue/full-context flows unchanged.
  */
 export const systemPromptFor = (
   mode: "sermon" | "general",
-  options: { schemaEnforced?: boolean } = {},
-): string =>
-  mode === "sermon"
-    ? sermonSystemPrompt(options.schemaEnforced ?? false)
-    : generalSystemPrompt(options.schemaEnforced ?? false);
+  options: { schemaEnforced?: boolean; ultraCompact?: boolean } = {},
+): string => {
+  const schemaEnforced = options.schemaEnforced ?? false;
+  if (options.ultraCompact) return compactSystemPrompt(mode, schemaEnforced);
+  return mode === "sermon"
+    ? sermonSystemPrompt(schemaEnforced)
+    : generalSystemPrompt(schemaEnforced);
+};
 
 /** Per-lag steer, appended to the user turn. */
 const LAG_STEER: Record<InterpretRequest["lag"], string> = {

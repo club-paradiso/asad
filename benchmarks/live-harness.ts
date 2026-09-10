@@ -123,7 +123,10 @@ export async function runLiveBenchmark(options: LiveBenchOptions): Promise<LiveB
     profileCounts[decision.profile] = (profileCounts[decision.profile] ?? 0) + 1;
 
     const budgeted = { ...request, context: applyProfile(request.context, decision.profile) };
-    const system = systemPromptFor(request.mode);
+    const system = systemPromptFor(request.mode, {
+      schemaEnforced: caps.structuredOutput,
+      ultraCompact: decision.profile === "ultra-compact",
+    });
     const user = buildLiveUserPrompt(budgeted);
     const tokens = estimateTokens(system) + estimateTokens(user);
     tokenTotals.push(tokens);
