@@ -530,7 +530,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         setPhase("idle");
       }
     }
-  }, [phase, interpret, prepareBrowserTranslator, resolveBible, teardown]);
+  }, [phase, interpret, prepareBrowserTranslator, resolveBible, script, teardown]);
 
   // Push setting changes into the running engine rather than restarting it.
   useEffect(() => {
