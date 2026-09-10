@@ -33,7 +33,7 @@ const body = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://tong-yuck.vercel.app"),
+  metadataBase: new URL("https://asad-what.vercel.app"),
   title: BRAND_TITLE,
   description: BRAND.description,
   applicationName: BRAND.shortName,

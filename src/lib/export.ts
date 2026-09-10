@@ -22,7 +22,7 @@ const header = (session: StoredSession): string[] => {
   const started = new Date(session.startedAt);
   const durationMs = (session.endedAt ?? session.startedAt) - session.startedAt;
   return [
-    session.title || "tong-yuck session",
+    session.title || "ASAD session",
     session.speaker ? `Speaker: ${session.speaker}` : "",
     `Mode: ${session.mode}`,
     `Date: ${started.toISOString()}`,
@@ -170,7 +170,7 @@ export function sessionFilename(session: StoredSession, format: ExportFormat): s
     .replace(/[^a-z0-9가-힣]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 40);
-  return `tong-yuck-${date}-${slug || "session"}.${EXTENSION[format]}`;
+  return `asad-${date}-${slug || "session"}.${EXTENSION[format]}`;
 }
 
 /** Trigger a download in the browser. No-op on the server. */
