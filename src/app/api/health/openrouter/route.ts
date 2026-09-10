@@ -7,12 +7,13 @@
  * parameters this application depends on. All three look identical to a
  * correctly configured deployment right up until a service starts.
  *
- * So this makes ONE real, tiny, structured request and reports what came back.
+ * So this makes ONE real, tiny, structured inference request and, in parallel,
+ * reads non-secret metadata for the current OpenRouter key. The account lookup
+ * lets diagnostics distinguish the 50-request unfunded free tier from an
+ * account that has moved off that tier without exposing spend or key identity.
  *
- * Deliberately NOT called on page load. It costs money, and a health check
- * that runs on every visit is a bill rather than a signal. It is for the
- * diagnostics page, for `npm run health:openrouter`, and for a deployment
- * smoke test.
+ * Deliberately NOT called on page load. The inference probe costs quota, and a
+ * health check that runs on every visit is a bill rather than a signal.
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -23,6 +24,12 @@ import { capabilitiesForModel, liveSuitabilityProblem } from "@/providers/llm/mo
 import { OpenRouterLlmProvider, describePolicy } from "@/providers/llm/openrouter";
 import { publicFreeOpenRouterFallbackModels } from "@/providers/llm/public-free";
 import { toLlmError } from "@/providers/llm/errors";
+import {
+  inspectOpenRouterAccount,
+  OPENROUTER_FREE_MODEL_RPD,
+  OPENROUTER_FUNDING_THRESHOLD_USD,
+  type OpenRouterAccountStatus,
+} from "@/providers/llm/openrouter-account";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,14 +37,6 @@ export const dynamic = "force-dynamic";
 /** The check must not itself become a slow page. */
 const HEALTH_DEADLINE_MS = 12_000;
 
-/**
- * The smallest structured request that still proves the thing we care about.
- *
- * Not "did it return 200" — that would pass with a model that ignores
- * `response_format` and answers in prose, which is exactly the failure the
- * live path cannot absorb. It has to come back as valid JSON matching a
- * schema.
- */
 const PROBE_SCHEMA: Record<string, unknown> = {
   type: "object",
   properties: {
@@ -53,30 +52,32 @@ const probeResultSchema = z.object({ ok: z.boolean(), language: z.string() });
 export interface OpenRouterHealth {
   configured: boolean;
   model: string;
-  /** Ordered model-level fallbacks actually sent by this deployment. */
   fallbackModels: readonly string[];
-  /** What the capability registry believes about the configured model. */
   capabilities: {
     family: string;
     structuredOutput: string;
     sampling: string;
     liveSuitable: boolean;
-    /** Populated when the model is a poor fit for the live path. */
     liveWarning?: string;
-    /** Whether these came from the table or from pattern inference. */
     source: string;
   };
   policy: { summary: string; sort: string; dataCollection: string; zdr: boolean };
-  /** Null when no request was attempted. */
+  /** Safe account metadata only. No label, spend, owner id or key material. */
+  account: (OpenRouterAccountStatus & {
+    documentedUnfundedRpd: number;
+    documentedFundedRpd: number;
+    fundingThresholdUsd: number;
+  }) | null;
   probe: {
     ok: boolean;
     latencyMs?: number;
-    /** The model OpenRouter actually served, which may differ from the ask. */
     servedModel?: string;
-    /** The upstream that served it. Never a key. */
     upstream?: string;
-    /** True when the answer parsed and validated against the probe schema. */
     schemaValid?: boolean;
+    /** Raw rate-limit remainder reported on the inference response, diagnostic only. */
+    requestsRemaining?: number;
+    tokensRemaining?: number;
+    rateLimitResetAt?: number;
     error?: string;
     failureKind?: string;
   } | null;
@@ -84,7 +85,6 @@ export interface OpenRouterHealth {
 }
 
 export async function GET(request: Request) {
-  // Same protections as the paid routes: this one makes a real billed call.
   if (!hasAccess(request)) {
     return NextResponse.json({ error: "This deployment is private." }, { status: 401 });
   }
@@ -94,16 +94,14 @@ export async function GET(request: Request) {
   const verdict = limiterFor("health").check(`health:${clientAddress(request)}`);
   if (!verdict.allowed) {
     return NextResponse.json(
-      { error: "Health checks are rate limited; they cost money." },
+      { error: "Health checks are rate limited; they cost quota." },
       { status: 429, headers: { "retry-after": String(verdict.retryAfterSeconds) } },
     );
   }
 
   // Resolve the same effective environment the translation routes use before
   // inspecting provider configuration. Public deployments may deliberately
-  // restore an explicit non-billable OpenRouter `:free` model; reading raw
-  // `appEnv()` first makes this health endpoint claim the provider is missing
-  // even while Counter Mode is successfully routing to it.
+  // restore an explicit non-billable OpenRouter `:free` model.
   llmRouter();
   const env = appEnv();
   const config = env.llm.providers.openrouter;
@@ -130,6 +128,7 @@ export async function GET(request: Request) {
       dataCollection: policy.dataCollection,
       zdr: policy.zdr,
     },
+    account: null,
     probe: null,
     checkedAt: new Date().toISOString(),
   };
@@ -147,6 +146,14 @@ export async function GET(request: Request) {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_DEADLINE_MS);
+  const accountPromise = inspectOpenRouterAccount(config.apiKey, { signal: controller.signal });
+
+  const decorateAccount = async () => ({
+    ...(await accountPromise),
+    documentedUnfundedRpd: OPENROUTER_FREE_MODEL_RPD.unfunded,
+    documentedFundedRpd: OPENROUTER_FREE_MODEL_RPD.funded10,
+    fundingThresholdUsd: OPENROUTER_FUNDING_THRESHOLD_USD,
+  });
 
   try {
     const response = await provider.complete({
@@ -163,12 +170,16 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         ...base,
+        account: await decorateAccount(),
         probe: {
           ok: parsed !== null,
           latencyMs: response.latencyMs,
           servedModel: response.model,
           upstream: provider.lastTurn?.upstream,
           schemaValid: parsed !== null,
+          requestsRemaining: response.rateLimit?.requestsRemaining,
+          tokensRemaining: response.rateLimit?.tokensRemaining,
+          rateLimitResetAt: response.rateLimit?.resetAt,
           error:
             parsed === null
               ? "The model answered, but the response did not match the requested schema."
@@ -182,10 +193,9 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         ...base,
+        account: await decorateAccount(),
         probe: {
           ok: false,
-          // The message names the policy when routing excluded every upstream,
-          // which is the failure a deployer is least likely to guess at.
           error: llmError.message,
           failureKind: llmError.kind,
         },
