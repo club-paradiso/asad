@@ -1,0 +1,26 @@
+name: Live performance baseline
+
+on:
+  push:
+    branches: [perf/live-degradation-fast-fallback]
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Current prompt sizes
+        run: |
+          npx tsx -e 'import { systemPromptFor } from "./src/interpreter/prompts/live.ts"; import { estimateTokens } from "./src/lib/telemetry.ts"; console.log(JSON.stringify({sermon: estimateTokens(systemPromptFor("sermon", {schemaEnforced:true})), general: estimateTokens(systemPromptFor("general", {schemaEnforced:true}))}))'
+      - name: Ultra compact live baseline
+        run: npm run bench:live -- --minutes 5 --profile ultra-compact
