@@ -233,6 +233,12 @@ export async function POST(request: Request) {
       provider: result.provider,
       model: result.model,
     });
+    telemetry.recordLatency({
+      stage: "server_to_safe",
+      ms: Date.now() - receivedAt,
+      provider: result.provider,
+      model: escalatedTo ?? result.model,
+    });
     telemetry.recordTokens({
       provider: result.provider,
       systemTokens,

@@ -12,10 +12,12 @@
 
 /** The stages the live path is measured across. */
 export type LatencyStage =
-  /** Stabilised Korean available → interpretation request dispatched. */
+  /** Server received request → provider dispatch. */
   | "trigger_to_dispatch"
   /** Request dispatched → complete validated provider response. */
   | "provider_response"
+  /** Server received request → validated safe English ready to return. */
+  | "server_to_safe"
   /** Stabilised Korean → safe English available to render. */
   | "stable_to_safe"
   /** Stabilised Korean → anticipated English available to render. */
@@ -171,6 +173,7 @@ export class TelemetryRecorder {
       latency: {
         trigger_to_dispatch: this.stage("trigger_to_dispatch"),
         provider_response: this.stage("provider_response"),
+        server_to_safe: this.stage("server_to_safe"),
         stable_to_safe: this.stage("stable_to_safe"),
         stable_to_anticipated: this.stage("stable_to_anticipated"),
       },

@@ -43,8 +43,8 @@ import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
 import { guardedFetch } from "@/lib/session-client";
 
-/** How often the engine's clock advances. 200ms is well inside human latency. */
-const TICK_MS = 200;
+/** How often the engine's clock advances. 100ms keeps trigger jitter below one tenth of a second. */
+const TICK_MS = 100;
 /** Short retries only. Live work cannot wait through a conventional API backoff. */
 const INTERPRET_RETRY_DELAYS_MS = [0, 350, 900] as const;
 /** Give recognisers a moment to emit their final result after capture is sealed. */
