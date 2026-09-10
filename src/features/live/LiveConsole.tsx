@@ -65,8 +65,19 @@ export function LiveConsole({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
-  const { snapshot, phase, error, demoBeat, startedAt, lastProvider, start, stop, correct } =
-    session;
+  const {
+    snapshot,
+    phase,
+    error,
+    demoBeat,
+    startedAt,
+    lastProvider,
+    browserTranslatorStatus,
+    browserTranslatorProgress,
+    start,
+    stop,
+    correct,
+  } = session;
 
   // NO DISCLOSURE FETCH HERE, deliberately.
   //
@@ -174,6 +185,10 @@ export function LiveConsole({
   const providerLabel = STT_PROVIDER_INFO[source]?.label ?? source;
   const rescueAvailable =
     settings.mode === "sermon" && source !== "demo" && phase === "running";
+  const browserTranslatorPercent =
+    browserTranslatorProgress !== null && browserTranslatorProgress > 0
+      ? Math.round(browserTranslatorProgress * 100)
+      : null;
 
   return (
     <div
@@ -211,7 +226,19 @@ export function LiveConsole({
         onEnd={() => void handleEnd()}
       />
 
-      {source === "demo" && demoBeat ? <DemoRibbon beat={demoBeat} /> : <div />}
+      {source === "demo" && demoBeat ? (
+        <DemoRibbon beat={demoBeat} />
+      ) : browserTranslatorStatus === "preparing" ? (
+        <div
+          role="status"
+          className="border-b border-[var(--line)] bg-[var(--bg-raised)] px-3 py-1.5 text-center text-[0.7rem] text-[var(--fg-muted)]"
+        >
+          Preparing offline Korean→English backup
+          {browserTranslatorPercent !== null ? ` · model download ${browserTranslatorPercent}%` : "…"}
+        </div>
+      ) : (
+        <div />
+      )}
 
       {/* --- English: the dominant region ---------------------------------- */}
       {/* `min-w-0` on every row: a grid item defaults to `min-width: auto`,
