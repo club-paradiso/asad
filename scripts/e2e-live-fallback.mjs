@@ -76,22 +76,18 @@ await page.addInitScript(() => {
       this.onstart?.();
       if (this.emitted) return;
       this.emitted = true;
+      const first = { isFinal: true, length: 1, 0: { transcript: "오늘 우리는 서로를 사랑해야 합니다.", confidence: 0.99 } };
+      window.setTimeout(() => { this.onresult?.({ resultIndex: 0, results: { length: 1, 0: first } }); }, 350);
       window.setTimeout(() => {
         this.onresult?.({
-          resultIndex: 0,
+          resultIndex: 1,
           results: {
-            length: 1,
-            0: {
-              isFinal: true,
-              length: 1,
-              0: {
-                transcript: "오늘 우리는 서로를 사랑해야 합니다.",
-                confidence: 0.99,
-              },
-            },
+            length: 2,
+            0: first,
+            1: { isFinal: true, length: 1, 0: { transcript: "그리고 오늘도 함께 걸어갑니다.", confidence: 0.99 } },
           },
         });
-      }, 350);
+      }, 2200);
     }
 
     stop() {
@@ -108,6 +104,7 @@ await page.addInitScript(() => {
 });
 
 let forcedInterpretCalls = 0;
+const forcedInterpretBodies = [];
 await page.route("**/api/interpret", async (route) => {
   if (route.request().method() !== "POST") {
     await route.continue();
@@ -115,6 +112,7 @@ await page.route("**/api/interpret", async (route) => {
   }
 
   forcedInterpretCalls += 1;
+  forcedInterpretBodies.push(JSON.parse(route.request().postData() ?? "{}"));
   await route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -148,7 +146,11 @@ await page.waitForFunction(
   { timeout: 12_000 },
 );
 
+const secondCallDeadline = Date.now() + 8_000;
+while (forcedInterpretCalls < 2 && Date.now() < secondCallDeadline) await page.waitForTimeout(100);
 const body = await page.locator("body").innerText();
+const secondTelemetry = forcedInterpretBodies[1]?.clientTelemetry ?? [];
+const secondTelemetryStages = new Set(secondTelemetry.map((sample) => sample.stage));
 const translatorState = await page.evaluate(() => ({
   created: window.__asadTranslatorCreated ?? 0,
   calls: window.__asadTranslatorCalls ?? [],
@@ -158,6 +160,15 @@ check(
   "real Live flow dispatched an interpretation request",
   forcedInterpretCalls > 0,
   `${forcedInterpretCalls} forced local response(s)`,
+);
+check(
+  "a later Live turn piggybacks earlier client latency",
+  forcedInterpretCalls >= 2 && secondTelemetryStages.has("stable_to_client_dispatch") && secondTelemetryStages.has("stable_to_safe") && secondTelemetryStages.has("stable_to_render"),
+  `${secondTelemetry.length} client sample(s) on turn 2`,
+);
+check(
+  "client latency payload contains no transcript text",
+  !JSON.stringify(secondTelemetry).includes("오늘") && !JSON.stringify(secondTelemetry).includes("사랑"),
 );
 check(
   "Start gesture prepared the browser Translator",

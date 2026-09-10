@@ -86,6 +86,7 @@ export async function POST(request: Request) {
     );
   }
   const input = parsed.data;
+  for (const sample of input.clientTelemetry ?? []) telemetry.recordClientLatency(sample);
   const router = llmRouter();
   const sessionToken = readCookie(request, SESSION_COOKIE);
   const routingKey = sessionToken ? `live:${sessionToken}` : undefined;

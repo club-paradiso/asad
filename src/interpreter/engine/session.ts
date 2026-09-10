@@ -84,6 +84,20 @@ export interface InterpretResult {
   output: InterpreterOutput;
   degraded?: boolean;
   reason?: string;
+  /** Browser clock time immediately before the first fetch for this turn. */
+  clientDispatchedAt?: number;
+  provider?: string;
+  model?: string;
+}
+
+export interface TurnTiming {
+  stableAt: number;
+  clientDispatchedAt?: number;
+  safeAt: number;
+  provider?: string;
+  model?: string;
+  hasSafe: boolean;
+  hasAnticipated: boolean;
 }
 
 export interface EngineOptions {
@@ -94,6 +108,8 @@ export interface EngineOptions {
   interpret: (request: InterpretRequest, signal: AbortSignal) => Promise<InterpretResult>;
   /** Optional Scripture text resolution. Omitted in demo/offline. */
   resolveBible?: (reference: BibleReference) => Promise<BibleReference>;
+  /** Browser-only latency hook. Carries times and provider labels, never text. */
+  onTurnTiming?: (timing: TurnTiming) => void;
   onChange: (snapshot: EngineSnapshot) => void;
   /** Injectable clock — tests drive time directly. */
   now?: () => number;
@@ -125,6 +141,8 @@ export class InterpretationEngine {
   private culturalNotes: CulturalNote[] = [];
   private memory: SessionMemory = emptyMemory();
   private stabiliser: StabiliserState = emptyStabiliser();
+  /** Oldest stable event represented by pending text, preserved across a failed turn. */
+  private pendingOriginAt: number | null = null;
 
   private connection: ConnectionState = "idle";
   private health: SubsystemHealth = { stt: "ok", llm: "ok", bible: "ok" };
@@ -164,6 +182,7 @@ export class InterpretationEngine {
     this.startedAt = this.clock;
     this.stopped = false;
     this.lastBoundary = null;
+    this.pendingOriginAt = null;
     this.stabiliser = { ...emptyStabiliser(), lastEventAt: 0 };
     this.setConnection("connecting");
   }
@@ -249,12 +268,16 @@ export class InterpretationEngine {
     const corrected = applyCorrectionsToText(text.trim(), this.memory.corrections);
     if (!corrected) return;
 
+    const stableAt = this.clock;
     this.segments = [
       ...this.segments,
-      { id: nextSegmentId(), text: corrected, at: this.elapsed() },
+      { id: nextSegmentId(), text: corrected, at: Math.max(0, stableAt - this.startedAt) },
     ];
     this.partial = null;
-    this.stabiliser = pushStable(this.stabiliser, corrected, this.clock);
+    if (!this.stabiliser.pending.trim() && this.pendingOriginAt === null) {
+      this.pendingOriginAt = stableAt;
+    }
+    this.stabiliser = pushStable(this.stabiliser, corrected, stableAt);
 
     // Local detection is instant and does not wait for the model.
     this.absorbLocalDetection(corrected);
@@ -286,8 +309,10 @@ export class InterpretationEngine {
   // -------------------------------------------------------------------------
 
   private async flush(reason: FlushBoundary): Promise<void> {
+    const stableAt = this.pendingOriginAt ?? this.stabiliser.pendingSince ?? this.clock;
     const { text: pending, state } = drain(this.stabiliser);
     this.stabiliser = state;
+    this.pendingOriginAt = null;
     if (!pending) return;
 
     const config = lagConfig(this.lag);
@@ -333,6 +358,17 @@ export class InterpretationEngine {
       if (this.stopped || controller.signal.aborted) return;
 
       this.applyOutput(result.output, allowAnticipation);
+      const safeAt = this.clock;
+      this.options.onTurnTiming?.({
+        stableAt,
+        clientDispatchedAt: result.clientDispatchedAt,
+        safeAt,
+        provider: result.provider,
+        model: result.model,
+        hasSafe: result.output.safeChunks.length > 0,
+        hasAnticipated:
+          allowAnticipation && (result.output.anticipatedChunks?.length ?? 0) > 0,
+      });
       this.setHealth("llm", result.degraded ? "degraded" : "ok", result.reason);
       void this.enrichScripture();
     } catch (error) {
@@ -341,6 +377,7 @@ export class InterpretationEngine {
       // a bad turn. New stable speech may have arrived while this request was
       // running, so restore the failed unit in front of that newer text.
       this.stabiliser = restorePending(this.stabiliser, pending, this.clock);
+      this.pendingOriginAt = Math.min(this.pendingOriginAt ?? stableAt, stableAt);
       this.setHealth(
         "llm",
         "down",
