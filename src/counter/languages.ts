@@ -30,6 +30,7 @@ export const COUNTER_LANGUAGES: CounterLanguage[] = [
   { code: "th-TH", endonym: "ไทย", ko: "태국어", en: "Thai", speechSupported: true },
   { code: "id-ID", endonym: "Bahasa Indonesia", ko: "인도네시아어", en: "Indonesian", speechSupported: true },
   { code: "ru-RU", endonym: "Русский", ko: "러시아어", en: "Russian", speechSupported: true },
+  { code: "uk-UA", endonym: "Українська", ko: "우크라이나어", en: "Ukrainian", speechSupported: true },
   { code: "uz-UZ", endonym: "Oʻzbekcha", ko: "우즈베크어", en: "Uzbek", speechSupported: false },
   { code: "mn-MN", endonym: "Монгол", ko: "몽골어", en: "Mongolian", speechSupported: false },
   { code: "ne-NP", endonym: "नेपाली", ko: "네팔어", en: "Nepali", speechSupported: false },
