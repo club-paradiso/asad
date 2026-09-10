@@ -53,6 +53,33 @@ said.
 
 ---
 
+## Two lanes: provisional first, contextual refinement second
+
+On a desktop Chrome whose on-device Korean→English Translator is already
+ready, a flushed Korean unit does not wait for the cloud. It becomes a
+**logical turn** with a monotonic id and runs through two lanes at once:
+
+```
+stable Korean ─▶ turn N ─┬─▶ on-device English  ─▶ current chunk, marked provisional
+                         └─▶ /api/interpret     ─▶ may replace N's provisional chunks
+                                                   ONLY while they are still current
+```
+
+The temporal state machine is unchanged. A provisional chunk is a `current`
+chunk carrying `turnId` and `provisional`; it commits on the same dwell clock
+as any other chunk, and once committed it is as immutable as any other. A
+cloud result that arrives after that point has its knowledge (glossary,
+entities, Scripture, topic) absorbed and its rewrite discarded. A result for
+turn N never touches turn N+1, and any result from a stopped, restarted or
+mode-switched session is dropped.
+
+Cloud concurrency stays at one request per session; while it is busy, later
+turns still get provisional English and their Korean coalesces into a single
+bounded pending unit for the cloud. Provisional output never teaches the
+rolling memory. See `docs/live-two-lane-engine.md`.
+
+---
+
 ## Lag profiles
 
 The interpreter chooses how far behind the speaker to run, and that one choice

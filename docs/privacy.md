@@ -248,6 +248,13 @@ kinds. It **never** records transcript content — that is a hard rule enforced
 at the type level in `src/lib/telemetry.ts`, not a convention. Nothing is
 transmitted anywhere; the numbers live in memory and disappear on restart.
 
+The two-lane Live engine adds lane stages to the same telemetry
+(`stable_to_provisional`, `provisional_to_refinement`,
+`refinement_discarded_committed`, `contextual_result_stale`, …). Each sample is
+a stage name, a duration, an opaque id and optional provider/model labels.
+Turn ids are counters, not content. Nothing in a lane stat is a word anyone
+said.
+
 The `/api/diagnostics` payload reports credential state as booleans only. There
 is no code path in it that can emit a key, a partial key, or a fingerprint of
 one.
