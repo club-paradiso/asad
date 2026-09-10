@@ -26,6 +26,12 @@ import {
 import { buildSttHints } from "@/interpreter/glossary/stt-hints";
 import { interpretLocally } from "@/providers/llm/mock";
 import {
+  beginBrowserTranslatorPreparation,
+  translateWithBrowserTranslator,
+  type BrowserTranslatorSession,
+  type BrowserTranslatorStatus,
+} from "@/providers/llm/browser-translator";
+import {
   MicrophoneCapture,
   createSpeechProvider,
   fetchSttCredentials,
@@ -114,11 +120,19 @@ export function useLiveSession(options: LiveSessionOptions) {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   /** Which provider answered the most recent turn — drives the AI pill. */
   const [lastProvider, setLastProvider] = useState<string | undefined>(undefined);
+  const [browserTranslatorStatus, setBrowserTranslatorStatus] =
+    useState<BrowserTranslatorStatus>("unsupported");
+  const [browserTranslatorProgress, setBrowserTranslatorProgress] = useState<number | null>(null);
 
   const engineRef = useRef<InterpretationEngine | null>(null);
   const providerRef = useRef<SpeechProvider | null>(null);
   const micRef = useRef<MicrophoneCapture | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const browserTranslatorRef = useRef<BrowserTranslatorSession | null>(null);
+  const browserTranslatorPreparationRef = useRef<Promise<BrowserTranslatorSession | null> | null>(
+    null,
+  );
+  const mountedRef = useRef(true);
 
   const script: DemoScript = useMemo(() => demoScriptFor(options.mode), [options.mode]);
 
@@ -131,10 +145,77 @@ export function useLiveSession(options: LiveSessionOptions) {
     optionsRef.current = options;
   }, [options]);
 
+  /**
+   * Begin Chrome's local ko→en translator while the Start click still carries
+   * user activation. If a model pack has to download, the console exposes that
+   * state; interpretation never waits on the download mid-sentence.
+   */
+  const prepareBrowserTranslator = useCallback(() => {
+    if (browserTranslatorRef.current) {
+      setBrowserTranslatorStatus("ready");
+      return;
+    }
+    if (browserTranslatorPreparationRef.current) return;
+
+    const preparation = beginBrowserTranslatorPreparation({
+      onDownloadProgress(progress) {
+        if (mountedRef.current) setBrowserTranslatorProgress(progress);
+      },
+    });
+    if (!preparation.supported) {
+      setBrowserTranslatorStatus("unsupported");
+      return;
+    }
+
+    setBrowserTranslatorStatus("preparing");
+    setBrowserTranslatorProgress(0);
+    browserTranslatorPreparationRef.current = preparation.session;
+    void preparation.session
+      .then((translator) => {
+        if (!mountedRef.current) {
+          translator?.destroy();
+          return;
+        }
+        if (translator) {
+          browserTranslatorRef.current = translator;
+          setBrowserTranslatorStatus("ready");
+          setBrowserTranslatorProgress(1);
+        } else {
+          setBrowserTranslatorStatus("failed");
+          setBrowserTranslatorProgress(null);
+        }
+      })
+      .finally(() => {
+        browserTranslatorPreparationRef.current = null;
+      });
+  }, []);
+
   /** One interpretation call. Demo mode never touches the network. */
   const interpret = useCallback(
     async (request: InterpretRequest, signal: AbortSignal): Promise<InterpretResult> => {
-      const localFallback = (reason: string): InterpretResult => {
+      /**
+       * Prefer the already-prepared browser translator over the deterministic
+       * fallback. Never wait for a model download here: a live turn has a
+       * deadline, and Korean echoed back four seconds late is not translation.
+       */
+      const localFallback = async (reason: string): Promise<InterpretResult> => {
+        const browserTranslator = browserTranslatorRef.current;
+        if (browserTranslator) {
+          const output = await translateWithBrowserTranslator(
+            browserTranslator,
+            request.pending,
+            signal,
+          );
+          if (output) {
+            setLastProvider("browser-on-device");
+            return {
+              output,
+              degraded: true,
+              reason: `${reason} Chrome on-device Korean→English backup was used.`,
+            };
+          }
+        }
+
         setLastProvider("local");
         return {
           output: interpretLocally({
@@ -188,7 +269,18 @@ export function useLiveSession(options: LiveSessionOptions) {
             const parsed = interpreterOutputSchema.safeParse(data.output);
             if (!parsed.success) {
               return localFallback(
-                "The interpretation response was malformed — this turn used the local fallback.",
+                "The interpretation response was malformed — using the local backup path.",
+              );
+            }
+
+            // The server intentionally returns HTTP 200 even after every cloud
+            // model fails, because the transcript must keep running. That means
+            // status-code retries alone cannot detect quota exhaustion. Replace
+            // its deterministic Korean-only answer with on-device English when
+            // Chrome has already prepared the translator.
+            if (data.provider === "local") {
+              return localFallback(
+                data.reason ?? "The cloud interpretation provider was unavailable.",
               );
             }
 
@@ -205,7 +297,7 @@ export function useLiveSession(options: LiveSessionOptions) {
             !retryableInterpretStatus(response.status) ||
             attempt === INTERPRET_RETRY_DELAYS_MS.length - 1
           ) {
-            return localFallback(`${lastFailure} This turn used the local fallback instead.`);
+            return localFallback(`${lastFailure} This turn used the local backup path instead.`);
           }
 
           // Honour a small Retry-After when present, but never let a server-side
@@ -219,13 +311,13 @@ export function useLiveSession(options: LiveSessionOptions) {
           lastFailure = err instanceof Error ? err.message : "Interpretation network request failed.";
           if (attempt === INTERPRET_RETRY_DELAYS_MS.length - 1) {
             return localFallback(
-              `${lastFailure} The connection did not recover, so this turn used the local fallback.`,
+              `${lastFailure} The connection did not recover, so this turn used the local backup path.`,
             );
           }
         }
       }
 
-      return localFallback(`${lastFailure} This turn used the local fallback.`);
+      return localFallback(`${lastFailure} This turn used the local backup path.`);
     },
     [script.id],
   );
@@ -287,13 +379,19 @@ export function useLiveSession(options: LiveSessionOptions) {
 
   const start = useCallback(async () => {
     if (phase === "running" || phase === "starting") return;
+
+    const current = optionsRef.current;
+    // This function is called synchronously from the launcher's Start click.
+    // Kick off Translator.create() before the first await so Chrome can use the
+    // user's activation to download/instantiate the local language pack.
+    if (current.source !== "demo") prepareBrowserTranslator();
+
     setError(null);
     setPhase("starting");
     setDemoBeat(null);
     setLastProvider(undefined);
     setSnapshot(emptySnapshot());
 
-    const current = optionsRef.current;
     const engine = new InterpretationEngine({
       mode: current.mode,
       lag: current.lag,
@@ -432,7 +530,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         setPhase("idle");
       }
     }
-  }, [phase, interpret, resolveBible, script, teardown]);
+  }, [phase, interpret, prepareBrowserTranslator, resolveBible, teardown]);
 
   // Push setting changes into the running engine rather than restarting it.
   useEffect(() => {
@@ -447,7 +545,15 @@ export function useLiveSession(options: LiveSessionOptions) {
     if (options.prep) engineRef.current?.setPrep(options.prep);
   }, [options.prep]);
 
-  useEffect(() => () => void teardown(), [teardown]);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      browserTranslatorRef.current?.destroy();
+      browserTranslatorRef.current = null;
+      void teardown();
+    },
+    [teardown],
+  );
 
   const correct = useCallback((from: string, to: string, english?: string) => {
     engineRef.current?.correct(from, to, english);
@@ -459,6 +565,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     error,
     demoBeat,
     lastProvider,
+    browserTranslatorStatus,
+    browserTranslatorProgress,
     startedAt,
     script,
     start,
