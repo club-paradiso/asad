@@ -1,0 +1,65 @@
+name: Live maintenance
+
+on:
+  push:
+    branches:
+      - fix/live-hook-and-dependency-audit
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/live-hook-and-dependency-audit
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Patch stale closure dependency
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/features/live/useLiveSession.ts')
+          s = p.read_text()
+          old = '  }, [phase, interpret, prepareBrowserTranslator, resolveBible, teardown]);'
+          new = '  }, [phase, interpret, prepareBrowserTranslator, resolveBible, script, teardown]);'
+          if old in s:
+              p.write_text(s.replace(old, new, 1))
+              print('patched useLiveSession dependency array')
+          elif new in s:
+              print('dependency array already patched')
+          else:
+              raise SystemExit('expected dependency array not found')
+          PY
+      - name: Install
+        run: npm ci
+      - name: Audit high severity dependencies
+        run: npm audit --json > /tmp/audit.json || true
+      - name: Print audit summary
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const audit = JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));
+          console.log(JSON.stringify({metadata:audit.metadata, vulnerabilities:audit.vulnerabilities}, null, 2));
+          NODE
+      - name: Verify hook patch
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test -- --runInBand=false
+      - name: Commit hook fix
+        run: |
+          if git diff --quiet; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/features/live/useLiveSession.ts
+          git commit -m 'fix(live): include demo script in start callback dependencies'
+          git push origin HEAD:fix/live-hook-and-dependency-audit
