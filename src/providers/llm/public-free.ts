@@ -1,17 +1,31 @@
 import type { AppEnv, EnvProblem } from "@/lib/env";
 
 /**
- * Verified free/open-weight recovery floor for the public Counter deployment.
+ * Verified zero-cost recovery floor for the public deployment.
  *
  * Keep this deliberately short. These are not quality-escalation models and
  * they are never used by paid-capable deployments. OpenRouter tries them only
  * after the configured primary model errors (for example, an upstream 429).
+ *
+ * `openrouter/free` is intentionally last. Unlike the explicit model variants,
+ * it lets OpenRouter select from the currently available free pool while still
+ * filtering for request requirements such as structured output. It is a useful
+ * final escape hatch when several named free models share an upstream outage.
  */
 export const PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS = [
   "nvidia/nemotron-3-super-120b-a12b:free",
   "google/gemma-4-31b-it:free",
   "google/gemma-4-26b-a4b-it:free",
+  "openrouter/free",
 ] as const;
+
+/**
+ * Zero-cost model identifiers that are safe to expose through the public key
+ * exception. Keep the router alias exact: `openrouter/auto` is paid-capable and
+ * must never be admitted by a fuzzy prefix check.
+ */
+export const isPublicZeroCostOpenRouterModel = (model: string): boolean =>
+  model.endsWith(":free") || model === "openrouter/free";
 
 function isSafePublicFreeConfiguration(
   env: AppEnv,
@@ -25,6 +39,8 @@ function isSafePublicFreeConfiguration(
     !!key &&
     key.length >= 8 &&
     env.llm.pinned === "openrouter" &&
+    // Keep the primary explicit. The dynamic free router is recovery-only so a
+    // healthy deployment remains model-stable from turn to turn.
     model.endsWith(":free") &&
     !env.llm.allowPaidFallback &&
     !env.llm.openrouter.qualityEscalation &&
@@ -36,10 +52,10 @@ function isSafePublicFreeConfiguration(
 /**
  * Return the model-level fallback chain for the exact public/free exception.
  *
- * Every candidate remains an explicit `:free` open-weight model. This is
- * intentionally separate from provider-level failover: OpenRouter first tries
- * another upstream for the same model, then may advance through this list if
- * the model itself is unavailable or rate-limited.
+ * Every candidate is independently constrained to a zero-cost OpenRouter model
+ * identifier. This is intentionally separate from provider-level failover:
+ * OpenRouter first tries another upstream for the same model, then may advance
+ * through this list if the model itself is unavailable or rate-limited.
  */
 export function publicFreeOpenRouterFallbackModels(
   env: AppEnv,
@@ -49,7 +65,9 @@ export function publicFreeOpenRouterFallbackModels(
   if (!isSafePublicFreeConfiguration(env, source, key)) return [];
 
   const primary = env.llm.openrouter.primaryModel;
-  return PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.filter((model) => model !== primary);
+  return PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS.filter(
+    (model) => model !== primary && isPublicZeroCostOpenRouterModel(model),
+  );
 }
 
 /**
