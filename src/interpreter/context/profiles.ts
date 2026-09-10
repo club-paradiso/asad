@@ -72,9 +72,9 @@ export const PROFILE_BUDGETS: Record<ContextProfile, ProfileBudget> = {
     corrections: 8,
     summary: false,
     prepNotes: false,
-    // Only ~20% below full: the system prompt dominates, so context trimming
-    // has a hard floor. See docs/llm-benchmark.md.
-    targetTokens: 2177,
+    // Refreshed after the dedicated ultra-compact system contract landed.
+    // 2026-09-10 five-minute harness: p50 850, p95 934, max 950 tokens/call.
+    targetTokens: 850,
   },
 };
 
