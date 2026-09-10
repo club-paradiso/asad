@@ -18,6 +18,16 @@ describe("known families", () => {
     expect(caps.source).toBe("registry");
   });
 
+  it("classifies Nex N2.5 Mini as an explicit live-capable open-weight model", () => {
+    const caps = capabilitiesForModel("nex-agi/nex-n2.5-mini:free");
+    expect(caps.family).toBe("Nex-N2.5-Mini");
+    expect(caps.structuredOutput).toBe("json_schema");
+    expect(caps.contextTokens).toBe(262_144);
+    expect(caps.openWeights).toBe(true);
+    expect(caps.liveSuitable).toBe(true);
+    expect(caps.source).toBe("registry");
+  });
+
   it("classifies the quality model as suitable but not fast", () => {
     const caps = capabilitiesForModel("anthropic/claude-sonnet-5");
     expect(caps.liveSuitable).toBe(true);

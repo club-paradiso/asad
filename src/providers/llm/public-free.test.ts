@@ -14,7 +14,7 @@ const currentProductionShape = (overrides: Record<string, string> = {}) => ({
   LLM_ROUTING_MODE: "reliable",
   LLM_PROVIDER: "openrouter",
   OPENROUTER_API_KEY: KEY,
-  OPENROUTER_PRIMARY_MODEL: "google/gemma-4-26b-a4b-it:free",
+  OPENROUTER_PRIMARY_MODEL: "nex-agi/nex-n2.5-mini:free",
   OPENROUTER_DATA_COLLECTION: "deny",
   ...overrides,
 });
@@ -36,7 +36,7 @@ describe("public free OpenRouter restoration", () => {
     expect(restored.llm.providers.openrouter.configured).toBe(true);
     expect(restored.llm.providers.openrouter.apiKey).toBe(KEY);
     expect(restored.llm.providers.openrouter.model).toBe(
-      "google/gemma-4-26b-a4b-it:free",
+      "nex-agi/nex-n2.5-mini:free",
     );
     expect(restored.problems).not.toContainEqual(
       expect.objectContaining({ field: "LLM_PROVIDER", level: "error" }),
@@ -49,6 +49,7 @@ describe("public free OpenRouter restoration", () => {
     expect(fallbacks).toEqual([
       "nvidia/nemotron-3-super-120b-a12b:free",
       "google/gemma-4-31b-it:free",
+      "google/gemma-4-26b-a4b-it:free",
       "openrouter/free",
     ]);
     expect(fallbacks).not.toContain(restored.llm.openrouter.primaryModel);
@@ -58,6 +59,7 @@ describe("public free OpenRouter restoration", () => {
   });
 
   it("admits only explicit :free variants or the exact dynamic free-router alias", () => {
+    expect(isPublicZeroCostOpenRouterModel("nex-agi/nex-n2.5-mini:free")).toBe(true);
     expect(isPublicZeroCostOpenRouterModel("google/gemma-4-31b-it:free")).toBe(true);
     expect(isPublicZeroCostOpenRouterModel("openrouter/free")).toBe(true);
     expect(isPublicZeroCostOpenRouterModel("openrouter/auto")).toBe(false);

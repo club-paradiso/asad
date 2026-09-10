@@ -13,6 +13,7 @@ import type { AppEnv, EnvProblem } from "@/lib/env";
  * final escape hatch when several named free models share an upstream outage.
  */
 export const PUBLIC_FREE_OPENROUTER_FALLBACK_MODELS = [
+  "nex-agi/nex-n2.5-mini:free",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "google/gemma-4-31b-it:free",
   "google/gemma-4-26b-a4b-it:free",
