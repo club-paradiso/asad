@@ -49,11 +49,20 @@ jobs:
           s = s.replace('lines.push("CLOSED END: the speaker completed this thought. It is safe to finish the English sentence.");', 'lines.push("CLOSED END: the speaker completed the thought; finish the English sentence.");')
           p.write_text(s)
 
+          p = Path('src/interpreter/prompts/boundary.test.ts')
+          s = p.read_text()
+          old = 'expect(prompt).toContain("the clock ended it, not the speaker");'
+          new = 'expect(prompt).toContain("mid-thought");\n    expect(prompt).toContain("do not invent missing payload");'
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = 'expect(prompt).toContain("do not restart the sentence");'
+          new = 'expect(prompt).toMatch(/Do not restart.*repeat delivered English/i);'
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+
           p = Path('src/lib/telemetry.ts')
           s = p.read_text()
-          old = '''  /** Request dispatched → complete validated provider response. */\n  | "provider_response"\n  /** Stabilised Korean → safe English available to render. */'''
           new = '''  /** Server received request → provider dispatch. */\n  | "trigger_to_dispatch"\n  /** Request dispatched → complete validated provider response. */\n  | "provider_response"\n  /** Server received request → validated safe English ready to return. */\n  | "server_to_safe"\n  /** Stabilised Korean → safe English available to render. */'''
-          # replace existing first stage + provider section together to avoid duplicate trigger_to_dispatch
           old_full = '''  /** Stabilised Korean available → interpretation request dispatched. */\n  | "trigger_to_dispatch"\n  /** Request dispatched → complete validated provider response. */\n  | "provider_response"\n  /** Stabilised Korean → safe English available to render. */'''
           assert old_full in s
           s = s.replace(old_full, new, 1)
@@ -87,6 +96,6 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/features/live/useLiveSession.ts src/interpreter/prompts/live.ts src/lib/telemetry.ts src/app/api/interpret/route.ts
+          git add src/features/live/useLiveSession.ts src/interpreter/prompts/live.ts src/interpreter/prompts/boundary.test.ts src/lib/telemetry.ts src/app/api/interpret/route.ts
           git commit -m 'perf(live): reduce trigger jitter and expose server latency [latency-opt-applied]'
           git push origin perf/live-latency-telemetry
