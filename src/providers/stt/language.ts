@@ -23,6 +23,7 @@ const DEEPGRAM_LANGUAGE: Record<string, string> = {
   "th-TH": "th-TH",
   "id-ID": "id",
   "ru-RU": "ru",
+  "uk-UA": "uk",
   "mn-MN": "mn",
   "ne-NP": "ne",
   "tl-PH": "tl",
