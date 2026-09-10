@@ -43,6 +43,7 @@ import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
 import { guardedFetch } from "@/lib/session-client";
 import { ClientLatencyQueue } from "./client-latency";
+import { cloudBypassMsForFailure } from "./cloud-degradation";
 
 /** How often the engine's clock advances. 100ms keeps trigger jitter below one tenth of a second. */
 const TICK_MS = 100;
@@ -136,6 +137,8 @@ export function useLiveSession(options: LiveSessionOptions) {
   const mountedRef = useRef(true);
   const clientLatencyRef = useRef(new ClientLatencyQueue());
   const pendingRenderLatencyRef = useRef<Array<{ stableAt: number; provider?: string; model?: string }>>([]);
+  /** Skip known-doomed cloud turns only while a real on-device translator is ready. */
+  const cloudBypassUntilRef = useRef(0);
 
   const script: DemoScript = useMemo(() => demoScriptFor(options.mode), [options.mode]);
 
@@ -248,6 +251,9 @@ export function useLiveSession(options: LiveSessionOptions) {
           }
         }
 
+        // Never strand a browser on the deterministic helper. If the on-device
+        // translator is unavailable, cloud remains worth retrying next turn.
+        cloudBypassUntilRef.current = 0;
         setLastProvider("local");
         return {
           output: interpretLocally({
@@ -279,6 +285,15 @@ export function useLiveSession(options: LiveSessionOptions) {
           provider: "local",
           model: "deterministic",
         };
+      }
+
+      if (
+        browserTranslatorRef.current &&
+        cloudBypassUntilRef.current > Date.now()
+      ) {
+        return localFallback(
+          "Cloud interpretation is cooling down after a quota or rate-limit failure.",
+        );
       }
 
       const clientTelemetry = clientLatencyRef.current.batch();
@@ -323,11 +338,16 @@ export function useLiveSession(options: LiveSessionOptions) {
             // its deterministic Korean-only answer with on-device English when
             // Chrome has already prepared the translator.
             if (data.provider === "local") {
+              const bypassMs = cloudBypassMsForFailure({ reason: data.reason });
+              if (browserTranslatorRef.current && bypassMs > 0) {
+                cloudBypassUntilRef.current = Date.now() + bypassMs;
+              }
               return localFallback(
                 data.reason ?? "The cloud interpretation provider was unavailable.",
               );
             }
 
+            cloudBypassUntilRef.current = 0;
             setLastProvider(data.provider);
             return {
               output: parsed.data, degraded: data.degraded, reason: data.reason,
@@ -339,6 +359,15 @@ export function useLiveSession(options: LiveSessionOptions) {
             response.status === 429
               ? "The free interpretation provider is temporarily rate limited."
               : `Interpretation request failed (${response.status}).`;
+
+          // Once Chrome's translator is ready, retrying a 429 in 350ms merely
+          // buys another 429. Fall back immediately and try cloud after the
+          // cooldown instead of adding dead air to this sentence.
+          if (response.status === 429 && browserTranslatorRef.current) {
+            cloudBypassUntilRef.current =
+              Date.now() + cloudBypassMsForFailure({ status: response.status });
+            return localFallback(`${lastFailure} Using the on-device backup immediately.`);
+          }
 
           if (
             !retryableInterpretStatus(response.status) ||

@@ -131,6 +131,9 @@ jobs:
       - name: Forced browser fallback checks
         run: npm run e2e:live-fallback -- http://localhost:3000 ./e2e-out
 
+      - name: Quota degradation bypass checks
+        run: npm run e2e:live-quota-bypass -- http://localhost:3000
+
       # The screenshots are the point when a check fails: they show what the
       # page actually looked like, which no assertion message can.
       - name: Upload screenshots
