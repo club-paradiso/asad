@@ -1,0 +1,91 @@
+name: Production Live Smoke
+
+on:
+  push:
+    branches: [ops/prod-smoke-20260910]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Exercise production session and live interpretation
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://asad-what.vercel.app"
+          TMP="$(mktemp -d)"
+          trap 'rm -rf "$TMP"' EXIT
+
+          echo "Minting an application session..."
+          curl -fsS --max-time 15 \
+            -c "$TMP/cookies" \
+            -H "Origin: $BASE" \
+            -H "Content-Type: application/json" \
+            --data '{}' \
+            "$BASE/api/session" > "$TMP/session.json"
+
+          node - "$TMP/session.json" <<'NODE'
+          const fs = require('fs');
+          const value = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (value.ok !== true || value.gated !== false) {
+            throw new Error(`session bootstrap failed: ${JSON.stringify(value)}`);
+          }
+          console.log('session bootstrap: ok');
+          NODE
+
+          cat > "$TMP/request.json" <<'JSON'
+          {
+            "mode": "general",
+            "lag": "balanced",
+            "pending": "안녕하세요. 오늘은 통역 시스템을 점검합니다.",
+            "boundary": "sentence",
+            "continuesPrevious": false,
+            "context": {
+              "recentKorean": [],
+              "recentEnglish": [],
+              "glossary": [],
+              "entities": [],
+              "scripture": [],
+              "corrections": []
+            },
+            "allowAnticipation": false
+          }
+          JSON
+
+          echo "Calling the real production Live endpoint..."
+          curl -fsS --max-time 20 \
+            -b "$TMP/cookies" \
+            -H "Origin: $BASE" \
+            -H "Content-Type: application/json" \
+            --data @"$TMP/request.json" \
+            "$BASE/api/interpret" > "$TMP/result.json"
+
+          node - "$TMP/result.json" <<'NODE'
+          const fs = require('fs');
+          const value = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const chunks = value?.output?.safeChunks;
+          if (value.provider !== 'openrouter') {
+            throw new Error(`expected OpenRouter, got ${value.provider}: ${value.reason ?? 'no reason'}`);
+          }
+          if (!Array.isArray(chunks) || chunks.length === 0) {
+            throw new Error(`no safeChunks: ${JSON.stringify(value)}`);
+          }
+          const text = chunks.map((chunk) => chunk.text).join(' ');
+          if (!/[A-Za-z]/.test(text)) {
+            throw new Error(`translation does not contain English text: ${text}`);
+          }
+          if (value.degraded) {
+            throw new Error(`live route degraded unexpectedly: ${value.reason ?? 'unknown reason'}`);
+          }
+          console.log(JSON.stringify({
+            provider: value.provider,
+            model: value.model,
+            latencyMs: value.latencyMs,
+            degraded: value.degraded,
+            safeChunks: chunks.map((chunk) => chunk.text)
+          }, null, 2));
+          NODE
