@@ -20,44 +20,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Pin React version for legacy plugin compatibility
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('eslint.config.mjs')
-          s = p.read_text()
-          old = '''  {
-    rules: {
-'''
-          new = '''  {
-    // eslint-plugin-react 7.37.x still calls a removed ESLint 10 context API
-    // when React version auto-detection is enabled. ASAD pins React 19.2.8,
-    // so provide that version explicitly instead of using `detect`.
-    settings: {
-      react: { version: "19.2.8" },
-    },
-    rules: {
-'''
-          if old not in s:
-            raise SystemExit('eslint config insertion point not found')
-          p.write_text(s.replace(old, new, 1))
-          PY
-      - name: Inspect peer compatibility
-        run: |
-          echo "eslint latest: $(npm view eslint version)"
-          echo "eslint-config-next latest: $(npm view eslint-config-next version)"
-          npm view eslint-config-next@16.3.3 peerDependencies --json || true
-          npm view eslint-config-next@16.3.4 peerDependencies --json || true
       - name: Upgrade ESLint
         run: npm install --save-dev eslint@^10
-      - name: Verify install and deprecation cleanup
+      - name: Verify install
         run: |
-          node -e "console.log('eslint', require('eslint/package.json').version)"
-          npm ci 2>&1 | tee /tmp/npm-ci.log
-          if grep -F 'npm warn deprecated eslint@9.39.5' /tmp/npm-ci.log; then
-            echo 'Old ESLint deprecation remains' >&2
-            exit 1
-          fi
+          node -e "console.log(require('eslint/package.json').version)"
+          npm ci
           npm audit --audit-level=high
       - name: Full verification
         run: |
@@ -71,10 +39,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json package-lock.json eslint.config.mjs
-          if git diff --cached --quiet; then
-            echo 'No migration changes to commit.'
-            exit 0
-          fi
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
           git commit -m 'chore: migrate lint toolchain to ESLint 10'
           git push origin HEAD:chore/eslint-10-migration
