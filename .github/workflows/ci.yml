@@ -76,10 +76,11 @@ jobs:
       - name: LLM smoke test (local only, no credentials)
         run: npm run smoke:llm
 
-      # A short soak proves the bounded-growth invariants on every PR without
-      # making CI slow.
-      - name: Soak (5 simulated minutes)
-        run: npm run soak -- --minutes 5
+      # Reliability branch: run the full service-length simulation once before
+      # this change is merged. This will be restored to the fast 5-minute PR
+      # check after the 45-minute invariants have been proven on CI hardware.
+      - name: Soak (45 simulated minutes)
+        run: npm run soak -- --minutes 45
 
   # The checks a unit test cannot make: does the built app actually work in a
   # browser. Kept as a separate job so a failure here is legible on its own,
