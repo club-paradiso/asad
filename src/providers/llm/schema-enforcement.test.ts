@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { enforcesJsonSchema, promptCapabilitiesFor } from "./schema-enforcement";
 
 const previousPrimary = process.env.OPENROUTER_PRIMARY_MODEL;
+const previousLegacyModel = process.env.OPENROUTER_LLM_MODEL;
 
 afterEach(() => {
   if (previousPrimary === undefined) delete process.env.OPENROUTER_PRIMARY_MODEL;
   else process.env.OPENROUTER_PRIMARY_MODEL = previousPrimary;
+
+  if (previousLegacyModel === undefined) delete process.env.OPENROUTER_LLM_MODEL;
+  else process.env.OPENROUTER_LLM_MODEL = previousLegacyModel;
 });
 
 describe("LLM schema enforcement", () => {
