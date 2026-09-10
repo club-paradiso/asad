@@ -1,0 +1,294 @@
+from pathlib import Path
+import json
+
+Path('src/features/live/cloud-degradation.ts').write_text(r'''"use client";
+
+/**
+ * How long a Live session should stop paying cloud latency after a failure we
+ * already know cannot improve on the next sentence.
+ *
+ * Generic network/server failures are deliberately NOT classified here. They
+ * may recover immediately and should keep using the normal retry/fallback path.
+ */
+export const TEMPORARY_RATE_LIMIT_BYPASS_MS = 60_000;
+export const SESSION_QUOTA_BYPASS_MS = 90 * 60_000;
+
+const DAILY_QUOTA =
+  /quota\s*(?:is\s*)?(?:exhausted|exceeded)|daily.{0,40}(?:limit|cap|quota)|free[-_\s]?models?[-_\s]?per[-_\s]?day|requests?\s*(?:per|\/)\s*day|insufficient.{0,20}(?:credit|quota)/i;
+const RATE_LIMIT = /\b429\b|rate[-\s]?limit(?:ed|ing)?|too many requests/i;
+
+export function cloudBypassMsForFailure(input: {
+  status?: number;
+  reason?: string;
+}): number {
+  const reason = input.reason?.trim() ?? "";
+  if (DAILY_QUOTA.test(reason)) return SESSION_QUOTA_BYPASS_MS;
+  if (input.status === 429 || RATE_LIMIT.test(reason)) return TEMPORARY_RATE_LIMIT_BYPASS_MS;
+  return 0;
+}
+''')
+
+Path('src/features/live/cloud-degradation.test.ts').write_text(r'''import { describe, expect, it } from "vitest";
+import {
+  SESSION_QUOTA_BYPASS_MS,
+  TEMPORARY_RATE_LIMIT_BYPASS_MS,
+  cloudBypassMsForFailure,
+} from "./cloud-degradation";
+
+describe("cloud degradation bypass", () => {
+  it("bypasses the rest of a normal service after a daily free quota exhaustion", () => {
+    expect(
+      cloudBypassMsForFailure({ reason: "OpenRouter rate limit exceeded: free-models-per-day" }),
+    ).toBe(SESSION_QUOTA_BYPASS_MS);
+    expect(cloudBypassMsForFailure({ reason: "Daily cap of 50 requests exhausted" })).toBe(
+      SESSION_QUOTA_BYPASS_MS,
+    );
+  });
+
+  it("uses a short cooldown for a generic 429", () => {
+    expect(cloudBypassMsForFailure({ status: 429 })).toBe(TEMPORARY_RATE_LIMIT_BYPASS_MS);
+    expect(cloudBypassMsForFailure({ reason: "temporarily rate limited" })).toBe(
+      TEMPORARY_RATE_LIMIT_BYPASS_MS,
+    );
+  });
+
+  it("does not suppress cloud after recoverable network or server failures", () => {
+    expect(cloudBypassMsForFailure({ status: 503, reason: "upstream unavailable" })).toBe(0);
+    expect(cloudBypassMsForFailure({ reason: "network request failed" })).toBe(0);
+  });
+});
+''')
+
+p = Path('src/features/live/useLiveSession.ts')
+s = p.read_text()
+old = 'import { ClientLatencyQueue } from "./client-latency";\n'
+new = old + 'import { cloudBypassMsForFailure } from "./cloud-degradation";\n'
+assert old in s
+s = s.replace(old, new, 1)
+
+old = '  const pendingRenderLatencyRef = useRef<Array<{ stableAt: number; provider?: string; model?: string }>>([]);\n'
+new = old + '  /** Skip known-doomed cloud turns only while a real on-device translator is ready. */\n  const cloudBypassUntilRef = useRef(0);\n'
+assert old in s
+s = s.replace(old, new, 1)
+
+old = '''        setLastProvider("local");
+        return {
+          output: interpretLocally({'''
+new = '''        // Never strand a browser on the deterministic helper. If the on-device
+        // translator is unavailable, cloud remains worth retrying next turn.
+        cloudBypassUntilRef.current = 0;
+        setLastProvider("local");
+        return {
+          output: interpretLocally({'''
+assert old in s
+s = s.replace(old, new, 1)
+
+old = '''      const clientTelemetry = clientLatencyRef.current.batch();
+      const telemetryIds = clientTelemetry.map((sample) => sample.id);'''
+new = '''      if (
+        browserTranslatorRef.current &&
+        cloudBypassUntilRef.current > Date.now()
+      ) {
+        return localFallback(
+          "Cloud interpretation is cooling down after a quota or rate-limit failure.",
+        );
+      }
+
+      const clientTelemetry = clientLatencyRef.current.batch();
+      const telemetryIds = clientTelemetry.map((sample) => sample.id);'''
+assert old in s
+s = s.replace(old, new, 1)
+
+old = '''            if (data.provider === "local") {
+              return localFallback(
+                data.reason ?? "The cloud interpretation provider was unavailable.",
+              );
+            }
+
+            setLastProvider(data.provider);'''
+new = '''            if (data.provider === "local") {
+              const bypassMs = cloudBypassMsForFailure({ reason: data.reason });
+              if (browserTranslatorRef.current && bypassMs > 0) {
+                cloudBypassUntilRef.current = Date.now() + bypassMs;
+              }
+              return localFallback(
+                data.reason ?? "The cloud interpretation provider was unavailable.",
+              );
+            }
+
+            cloudBypassUntilRef.current = 0;
+            setLastProvider(data.provider);'''
+assert old in s
+s = s.replace(old, new, 1)
+
+old = '''          lastFailure =
+            response.status === 429
+              ? "The free interpretation provider is temporarily rate limited."
+              : `Interpretation request failed (${response.status}).`;
+
+          if (
+            !retryableInterpretStatus(response.status) ||'''
+new = '''          lastFailure =
+            response.status === 429
+              ? "The free interpretation provider is temporarily rate limited."
+              : `Interpretation request failed (${response.status}).`;
+
+          // Once Chrome's translator is ready, retrying a 429 in 350ms merely
+          // buys another 429. Fall back immediately and try cloud after the
+          // cooldown instead of adding dead air to this sentence.
+          if (response.status === 429 && browserTranslatorRef.current) {
+            cloudBypassUntilRef.current =
+              Date.now() + cloudBypassMsForFailure({ status: response.status });
+            return localFallback(`${lastFailure} Using the on-device backup immediately.`);
+          }
+
+          if (
+            !retryableInterpretStatus(response.status) ||'''
+assert old in s
+s = s.replace(old, new, 1)
+p.write_text(s)
+
+p = Path('src/features/live/StartScreen.tsx')
+s = p.read_text()
+old = '`${config.llm.capacityNote ?? ""} 그 뒤로는 기기 안의 통역기로 이어서 돌아갑니다.`.trim(),'
+new = '`${config.llm.capacityNote ?? ""} 지원되는 데스크톱 Chrome에서는 기기 내 한국어→영어 번역으로 전환되며, 그 외 브라우저에서는 규칙 기반 보조만 남습니다.`.trim(),'
+assert old in s
+p.write_text(s.replace(old, new, 1))
+
+Path('scripts/e2e-live-quota-bypass.mjs').write_text(r'''/**
+ * A quota failure must cost one cloud turn, not every following sentence.
+ * The Translator API is mocked here; CI does not claim to exercise Chrome's
+ * downloadable Korean-English language pack.
+ */
+import { chromium } from "playwright";
+import { chromiumLaunchOptions } from "./browser.mjs";
+
+const base = process.argv[2] ?? "http://localhost:3000";
+const browser = await chromium.launch(chromiumLaunchOptions());
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await context.newPage();
+const problems = [];
+page.on("pageerror", (error) => problems.push(error.message));
+
+await page.addInitScript(() => {
+  window.localStorage.setItem("tong-yuck:free-tier-privacy-ack-v2", "1");
+  window.__quotaTranslations = [];
+  window.Translator = {
+    create() {
+      return Promise.resolve({
+        async translate(input) {
+          window.__quotaTranslations.push(input);
+          return input.includes("그리고")
+            ? "And we keep walking together today."
+            : "We should love one another today.";
+        },
+        destroy() {},
+      });
+    },
+  };
+
+  class MockSpeechRecognition {
+    lang = "";
+    continuous = true;
+    interimResults = true;
+    maxAlternatives = 3;
+    onresult = null;
+    onerror = null;
+    onend = null;
+    onstart = null;
+    emitted = false;
+    start() {
+      this.onstart?.();
+      if (this.emitted) return;
+      this.emitted = true;
+      const first = { isFinal: true, length: 1, 0: { transcript: "오늘 우리는 서로를 사랑해야 합니다.", confidence: 0.99 } };
+      setTimeout(() => this.onresult?.({ resultIndex: 0, results: { length: 1, 0: first } }), 300);
+      setTimeout(() => this.onresult?.({
+        resultIndex: 1,
+        results: {
+          length: 2,
+          0: first,
+          1: { isFinal: true, length: 1, 0: { transcript: "그리고 오늘도 함께 걸어갑니다.", confidence: 0.99 } },
+        },
+      }), 2200);
+    }
+    stop() { this.onend?.(); }
+    abort() { this.onend?.(); }
+  }
+  window.SpeechRecognition = MockSpeechRecognition;
+  window.webkitSpeechRecognition = MockSpeechRecognition;
+});
+
+let interpretCalls = 0;
+await page.route("**/api/interpret", async (route) => {
+  if (route.request().method() !== "POST") return route.continue();
+  interpretCalls += 1;
+  await route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      output: {
+        safeChunks: [{ text: "오늘 우리는 서로를 사랑해야 합니다.", confidence: "medium" }],
+        confidence: "medium",
+      },
+      provider: "local",
+      model: "deterministic",
+      degraded: true,
+      reason: "OpenRouter rate limit exceeded: free-models-per-day quota exhausted",
+    }),
+  });
+});
+
+await page.goto(`${base}/live`, { waitUntil: "networkidle" });
+await page.getByRole("radio", { name: /^브라우저/ }).click();
+await page.getByRole("radio", { name: /^빠르게/ }).click();
+await page.getByRole("button", { name: "통역 시작" }).click();
+await page.waitForFunction(
+  () => (window.__quotaTranslations?.length ?? 0) >= 2,
+  undefined,
+  { timeout: 12_000 },
+);
+const translated = await page.evaluate(() => window.__quotaTranslations ?? []);
+await browser.close();
+
+const checks = [
+  ["quota failure touched cloud exactly once", interpretCalls === 1, `${interpretCalls} call(s)`],
+  ["first turn used browser translation", translated.some((text) => text.includes("사랑해야")), ""],
+  ["next turn bypassed cloud and still translated", translated.some((text) => text.includes("그리고")), ""],
+  ["page stayed healthy", problems.length === 0, problems.join(" | ")],
+];
+let failed = 0;
+for (const [name, ok, detail] of checks) {
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
+  if (!ok) failed += 1;
+}
+console.log(`\n${checks.length - failed}/${checks.length} quota-bypass checks passed`);
+if (failed) process.exit(1);
+''')
+
+p = Path('package.json')
+data = json.loads(p.read_text())
+scripts = data['scripts']
+new_scripts = {}
+for key, value in scripts.items():
+    new_scripts[key] = value
+    if key == 'e2e:live-fallback':
+        new_scripts['e2e:live-quota-bypass'] = 'node scripts/e2e-live-quota-bypass.mjs'
+data['scripts'] = new_scripts
+p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n')
+
+p = Path('.github/workflows/ci.yml')
+s = p.read_text()
+old = '''      - name: Forced browser fallback checks
+        run: npm run e2e:live-fallback -- http://localhost:3000 ./e2e-out
+
+      # The screenshots'''
+new = '''      - name: Forced browser fallback checks
+        run: npm run e2e:live-fallback -- http://localhost:3000 ./e2e-out
+
+      - name: Quota degradation bypass checks
+        run: npm run e2e:live-quota-bypass -- http://localhost:3000
+
+      # The screenshots'''
+assert old in s
+p.write_text(s.replace(old, new, 1))
