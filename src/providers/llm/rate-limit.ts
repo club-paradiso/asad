@@ -3,10 +3,16 @@
  *
  * Free tiers are where this earns its keep. Minute-level limits are useful hard
  * routing signals because this process can measure them accurately. Daily
- * request caps are different: on serverless a single process sees only part of
- * the account's traffic, and OpenRouter's free-model allowance can also change
- * with account funding. Treating that local estimate as an authoritative hard
- * stop can bench a healthy provider while the account still has capacity.
+ * request caps are different when a provider ALSO publishes a minute-level
+ * limit: on serverless a single process sees only part of the account's daily
+ * traffic, and OpenRouter's free-model daily allowance can change with account
+ * funding. Treating that local estimate as an authoritative hard stop can bench
+ * a healthy provider while the account still has capacity.
+ *
+ * A provider whose ONLY documented request ceiling is daily keeps the historic
+ * hard-cap behaviour. There is no stronger provider-specific scheduling signal
+ * available in that case, and preserving it avoids silently weakening other
+ * adapters while fixing OpenRouter's mixed RPM+RPD case.
  *
  * NOTHING here stores transcript content. Counts and timestamps only.
  */
@@ -22,10 +28,10 @@ export interface QuotaPressure {
   /** Max pressure including advisory daily estimates, for diagnostics only. */
   advisoryLevel: number;
   /** Binding enforceable limit, when one exists. */
-  binding?: "rpm" | "tpm";
+  binding?: "rpm" | "tpm" | "rpd";
   /** Human-readable detail for the enforceable score. */
   detail: string;
-  /** Advisory daily detail, when RPD is known. */
+  /** Advisory daily detail, when RPD is known but not enforceable. */
   advisoryDetail?: string;
 }
 
@@ -100,9 +106,9 @@ export class RateLimitTracker {
   /**
    * How close we are to limits.
    *
-   * `level` is deliberately conservative and may be used to route away from a
-   * provider. `advisoryLevel` may not: it includes a per-instance RPD estimate
-   * that is useful on a diagnostics screen but is not an account-wide fact.
+   * `level` may be used to route away from a provider. `advisoryLevel` may not:
+   * for mixed RPM+RPD providers it includes a per-instance daily estimate that
+   * is useful on a diagnostics screen but is not an account-wide fact.
    */
   pressure(): QuotaPressure {
     this.roll();
@@ -141,11 +147,16 @@ export class RateLimitTracker {
     }
 
     if (this.quota?.requestsPerDay) {
+      const dailyOnly =
+        this.quota.requestsPerMinute === undefined &&
+        this.quota.tokensPerMinute === undefined;
       scores.push({
         level: clamp(this.day.requests / this.quota.requestsPerDay),
-        hard: false,
+        hard: dailyOnly,
         binding: "rpd",
-        detail: `${this.day.requests}/${this.quota.requestsPerDay} requests seen by this instance today (advisory).`,
+        detail: dailyOnly
+          ? `${this.day.requests}/${this.quota.requestsPerDay} requests today (estimated).`
+          : `${this.day.requests}/${this.quota.requestsPerDay} requests seen by this instance today (advisory).`,
       });
     }
 
@@ -162,7 +173,7 @@ export class RateLimitTracker {
       return {
         level: 0,
         advisoryLevel: 0,
-        detail: "No enforceable quota pressure to track.",
+        detail: "No documented quota to track.",
       };
     }
 
@@ -171,17 +182,14 @@ export class RateLimitTracker {
       ? hardScores.reduce((a, b) => (b.level > a.level ? b : a))
       : undefined;
     const advisoryWorst = scores.reduce((a, b) => (b.level > a.level ? b : a));
-    const daily = scores.find((score) => score.binding === "rpd");
+    const advisoryDaily = scores.find((score) => score.binding === "rpd" && !score.hard);
 
     return {
       level: hardWorst?.level ?? 0,
       advisoryLevel: advisoryWorst.level,
-      binding:
-        hardWorst?.binding === "rpm" || hardWorst?.binding === "tpm"
-          ? hardWorst.binding
-          : undefined,
-      detail: hardWorst?.detail ?? "No enforceable quota pressure to track.",
-      advisoryDetail: daily?.detail,
+      binding: hardWorst?.binding,
+      detail: hardWorst?.detail ?? "No documented quota to track.",
+      advisoryDetail: advisoryDaily?.detail,
     };
   }
 
