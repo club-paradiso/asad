@@ -20,6 +20,28 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Pin React version for legacy plugin compatibility
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('eslint.config.mjs')
+          s = p.read_text()
+          old = '''  {
+    rules: {
+'''
+          new = '''  {
+    // eslint-plugin-react 7.37.x still calls a removed ESLint 10 context API
+    // when React version auto-detection is enabled. ASAD pins React 19.2.8,
+    // so provide that version explicitly instead of using `detect`.
+    settings: {
+      react: { version: "19.2.8" },
+    },
+    rules: {
+'''
+          if old not in s:
+            raise SystemExit('eslint config insertion point not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
       - name: Inspect peer compatibility
         run: |
           echo "eslint latest: $(npm view eslint version)"
@@ -49,7 +71,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json package-lock.json
+          git add package.json package-lock.json eslint.config.mjs
           if git diff --cached --quiet; then
             echo 'No migration changes to commit.'
             exit 0
