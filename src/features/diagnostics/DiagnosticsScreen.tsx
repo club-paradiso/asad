@@ -786,8 +786,8 @@ export function DiagnosticsScreen() {
 
       <p className="mt-2 text-xs text-[var(--fg-dim)]">
         Generated {new Date(data.generatedAt).toLocaleString()}. Measured workload:{" "}
-        {String(data.workload.callsPerMinute)} calls/min at {String(data.workload.tokensPerCallFull)}{" "}
-        tokens per call.
+        {String(data.workload.callsPerMinute)} calls/min; ultra-compact{" "}
+        {String(data.workload.tokensPerCallUltraCompact)} tokens per call.
       </p>
     </div>
   );

@@ -94,7 +94,7 @@ export async function GET() {
     const caps = capabilitiesFor(id);
     return (
       !caps.freeTierPossible ||
-      assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull).viable
+      assessFreeTierViability(id).viable
     );
   };
   const sustainableChain = plan.chain.filter(sustainableForLive);
@@ -191,7 +191,7 @@ export async function GET() {
         const health = router.health().find((h) => h.provider === id)!;
         const viability =
           caps.freeTierPossible && id !== "local"
-            ? assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull)
+            ? assessFreeTierViability(id)
             : undefined;
         return {
           id,

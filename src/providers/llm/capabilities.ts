@@ -314,6 +314,23 @@ export interface QuotaVerdict {
 }
 
 /**
+ * Baseline prompt cost the live router will actually send for this provider.
+ * Mirrors the zero-pressure BALANCED profile decision without importing the
+ * context budgeter back into the provider registry (which would create a
+ * dependency cycle).
+ */
+export function liveTokensPerCallForProvider(id: LlmProviderId): number {
+  const recommended = PROVIDER_CAPABILITIES[id].recommendedLiveContextTokens;
+  if (recommended !== undefined && recommended < LIVE_WORKLOAD.tokensPerCallCompact) {
+    return LIVE_WORKLOAD.tokensPerCallUltraCompact;
+  }
+  if (recommended !== undefined && recommended < LIVE_WORKLOAD.tokensPerCallFull) {
+    return LIVE_WORKLOAD.tokensPerCallCompact;
+  }
+  return LIVE_WORKLOAD.tokensPerCallFull;
+}
+
+/**
  * Can this provider actually sustain a live sermon on its free tier?
  *
  * "Technically $0" and "survives 45 minutes of continuous speech" are very
@@ -321,7 +338,7 @@ export interface QuotaVerdict {
  */
 export function assessFreeTierViability(
   id: LlmProviderId,
-  tokensPerCall: number = LIVE_WORKLOAD.tokensPerCallFull,
+  tokensPerCall: number = liveTokensPerCallForProvider(id),
 ): QuotaVerdict {
   const caps = PROVIDER_CAPABILITIES[id];
   if (caps.freeTierPrivacy === "local") {
