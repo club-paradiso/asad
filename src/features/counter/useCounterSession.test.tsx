@@ -244,7 +244,9 @@ describe("useCounterSession across consultations", () => {
 
     // The desk ends one conversation to open the next; the new one must not
     // start on the previous one's terminal state.
-    rerender({ code: "BD57" });
+    await act(async () => {
+      rerender({ code: "BD57" });
+    });
     expect(result.current.ended).toBe(false);
     expect(result.current.endedBy).toBeNull();
   });
