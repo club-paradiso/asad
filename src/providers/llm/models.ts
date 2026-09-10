@@ -182,6 +182,29 @@ const PATTERNS: ReadonlyArray<{ match: RegExp; caps: CapabilityShape }> = [
     },
   },
 
+  /* --- Nex AGI ----------------------------------------------------------- */
+  {
+    // Production health selected Nex-N2.5-Mini from the free pool in ~2.3s
+    // and validated a JSON-schema response. OpenRouter documents native JSON
+    // schema structured output and a 262,144-token context; Nex publishes the
+    // model weights under Apache-2.0. Keep the slug-specific match ahead of the
+    // generic open-weight families so those verified capabilities are explicit.
+    match: /nex-agi\/nex-n2\.5-mini/i,
+    caps: {
+      family: "Nex-N2.5-Mini",
+      structuredOutput: "json_schema",
+      sampling: "supported",
+      reasoning: "none",
+      reasoningAlwaysOn: false,
+      maxOutputTokens: 900,
+      contextTokens: 262_144,
+      latencyClass: "fast",
+      liveSuitable: true,
+      promptCaching: false,
+      openWeights: true,
+    },
+  },
+
   /* --- Gemini ------------------------------------------------------------ */
   {
     match: /gemini-[\d.]+-flash-lite/i,
