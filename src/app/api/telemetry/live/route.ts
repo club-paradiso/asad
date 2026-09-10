@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { clientTelemetryBatchSchema } from "@/lib/schema";
 import { guardInferenceRoute } from "@/lib/guard";
 import { telemetry } from "@/lib/telemetry";
+import { persistSharedLatency } from "@/lib/shared-telemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,5 +15,9 @@ export async function POST(request: Request) {
   const parsed = clientTelemetryBatchSchema.safeParse(guarded.body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid telemetry batch." }, { status: 400 });
   for (const sample of parsed.data.samples) telemetry.recordClientLatency(sample);
+  const batch = [...parsed.data.samples];
+  after(async () => {
+    await persistSharedLatency(batch);
+  });
   return new NextResponse(null, { status: 204 });
 }

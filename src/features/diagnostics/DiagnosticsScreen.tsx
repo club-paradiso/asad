@@ -161,6 +161,18 @@ interface Payload {
   };
   workload: Record<string, number | string>;
   telemetry: {
+    storage: {
+      kind: "redis" | "memory";
+      shared: boolean;
+      source: "upstash" | "vercel-kv" | null;
+      health: "ok" | "local" | "unavailable";
+      retentionDays: number | null;
+      maxSamples: number | null;
+      sampleCount: number | null;
+      latencyScope: "shared-redis" | "process-fallback" | "process-local";
+      otherMetricsScope: "process-local";
+      transcriptStored: false;
+    };
     latency: Record<string, { count: number; p50: number; p90: number; p95: number; max: number }>;
     slo: Array<{ stage: string; target: { p50: number; p95: number }; actual: { count: number; p50: number; p95: number }; p50Met: boolean; p95Met: boolean }>;
     tokens: { calls: number; perCall: { p50: number; p95: number; max: number }; sessionTotal: number } | null;
@@ -567,6 +579,24 @@ export function DiagnosticsScreen() {
       </Section>
 
       <Section title="Measured latency">
+        <Row
+          k="Latency aggregation"
+          v={
+            data.telemetry.storage.latencyScope === "shared-redis"
+              ? `shared Redis · ${data.telemetry.storage.retentionDays}d · n=${data.telemetry.storage.sampleCount ?? 0}`
+              : data.telemetry.storage.latencyScope === "process-fallback"
+                ? "process fallback (Redis unavailable)"
+                : "process local"
+          }
+          tone={
+            data.telemetry.storage.latencyScope === "shared-redis"
+              ? "ok"
+              : data.telemetry.storage.health === "unavailable"
+                ? "bad"
+                : "warn"
+          }
+        />
+        <Row k="Transcript stored in telemetry" v="no" tone="ok" />
         {data.telemetry.slo.map((s) => (
           <div key={s.stage} className="py-1">
             <Row
