@@ -10,27 +10,31 @@ export const OPENROUTER_FUNDING_THRESHOLD_USD = 10;
 
 export interface OpenRouterAccountStatus {
   ok: boolean;
-  /** True means the account is definitely on OpenRouter's free tier. */
+  /** True means OpenRouter reports this key as belonging to the free tier. */
   isFreeTier?: boolean;
-  /** Deprecated provider-reported request limit. Diagnostic only, never routing authority. */
-  reportedRequestLimit?: number;
-  reportedInterval?: string;
   /** Calls the measured ASAD workload needs for one 45-minute service. */
   estimatedCallsPerService: number;
-  /** Fresh daily free-model cap for an unfunded account. */
+  /** Daily free-model cap for an account that has not purchased >= $10 credits. */
   unfundedMinutes: number;
-  /** Fresh daily free-model cap after >= $10 credits have been purchased. */
+  /** Daily free-model cap after >= $10 credits have been purchased. */
   fundedMinutes: number;
+  /**
+   * The documented free-model daily allowance implied by the reported tier.
+   * This is intentionally derived from current OpenRouter documentation, not
+   * from data.rate_limit: that API field is deprecated and explicitly safe to
+   * ignore.
+   */
+  documentedDailyAllowance?: number;
+  /** Approximate continuous ASAD minutes available at that documented floor. */
+  documentedMinutesAvailable?: number;
+  /** Whether that documented allowance covers one measured 45-minute service. */
+  canSustainOneService?: boolean;
   error?: string;
 }
 
 interface CurrentKeyResponse {
   data?: {
     is_free_tier?: boolean;
-    rate_limit?: {
-      requests?: number;
-      interval?: string;
-    };
   };
 }
 
@@ -47,8 +51,13 @@ const baseStatus = (): Pick<
  * Read only non-secret account metadata for diagnostics.
  *
  * The API key never leaves the Authorization header and no label, creator id,
- * spend amount or key fingerprint is returned to callers. Failure is soft:
- * health can still probe inference even if this metadata endpoint is down.
+ * spend amount or key fingerprint is returned to callers. OpenRouter's
+ * `data.rate_limit` object is deliberately ignored: the current API reference
+ * marks it deprecated and safe to ignore, so values such as requests=-1 must
+ * never be presented as real account capacity.
+ *
+ * Failure is soft: health can still probe inference even if this metadata
+ * endpoint is down.
  */
 export async function inspectOpenRouterAccount(
   apiKey: string,
@@ -76,14 +85,20 @@ export async function inspectOpenRouterAccount(
       return { ...common, ok: false, error: "OpenRouter account response was missing tier metadata." };
     }
 
+    const documentedDailyAllowance = data.is_free_tier
+      ? OPENROUTER_FREE_MODEL_RPD.unfunded
+      : OPENROUTER_FREE_MODEL_RPD.funded10;
+    const documentedMinutesAvailable = Math.round(
+      documentedDailyAllowance / LIVE_WORKLOAD.callsPerMinute,
+    );
+
     return {
       ...common,
       ok: true,
       isFreeTier: data.is_free_tier,
-      reportedRequestLimit:
-        typeof data.rate_limit?.requests === "number" ? data.rate_limit.requests : undefined,
-      reportedInterval:
-        typeof data.rate_limit?.interval === "string" ? data.rate_limit.interval : undefined,
+      documentedDailyAllowance,
+      documentedMinutesAvailable,
+      canSustainOneService: documentedMinutesAvailable >= LIVE_WORKLOAD.sermonMinutes,
     };
   } catch {
     return { ...common, ok: false, error: "OpenRouter account check could not be reached." };
