@@ -198,7 +198,11 @@ export class LlmRouter {
       };
     }
     const pressure = this.limiterFor(id).pressure();
-    if (pressure.level >= PRESSURE_ABANDON) {
+    // Only minute-level quota pressure and actual recent 429s may hard-disable
+    // a route. Daily counters are advisory: this serverless instance does not
+    // see the account's complete day, and some providers raise daily free-model
+    // allowances when an account is funded.
+    if (pressure.hardLevel >= PRESSURE_ABANDON) {
       return { ok: false, reason: `quota nearly exhausted — ${pressure.detail}` };
     }
     return { ok: true };
@@ -400,56 +404,56 @@ export class LlmRouter {
     // Refresh insertion order and bound attacker-controlled session keys.
     this.sticky.delete(key);
     this.sticky.set(key, provider);
-    while (this.sticky.size > 2_000) {
-      const oldest = this.sticky.keys().next().value as string | undefined;
-      if (!oldest) break;
+    while (this.sticky.size > 256) {
+      const oldest = this.sticky.keys().next().value;
+      if (oldest === undefined) break;
       this.sticky.delete(oldest);
     }
   }
 
-  /* --- Introspection ---------------------------------------------------- */
+  /* --- Diagnostics ------------------------------------------------------ */
 
   health(): ProviderHealth[] {
-    return (Object.keys(this.env.llm.providers) as LlmProviderId[]).map((id) => {
-      const eligibility = this.eligibility(id);
-      return {
-        provider: id,
-        model: this.env.llm.providers[id].model,
-        configured: this.env.llm.providers[id].configured,
-        breaker: this.breakerFor(id).snapshot(),
-        rateLimit: this.limiterFor(id).snapshot(),
-        eligible: id === "local" ? true : eligibility.ok,
-        ineligibleReason: id === "local" ? undefined : eligibility.reason,
-      };
-    });
+    return (["local", ...this.candidates()] as LlmProviderId[])
+      .filter((id, i, all) => all.indexOf(id) === i)
+      .map((id) => {
+        const eligibility = id === "local" ? { ok: true } : this.eligibility(id);
+        return {
+          provider: id,
+          model: this.env.llm.providers[id].model,
+          configured: id === "local" || this.env.llm.providers[id].configured,
+          breaker: this.breakerFor(id).snapshot(),
+          rateLimit: this.limiterFor(id).snapshot(),
+          eligible: eligibility.ok,
+          ineligibleReason: eligibility.reason,
+        };
+      });
   }
 
-  /** What the deployment would do right now, for the diagnostics page. */
+  /** Human-readable routing plan for the diagnostics screen. */
   plan(): {
     mode: RoutingMode;
     privacyMode: PrivacyMode;
     allowPaidFallback: boolean;
-    /** Providers declared to be on a billed plan. */
-    paidTier: LlmProviderId[];
-    chain: LlmProviderId[];
     active: LlmProviderId | null;
+    chain: LlmProviderId[];
     warnings: string[];
   } {
-    const chain = [...this.candidates(), "local" as const];
+    const chain = this.buildChain();
+    const active = chain.find((id) => id !== "local" && this.eligibility(id).ok) ?? "local";
     const warnings: string[] = [];
 
     for (const id of this.candidates()) {
       const caps = capabilitiesFor(id);
       const paid = this.isPaid(id);
-      // A free-tier ceiling is not a fact about a billed plan.
       if (caps.freeTierPossible && !paid) {
         const verdict = assessFreeTierViability(id);
         if (!verdict.viable) {
-          warnings.push(`${caps.label} free tier: ${verdict.detail}`);
+          warnings.push(`${caps.label} free tier is not viable for a 45-minute live session: ${verdict.detail}`);
         }
       }
-      if (this.mayTrain(id) && this.env.llm.privacyMode !== "strict") {
-        warnings.push(`${caps.label}: ${caps.privacyNote}`);
+      if (this.mayTrain(id)) {
+        warnings.push(`${caps.label}: configured tier may use submitted content for product improvement.`);
       }
     }
 
@@ -457,39 +461,31 @@ export class LlmRouter {
       mode: this.env.llm.routingMode,
       privacyMode: this.env.llm.privacyMode,
       allowPaidFallback: this.env.llm.allowPaidFallback,
-      paidTier: [...this.env.llm.paidTier],
+      active,
       chain,
-      active: this.preferred(),
       warnings,
     };
-  }
-
-  /** Test seam. */
-  reset(): void {
-    this.breakers.clear();
-    this.limits.clear();
-    this.sticky.clear();
   }
 }
 
 /**
- * Combine the caller's signal with a per-provider deadline.
- *
- * A response that arrives after the interpreter has moved on is worthless, so
- * the deadline is short and enforced here rather than trusted to the adapter.
+ * Derive a child request with a provider deadline without destroying the
+ * caller's own signal. The provider sees one signal that fires when either one
+ * does, and the listener is removed after the attempt.
  */
-function withDeadline(request: LlmRequest, deadlineMs: number) {
+function withDeadline(
+  request: LlmRequest,
+  timeoutMs: number,
+): { request: LlmRequest; dispose: () => void } {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), deadlineMs);
-  const onAbort = () => controller.abort();
-  if (request.signal?.aborted) controller.abort(request.signal.reason);
-  else request.signal?.addEventListener("abort", onAbort, { once: true });
-
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onCallerAbort = () => controller.abort();
+  request.signal?.addEventListener("abort", onCallerAbort, { once: true });
   return {
     request: { ...request, signal: controller.signal },
     dispose: () => {
       clearTimeout(timer);
-      request.signal?.removeEventListener("abort", onAbort);
+      request.signal?.removeEventListener("abort", onCallerAbort);
     },
   };
 }
