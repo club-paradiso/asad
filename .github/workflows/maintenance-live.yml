@@ -36,30 +36,42 @@ jobs:
           else:
               raise SystemExit('expected dependency array not found')
           PY
-      - name: Install
+      - name: Install current lockfile
         run: npm ci
-      - name: Audit high severity dependencies
-        run: npm audit --json > /tmp/audit.json || true
-      - name: Print audit summary
+      - name: Explain vulnerable transitive dependencies
         run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const audit = JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));
-          console.log(JSON.stringify({metadata:audit.metadata, vulnerabilities:audit.vulnerabilities}, null, 2));
-          NODE
-      - name: Verify hook patch
+          npm explain js-yaml || true
+          npm explain sharp || true
+      - name: Apply non-breaking audit fix to lockfile
+        run: npm audit fix --package-lock-only
+      - name: Install repaired lockfile
+        run: npm ci
+      - name: Require zero high vulnerabilities
+        run: npm audit --audit-level=high
+      - name: Verify source and dependency repair
         run: |
           npm run lint
           npm run typecheck
-          npm test -- --runInBand=false
-      - name: Commit hook fix
+          npm test
+          npm run build
+      - name: Show repaired versions
+        run: |
+          node - <<'NODE'
+          const lock = require('./package-lock.json');
+          for (const name of ['node_modules/js-yaml','node_modules/sharp']) {
+            const p = lock.packages?.[name];
+            console.log(`${name}: ${p?.version ?? 'not installed'}`);
+          }
+          NODE
+          git diff --stat
+      - name: Commit verified repair
         run: |
           if git diff --quiet; then
-            echo 'No source changes to commit.'
+            echo 'No source or lockfile changes to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/features/live/useLiveSession.ts
-          git commit -m 'fix(live): include demo script in start callback dependencies'
+          git add src/features/live/useLiveSession.ts package-lock.json
+          git commit -m 'fix(live): clear hook warning and vulnerable transitive deps'
           git push origin HEAD:fix/live-hook-and-dependency-audit
