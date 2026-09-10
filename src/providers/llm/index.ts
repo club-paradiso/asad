@@ -8,6 +8,7 @@ import { restorePublicFreeOpenRouter } from "./public-free";
 
 export * from "./types";
 export * from "./capabilities";
+export { enforcesJsonSchema } from "./schema-enforcement";
 export { LlmRouter } from "./router";
 export type { ProviderHealth, RouteResult, RouteAttempt } from "./router";
 export { deadlineFor, turnBudgetFor } from "./deadlines";
