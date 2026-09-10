@@ -11,7 +11,6 @@
 import { NextResponse } from "next/server";
 import { appEnv } from "@/lib/env";
 import {
-  LIVE_WORKLOAD,
   assessFreeTierViability,
   capabilitiesFor,
   trainsOnSubmissions,
@@ -91,7 +90,7 @@ export async function GET() {
     if (env.llm.paidTier.has(id)) return true;
     const caps = capabilitiesFor(id);
     return !caps.freeTierPossible ||
-      assessFreeTierViability(id, LIVE_WORKLOAD.tokensPerCallFull).viable;
+      assessFreeTierViability(id).viable;
   });
 
   // The router is the authority on what a live turn would reach: it accounts
@@ -105,7 +104,7 @@ export async function GET() {
   const activePaid = active !== null && env.llm.paidTier.has(active);
   const viability =
     modelAvailable && capabilitiesFor(active).freeTierPossible && !activePaid
-      ? assessFreeTierViability(active, LIVE_WORKLOAD.tokensPerCallFull)
+      ? assessFreeTierViability(active)
       : undefined;
 
   const textAvailable = env.bible.provider !== "reference-only";
