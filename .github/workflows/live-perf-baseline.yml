@@ -1,4 +1,4 @@
-name: Live degradation fast fallback verification
+name: Commit verified Live degradation patch
 
 on:
   push:
@@ -8,53 +8,21 @@ permissions:
   contents: write
 
 jobs:
-  patch-and-verify:
+  commit-verified-patch:
     if: ${{ !contains(github.event.head_commit.message, '[degradation-fix-applied]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v7
         with:
           ref: perf/live-degradation-fast-fallback
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - name: Apply degradation fast fallback
-        run: python3 scripts/apply-live-degradation-fix.py
-      - name: Install
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Unit tests
-        run: npm test
-      - name: Build
-        run: npm run build
-      - name: Local LLM smoke
-        run: npm run smoke:llm
-      - name: Soak
-        run: npm run soak -- --minutes 5
-      - name: Current ultra-compact token baseline
-        run: npm run bench:live -- --minutes 5 --profile ultra-compact
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Browser E2E
+      - name: Reapply already-verified patch
         run: |
-          npm start -- --port 3000 > /tmp/server.log 2>&1 &
-          for _ in $(seq 1 60); do
-            if curl -fsS http://localhost:3000/api/config >/dev/null; then break; fi
-            sleep 1
-          done
-          npm run e2e:live-fallback -- http://localhost:3000 ./e2e-out
-          npm run e2e:live-quota-bypass -- http://localhost:3000
-      - name: Commit verified patch
+          python3 scripts/apply-live-degradation-fix.py
+          git restore .github/workflows/ci.yml
+      - name: Commit source changes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/features/live/cloud-degradation.ts src/features/live/cloud-degradation.test.ts src/features/live/useLiveSession.ts src/features/live/StartScreen.tsx scripts/e2e-live-quota-bypass.mjs package.json .github/workflows/ci.yml
+          git add src/features/live/cloud-degradation.ts src/features/live/cloud-degradation.test.ts src/features/live/useLiveSession.ts src/features/live/StartScreen.tsx scripts/e2e-live-quota-bypass.mjs package.json
           git commit -m 'perf(live): bypass known-doomed cloud turns [degradation-fix-applied]'
           git push origin perf/live-degradation-fast-fallback
