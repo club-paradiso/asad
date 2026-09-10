@@ -4,7 +4,7 @@
  * Free tiers are where this earns its keep. Minute-level limits are useful hard
  * routing signals because this process can measure them accurately. Daily
  * request caps are different: on serverless a single process sees only part of
- * the account's traffic, and OpenRouter's free-model allowance also changes
+ * the account's traffic, and OpenRouter's free-model allowance can also change
  * with account funding. Treating that local estimate as an authoritative hard
  * stop can bench a healthy provider while the account still has capacity.
  *
@@ -14,19 +14,19 @@ import type { FreeTierQuota } from "./capabilities";
 import type { LlmProviderId, RateLimitSnapshot } from "./types";
 
 export interface QuotaPressure {
-  /** 0 = plenty of headroom, 1 = at the closest known limit. */
-  level: number;
   /**
-   * Highest pressure backed by a limit this process can safely enforce.
-   *
-   * RPM/TPM and recent 429s are hard evidence. A locally estimated RPD is not:
-   * serverless instances do not share that counter and some provider plans can
-   * raise the daily allowance without changing the API key.
+   * Enforceable 0–1 pressure. Existing router callers intentionally read this
+   * field, so it contains only signals safe enough to make routing decisions.
    */
-  hardLevel: number;
-  /** Which limit is closest to binding. */
-  binding?: "rpm" | "tpm" | "rpd";
+  level: number;
+  /** Max pressure including advisory daily estimates, for diagnostics only. */
+  advisoryLevel: number;
+  /** Binding enforceable limit, when one exists. */
+  binding?: "rpm" | "tpm";
+  /** Human-readable detail for the enforceable score. */
   detail: string;
+  /** Advisory daily detail, when RPD is known. */
+  advisoryDetail?: string;
 }
 
 interface Window {
@@ -38,7 +38,7 @@ interface Window {
 interface PressureScore {
   level: number;
   hard: boolean;
-  binding: QuotaPressure["binding"];
+  binding?: "rpm" | "tpm" | "rpd";
   detail: string;
 }
 
@@ -98,18 +98,19 @@ export class RateLimitTracker {
   }
 
   /**
-   * How close we are to the limit, as a 0–1 pressure score.
+   * How close we are to limits.
    *
-   * `level` is useful for context compaction. `hardLevel` is the only value the
-   * router may use to make a provider ineligible.
+   * `level` is deliberately conservative and may be used to route away from a
+   * provider. `advisoryLevel` may not: it includes a per-instance RPD estimate
+   * that is useful on a diagnostics screen but is not an account-wide fact.
    */
   pressure(): QuotaPressure {
     this.roll();
 
     const scores: PressureScore[] = [];
 
-    // Token headers are used as a TPM signal by the providers we support and
-    // are more authoritative than our pre-dispatch estimate.
+    // Token headers are useful when the provider's documented limit is TPM and
+    // are more authoritative than our pre-dispatch token estimate.
     if (this.observed?.tokensRemaining !== undefined && this.quota?.tokensPerMinute) {
       const used = 1 - this.observed.tokensRemaining / this.quota.tokensPerMinute;
       scores.push({
@@ -153,22 +154,34 @@ export class RateLimitTracker {
       scores.push({
         level: Math.min(1, 0.85 + this.recent429s.length * 0.05),
         hard: true,
-        binding: undefined,
         detail: `${this.recent429s.length} rate-limit response(s) in the last 5 minutes.`,
       });
     }
 
     if (scores.length === 0) {
-      return { level: 0, hardLevel: 0, detail: "No documented quota to track." };
+      return {
+        level: 0,
+        advisoryLevel: 0,
+        detail: "No enforceable quota pressure to track.",
+      };
     }
 
-    const worst = scores.reduce((a, b) => (b.level > a.level ? b : a));
-    const hardLevel = scores.reduce((max, score) => (score.hard ? Math.max(max, score.level) : max), 0);
+    const hardScores = scores.filter((score) => score.hard);
+    const hardWorst = hardScores.length
+      ? hardScores.reduce((a, b) => (b.level > a.level ? b : a))
+      : undefined;
+    const advisoryWorst = scores.reduce((a, b) => (b.level > a.level ? b : a));
+    const daily = scores.find((score) => score.binding === "rpd");
+
     return {
-      level: worst.level,
-      hardLevel,
-      binding: worst.binding,
-      detail: worst.detail,
+      level: hardWorst?.level ?? 0,
+      advisoryLevel: advisoryWorst.level,
+      binding:
+        hardWorst?.binding === "rpm" || hardWorst?.binding === "tpm"
+          ? hardWorst.binding
+          : undefined,
+      detail: hardWorst?.detail ?? "No enforceable quota pressure to track.",
+      advisoryDetail: daily?.detail,
     };
   }
 
@@ -190,5 +203,5 @@ const clamp = (value: number) => Math.max(0, Math.min(1, value));
 
 /** Pressure above this means: compact the context. */
 export const PRESSURE_COMPACT = 0.6;
-/** Hard pressure above this means: stop using this provider. */
+/** Pressure above this means: stop using this provider. */
 export const PRESSURE_ABANDON = 0.9;
