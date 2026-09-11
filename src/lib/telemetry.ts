@@ -27,7 +27,19 @@ export type LatencyStage =
   /** Browser stable event → anticipated chunks applied to engine state. */
   | "stable_to_anticipated"
   /** Browser stable event → React committed the safe chunk update. */
-  | "stable_to_render";
+  | "stable_to_render"
+  /** Browser stable event → provisional on-device English applied to engine state. */
+  | "stable_to_provisional"
+  /** Browser stable event → React committed the provisional chunk update. */
+  | "stable_to_provisional_render"
+  /** Provisional English applied → contextual English legally replaced it. */
+  | "provisional_to_refinement"
+  /** Stable event → a contextual rewrite arrived after its provisional line had committed (dropped). */
+  | "refinement_discarded_committed"
+  /** Stable event → a contextual result arrived for a stopped/invalidated generation (dropped). */
+  | "contextual_result_stale"
+  /** Stable event → the on-device lane failed or timed out for a turn. */
+  | "provisional_failed";
 
 export interface LatencySample {
   stage: LatencyStage;
@@ -206,6 +218,12 @@ export class TelemetryRecorder {
         stable_to_safe: this.stage("stable_to_safe"),
         stable_to_anticipated: this.stage("stable_to_anticipated"),
         stable_to_render: this.stage("stable_to_render"),
+        stable_to_provisional: this.stage("stable_to_provisional"),
+        stable_to_provisional_render: this.stage("stable_to_provisional_render"),
+        provisional_to_refinement: this.stage("provisional_to_refinement"),
+        refinement_discarded_committed: this.stage("refinement_discarded_committed"),
+        contextual_result_stale: this.stage("contextual_result_stale"),
+        provisional_failed: this.stage("provisional_failed"),
       },
       slo: this.sloVerdicts(),
       tokens: this.tokenSummary(),

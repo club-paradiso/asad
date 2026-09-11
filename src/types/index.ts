@@ -95,6 +95,19 @@ export interface InterpretationChunk {
   note?: string;
   /** True when the chunk is an adapted rendering rather than a literal one. */
   adapted?: boolean;
+  /**
+   * The logical turn (one flushed Korean unit) this chunk answers. Carries no
+   * content; it is the key an asynchronous result must match before it may
+   * touch the chunk.
+   */
+  turnId?: number;
+  /**
+   * True while the chunk is fast on-device English that the contextual lane
+   * may still replace. The temporal state is unchanged: a provisional chunk
+   * is `current` until it commits, and once committed it is as immutable as
+   * any other.
+   */
+  provisional?: boolean;
 }
 
 // ---------------------------------------------------------------------------

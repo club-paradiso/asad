@@ -201,3 +201,163 @@ export function trimChunks(chunks: InterpretationChunk[]): InterpretationChunk[]
     ? chunks
     : chunks.slice(chunks.length - MAX_CHUNKS_IN_VIEW);
 }
+
+/* --------------------------------------------------------------------------
+ * Two-lane support: logical turns, provisional chunks, legal refinement.
+ *
+ * None of this adds a temporal state. A provisional chunk is a `current` chunk
+ * with two pieces of metadata — which turn it answers and that it came from the
+ * fast lane — and commits on exactly the same dwell clock as any other chunk.
+ * The only new question these helpers answer is: "may contextual English for
+ * turn N still replace what the fast lane rendered for turn N?"
+ * ------------------------------------------------------------------------ */
+
+/** Provisional chunks belonging to any of `turnIds`, in stream order. */
+export const provisionalChunksFor = (
+  chunks: InterpretationChunk[],
+  turnIds: readonly number[],
+): InterpretationChunk[] =>
+  chunks.filter(
+    (c) => c.provisional === true && c.turnId !== undefined && turnIds.includes(c.turnId),
+  );
+
+/**
+ * - `refine`: every provisional chunk of those turns is still editable.
+ * - `locked`: at least one has committed. The interpreter may have said it, so
+ *   a stylistic replacement is discarded rather than appended.
+ * - `fresh`: no provisional chunk exists for those turns (the fast lane was
+ *   off, failed, or is still running); the result is appended as new English.
+ */
+export type RefinementLegality = "refine" | "locked" | "fresh";
+
+export function refinementLegality(
+  chunks: InterpretationChunk[],
+  turnIds: readonly number[],
+): RefinementLegality {
+  const provisional = provisionalChunksFor(chunks, turnIds);
+  if (provisional.length === 0) return "fresh";
+  return provisional.every((c) => c.state === "current") ? "refine" : "locked";
+}
+
+export interface RefineResult {
+  chunks: InterpretationChunk[];
+  /** False when the contextual English matched the provisional line for line. */
+  changed: boolean;
+  added: InterpretationChunk[];
+}
+
+/**
+ * Replace the still-editable provisional chunks of `turnIds` with contextual
+ * drafts, in the position the provisional text occupied.
+ *
+ * Caller must have checked `refinementLegality === "refine"`. The replacement
+ * keeps the earliest provisional `at`: the dwell clock measures how long the
+ * interpreter has had that line, and a refinement is a better rendering of the
+ * same line, not a new one. Committed chunks are never touched — they keep
+ * their object identity.
+ */
+export function refineProvisionalChunks(
+  chunks: InterpretationChunk[],
+  turnIds: readonly number[],
+  drafts: ChunkDraft[],
+  now: number,
+): RefineResult {
+  const targets = provisionalChunksFor(chunks, turnIds);
+  if (targets.length === 0 || targets.some((c) => c.state !== "current")) {
+    return { chunks, changed: false, added: [] };
+  }
+  const targetIds = new Set(targets.map((c) => c.id));
+  const first = chunks.findIndex((c) => targetIds.has(c.id));
+  const before = chunks.slice(0, first).filter((c) => !targetIds.has(c.id));
+  const after = chunks.slice(first).filter((c) => !targetIds.has(c.id) && c.state !== "anticipated");
+  const at = Math.min(now, ...targets.map((c) => c.at));
+
+  const alreadyDelivered = before
+    .filter((c) => c.state !== "anticipated")
+    .slice(-DUPLICATE_WINDOW)
+    .map((c) => normalise(c.text));
+  const incoming = drafts
+    .map((d) => ({ ...d, text: d.text.trim() }))
+    .filter((d) => d.text && normalise(d.text) && !alreadyDelivered.includes(normalise(d.text)));
+
+  // Nothing usable: the provisional line stands. Never blank the screen.
+  if (incoming.length === 0) return { chunks, changed: false, added: [] };
+
+  const identical =
+    incoming.length === targets.length &&
+    incoming.every((d, i) => normalise(d.text) === normalise(targets[i].text));
+  if (identical) {
+    // Same words: keep the text the interpreter is already reading, drop the
+    // provisional flag so a later result cannot touch it again.
+    const settled = chunks.map((c) => (targetIds.has(c.id) ? { ...c, provisional: false } : c));
+    return { chunks: settled.filter((c) => c.state !== "anticipated"), changed: false, added: [] };
+  }
+
+  const turnId = Math.max(...turnIds);
+  const added = incoming.map<InterpretationChunk>((d) => ({
+    ...d,
+    id: nextChunkId(),
+    state: "current",
+    at,
+    turnId,
+    provisional: false,
+  }));
+  return { chunks: [...before, ...added, ...after], changed: true, added };
+}
+
+/**
+ * Append English for `turnIds` in stream order.
+ *
+ * Normally that is the tail. When an older turn's English arrives after a
+ * newer turn has already rendered (fast lane ahead of a slow cloud), it goes
+ * in front of the newer turn's chunks — but only while those are still
+ * editable. Anything committed keeps its place, so a late result can never
+ * reorder what the interpreter has already read; it is appended after it.
+ *
+ * Everything positioned before the insertion point is locked, as
+ * `applyOutput` always did: new English means the interpreter has moved past
+ * whatever was editable before it.
+ */
+export function insertTurnChunks(
+  chunks: InterpretationChunk[],
+  drafts: ChunkDraft[],
+  turnIds: readonly number[],
+  now: number,
+  options: { provisional?: boolean } = {},
+): AddSafeResult {
+  const base = clearAnticipated(chunks);
+  const turnId = Math.max(...turnIds);
+
+  let position = base.length;
+  for (let i = base.length - 1; i >= 0; i -= 1) {
+    const chunk = base[i];
+    if (chunk.state === "current" && chunk.turnId !== undefined && chunk.turnId > turnId) {
+      position = i;
+    } else {
+      break;
+    }
+  }
+
+  const before = commitAll(base.slice(0, position));
+  const after = base.slice(position);
+  const alreadyDelivered = before.slice(-DUPLICATE_WINDOW).map((c) => normalise(c.text));
+  const added: InterpretationChunk[] = [];
+
+  for (const draft of drafts) {
+    const text = draft.text.trim();
+    if (!text) continue;
+    const key = normalise(text);
+    if (!key || alreadyDelivered.includes(key)) continue;
+    added.push({
+      ...draft,
+      text,
+      id: nextChunkId(),
+      state: "current",
+      at: now,
+      turnId,
+      ...(options.provisional ? { provisional: true } : {}),
+    });
+  }
+
+  return { chunks: [...before, ...added, ...after], added };
+}

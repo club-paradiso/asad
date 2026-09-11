@@ -7,6 +7,9 @@ import {
   clearAnticipated,
   commitAll,
   commitDueChunks,
+  insertTurnChunks,
+  refineProvisionalChunks,
+  refinementLegality,
   setAnticipatedChunks,
   trimChunks,
   MAX_CHUNKS_IN_VIEW,
@@ -179,5 +182,93 @@ describe("deliberate repetition", () => {
     let chunks = addSafeChunks([], [draft("God is faithful."), draft("God is faithful.")], 0).chunks;
     chunks = addSafeChunks(chunks, [draft("God is faithful.")], 900).chunks;
     expect(chunks).toHaveLength(2);
+  });
+});
+
+describe("provisional chunks and refinement", () => {
+  const provisional = (chunks: InterpretationChunk[], text: string, turnId: number, at: number) =>
+    insertTurnChunks(chunks, [draft(text)], [turnId], at, { provisional: true }).chunks;
+
+  it("marks provisional chunks with their turn and keeps them editable", () => {
+    const chunks = provisional([], "Fast line.", 1, 0);
+    expect(chunks[0]).toMatchObject({ state: "current", provisional: true, turnId: 1 });
+    expect(refinementLegality(chunks, [1])).toBe("refine");
+    expect(refinementLegality(chunks, [2])).toBe("fresh");
+  });
+
+  it("locks refinement once any provisional chunk of the turn commits", () => {
+    let chunks = insertTurnChunks([], [draft("One."), draft("Two.")], [1], 0, { provisional: true }).chunks;
+    chunks = commitDueChunks(chunks, 2600, 2600);
+    expect(refinementLegality(chunks, [1])).toBe("locked");
+    const before = chunks;
+    const result = refineProvisionalChunks(chunks, [1], [draft("Rewritten.")], 3000);
+    expect(result.changed).toBe(false);
+    expect(result.chunks).toBe(before);
+  });
+
+  it("replaces provisional text in place and keeps the original dwell clock", () => {
+    let chunks = commitAll(addSafeChunks([], [draft("Earlier, locked.")], 0).chunks);
+    chunks = provisional(chunks, "Fast line.", 1, 1000);
+    const locked = chunks[0];
+    const result = refineProvisionalChunks(chunks, [1], [draft("Better line."), draft("And more.")], 1800);
+
+    expect(result.changed).toBe(true);
+    expect(result.chunks.map((c) => c.text)).toEqual(["Earlier, locked.", "Better line.", "And more."]);
+    expect(result.chunks[0]).toBe(locked);
+    expect(result.chunks[1]).toMatchObject({ state: "current", provisional: false, turnId: 1, at: 1000 });
+  });
+
+  it("only touches the provisional chunks of the named turn", () => {
+    let chunks = provisional([], "Turn one.", 1, 0);
+    chunks = provisional(chunks, "Turn two.", 2, 500);
+    const [one, two] = chunks;
+    expect(one.state).toBe("committed"); // superseded by newer English, as always
+    const result = refineProvisionalChunks(chunks, [2], [draft("Turn two, refined.")], 900);
+    expect(result.chunks[0]).toBe(one);
+    expect(result.chunks[1].text).toBe("Turn two, refined.");
+    expect(result.chunks[1]).not.toBe(two);
+  });
+
+  it("keeps the provisional text when the refinement is identical", () => {
+    const chunks = provisional([], "Same words.", 1, 0);
+    const result = refineProvisionalChunks(chunks, [1], [draft("same words")], 500);
+    expect(result.changed).toBe(false);
+    expect(result.chunks[0].text).toBe("Same words.");
+    expect(result.chunks[0].provisional).toBe(false);
+  });
+
+  it("keeps the provisional text rather than blanking it on an empty refinement", () => {
+    const chunks = provisional([], "Keep me.", 1, 0);
+    const result = refineProvisionalChunks(chunks, [1], [draft("  ")], 500);
+    expect(result.changed).toBe(false);
+    expect(result.chunks.map((c) => c.text)).toEqual(["Keep me."]);
+  });
+
+  it("drops a refinement chunk that duplicates the line before it", () => {
+    let chunks = commitAll(addSafeChunks([], [draft("God has called us.")], 0).chunks);
+    chunks = provisional(chunks, "Fast.", 1, 100);
+    const result = refineProvisionalChunks(chunks, [1], [draft("God has called us."), draft("Fresh.")], 900);
+    expect(result.chunks.map((c) => c.text)).toEqual(["God has called us.", "Fresh."]);
+  });
+
+  it("inserts an older turn ahead of newer editable turns and after committed ones", () => {
+    let chunks = provisional([], "Turn two.", 2, 0);
+    let result = insertTurnChunks(chunks, [draft("Turn one.")], [1], 100);
+    expect(result.chunks.map((c) => c.text)).toEqual(["Turn one.", "Turn two."]);
+    expect(result.chunks[1].state).toBe("current");
+
+    chunks = commitAll(provisional([], "Turn two.", 2, 0));
+    result = insertTurnChunks(chunks, [draft("Turn one.")], [1], 100);
+    expect(result.chunks.map((c) => c.text)).toEqual(["Turn two.", "Turn one."]);
+  });
+
+  it("clears predictions and locks what came before, like any new English", () => {
+    let chunks = addSafeChunks([], [draft("Before.")], 0).chunks;
+    chunks = setAnticipatedChunks(chunks, [draft("guess")], 10);
+    const result = insertTurnChunks(chunks, [draft("Now.")], [3], 20, { provisional: true });
+    expect(result.chunks.map((c) => [c.text, c.state])).toEqual([
+      ["Before.", "committed"],
+      ["Now.", "current"],
+    ]);
   });
 });

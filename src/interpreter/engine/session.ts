@@ -4,8 +4,17 @@
  * Framework-agnostic state machine sitting between the recogniser and the
  * console. It owns the whole live pipeline:
  *
- *   partial/stable events → stabiliser → local detection → rolling context
- *     → interpretation call → chunk store (temporal locking) → subscribers
+ *   partial/stable events → stabiliser → local detection → logical turn
+ *     ├─ provisional lane: on-device English, rendered at once (when ready)
+ *     └─ contextual lane: rolling context → cloud call → legal refinement
+ *     → chunk store (temporal locking) → subscribers
+ *
+ * Two lanes, one truth. Every flushed Korean unit becomes a logical turn with
+ * a monotonically increasing id. The fast lane may render provisional English
+ * for that turn immediately; the contextual lane may later replace it — but
+ * only while every provisional chunk of that turn is still editable, only for
+ * the same turn, and only within the session generation that started it.
+ * Committed chunks are never touched by either lane.
  *
  * Everything here is deliberately outside React: it is driven by a clock and
  * by provider callbacks, it must keep running while the UI is frozen, and it
@@ -42,14 +51,29 @@ import {
   type SessionMemory,
 } from "../context/memory";
 import {
-  addSafeChunks,
   clearAnticipated,
   commitAll,
   commitDueChunks,
+  insertTurnChunks,
+  refineProvisionalChunks,
+  refinementLegality,
   setAnticipatedChunks,
   trimChunks,
 } from "./chunks";
 import { lagConfig } from "./lag";
+import {
+  createTurn,
+  emptyLaneStats,
+  enqueueContextual,
+  MAX_TURN_RECORDS,
+  settleProvisional,
+  unitText,
+  unitTurnIds,
+  type ContextualState,
+  type ContextualUnit,
+  type LaneStats,
+  type LogicalTurn,
+} from "./turns";
 import {
   drain,
   emptyStabiliser,
@@ -90,7 +114,18 @@ export interface InterpretResult {
   model?: string;
 }
 
+/** What the contextual lane did with a result, once it was allowed to act. */
+export type ContextualOutcome =
+  | "applied"
+  | "refined"
+  | "kept"
+  | "discarded"
+  | "stale";
+
 export interface TurnTiming {
+  /** Logical turn the timing belongs to. An id, never content. */
+  turnId: number;
+  lane: "provisional" | "contextual";
   stableAt: number;
   clientDispatchedAt?: number;
   safeAt: number;
@@ -98,14 +133,49 @@ export interface TurnTiming {
   model?: string;
   hasSafe: boolean;
   hasAnticipated: boolean;
+  /** Contextual lane only. */
+  outcome?: ContextualOutcome;
+  /** Engine clock when the fast lane's English reached state, if it did. */
+  provisionalAppliedAt?: number;
+}
+
+/** What the engine tells the contextual caller about the turn it is carrying. */
+export interface ContextualTurnInfo {
+  turnIds: number[];
+  /**
+   * Resolves true once every turn in the request has provisional English on
+   * screen, false as soon as any of them will not get it. A caller whose
+   * cloud path fails waits on this instead of paying for a second on-device
+   * translation of the same Korean — and never waits on a lane that is off.
+   */
+  provisionalSettled: () => Promise<boolean>;
+}
+
+/**
+ * The fast lane. Only a genuine, already-ready on-device translator belongs
+ * here: a deterministic helper is not translation, and a language pack that
+ * is still downloading is not ready.
+ */
+export interface ProvisionalLane {
+  /** Answered synchronously at flush time; never awaits a download. */
+  isReady(): boolean;
+  translate(text: string, signal: AbortSignal): Promise<InterpreterOutput | null>;
+  provider?: string;
+  model?: string;
 }
 
 export interface EngineOptions {
   mode: InterpretationMode;
   lag: LagProfile;
   prep?: PrepSheet;
-  /** Performs one interpretation call. Injected so tests need no network. */
-  interpret: (request: InterpretRequest, signal: AbortSignal) => Promise<InterpretResult>;
+  /** Performs one contextual interpretation call. Injected so tests need no network. */
+  interpret: (
+    request: InterpretRequest,
+    signal: AbortSignal,
+    turn: ContextualTurnInfo,
+  ) => Promise<InterpretResult>;
+  /** Fast on-device lane. Absent, or not ready, means cloud-first behaviour. */
+  provisional?: ProvisionalLane;
   /** Optional Scripture text resolution. Omitted in demo/offline. */
   resolveBible?: (reference: BibleReference) => Promise<BibleReference>;
   /** Browser-only latency hook. Carries times and provider labels, never text. */
@@ -114,6 +184,12 @@ export interface EngineOptions {
   /** Injectable clock — tests drive time directly. */
   now?: () => number;
 }
+
+/**
+ * A fast lane that has not answered by now is not fast. The turn's contextual
+ * request is already running and will carry the Korean instead.
+ */
+export const PROVISIONAL_TIMEOUT_MS = 2_500;
 
 /**
  * How many Scripture hints one turn may carry. Matches the cap in
@@ -149,8 +225,19 @@ export class InterpretationEngine {
   private degradedReason: string | undefined;
 
   private startedAt = 0;
-  private inFlight: AbortController | null = null;
   private stopped = false;
+  /**
+   * Bumped by start(), stop() and mode changes. A result created under an
+   * older generation is dropped no matter which lane it came from.
+   */
+  private generation = 0;
+  private turnCounter = 0;
+  private turns: LogicalTurn[] = [];
+  private cloudInFlight: AbortController | null = null;
+  /** Turns waiting behind the in-flight cloud request. At most one unit. */
+  private pendingUnit: ContextualUnit | null = null;
+  private provisionalInFlight: { controller: AbortController; turn: LogicalTurn; startedAt: number } | null = null;
+  private stats: LaneStats = emptyLaneStats();
   /**
    * How the previous unit ended. Anything but `sentence` means the speaker's
    * thought was still open when the clock forced the call, so the next unit
@@ -179,6 +266,8 @@ export class InterpretationEngine {
   // -------------------------------------------------------------------------
 
   start(): void {
+    // Anything still running belongs to a previous life of this instance.
+    this.invalidateOutstanding({ restore: false });
     this.startedAt = this.clock;
     this.stopped = false;
     this.lastBoundary = null;
@@ -194,22 +283,70 @@ export class InterpretationEngine {
    * pressed before the normal stabilisation timer fired.
    */
   async flushPending(): Promise<void> {
-    if (this.stopped || this.inFlight || !this.stabiliser.pending.trim()) return;
+    if (this.stopped || !this.canFlush() || !this.stabiliser.pending.trim()) return;
     await this.flush("quiet");
   }
 
   stop(): void {
     this.stopped = true;
-    this.inFlight?.abort();
-    this.inFlight = null;
+    this.invalidateOutstanding({ restore: false });
     // Anything still editable is now final — the session is over.
     this.chunks = commitAll(clearAnticipated(this.chunks));
     this.setConnection("idle");
   }
 
+  /**
+   * A mode switch changes the contract every in-flight request was built on.
+   * Outstanding results are invalidated; their Korean is put back so the next
+   * turn interprets it under the new mode rather than losing it.
+   */
   setMode(mode: InterpretationMode): void {
+    if (mode !== this.mode) this.invalidateOutstanding({ restore: !this.stopped });
     this.mode = mode;
     this.emit();
+  }
+
+  /** Transcript-free lane counters, for diagnostics and the soak harness. */
+  laneStats(): LaneStats {
+    return { ...this.stats };
+  }
+
+  /**
+   * Abort every outstanding lane result and advance the generation so a
+   * result that slips past the abort is still recognised as foreign.
+   */
+  private invalidateOutstanding(options: { restore: boolean }): void {
+    this.generation += 1;
+    const orphaned: LogicalTurn[] = [];
+
+    if (this.provisionalInFlight) {
+      const { controller, turn } = this.provisionalInFlight;
+      this.provisionalInFlight = null;
+      controller.abort();
+      settleProvisional(turn, "stale");
+      this.stats.provisionalStale += 1;
+      if (turn.contextual === "inflight" || turn.contextual === "queued") orphaned.push(turn);
+    }
+    if (this.cloudInFlight) {
+      this.cloudInFlight.abort();
+      this.cloudInFlight = null;
+      this.stats.contextualStale += 1;
+    }
+    for (const turn of this.turns) {
+      if (turn.contextual === "inflight" || turn.contextual === "queued") {
+        turn.contextual = "stale";
+        if (!orphaned.includes(turn)) orphaned.push(turn);
+      }
+    }
+    this.pendingUnit = null;
+
+    if (!options.restore) return;
+    // Only Korean with no English on screen is worth re-interpreting.
+    const uncovered = orphaned.filter((t) => t.provisional !== "applied");
+    for (const turn of [...uncovered].reverse()) {
+      this.stabiliser = restorePending(this.stabiliser, turn.text, this.clock);
+      this.pendingOriginAt = Math.min(this.pendingOriginAt ?? turn.stableAt, turn.stableAt);
+    }
   }
 
   setLag(lag: LagProfile): void {
@@ -295,13 +432,38 @@ export class InterpretationEngine {
     const before = this.chunks;
     this.chunks = commitDueChunks(this.chunks, this.elapsed(), config.commitDwellMs);
 
+    // A fast lane that has stalled must not hold the pipeline. The timeout is
+    // decided here, on the engine clock, and is final: the slot is freed and
+    // the turn marked failed whether or not the translator ever answers. The
+    // contextual request already running carries the turn.
+    const provisional = this.provisionalInFlight;
+    if (provisional && this.clock - provisional.startedAt >= PROVISIONAL_TIMEOUT_MS) {
+      this.provisionalInFlight = null;
+      settleProvisional(provisional.turn, "failed");
+      this.stats.provisionalFailed += 1;
+      provisional.controller.abort();
+    }
+
     const reason = flushReason(this.stabiliser, config, this.clock);
-    if (reason && !this.inFlight) {
+    if (reason && this.canFlush()) {
       void this.flush(reason);
       return;
     }
 
     if (this.chunks !== before) this.emit();
+  }
+
+  /**
+   * Whether the stabiliser may hand over its next unit.
+   *
+   * With a ready fast lane the cloud may be busy — the unit still gets
+   * provisional English now and joins the coalesced contextual unit. Without
+   * one, the engine stays single-flight exactly as before: the stabiliser
+   * buffer is the queue, and it holds one growing unit rather than a list.
+   */
+  private canFlush(): boolean {
+    if (this.options.provisional?.isReady()) return this.provisionalInFlight === null;
+    return this.cloudInFlight === null && this.pendingUnit === null;
   }
 
   // -------------------------------------------------------------------------
@@ -315,11 +477,134 @@ export class InterpretationEngine {
     this.pendingOriginAt = null;
     if (!pending) return;
 
+    const lane = this.options.provisional;
+    const laneReady = !!lane && lane.isReady();
+    const turn = createTurn({
+      id: (this.turnCounter += 1),
+      text: pending,
+      stableAt,
+      boundary: reason,
+      continuesPrevious: this.lastBoundary !== null && this.lastBoundary !== "sentence",
+      provisional: laneReady ? "pending" : "off",
+    });
+    this.turns.push(turn);
+    if (this.turns.length > MAX_TURN_RECORDS) this.turns.splice(0, this.turns.length - MAX_TURN_RECORDS);
+    this.stats.turns += 1;
+
+    // Recorded before any await: a failed turn still cut the Korean where it
+    // cut it, and the unit restored by `restorePending` is the same open
+    // thought the next call has to finish.
+    this.lastBoundary = reason;
+
+    const provisionalWork = laneReady && lane ? this.runProvisional(lane, turn) : Promise.resolve();
+    const contextualWork = this.scheduleContextual(turn);
+    await Promise.all([provisionalWork, contextualWork]);
+  }
+
+  // --- Lane A: provisional ----------------------------------------------------
+
+  private async runProvisional(lane: ProvisionalLane, turn: LogicalTurn): Promise<void> {
+    const controller = new AbortController();
+    this.provisionalInFlight = { controller, turn, startedAt: this.clock };
+    this.stats.maxProvisionalInFlight = Math.max(this.stats.maxProvisionalInFlight, 1);
+    this.emit();
+
+    // Timeout, stop, restart and mode change all decide the turn's fate before
+    // the translator answers, and they say so in the turn record. A result
+    // that arrives after that is simply dropped; it was already counted.
+    const decided = () => turn.provisional !== "pending";
+
+    try {
+      const output = await lane.translate(turn.text, controller.signal);
+      if (decided()) return;
+      if (!output || output.safeChunks.length === 0) {
+        settleProvisional(turn, "failed");
+        this.stats.provisionalFailed += 1;
+        return;
+      }
+      if (turn.contextual === "applied" || turn.contextual === "refined") {
+        // The cloud beat the on-device path. Its English is already on screen
+        // and is the better rendering; a second copy would be noise.
+        settleProvisional(turn, "superseded");
+        this.stats.provisionalSuperseded += 1;
+        return;
+      }
+      this.applyProvisional(lane, turn, output);
+    } catch {
+      if (decided()) return;
+      settleProvisional(turn, "failed");
+      this.stats.provisionalFailed += 1;
+    } finally {
+      if (this.provisionalInFlight?.controller === controller) this.provisionalInFlight = null;
+      this.emit();
+    }
+  }
+
+  /**
+   * Provisional English is rendered and nothing else. The fast lane has no
+   * sermon contract, so it is never allowed to teach the rolling memory:
+   * glossary, entities, Scripture and topic come from the contextual lane.
+   */
+  private applyProvisional(lane: ProvisionalLane, turn: LogicalTurn, output: InterpreterOutput): void {
+    const now = this.elapsed();
+    const drafts = output.safeChunks.map((d) => ({ text: d.text, confidence: d.confidence }));
+    const { chunks, added } = insertTurnChunks(this.chunks, drafts, [turn.id], now, { provisional: true });
+    this.chunks = trimChunks(chunks);
+    turn.provisionalAppliedAt = this.clock;
+    settleProvisional(turn, "applied");
+    this.stats.provisionalApplied += 1;
+    this.options.onTurnTiming?.({
+      turnId: turn.id,
+      lane: "provisional",
+      stableAt: turn.stableAt,
+      safeAt: this.clock,
+      provider: lane.provider,
+      model: lane.model,
+      hasSafe: added.length > 0,
+      hasAnticipated: false,
+    });
+  }
+
+  // --- Lane B: contextual -----------------------------------------------------
+
+  private scheduleContextual(turn: LogicalTurn): Promise<void> {
+    if (this.cloudInFlight) {
+      const { unit, dropped } = enqueueContextual(this.pendingUnit, turn);
+      this.pendingUnit = unit;
+      turn.contextual = "queued";
+      this.stats.coalescedTurns += 1;
+      this.stats.maxPendingTurns = Math.max(this.stats.maxPendingTurns, unit.turns.length);
+      for (const old of dropped) {
+        old.contextual = "skipped";
+        this.stats.coalesceOverflowDrops += 1;
+        // A skipped turn with no English at all goes back to the stabiliser
+        // rather than vanishing. It will flush again as a new turn.
+        if (old.provisional !== "applied") {
+          this.stabiliser = restorePending(this.stabiliser, old.text, this.clock);
+          this.pendingOriginAt = Math.min(this.pendingOriginAt ?? old.stableAt, old.stableAt);
+        }
+      }
+      return Promise.resolve();
+    }
+    return this.dispatchContextual({ turns: [turn] });
+  }
+
+  private async dispatchContextual(unit: ContextualUnit): Promise<void> {
+    const turnIds = unitTurnIds(unit);
+    const first = unit.turns[0];
+    const last = unit.turns[unit.turns.length - 1];
+    const pending = unitText(unit);
+
     const config = lagConfig(this.lag);
     const partial = this.partial?.text ?? "";
-    const allowAnticipation = shouldAnticipate(config, reason, partial);
-
+    const allowAnticipation = shouldAnticipate(config, last.boundary, partial);
     const detectedScripture = this.scriptureHints(pending);
+
+    // The model is asked for this unit's English; its own provisional rendering
+    // must not be offered back to it as delivered context.
+    const contextChunks = this.chunks.filter(
+      (c) => !(c.provisional && c.turnId !== undefined && turnIds.includes(c.turnId)),
+    );
 
     const request: InterpretRequest = {
       mode: this.mode,
@@ -328,7 +613,7 @@ export class InterpretationEngine {
       partial: allowAnticipation ? partial : undefined,
       context: buildRollingContext({
         segments: this.segments,
-        chunks: this.chunks,
+        chunks: contextChunks,
         memory: this.memory,
         mode: this.mode,
         prep: this.prep,
@@ -339,77 +624,179 @@ export class InterpretationEngine {
         glossary: promptGlossary(pending, this.mode, this.memory.glossary),
         culturalNotes: detectCultural(pending, this.memory.entities),
       },
-      boundary: reason,
-      continuesPrevious: this.lastBoundary !== null && this.lastBoundary !== "sentence",
+      boundary: last.boundary,
+      continuesPrevious: first.continuesPrevious,
       allowAnticipation,
     };
 
-    // Recorded before the await: a failed turn still cut the Korean where it
-    // cut it, and the unit restored by `restorePending` is the same open
-    // thought the next call has to finish.
-    this.lastBoundary = reason;
-
     const controller = new AbortController();
-    this.inFlight = controller;
+    const generation = this.generation;
+    this.cloudInFlight = controller;
+    for (const turn of unit.turns) turn.contextual = "inflight";
+    this.stats.contextualDispatched += 1;
+    this.stats.maxCloudInFlight = Math.max(this.stats.maxCloudInFlight, 1);
     this.emit();
 
-    try {
-      const result = await this.options.interpret(request, controller.signal);
-      if (this.stopped || controller.signal.aborted) return;
+    const isStale = () =>
+      this.stopped || controller.signal.aborted || generation !== this.generation;
 
-      this.applyOutput(result.output, allowAnticipation);
-      const safeAt = this.clock;
-      this.options.onTurnTiming?.({
-        stableAt,
-        clientDispatchedAt: result.clientDispatchedAt,
-        safeAt,
-        provider: result.provider,
-        model: result.model,
-        hasSafe: result.output.safeChunks.length > 0,
-        hasAnticipated:
-          allowAnticipation && (result.output.anticipatedChunks?.length ?? 0) > 0,
+    try {
+      const result = await this.options.interpret(request, controller.signal, {
+        turnIds,
+        provisionalSettled: () =>
+          Promise.all(unit.turns.map((t) => t.provisionalSettled)).then((states) =>
+            states.every((state) => state === "applied"),
+          ),
       });
+      if (isStale()) {
+        this.recordStale(unit, result);
+        return;
+      }
+      this.applyContextual(unit, result, allowAnticipation);
       this.setHealth("llm", result.degraded ? "degraded" : "ok", result.reason);
       void this.enrichScripture();
     } catch (error) {
-      if (controller.signal.aborted) return;
+      if (isStale()) {
+        this.recordStale(unit);
+        return;
+      }
+      for (const turn of unit.turns) turn.contextual = "failed";
+      this.stats.contextualFailed += 1;
       // Do not discard a thought merely because the network or free model had
       // a bad turn. New stable speech may have arrived while this request was
-      // running, so restore the failed unit in front of that newer text.
-      this.stabiliser = restorePending(this.stabiliser, pending, this.clock);
-      this.pendingOriginAt = Math.min(this.pendingOriginAt ?? stableAt, stableAt);
+      // running, so restore the failed unit in front of that newer text —
+      // but only the Korean that has no English on screen at all.
+      const uncovered = unit.turns.filter((t) => t.provisional !== "applied");
+      for (const turn of [...uncovered].reverse()) {
+        this.stabiliser = restorePending(this.stabiliser, turn.text, this.clock);
+        this.pendingOriginAt = Math.min(this.pendingOriginAt ?? turn.stableAt, turn.stableAt);
+      }
       this.setHealth(
         "llm",
         "down",
         error instanceof Error ? error.message : "Interpretation is unavailable.",
       );
     } finally {
-      if (this.inFlight === controller) this.inFlight = null;
+      if (this.cloudInFlight === controller) this.cloudInFlight = null;
       this.emit();
+      // The bound is one request in flight: the next coalesced unit goes now.
+      if (!this.stopped && generation === this.generation && this.pendingUnit) {
+        const next = this.pendingUnit;
+        this.pendingUnit = null;
+        void this.dispatchContextual(next);
+      }
     }
   }
 
-  private applyOutput(output: InterpreterOutput, allowAnticipation: boolean): void {
+  /** Already counted by `invalidateOutstanding`; this only reports the timing. */
+  private recordStale(unit: ContextualUnit, result?: InterpretResult): void {
+    for (const turn of unit.turns) turn.contextual = "stale";
+    const last = unit.turns[unit.turns.length - 1];
+    this.options.onTurnTiming?.({
+      turnId: last.id,
+      lane: "contextual",
+      stableAt: unit.turns[0].stableAt,
+      clientDispatchedAt: result?.clientDispatchedAt,
+      safeAt: this.clock,
+      provider: result?.provider,
+      model: result?.model,
+      hasSafe: false,
+      hasAnticipated: false,
+      outcome: "stale",
+    });
+  }
+
+  /**
+   * Decide what a contextual result may still do, then do exactly that.
+   *
+   *   refine    every provisional chunk of these turns is still editable →
+   *             replace them in place.
+   *   locked    the interpreter may have said the provisional line → drop the
+   *             rewrite; keep the knowledge.
+   *   fresh     no provisional English exists → append, as the engine always
+   *             has; older-turn results slot in ahead of newer editable turns.
+   *
+   * Knowledge (glossary, entities, Scripture, topic, cultural notes) is
+   * absorbed in every non-stale case: it is the trusted source for memory
+   * whether or not its chunks were allowed on screen.
+   */
+  private applyContextual(unit: ContextualUnit, result: InterpretResult, allowAnticipation: boolean): void {
+    const output = result.output;
+    const turnIds = unitTurnIds(unit);
     const now = this.elapsed();
+    const legality = refinementLegality(this.chunks, turnIds);
+    const newest = turnIds.includes(this.turnCounter);
+    const drafts = output.safeChunks;
 
-    // New confirmed English means the interpreter has moved past whatever was
-    // still editable. Lock it before appending.
-    let chunks = commitAll(this.chunks);
-    const result = addSafeChunks(chunks, output.safeChunks, now);
-    chunks = result.chunks;
+    let chunks = this.chunks;
+    let outcome: ContextualOutcome;
+    let state: ContextualState;
+    let hasSafe = false;
 
-    chunks =
-      allowAnticipation && output.anticipatedChunks?.length
-        ? setAnticipatedChunks(chunks, output.anticipatedChunks, now)
-        : clearAnticipated(chunks);
+    if (legality === "fresh") {
+      const added = insertTurnChunks(chunks, drafts, turnIds, now);
+      chunks = added.chunks;
+      hasSafe = added.added.length > 0;
+      outcome = "applied";
+      state = "applied";
+      this.stats.contextualApplied += 1;
+    } else if (legality === "refine") {
+      const refined = refineProvisionalChunks(chunks, turnIds, drafts, now);
+      chunks = refined.chunks;
+      hasSafe = drafts.length > 0;
+      outcome = refined.changed ? "refined" : "kept";
+      state = refined.changed ? "refined" : "kept";
+      if (refined.changed) this.stats.contextualRefined += 1;
+      else this.stats.contextualKept += 1;
+    } else {
+      // Locked. If the cloud had nothing to say the provisional simply stands;
+      // if it had a rewrite, that rewrite arrived after the line was spoken.
+      if (drafts.length > 0) {
+        outcome = "discarded";
+        state = "discarded";
+        this.stats.contextualDiscardedCommitted += 1;
+      } else {
+        outcome = "kept";
+        state = "kept";
+        this.stats.contextualKept += 1;
+      }
+    }
+
+    // A prediction only makes sense off the newest turn; anything older has
+    // already been followed by real Korean. Predictions are never kept next to
+    // a locked line the interpreter has moved past.
+    const predict =
+      newest && legality !== "locked" && allowAnticipation && (output.anticipatedChunks?.length ?? 0) > 0;
+    if (predict) {
+      chunks = setAnticipatedChunks(chunks, output.anticipatedChunks!, now);
+    } else if (newest || legality === "fresh") {
+      chunks = clearAnticipated(chunks);
+    }
 
     this.chunks = trimChunks(chunks);
+    for (const turn of unit.turns) turn.contextual = state;
+    this.absorbContextualKnowledge(output);
 
+    this.options.onTurnTiming?.({
+      turnId: unit.turns[unit.turns.length - 1].id,
+      lane: "contextual",
+      stableAt: unit.turns[0].stableAt,
+      clientDispatchedAt: result.clientDispatchedAt,
+      safeAt: this.clock,
+      provider: result.provider,
+      model: result.model,
+      hasSafe,
+      hasAnticipated: predict,
+      outcome,
+      provisionalAppliedAt: unit.turns[0].provisionalAppliedAt,
+    });
+  }
+
+  private absorbContextualKnowledge(output: InterpreterOutput): void {
     if (output.bibleReferences?.length) this.absorbScripture(output.bibleReferences);
     if (output.culturalNotes?.length) {
       this.culturalNotes = dedupeNotes([...output.culturalNotes, ...this.culturalNotes]).slice(0, 12);
     }
-
     this.memory = rememberKnowledge(this.memory, {
       glossary: output.glossary,
       entities: output.entities,
@@ -556,7 +943,7 @@ export class InterpretationEngine {
       connection: this.connection,
       health: this.health,
       degradedReason: this.degradedReason,
-      thinking: this.inFlight !== null,
+      thinking: this.cloudInFlight !== null || this.provisionalInFlight !== null,
     };
   }
 

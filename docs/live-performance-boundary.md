@@ -9,3 +9,8 @@ Incremental pre-handoff work is complete when this change reaches production:
 5. the next unresolved performance problem is architectural: cloud completion is still on the first-English critical path when cloud-first behavior is used.
 
 Do not keep reducing stabilizer windows or deleting prompt safety rules without production telemetry. The next major change belongs in the bounded two-lane design described in `docs/claude-live-two-lane-handoff.md` and `docs/claude-live-two-lane-ultimate-prompt.md`.
+
+Update 2026-09-10: the bounded two-lane design is implemented on
+`feat/live-two-lane-engine`; see `docs/live-two-lane-engine.md` and
+`benchmarks/results/live-two-lane-2026-09-10.md`. Stabiliser windows, lag
+timings and prompt safety rules were not changed by that work.
