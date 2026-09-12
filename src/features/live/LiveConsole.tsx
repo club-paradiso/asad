@@ -3,21 +3,27 @@
 /**
  * The interpreter console.
  *
- * Layout is a four-row grid pinned to the viewport, with the English stream
- * taking everything left over. That ordering is the product: English dominant,
- * Korean available, context reachable, controls at the thumb.
+ * Layout is a grid pinned to the viewport, with the English stream taking
+ * everything left over. That ordering is the product: English dominant, Korean
+ * available, context reachable, one control at the thumb.
  *
- *   ┌──────────────────────────────────────────┐  status
+ *   ┌──────────────────────────────────────────┐  44px   status
  *   │                                          │
  *   │            ENGLISH  (1fr)                │         the thing you say
  *   │                                          │
  *   ├──────────────────────────────────────────┤  ≤22%   Korean, checkable
- *   ├──────────────────────────────────────────┤  auto   context rail
- *   └──────────────────────────────────────────┘  controls
+ *   ├──────────────────────────────────────────┤  auto   context rail, when
+ *   │                                          │         it has a cue
+ *   └──────────────────────────────────────────┘  auto   FREEZE
+ *
+ * Every row except the English earns its height or is not rendered: the
+ * context rail is absent until there is something to put in it, and the
+ * notice row above the English exists only during a demo or while the
+ * on-device backup is still coming up.
  *
  * On an iPhone in landscape the whole thing is about 390px tall, which is why
- * the Korean row is capped as a percentage and the context rail scrolls
- * horizontally rather than wrapping.
+ * the Korean row is capped as a percentage, the context rail scrolls
+ * horizontally rather than wrapping, and the chrome sheds padding below 480px.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SessionSettings, StoredSession } from "@/types";
@@ -72,7 +78,6 @@ export function LiveConsole({
     startedAt,
     lastProvider,
     browserTranslatorStatus,
-    browserTranslatorProgress,
     start,
     stop,
     correct,
@@ -183,10 +188,6 @@ export function LiveConsole({
   const teleprompter = settings.view === "teleprompter";
   const rescueAvailable =
     settings.mode === "sermon" && source !== "demo" && phase === "running";
-  const browserTranslatorPercent =
-    browserTranslatorProgress !== null && browserTranslatorProgress > 0
-      ? Math.round(browserTranslatorProgress * 100)
-      : null;
 
   return (
     <div
@@ -218,12 +219,15 @@ export function LiveConsole({
       {source === "demo" && demoBeat ? (
         <DemoRibbon beat={demoBeat} />
       ) : browserTranslatorStatus === "preparing" ? (
+        // The download percentage is gone. The session has already started by
+        // the time this row can appear, interpretation never waits on the
+        // pack, and there is nothing the interpreter can do with a number —
+        // what they can use is knowing the offline backup is not ready yet.
         <div
           role="status"
           className="border-b border-[var(--line)] bg-[var(--bg-raised)] px-3 py-1.5 text-center text-[0.7rem] text-[var(--fg-muted)]"
         >
-          Preparing offline Korean→English backup
-          {browserTranslatorPercent !== null ? ` · model download ${browserTranslatorPercent}%` : "…"}
+          Offline backup is still starting up
         </div>
       ) : (
         <div />

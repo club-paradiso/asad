@@ -112,11 +112,14 @@ export function useLiveSession(options: LiveSessionOptions) {
   const [error, setError] = useState<string | null>(null);
   const [demoBeat, setDemoBeat] = useState<DemoBeat | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  /** Which provider answered the most recent turn — drives the AI pill. */
+  /**
+   * Which provider answered the most recent turn. The console shows this only
+   * when it is the deterministic local interpreter, because that is the case
+   * where the English is not a translation and has to be read differently.
+   */
   const [lastProvider, setLastProvider] = useState<string | undefined>(undefined);
   const [browserTranslatorStatus, setBrowserTranslatorStatus] =
     useState<BrowserTranslatorStatus>("unsupported");
-  const [browserTranslatorProgress, setBrowserTranslatorProgress] = useState<number | null>(null);
 
   const engineRef = useRef<InterpretationEngine | null>(null);
   const providerRef = useRef<SpeechProvider | null>(null);
@@ -187,18 +190,16 @@ export function useLiveSession(options: LiveSessionOptions) {
     }
     if (browserTranslatorPreparationRef.current) return;
 
-    const preparation = beginBrowserTranslatorPreparation({
-      onDownloadProgress(progress) {
-        if (mountedRef.current) setBrowserTranslatorProgress(progress);
-      },
-    });
+    // No download-progress callback: the console does not render a
+    // percentage, and interpretation never waits on the pack, so observing it
+    // only re-rendered the live surface while a background download ticked.
+    const preparation = beginBrowserTranslatorPreparation();
     if (!preparation.supported) {
       setBrowserTranslatorStatus("unsupported");
       return;
     }
 
     setBrowserTranslatorStatus("preparing");
-    setBrowserTranslatorProgress(0);
     browserTranslatorPreparationRef.current = preparation.session;
     void preparation.session
       .then((translator) => {
@@ -209,10 +210,8 @@ export function useLiveSession(options: LiveSessionOptions) {
         if (translator) {
           browserTranslatorRef.current = translator;
           setBrowserTranslatorStatus("ready");
-          setBrowserTranslatorProgress(1);
         } else {
           setBrowserTranslatorStatus("failed");
-          setBrowserTranslatorProgress(null);
         }
       })
       .finally(() => {
@@ -612,7 +611,6 @@ export function useLiveSession(options: LiveSessionOptions) {
     demoBeat,
     lastProvider,
     browserTranslatorStatus,
-    browserTranslatorProgress,
     startedAt,
     script,
     start,
