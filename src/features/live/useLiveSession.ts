@@ -130,6 +130,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     null,
   );
   const mountedRef = useRef(true);
+  /** The last message the speech provider itself reported, if any. */
+  const providerErrorRef = useRef<string | null>(null);
   const clientLatencyRef = useRef(new ClientLatencyQueue());
   const pendingRenderLatencyRef = useRef<RenderMarker[]>([]);
   /** When each turn's provisional English reached the screen, by turn id. */
@@ -422,6 +424,7 @@ export function useLiveSession(options: LiveSessionOptions) {
     if (current.source !== "demo") prepareBrowserTranslator();
 
     setError(null);
+    providerErrorRef.current = null;
     setPhase("starting");
     setDemoBeat(null);
     setLastProvider(undefined);
@@ -451,7 +454,14 @@ export function useLiveSession(options: LiveSessionOptions) {
     // then close capture/provider resources before exposing Try again. Keeping
     // the engine instance in this closure prevents an old teardown from
     // overwriting a newer retry session if the user moves quickly.
-    const failTerminally = (message: string) => {
+    //
+    // `fallback` really is a fallback. A recogniser reports its own failure
+    // before it reports the status change, and it knows things this does not:
+    // a denied microphone was being described here as a connection problem,
+    // sending the interpreter to check the venue Wi-Fi over a permission
+    // prompt. Whatever the provider said wins.
+    const failTerminally = (fallback: string) => {
+      const message = providerErrorRef.current ?? fallback;
       setError(message);
       engine.stop();
       void teardown().finally(() => {
@@ -510,7 +520,10 @@ export function useLiveSession(options: LiveSessionOptions) {
 
       provider.onPartial((text) => engineRef.current?.handlePartial(text));
       provider.onStable((text) => engineRef.current?.handleStable(text));
-      provider.onError((err) => setError(err.message));
+      provider.onError((err) => {
+        providerErrorRef.current = err.message;
+        setError(err.message);
+      });
       provider.onStatus((status) => {
         engineRef.current?.setConnection(mapStatus(status));
         engineRef.current?.setHealth(
@@ -616,7 +629,10 @@ export function useLiveSession(options: LiveSessionOptions) {
     start,
     stop,
     correct,
-    dismissError: useCallback(() => setError(null), []),
+    dismissError: useCallback(() => {
+      providerErrorRef.current = null;
+      setError(null);
+    }, []),
   };
 }
 
