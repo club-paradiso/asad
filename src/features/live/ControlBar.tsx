@@ -34,30 +34,37 @@ export function ControlBar({
 }) {
   return (
     <div
-      className="flex shrink-0 items-center gap-2 border-t border-[var(--line)] bg-[var(--bg-raised)] px-2 py-1.5 sm:px-4 tall:py-2"
+      className="rail-row flex shrink-0 items-center gap-2 border-t border-[var(--line)] bg-[var(--bg-raised)] px-2 py-1.5 sm:px-4 tall:py-2"
       style={{ paddingBottom: "calc(0.375rem + var(--safe-bottom))" }}
     >
+      {/* `size="md"`, not `lg`, and the height comes from `h-*`.
+          These buttons used to ask for `lg` and then try to shrink with
+          `min-h-0`, which never took: `cn` is a plain join, so the two
+          min-height utilities both landed and Tailwind's own order decided —
+          `min-h-14` won. The button was 56px tall on every screen however it
+          was styled, which on a 390px-tall phone in landscape is twelve pixels
+          of the English spent on a button nobody needed to be bigger. */}
       <Button
         onClick={onToggleFreeze}
-        size="lg"
+        size="md"
         tone={frozen ? "primary" : "neutral"}
-        // Shorter on a phone in landscape, where every pixel of height is
-        // competing with the English.
-        className="h-12 min-h-0 flex-1 max-w-[26rem] font-semibold tracking-wide tall:h-14"
+        className="h-11 flex-1 max-w-[26rem] tracking-wide sm:h-12 tall:h-14"
         title="Freeze the display — processing continues (Space)"
       >
-        {frozen ? "FROZEN — TAP TO RESUME" : "FREEZE"}
+        <span className="text-base font-semibold">
+          {frozen ? "FROZEN — TAP TO RESUME" : "FREEZE"}
+        </span>
       </Button>
 
       {!atLive && !frozen && (
         <Button
           onClick={onReturnToLive}
-          size="lg"
+          size="md"
           tone="neutral"
-          className="h-12 min-h-0 shrink-0 tall:h-14"
+          className="h-11 shrink-0 sm:h-12 tall:h-14"
           title="Jump back to live (F)"
         >
-          ↓ Live
+          <span className="text-base">↓ Live</span>
         </Button>
       )}
     </div>

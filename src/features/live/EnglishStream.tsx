@@ -173,8 +173,11 @@ export function EnglishStream({
             />
           ))}
           {/* Reserves the lower portion so the active line never sits at the
-              bottom edge — the interpreter needs to see what is coming next. */}
-          <div aria-hidden className="h-[46cqh] shrink-0" />
+              bottom edge — the interpreter needs to see what is coming next.
+              Sized in CSS, because how much of a short screen is worth
+              reserving for a prediction is a different answer on an iPhone in
+              landscape than on a laptop. */}
+          <div aria-hidden className="stream-tail shrink-0" />
         </div>
       )}
     </div>

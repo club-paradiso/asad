@@ -55,7 +55,7 @@ export function ContextRail({
         className,
       )}
     >
-      <div className="scroll-x fade-right flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
+      <div className="rail-row scroll-x fade-right flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
         {notes.map((note) => {
           const key = `note:${note.kind}:${note.korean}`;
           const open = expanded === key;
@@ -102,15 +102,21 @@ export function ContextRail({
                   </span>
                 )}
               </span>
-              {reference.text ? (
+              {/* No second line when there is no verse text.
+                  Most deployments never license verse wording, so "reference
+                  only" was a permanent caption under every Scripture cue,
+                  explaining the absence of something rather than helping with
+                  what is there. It also set the height of the whole rail — on
+                  an iPhone in landscape that was about eighteen pixels of the
+                  English, all service long, to say that a verse is missing.
+                  The reference IS the cue; its absence of text is visible. */}
+              {reference.text && (
                 <span className={cn("mt-0.5 block text-[var(--fg-muted)]", !open && "truncate")}>
                   {reference.text}
                   {reference.translation && (
                     <span className="ml-1.5 text-[var(--fg-dim)]">({reference.translation})</span>
                   )}
                 </span>
-              ) : (
-                <span className="mt-0.5 block text-[var(--fg-dim)]">reference only</span>
               )}
             </Chip>
           );
