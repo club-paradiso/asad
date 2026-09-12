@@ -85,13 +85,54 @@ describe("WebSpeechProvider", () => {
     const recognition = FakeRecognition.last!;
     recognition.onerror?.({ error: "not-allowed" });
 
-    await expect(connected).rejects.toThrow("not-allowed");
+    await expect(connected).rejects.toThrow(/Microphone access was refused/);
     recognition.onend?.();
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(recognition.start).toHaveBeenCalledTimes(1);
-    expect(errors).toEqual(["Speech recognition error: not-allowed"]);
+    // What the interpreter is told: what happened, and what to do about it.
+    // The browser's own code for it is not part of that sentence.
+    expect(errors).toEqual([
+      "Microphone access was refused. Allow it in the browser's site settings, then tap Try again.",
+    ]);
     expect(statuses).toContain("error");
+  });
+
+  it("never puts a recogniser error code in front of the interpreter", async () => {
+    vi.useFakeTimers();
+    const codes = [
+      "not-allowed",
+      "service-not-allowed",
+      "language-not-supported",
+      "audio-capture",
+      "network",
+      "something-nobody-has-seen",
+    ];
+
+    for (const code of codes) {
+      const provider = new WebSpeechProvider();
+      const errors: Error[] = [];
+      provider.onError((error) => errors.push(error));
+
+      const connected = provider.connect();
+      const recognition = FakeRecognition.last!;
+      recognition.onstart?.();
+      await connected;
+
+      // Spend the retry budget so even recoverable codes reach the interpreter.
+      for (let i = 0; i < 5; i += 1) {
+        recognition.onerror?.({ error: code });
+        await vi.advanceTimersByTimeAsync(6000);
+      }
+
+      expect(errors.length).toBeGreaterThan(0);
+      for (const error of errors) {
+        expect(error.message).not.toContain(code);
+        expect(error.message).toMatch(/[.!]$/);
+        // The code is still available to whoever is debugging the deployment.
+        expect((error as Error & { code?: string }).code).toBe(code);
+      }
+    }
   });
 
   it("keeps unchanged interim words when a later result is updated", async () => {
@@ -159,6 +200,76 @@ describe("WebSpeechProvider", () => {
       },
     });
     expect(stable).toEqual(["하나님은 사랑이십니다"]);
+  });
+
+  /**
+   * The reported defect: the same sentence reached the engine twice.
+   *
+   * WebKit promotes a hypothesis through the interim timer above and then
+   * finalises it with different wording a second later. The delta was computed
+   * with a plain `startsWith`, so any revision that was not a pure extension
+   * returned the WHOLE sentence — which the engine had already interpreted,
+   * rendered and very possibly committed.
+   */
+  it("emits only the revised tail when a promoted interim is finalised differently", async () => {
+    vi.useFakeTimers();
+    const provider = new WebSpeechProvider();
+    const stable: string[] = [];
+    provider.onStable((text) => stable.push(text));
+
+    const connected = provider.connect();
+    const recognition = FakeRecognition.last!;
+    recognition.onstart?.();
+    await connected;
+
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: { length: 1, 0: result("하나님은 사랑이십니다", false) },
+    });
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(stable).toEqual(["하나님은 사랑이십니다"]);
+
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: { length: 1, 0: result("하나님은 사랑이심을 믿습니다", true) },
+    });
+
+    // Not the whole sentence again — only the words the recogniser changed.
+    expect(stable).toEqual(["하나님은 사랑이십니다", "사랑이심을 믿습니다"]);
+  });
+
+  /**
+   * A recognition session's result list only grows. Re-ranking every settled
+   * result on every event made the cost of one recogniser event proportional to
+   * how long the service had been running — on the thread that renders the
+   * English.
+   */
+  it("does not re-read results that settled before this event", async () => {
+    const provider = new WebSpeechProvider({ language: "ko-KR" });
+    const stable: string[] = [];
+    provider.onStable((text) => stable.push(text));
+
+    const connected = provider.connect();
+    const recognition = FakeRecognition.last!;
+    recognition.onstart?.();
+    await connected;
+
+    const settled = result("앞서 확정된 문장입니다", true);
+    let reads = 0;
+    Object.defineProperty(settled, "0", {
+      get() {
+        reads += 1;
+        return { transcript: "앞서 확정된 문장입니다" };
+      },
+    });
+
+    recognition.onresult?.({
+      resultIndex: 1,
+      results: { length: 2, 0: settled, 1: result("새로 들어온 말", true) },
+    });
+
+    expect(reads).toBe(0);
+    expect(stable).toEqual(["새로 들어온 말"]);
   });
 
   it("restarts after a normal browser end while the session is wanted", async () => {
@@ -229,7 +340,10 @@ describe("WebSpeechProvider", () => {
 
       recognition.onerror?.({ error: "audio-capture" });
       expect(statuses).toContain("error");
-      expect(errors[0]).toMatch(/after 4 attempts/);
+      // The budget itself is the assertion: four restarts were attempted on top
+      // of the original start, and the fifth failure was not forgiven.
+      expect(recognition.start).toHaveBeenCalledTimes(5);
+      expect(errors[0]).toMatch(/could not recover/);
     });
 
     it("forgives afresh once listening resumes", async () => {
@@ -254,6 +368,42 @@ describe("WebSpeechProvider", () => {
       expect(statuses).not.toContain("error");
     });
 
+    /**
+     * An unrecognised code used to satisfy none of the branches: no error, no
+     * restart, and a status stuck on "reconnecting" while nothing was
+     * listening. Browsers do not agree on this vocabulary, so an unknown code
+     * has to behave like every other transient failure.
+     */
+    it("retries an unfamiliar error code rather than going quietly dead", async () => {
+      vi.useFakeTimers();
+      const provider = new WebSpeechProvider();
+      const statuses: string[] = [];
+      const errors: string[] = [];
+      provider.onStatus((status) => statuses.push(status));
+      provider.onError((error) => errors.push(error.message));
+
+      const connected = provider.connect();
+      const recognition = FakeRecognition.last!;
+      recognition.onstart?.();
+      await connected;
+
+      recognition.onerror?.({ error: "a-code-from-a-future-browser" });
+      await vi.advanceTimersByTimeAsync(400);
+
+      expect(recognition.start).toHaveBeenCalledTimes(2);
+      expect(statuses).not.toContain("error");
+      expect(errors).toEqual([]);
+
+      for (const delay of [1200, 3000, 6000, 6000]) {
+        recognition.onerror?.({ error: "a-code-from-a-future-browser" });
+        await vi.advanceTimersByTimeAsync(delay);
+      }
+
+      // And once retrying has genuinely failed, it says so instead of pretending.
+      expect(statuses).toContain("error");
+      expect(errors[0]).toMatch(/could not recover/);
+    });
+
     it("still refuses to retry a denied microphone", async () => {
       vi.useFakeTimers();
       const provider = new WebSpeechProvider();
@@ -264,7 +414,7 @@ describe("WebSpeechProvider", () => {
       const recognition = FakeRecognition.last!;
       recognition.onerror?.({ error: "not-allowed" });
 
-      await expect(connected).rejects.toThrow("not-allowed");
+      await expect(connected).rejects.toThrow(/Microphone access was refused/);
       await vi.advanceTimersByTimeAsync(10_000);
 
       // Permission is a decision, not a blip: no retry, ever.

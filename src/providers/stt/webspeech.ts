@@ -7,6 +7,7 @@
  */
 import { BaseSpeechProvider, type SttProviderId, type SttProviderOptions } from "./types";
 import { webSpeechLanguage } from "./language";
+import { speechFailureMessage } from "./failure";
 import { joinBrowserResultParts, pickSpeechAlternative } from "./transcript";
 
 interface SpeechRecognitionAlternativeLike {
@@ -39,7 +40,6 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 const BENIGN_ERRORS = new Set(["no-speech", "aborted"]);
 const PERMANENT_ERRORS = new Set(["not-allowed", "language-not-supported", "language-unavailable"]);
-const RECOVERABLE_ERRORS = new Set(["service-not-allowed", "audio-capture", "network"]);
 const RECOVERY_ATTEMPTS = 4;
 const RECOVERY_BACKOFF_MS = [400, 1200, 3000, 6000];
 /**
@@ -84,8 +84,25 @@ function stableDelta(previous: string | undefined, next: string): string {
   const before = previous?.trim() ?? "";
   const after = next.trim();
   if (!after || after === before) return "";
-  if (before && after.startsWith(before)) return after.slice(before.length).trim();
-  return after;
+  if (!before) return after;
+  if (after.startsWith(before)) return after.slice(before.length).trim();
+
+  // The recogniser revised wording it had already handed over. WebKit does this
+  // routinely: a hypothesis promoted by the interim timer above is finalised a
+  // second later with a different ending. Returning the whole sentence here
+  // re-sent text the engine had already turned into English, so the same
+  // thought was interpreted and rendered twice.
+  //
+  // What was emitted cannot be unsaid, so emit only what is genuinely new —
+  // everything past the longest common prefix, backed up to a word boundary so
+  // a word is never cut in half.
+  let shared = 0;
+  while (shared < before.length && shared < after.length && before[shared] === after[shared]) {
+    shared += 1;
+  }
+  if (shared === 0) return after;
+  const boundary = after.lastIndexOf(" ", shared);
+  return after.slice(boundary > 0 ? boundary : shared).trim();
 }
 
 export class WebSpeechProvider extends BaseSpeechProvider {
@@ -165,16 +182,25 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         const interim: string[] = [];
         for (let i = 0; i < event.results.length; i += 1) {
           const result = event.results[i];
+          // `resultIndex` is the lowest index that changed in this event, so a
+          // FINAL result below it was settled earlier and has already been
+          // emitted — the old code computed it anyway and then discarded it.
+          //
+          // The list only ever grows within a recognition session, so that made
+          // the per-event cost proportional to how long the service had been
+          // running: `alternativesFor` + `pickSpeechAlternative` score every
+          // alternative character by character, on the same thread that renders
+          // the English the interpreter is reading. Forty minutes in, every
+          // recogniser event re-ranked forty minutes of settled transcript.
+          if (result.isFinal && i < event.resultIndex) continue;
           const text = pickSpeechAlternative(alternativesFor(result), this.options.language);
           if (!text) continue;
           hasResult = true;
           if (result.isFinal) {
             interimByIndex.delete(i);
-            if (i >= event.resultIndex) {
-              const delta = stableDelta(committedByIndex.get(i), text);
-              if (delta) this.emitStable(delta);
-              committedByIndex.set(i, text.trim());
-            }
+            const delta = stableDelta(committedByIndex.get(i), text);
+            if (delta) this.emitStable(delta);
+            committedByIndex.set(i, text.trim());
           } else {
             interimByIndex.set(i, text);
             interim.push(text);
@@ -189,14 +215,25 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         const code = event.error ?? "unknown";
         if (BENIGN_ERRORS.has(code)) return;
 
-        const recoverable = RECOVERABLE_ERRORS.has(code);
+        // Anything not known to be permanent is worth retrying.
+        //
+        // This used to be an allow-list of three codes, and a code outside it
+        // fell through every branch below: no error was raised, no restart was
+        // scheduled, and the status stayed on "reconnecting" — so an unfamiliar
+        // failure left the console claiming it was coming back while nothing
+        // was listening and nothing was going to try. Browsers do not agree on
+        // this vocabulary and it grows; an unknown code is a reason to retry,
+        // not a reason to do nothing.
+        const recoverable = !PERMANENT_ERRORS.has(code);
         const budgetLeft = recoverable && this.recoveryUsed < RECOVERY_ATTEMPTS;
         const fatal = PERMANENT_ERRORS.has(code) || (recoverable && !budgetLeft);
-        const error = new Error(
-          fatal && recoverable
-            ? `Speech recognition stopped after ${RECOVERY_ATTEMPTS} attempts to recover: ${code}`
-            : `Speech recognition error: ${code}`,
+        // The message goes straight to the console's error bar, so it is
+        // written for the interpreter rather than for the log. The raw code
+        // travels alongside it, for /diagnostics and nothing else.
+        const error: Error & { code?: string } = new Error(
+          speechFailureMessage(code, fatal && recoverable),
         );
+        error.code = code;
 
         if (fatal) this.wantRunning = false;
         if (!fatal) this.recoveryUsed += 1;
