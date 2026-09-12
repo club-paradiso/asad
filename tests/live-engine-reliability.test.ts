@@ -18,6 +18,53 @@ beforeEach(() => {
 });
 
 describe("live interpretation reliability", () => {
+  /**
+   * WebKit finalises the full stop as a result of its own, a beat after the
+   * words. The Korean pane shows four lines; a line containing only "." spends
+   * one of them, and pushes a real sentence off the top of the only surface the
+   * interpreter uses to check what they half-heard.
+   */
+  it("folds a punctuation-only stable result into the sentence it terminates", () => {
+    let snapshot: EngineSnapshot | null = null;
+    const engine = new InterpretationEngine({
+      mode: "sermon",
+      lag: "balanced",
+      now: () => 0,
+      onChange: (next) => {
+        snapshot = next;
+      },
+      interpret: async () => ({ output: output("English") }),
+    });
+
+    engine.start();
+    engine.handleStable("오늘 본문은 요한복음 3장 16절");
+    engine.handleStable(".");
+
+    const state = snapshot as unknown as EngineSnapshot;
+    expect(state.segments.map((segment) => segment.text)).toEqual([
+      "오늘 본문은 요한복음 3장 16절.",
+    ]);
+  });
+
+  it("keeps a punctuation-only result as its own segment when nothing precedes it", () => {
+    let snapshot: EngineSnapshot | null = null;
+    const engine = new InterpretationEngine({
+      mode: "sermon",
+      lag: "balanced",
+      now: () => 0,
+      onChange: (next) => {
+        snapshot = next;
+      },
+      interpret: async () => ({ output: output("English") }),
+    });
+
+    engine.start();
+    engine.handleStable(".");
+
+    const state = snapshot as unknown as EngineSnapshot;
+    expect(state.segments).toHaveLength(1);
+  });
+
   it("restores a failed interpretation unit in front of newer speech", async () => {
     let now = 0;
     let snapshot: EngineSnapshot | null = null;
