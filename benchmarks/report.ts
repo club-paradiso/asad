@@ -35,6 +35,15 @@ export function renderConsole(run: BenchmarkRun): string {
     lines.push("");
     lines.push(`  ${score.provider} (${score.model})${flag}`);
     lines.push(`    tier             ${score.tier}`);
+    if (score.promptProfile) {
+      // Which request production would send this provider. Two providers on
+      // different profiles were asked different questions.
+      lines.push(
+        `    measured as      ${score.promptProfile} context · ${
+          score.schemaEnforced ? "native schema" : "prose schema contract"
+        }`,
+      );
+    }
     lines.push(`    total            ${pct(score.total)}`);
     lines.push(`    fidelity         ${pct(score.components.fidelity)}`);
     lines.push(`    speakability     ${pct(score.components.speakability)}`);
@@ -93,14 +102,20 @@ export function renderMarkdown(run: BenchmarkRun): string {
   );
   out.push("");
   out.push(
-    "| Provider | Model | Tier | Total | Fidelity | Speakable | Latency p50 / p95 | Schema | Quota | Privacy | Cache | Verdict |",
+    "| Provider | Model | Measured as | Tier | Total | Fidelity | Speakable | Latency p50 / p95 | Schema | Quota | Privacy | Cache | Verdict |",
   );
   out.push(
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   );
   for (const s of run.scores) {
+    // "Measured as" is the configuration `/api/interpret` would send this
+    // provider. Without it the table invites a comparison between a provider
+    // measured on the full contract and one production runs ultra-compact.
+    const shape = s.promptProfile
+      ? `${s.promptProfile}${s.schemaEnforced ? "" : " + prose schema"}`
+      : "—";
     out.push(
-      `| ${s.provider} | \`${s.model}\` | ${s.tier} | **${pct(s.total)}** | ${pct(s.components.fidelity)} | ${pct(
+      `| ${s.provider} | \`${s.model}\` | ${shape} | ${s.tier} | **${pct(s.total)}** | ${pct(s.components.fidelity)} | ${pct(
         s.components.speakability,
       )} | ${ms(s.latency.p50)} / ${ms(s.latency.p95)} | ${pct(s.components.schema)} | ${pct(
         s.components.sustainability,

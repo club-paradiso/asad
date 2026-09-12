@@ -101,6 +101,15 @@ export interface ProviderScore {
   /** True when hard failures make the candidate unsuitable at any score. */
   disqualified: boolean;
   notes: string[];
+  /**
+   * The context profile this provider was measured under — the one
+   * `/api/interpret` would choose for it at the start of a session. Two
+   * providers on different profiles were asked different questions, and a
+   * table that hides that is comparing scores that are not comparable.
+   */
+  promptProfile?: "full" | "compact" | "ultra-compact";
+  /** Whether the prose restatement of the schema was dropped, as in production. */
+  schemaEnforced?: boolean;
 }
 
 const lower = (s: string) => s.toLowerCase();
