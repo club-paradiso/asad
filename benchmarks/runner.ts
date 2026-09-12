@@ -12,6 +12,11 @@ import {
   systemPromptFor,
 } from "@/interpreter/prompts/live";
 import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
+import { applyProfile, chooseProfile, type ContextProfile } from "@/interpreter/context/profiles";
+// The same conservative, model-aware view `/api/interpret` uses. Imported from
+// the module rather than the `@/providers/llm` barrel, which pulls in
+// `server-only` and cannot load under tsx.
+import { promptCapabilitiesFor } from "@/providers/llm/schema-enforcement";
 import { LocalLlmProvider } from "@/providers/llm/mock";
 import { createProvider } from "@/providers/llm/factory";
 import { toLlmError } from "@/providers/llm/errors";
@@ -143,15 +148,61 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
   };
 }
 
+/**
+ * The prompt `/api/interpret` would actually send this provider.
+ *
+ * The benchmark used to call `systemPromptFor(mode)` bare, which defaults
+ * `schemaEnforced` to false and never selects a context profile — so it
+ * measured a prompt production does not send. The gap is not cosmetic:
+ *
+ *   - four of the five cloud providers enforce the JSON schema natively, and
+ *     production drops the prose restatement of that shape for them;
+ *   - OpenRouter and Groq sustain fewer tokens per live call than the `full`
+ *     profile costs, so production runs them on the ultra-compact system
+ *     contract with a heavily clipped context.
+ *
+ * Measuring OpenRouter at `full` was therefore measuring a configuration the
+ * live route never uses, on the provider that is first in the production
+ * routing order.
+ *
+ * Quota pressure is zero and p95 latency unknown because a benchmark run is a
+ * fresh session — which is the state every service starts in.
+ */
+export function livePromptFor(
+  id: LlmProviderId,
+  benchCase: BenchCase,
+  request: InterpretRequest,
+): { system: string; user: string; profile: ContextProfile; schemaEnforced: boolean } {
+  const caps = promptCapabilitiesFor(id);
+  const decision = chooseProfile({
+    recommendedLiveTokens: caps.recommendedLiveContextTokens,
+    quotaPressure: 0,
+    latencyP95Ms: undefined,
+    lag: request.lag,
+  });
+  return {
+    system: systemPromptFor(benchCase.mode, {
+      schemaEnforced: caps.structuredOutput,
+      ultraCompact: decision.profile === "ultra-compact",
+    }),
+    user: buildLiveUserPrompt({
+      ...request,
+      context: applyProfile(request.context, decision.profile),
+    }),
+    profile: decision.profile,
+    schemaEnforced: caps.structuredOutput,
+  };
+}
+
 async function runCase(
+  id: LlmProviderId,
   provider: LlmProvider,
   benchCase: BenchCase,
   deadlineMs: number,
   repeats: number,
 ): Promise<CaseResult> {
   const request = requestFor(benchCase);
-  const system = systemPromptFor(benchCase.mode);
-  const user = buildLiveUserPrompt(request);
+  const { system, user } = livePromptFor(id, benchCase, request);
 
   const latencies: number[] = [];
   const usages: LlmUsage[] = [];
@@ -223,10 +274,18 @@ export async function runBenchmark(
   const scores: ProviderScore[] = [];
 
   for (const entry of selected) {
-    log(`\n▸ ${entry.id} (${entry.provider.model})`);
+    // Say which configuration is being measured. A score for a provider run at
+    // `full` is not comparable to the same provider run as production runs it,
+    // and the report should never leave that ambiguous.
+    const shape = livePromptFor(entry.id, BENCH_CASES[0], requestFor(BENCH_CASES[0]));
+    log(
+      `\n▸ ${entry.id} (${entry.provider.model}) — ${shape.profile} context, ` +
+        `${shape.schemaEnforced ? "native schema" : "prose schema contract"}`,
+    );
     const cases: CaseResult[] = [];
     for (const benchCase of BENCH_CASES) {
       const result = await runCase(
+        entry.id,
         entry.provider,
         benchCase,
         deadlineMs,
@@ -238,11 +297,13 @@ export async function runBenchmark(
         `  ${mark} ${benchCase.id} ${benchCase.category} ${result.latencyMs}ms`,
       );
     }
-    scores.push(
-      scoreProvider(entry.id, entry.provider.model, cases, {
+    scores.push({
+      ...scoreProvider(entry.id, entry.provider.model, cases, {
         paidTier: entry.paid,
       }),
-    );
+      promptProfile: shape.profile,
+      schemaEnforced: shape.schemaEnforced,
+    });
   }
 
   scores.sort((a, b) => {
