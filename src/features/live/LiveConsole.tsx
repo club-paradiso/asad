@@ -23,11 +23,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SessionSettings, StoredSession } from "@/types";
 import { activeChunk } from "@/interpreter/engine/chunks";
 import type { EngineSnapshot } from "@/interpreter/engine/session";
-import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import { STT_PROVIDER_INFO, type SttProviderId } from "@/providers/stt";
+import type { SttProviderId } from "@/providers/stt";
 import { saveSession } from "@/lib/storage";
 import { downloadSession } from "@/lib/export";
 import { Button } from "@/components/ui/primitives";
@@ -182,7 +181,6 @@ export function LiveConsole({
   );
 
   const teleprompter = settings.view === "teleprompter";
-  const providerLabel = STT_PROVIDER_INFO[source]?.label ?? source;
   const rescueAvailable =
     settings.mode === "sermon" && source !== "demo" && phase === "running";
   const browserTranslatorPercent =
@@ -207,21 +205,12 @@ export function LiveConsole({
         connection={snapshot.connection}
         health={snapshot.health}
         elapsedMs={elapsed}
-        modeLabel={settings.mode === "sermon" ? "Sermon" : "General"}
-        lagLabel={LAG_PROFILES[settings.lag].label}
-        sourceLabel={providerLabel}
-        thinking={snapshot.thinking}
-        degradedReason={snapshot.degradedReason}
         aiState={aiStateFrom({
           llmHealth: snapshot.health.llm,
           lastProvider,
           started: phase === "running",
         })}
-        aiTitle={
-          lastProvider
-            ? `Last turn answered by: ${lastProvider}. Details on /diagnostics.`
-            : undefined
-        }
+        scripted={source === "demo"}
         onOpenSettings={() => setSettingsOpen(true)}
         onEnd={() => void handleEnd()}
       />
@@ -258,14 +247,14 @@ export function LiveConsole({
             activeId={active?.id}
             containerRef={autoScroll.containerRef}
             activeRef={autoScroll.activeRef}
+            // Short enough to take in without reading. The interpreter is
+            // waiting for the speaker, not for an explanation of the product.
             emptyMessage={
               phase === "starting"
-                ? "Connecting to the microphone…"
+                ? "Connecting…"
                 : phase === "idle" && source !== "demo"
-                  ? "Microphone is not listening. Use Try again below."
-                  : source === "demo"
-                    ? "Starting the scripted session…"
-                    : "English assistance will appear here as the speaker begins."
+                  ? "Not listening."
+                  : "Waiting for the speaker."
             }
           />
         )}
@@ -341,22 +330,6 @@ export function LiveConsole({
           setFrozen(false);
           autoScroll.returnToLive();
         }}
-        view={settings.view}
-        onToggleView={() =>
-          onSettingsChange({
-            ...settings,
-            view: teleprompter ? "console" : "teleprompter",
-          })
-        }
-        showKorean={settings.showKorean}
-        onToggleKorean={() =>
-          onSettingsChange({ ...settings, showKorean: !settings.showKorean })
-        }
-        showGlossary={settings.showGlossary}
-        onToggleGlossary={() =>
-          onSettingsChange({ ...settings, showGlossary: !settings.showGlossary })
-        }
-        onFontScale={adjustFontScale}
       />
 
       <SettingsSheet
@@ -367,6 +340,7 @@ export function LiveConsole({
         corrections={snapshot.corrections}
         onCorrect={correct}
         onExport={() => downloadSession(buildStoredSession(), "markdown")}
+        onFontScale={adjustFontScale}
         wakeLockHeld={wakeLock.held}
         wakeLockSupported={wakeLock.supported}
         degradedReason={snapshot.degradedReason}

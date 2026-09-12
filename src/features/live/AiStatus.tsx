@@ -1,44 +1,20 @@
-"use client";
-
 /**
- * The live console's entire view of the AI layer: one word.
+ * How the AI layer is answering, reduced to something the console can act on.
  *
- * LIVE / DEGRADED / LOCAL is all an interpreter can absorb mid-sentence, and
- * all they can act on. Provider names, latency percentiles and quota pressure
- * belong on /diagnostics, where someone has time to read them.
+ * There used to be a pill in the status strip rendering this as `AI LIVE` on
+ * every glance. It is gone: "the model answered normally" is not information an
+ * interpreter can do anything with mid-sentence, and it cost a fixation every
+ * time their eye crossed the top of the screen.
+ *
+ * What survives is the derivation, because the two states that are NOT normal
+ * do change how much the English on screen should be trusted — and those reach
+ * the interpreter through `consoleStatus`, in plain language, only when they
+ * happen. Provider names, latency percentiles and quota pressure belong on
+ * /diagnostics, where someone has time to read them.
  */
-import { cn } from "@/lib/cn";
-
 export type AiState = "live" | "degraded" | "local" | "connecting";
 
-const LABEL: Record<AiState, string> = {
-  live: "LIVE",
-  degraded: "DEGRADED",
-  local: "LOCAL",
-  connecting: "…",
-};
-
-const COLOUR: Record<AiState, string> = {
-  live: "text-[var(--ok)]",
-  degraded: "text-[var(--warn)]",
-  local: "text-[var(--fg-muted)]",
-  connecting: "text-[var(--fg-dim)]",
-};
-
-export function AiStatus({ state, title }: { state: AiState; title?: string }) {
-  return (
-    <span
-      className="flex items-center gap-1"
-      title={title ?? `AI: ${LABEL[state]}`}
-      aria-label={`AI status: ${LABEL[state]}`}
-    >
-      <span className="text-[var(--fg-dim)]">AI</span>
-      <span className={cn("font-semibold tracking-wide", COLOUR[state])}>{LABEL[state]}</span>
-    </span>
-  );
-}
-
-/** Derive the pill state from what the last interpretation turn reported. */
+/** Derive the AI state from what the last interpretation turn reported. */
 export function aiStateFrom(input: {
   llmHealth: "ok" | "degraded" | "down";
   lastProvider?: string;

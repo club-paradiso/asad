@@ -39,7 +39,14 @@ export function ContextRail({
   const refs = showScripture ? scripture.slice(-2).reverse() : [];
   const terms = showGlossary ? glossary.slice(-6).reverse() : [];
 
-  const empty = notes.length === 0 && refs.length === 0 && terms.length === 0;
+  // An empty rail is not rendered at all.
+  //
+  // It used to hold its row open on a sentence explaining what would eventually
+  // appear in it — forty pixels of a 390-pixel-tall iPhone in landscape, spent
+  // on a caption for an empty box. The English takes that space instead until
+  // there is a cue worth showing, and a cue is worth showing exactly when the
+  // rail reappears.
+  if (notes.length === 0 && refs.length === 0 && terms.length === 0) return null;
 
   return (
     <div
@@ -49,12 +56,6 @@ export function ContextRail({
       )}
     >
       <div className="scroll-x fade-right flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
-        {empty && (
-          <span className="type-context self-center text-[var(--fg-dim)]">
-            Scripture, terminology and cultural notes appear here.
-          </span>
-        )}
-
         {notes.map((note) => {
           const key = `note:${note.kind}:${note.korean}`;
           const open = expanded === key;

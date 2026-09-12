@@ -35,6 +35,7 @@ export function SettingsSheet({
   corrections,
   onCorrect,
   onExport,
+  onFontScale,
   wakeLockHeld,
   wakeLockSupported,
   degradedReason,
@@ -46,6 +47,7 @@ export function SettingsSheet({
   corrections: CorrectionRecord[];
   onCorrect: (from: string, to: string, english?: string) => void;
   onExport: () => void;
+  onFontScale: (delta: number) => void;
   wakeLockHeld: boolean;
   wakeLockSupported: boolean;
   degradedReason?: string;
@@ -131,9 +133,40 @@ export function SettingsSheet({
             onChange={(view) => patch({ view })}
             options={[
               { value: "console", label: "Console" },
-              { value: "teleprompter", label: "Teleprompter" },
+              { value: "teleprompter", label: "Focus" },
             ]}
           />
+        </Field>
+
+        {/* Text size used to be two buttons on the live bar. It is set once, at
+            the stand, for the distance the interpreter is reading from — so it
+            belongs here, next to the other things decided before a service.
+            The +/− shortcuts still work without opening this sheet. */}
+        <Field label="Text size" hint="Shortcut: + and − during the session.">
+          <div className="flex items-center gap-2">
+            <Button
+              size="md"
+              className="min-w-14 flex-1"
+              onClick={() => onFontScale(-0.1)}
+              ariaLabel="Smaller English text"
+            >
+              <span className="text-sm">A−</span>
+            </Button>
+            <span
+              className="min-w-14 text-center text-sm tabular-nums text-[var(--fg-muted)]"
+              aria-live="polite"
+            >
+              {Math.round(settings.fontScale * 100)}%
+            </span>
+            <Button
+              size="md"
+              className="min-w-14 flex-1"
+              onClick={() => onFontScale(0.1)}
+              ariaLabel="Larger English text"
+            >
+              <span className="text-lg">A+</span>
+            </Button>
+          </div>
         </Field>
 
         <div className="flex flex-col gap-2">

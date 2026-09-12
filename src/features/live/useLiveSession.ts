@@ -36,6 +36,7 @@ import {
 import type { ClientLatencyStage } from "@/lib/schema";
 import {
   MicrophoneCapture,
+  STT_PROVIDER_INFO,
   createSpeechProvider,
   fetchSttCredentials,
   type SpeechProvider,
@@ -478,15 +479,17 @@ export function useLiveSession(options: LiveSessionOptions) {
       // configuration changes underneath an open page, fail visibly instead.
       if (current.source !== "demo" && current.source !== "webspeech" && !credentials) {
         throw new Error(
-          `${current.source} speech recognition is not configured. Return to the start screen and choose Browser input.`,
+          `${STT_PROVIDER_INFO[current.source]?.label ?? current.source} speech recognition is not set up on this deployment. Go back and choose Browser input.`,
         );
       }
 
       const effectiveSource: SttProviderId = credentials?.provider ?? current.source;
 
       if (effectiveSource !== current.source) {
+        // Not a fault, but not silent either: the interpreter agreed to send
+        // audio to one provider and it is going to a different one.
         setError(
-          `The server selected ${effectiveSource} speech recognition instead of ${current.source}.`,
+          `Speech recognition switched to ${STT_PROVIDER_INFO[effectiveSource]?.label ?? effectiveSource} — the input you chose is not available here. Voice is sent to that provider instead.`,
         );
       }
 
