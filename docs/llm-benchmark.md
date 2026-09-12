@@ -28,6 +28,21 @@ Additionally, the build environment's egress policy reaches
 `api.groq.com`, `openrouter.ai` and `api.openai.com`. So even with keys, only
 two of the five providers could have been reached from here.
 
+`api.vercel.com` is blocked as well, which rules out the obvious shortcut:
+`vercel env pull` cannot retrieve the deployment's keys into a sandbox, so
+there is no way to benchmark from here using credentials that already exist in
+the Vercel project. The key has to be present in the environment the benchmark
+runs in. Re-verified 2026-09-12.
+
+> **Numbers taken before 2026-09-12 measured the wrong prompt.** Until then the
+> runner built its request with `systemPromptFor(mode)` and no options and
+> applied no context profile, so every provider was scored on the full sermon
+> contract with the prose schema restatement. `/api/interpret` drops that
+> restatement for the four providers that enforce the schema natively, and runs
+> OpenRouter and Groq ultra-compact. Any cloud result older than that date is
+> not comparable to one taken now — for Groq the prompt was 49% larger than
+> production's, for OpenRouter 34%.
+
 **To produce real numbers**, set one or more keys and run:
 
 ```bash
@@ -54,7 +69,7 @@ quota posture, and shows both `cachedInputTokens` and the cache rate. A 0% rate
 means Gemini reported usage but no cached prompt tokens; “not reported” means
 the API did not return enough telemetry to decide.
 
-The command sends the 20 synthetic benchmark cases to the configured model.
+The command sends the 34 synthetic benchmark cases to the configured model.
 It does not read application data or print credentials.
 
 ---
@@ -256,6 +271,40 @@ npm run bench:live -- --profile compact
 npm run soak -- --minutes 60           # bounded-growth invariants
 npm run smoke:llm                      # one fixture per provider
 ```
+
+### Getting real cloud numbers
+
+Run these from an environment that already holds the key — a machine with the
+provider reachable, or the deployed service's own console. Do not copy a
+production key anywhere to benchmark it.
+
+```bash
+# 1. Prove the credential works before spending a full run on it.
+npm run smoke:llm
+
+# 2. The headline run. Three repeats so one slow response cannot decide a
+#    provider, and --no-write so a committed baseline is not clobbered until
+#    the numbers have been read.
+npm run bench:llm -- --repeats 3 --no-write
+
+# 3. The production candidates on their own, in routing order.
+npm run bench:llm -- --only openrouter --repeats 3 --no-write
+npm run bench:llm -- --only gemini --repeats 3 --no-write
+
+# 4. The same run under a live deadline. The default 12s is deliberately
+#    generous so a provider is measured rather than timed out, which also
+#    means it hides a model that is accurate and too late to use.
+npm run bench:llm -- --repeats 3 --deadline 5000 --no-write
+
+# 5. Only once the numbers look right, record them.
+npm run bench:llm -- --repeats 3
+```
+
+Compare step 2 against step 4. A provider whose score barely moves is one that
+answers inside the turn; a provider that collapses was being carried by a
+deadline no live session grants it. The summary table's **Measured as** column
+says which context profile each provider was scored under — a `full` score and
+an `ultra-compact` score are answers to different questions.
 
 Every one of these skips unconfigured providers cleanly. A provider that was
 not run was not measured, and the reports say so.
