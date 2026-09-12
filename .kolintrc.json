@@ -1,0 +1,13 @@
+{
+  "$comment": "Config for ~/dev/korean-language-quality (kolint). ASAD's own Korean is interface microcopy, so the genre is 'ux'. The layer is a checker here and nothing more: interpretation output is produced live under a latency budget, and its meaning is already guarded deterministically by src/counter/integrity.ts. Do not add a rewriting pass to the translation path.",
+  "genre": "ux",
+  "intensity": "standard",
+  "exclude": [
+    "src/demo/**",
+    "benchmarks/**",
+    "public/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
+  "extraTerms": ["ASAD", "아무튼서로알아들었으면된거아닌가요"]
+}
