@@ -3,31 +3,36 @@
 /**
  * The interpreter console.
  *
- * Layout is a four-row grid pinned to the viewport, with the English stream
- * taking everything left over. That ordering is the product: English dominant,
- * Korean available, context reachable, controls at the thumb.
+ * Layout is a grid pinned to the viewport, with the English stream taking
+ * everything left over. That ordering is the product: English dominant, Korean
+ * available, context reachable, one control at the thumb.
  *
- *   ┌──────────────────────────────────────────┐  status
+ *   ┌──────────────────────────────────────────┐  44px   status
  *   │                                          │
  *   │            ENGLISH  (1fr)                │         the thing you say
  *   │                                          │
  *   ├──────────────────────────────────────────┤  ≤22%   Korean, checkable
- *   ├──────────────────────────────────────────┤  auto   context rail
- *   └──────────────────────────────────────────┘  controls
+ *   ├──────────────────────────────────────────┤  auto   context rail, when
+ *   │                                          │         it has a cue
+ *   └──────────────────────────────────────────┘  auto   FREEZE
+ *
+ * Every row except the English earns its height or is not rendered: the
+ * context rail is absent until there is something to put in it, and the
+ * notice row above the English exists only during a demo or while the
+ * on-device backup is still coming up.
  *
  * On an iPhone in landscape the whole thing is about 390px tall, which is why
- * the Korean row is capped as a percentage and the context rail scrolls
- * horizontally rather than wrapping.
+ * the Korean row is capped as a percentage, the context rail scrolls
+ * horizontally rather than wrapping, and the chrome sheds padding below 480px.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SessionSettings, StoredSession } from "@/types";
 import { activeChunk } from "@/interpreter/engine/chunks";
 import type { EngineSnapshot } from "@/interpreter/engine/session";
-import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import { STT_PROVIDER_INFO, type SttProviderId } from "@/providers/stt";
+import type { SttProviderId } from "@/providers/stt";
 import { saveSession } from "@/lib/storage";
 import { downloadSession } from "@/lib/export";
 import { Button } from "@/components/ui/primitives";
@@ -73,7 +78,6 @@ export function LiveConsole({
     startedAt,
     lastProvider,
     browserTranslatorStatus,
-    browserTranslatorProgress,
     start,
     stop,
     correct,
@@ -182,13 +186,8 @@ export function LiveConsole({
   );
 
   const teleprompter = settings.view === "teleprompter";
-  const providerLabel = STT_PROVIDER_INFO[source]?.label ?? source;
   const rescueAvailable =
     settings.mode === "sermon" && source !== "demo" && phase === "running";
-  const browserTranslatorPercent =
-    browserTranslatorProgress !== null && browserTranslatorProgress > 0
-      ? Math.round(browserTranslatorProgress * 100)
-      : null;
 
   return (
     <div
@@ -207,21 +206,12 @@ export function LiveConsole({
         connection={snapshot.connection}
         health={snapshot.health}
         elapsedMs={elapsed}
-        modeLabel={settings.mode === "sermon" ? "Sermon" : "General"}
-        lagLabel={LAG_PROFILES[settings.lag].label}
-        sourceLabel={providerLabel}
-        thinking={snapshot.thinking}
-        degradedReason={snapshot.degradedReason}
         aiState={aiStateFrom({
           llmHealth: snapshot.health.llm,
           lastProvider,
           started: phase === "running",
         })}
-        aiTitle={
-          lastProvider
-            ? `Last turn answered by: ${lastProvider}. Details on /diagnostics.`
-            : undefined
-        }
+        scripted={source === "demo"}
         onOpenSettings={() => setSettingsOpen(true)}
         onEnd={() => void handleEnd()}
       />
@@ -229,12 +219,15 @@ export function LiveConsole({
       {source === "demo" && demoBeat ? (
         <DemoRibbon beat={demoBeat} />
       ) : browserTranslatorStatus === "preparing" ? (
+        // The download percentage is gone. The session has already started by
+        // the time this row can appear, interpretation never waits on the
+        // pack, and there is nothing the interpreter can do with a number —
+        // what they can use is knowing the offline backup is not ready yet.
         <div
           role="status"
           className="border-b border-[var(--line)] bg-[var(--bg-raised)] px-3 py-1.5 text-center text-[0.7rem] text-[var(--fg-muted)]"
         >
-          Preparing offline Korean→English backup
-          {browserTranslatorPercent !== null ? ` · model download ${browserTranslatorPercent}%` : "…"}
+          Offline backup is still starting up
         </div>
       ) : (
         <div />
@@ -258,14 +251,14 @@ export function LiveConsole({
             activeId={active?.id}
             containerRef={autoScroll.containerRef}
             activeRef={autoScroll.activeRef}
+            // Short enough to take in without reading. The interpreter is
+            // waiting for the speaker, not for an explanation of the product.
             emptyMessage={
               phase === "starting"
-                ? "Connecting to the microphone…"
+                ? "Connecting…"
                 : phase === "idle" && source !== "demo"
-                  ? "Microphone is not listening. Use Try again below."
-                  : source === "demo"
-                    ? "Starting the scripted session…"
-                    : "English assistance will appear here as the speaker begins."
+                  ? "Not listening."
+                  : "Waiting for the speaker."
             }
           />
         )}
@@ -341,22 +334,6 @@ export function LiveConsole({
           setFrozen(false);
           autoScroll.returnToLive();
         }}
-        view={settings.view}
-        onToggleView={() =>
-          onSettingsChange({
-            ...settings,
-            view: teleprompter ? "console" : "teleprompter",
-          })
-        }
-        showKorean={settings.showKorean}
-        onToggleKorean={() =>
-          onSettingsChange({ ...settings, showKorean: !settings.showKorean })
-        }
-        showGlossary={settings.showGlossary}
-        onToggleGlossary={() =>
-          onSettingsChange({ ...settings, showGlossary: !settings.showGlossary })
-        }
-        onFontScale={adjustFontScale}
       />
 
       <SettingsSheet
@@ -367,6 +344,7 @@ export function LiveConsole({
         corrections={snapshot.corrections}
         onCorrect={correct}
         onExport={() => downloadSession(buildStoredSession(), "markdown")}
+        onFontScale={adjustFontScale}
         wakeLockHeld={wakeLock.held}
         wakeLockSupported={wakeLock.supported}
         degradedReason={snapshot.degradedReason}

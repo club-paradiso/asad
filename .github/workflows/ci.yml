@@ -137,6 +137,13 @@ jobs:
       - name: Forced browser fallback checks
         run: npm run e2e:live-fallback -- http://localhost:3000 ./e2e-out
 
+      # What the console tells an interpreter when the recogniser fails, which
+      # is the part of the product a unit test cannot see: that a healthy
+      # session stays quiet, that the advice matches the actual fault, and that
+      # no browser error code ever reaches the screen.
+      - name: Live failure-state checks
+        run: npm run e2e:live-failure -- http://localhost:3000 ./e2e-out
+
       - name: Quota degradation bypass checks
         run: npm run e2e:live-quota-bypass -- http://localhost:3000
 

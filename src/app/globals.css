@@ -390,6 +390,14 @@ select:focus-visible,
    share — the priority order is the product, and it must survive the smallest
    screen it runs on. */
 
+/* Space held below the newest English line so it never sits on the bottom
+   edge, and so an anticipated continuation has somewhere to appear. It is a
+   fraction of the READING REGION, not the viewport — what is left after the
+   Korean pane and the context rail have taken their share. */
+.stream-tail {
+  height: 46cqh;
+}
+
 @media (max-height: 480px) {
   [data-surface="live"] .type-english {
     line-height: 1.18;
@@ -397,6 +405,21 @@ select:focus-visible,
 
   [data-surface="live"] .type-korean {
     line-height: 1.38;
+  }
+
+  /* On a phone in landscape the reading region is about 125px. Reserving 46%
+     of it spends nearly sixty pixels on a prediction that is dimmed by design
+     and often is not there at all, while real English — the line being spoken
+     and the one before it — is what gets pushed off the top. The active line
+     still clears the bottom edge comfortably at this size. */
+  [data-surface="live"] .stream-tail {
+    height: 24cqh;
+  }
+
+  /* Every row that is not the English gives up a little padding here. Each one
+     is small; together they are most of another line of English. */
+  [data-surface="live"] .rail-row {
+    padding-block: 0.25rem;
   }
 }
 

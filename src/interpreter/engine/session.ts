@@ -198,6 +198,9 @@ export const PROVISIONAL_TIMEOUT_MS = 2_500;
  */
 const SCRIPTURE_HINT_LIMIT = 4;
 
+/** A stable result with none of this is punctuation, not a line of transcript. */
+const TRANSCRIPT_CONTENT = /[\p{L}\p{N}]/u;
+
 let segmentCounter = 0;
 const nextSegmentId = () => `s${(segmentCounter += 1).toString(36)}`;
 /** Test seam. */
@@ -406,10 +409,24 @@ export class InterpretationEngine {
     if (!corrected) return;
 
     const stableAt = this.clock;
-    this.segments = [
-      ...this.segments,
-      { id: nextSegmentId(), text: corrected, at: Math.max(0, stableAt - this.startedAt) },
-    ];
+    const previous = this.segments[this.segments.length - 1];
+    if (previous && !TRANSCRIPT_CONTENT.test(corrected)) {
+      // Recognisers finalise trailing punctuation as a result of its own —
+      // WebKit adds the full stop a beat after the words. On its own that is
+      // not a line of transcript, and the Korean pane shows only a handful of
+      // lines: rendering "." as one of them costs a real sentence its place.
+      // It still reaches the stabiliser below, where the terminal mark is a
+      // sentence boundary worth acting on.
+      this.segments = [
+        ...this.segments.slice(0, -1),
+        { ...previous, text: `${previous.text}${corrected}` },
+      ];
+    } else {
+      this.segments = [
+        ...this.segments,
+        { id: nextSegmentId(), text: corrected, at: Math.max(0, stableAt - this.startedAt) },
+      ];
+    }
     this.partial = null;
     if (!this.stabiliser.pending.trim() && this.pendingOriginAt === null) {
       this.pendingOriginAt = stableAt;

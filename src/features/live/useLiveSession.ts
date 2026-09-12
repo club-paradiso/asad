@@ -36,6 +36,7 @@ import {
 import type { ClientLatencyStage } from "@/lib/schema";
 import {
   MicrophoneCapture,
+  STT_PROVIDER_INFO,
   createSpeechProvider,
   fetchSttCredentials,
   type SpeechProvider,
@@ -111,11 +112,14 @@ export function useLiveSession(options: LiveSessionOptions) {
   const [error, setError] = useState<string | null>(null);
   const [demoBeat, setDemoBeat] = useState<DemoBeat | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  /** Which provider answered the most recent turn — drives the AI pill. */
+  /**
+   * Which provider answered the most recent turn. The console shows this only
+   * when it is the deterministic local interpreter, because that is the case
+   * where the English is not a translation and has to be read differently.
+   */
   const [lastProvider, setLastProvider] = useState<string | undefined>(undefined);
   const [browserTranslatorStatus, setBrowserTranslatorStatus] =
     useState<BrowserTranslatorStatus>("unsupported");
-  const [browserTranslatorProgress, setBrowserTranslatorProgress] = useState<number | null>(null);
 
   const engineRef = useRef<InterpretationEngine | null>(null);
   const providerRef = useRef<SpeechProvider | null>(null);
@@ -126,6 +130,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     null,
   );
   const mountedRef = useRef(true);
+  /** The last message the speech provider itself reported, if any. */
+  const providerErrorRef = useRef<string | null>(null);
   const clientLatencyRef = useRef(new ClientLatencyQueue());
   const pendingRenderLatencyRef = useRef<RenderMarker[]>([]);
   /** When each turn's provisional English reached the screen, by turn id. */
@@ -186,18 +192,16 @@ export function useLiveSession(options: LiveSessionOptions) {
     }
     if (browserTranslatorPreparationRef.current) return;
 
-    const preparation = beginBrowserTranslatorPreparation({
-      onDownloadProgress(progress) {
-        if (mountedRef.current) setBrowserTranslatorProgress(progress);
-      },
-    });
+    // No download-progress callback: the console does not render a
+    // percentage, and interpretation never waits on the pack, so observing it
+    // only re-rendered the live surface while a background download ticked.
+    const preparation = beginBrowserTranslatorPreparation();
     if (!preparation.supported) {
       setBrowserTranslatorStatus("unsupported");
       return;
     }
 
     setBrowserTranslatorStatus("preparing");
-    setBrowserTranslatorProgress(0);
     browserTranslatorPreparationRef.current = preparation.session;
     void preparation.session
       .then((translator) => {
@@ -208,10 +212,8 @@ export function useLiveSession(options: LiveSessionOptions) {
         if (translator) {
           browserTranslatorRef.current = translator;
           setBrowserTranslatorStatus("ready");
-          setBrowserTranslatorProgress(1);
         } else {
           setBrowserTranslatorStatus("failed");
-          setBrowserTranslatorProgress(null);
         }
       })
       .finally(() => {
@@ -422,6 +424,7 @@ export function useLiveSession(options: LiveSessionOptions) {
     if (current.source !== "demo") prepareBrowserTranslator();
 
     setError(null);
+    providerErrorRef.current = null;
     setPhase("starting");
     setDemoBeat(null);
     setLastProvider(undefined);
@@ -451,7 +454,14 @@ export function useLiveSession(options: LiveSessionOptions) {
     // then close capture/provider resources before exposing Try again. Keeping
     // the engine instance in this closure prevents an old teardown from
     // overwriting a newer retry session if the user moves quickly.
-    const failTerminally = (message: string) => {
+    //
+    // `fallback` really is a fallback. A recogniser reports its own failure
+    // before it reports the status change, and it knows things this does not:
+    // a denied microphone was being described here as a connection problem,
+    // sending the interpreter to check the venue Wi-Fi over a permission
+    // prompt. Whatever the provider said wins.
+    const failTerminally = (fallback: string) => {
+      const message = providerErrorRef.current ?? fallback;
       setError(message);
       engine.stop();
       void teardown().finally(() => {
@@ -478,15 +488,17 @@ export function useLiveSession(options: LiveSessionOptions) {
       // configuration changes underneath an open page, fail visibly instead.
       if (current.source !== "demo" && current.source !== "webspeech" && !credentials) {
         throw new Error(
-          `${current.source} speech recognition is not configured. Return to the start screen and choose Browser input.`,
+          `${STT_PROVIDER_INFO[current.source]?.label ?? current.source} speech recognition is not set up on this deployment. Go back and choose Browser input.`,
         );
       }
 
       const effectiveSource: SttProviderId = credentials?.provider ?? current.source;
 
       if (effectiveSource !== current.source) {
+        // Not a fault, but not silent either: the interpreter agreed to send
+        // audio to one provider and it is going to a different one.
         setError(
-          `The server selected ${effectiveSource} speech recognition instead of ${current.source}.`,
+          `Speech recognition switched to ${STT_PROVIDER_INFO[effectiveSource]?.label ?? effectiveSource} — the input you chose is not available here. Voice is sent to that provider instead.`,
         );
       }
 
@@ -508,7 +520,10 @@ export function useLiveSession(options: LiveSessionOptions) {
 
       provider.onPartial((text) => engineRef.current?.handlePartial(text));
       provider.onStable((text) => engineRef.current?.handleStable(text));
-      provider.onError((err) => setError(err.message));
+      provider.onError((err) => {
+        providerErrorRef.current = err.message;
+        setError(err.message);
+      });
       provider.onStatus((status) => {
         engineRef.current?.setConnection(mapStatus(status));
         engineRef.current?.setHealth(
@@ -609,13 +624,15 @@ export function useLiveSession(options: LiveSessionOptions) {
     demoBeat,
     lastProvider,
     browserTranslatorStatus,
-    browserTranslatorProgress,
     startedAt,
     script,
     start,
     stop,
     correct,
-    dismissError: useCallback(() => setError(null), []),
+    dismissError: useCallback(() => {
+      providerErrorRef.current = null;
+      setError(null);
+    }, []),
   };
 }
 

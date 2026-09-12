@@ -39,7 +39,14 @@ export function ContextRail({
   const refs = showScripture ? scripture.slice(-2).reverse() : [];
   const terms = showGlossary ? glossary.slice(-6).reverse() : [];
 
-  const empty = notes.length === 0 && refs.length === 0 && terms.length === 0;
+  // An empty rail is not rendered at all.
+  //
+  // It used to hold its row open on a sentence explaining what would eventually
+  // appear in it — forty pixels of a 390-pixel-tall iPhone in landscape, spent
+  // on a caption for an empty box. The English takes that space instead until
+  // there is a cue worth showing, and a cue is worth showing exactly when the
+  // rail reappears.
+  if (notes.length === 0 && refs.length === 0 && terms.length === 0) return null;
 
   return (
     <div
@@ -48,13 +55,7 @@ export function ContextRail({
         className,
       )}
     >
-      <div className="scroll-x fade-right flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
-        {empty && (
-          <span className="type-context self-center text-[var(--fg-dim)]">
-            Scripture, terminology and cultural notes appear here.
-          </span>
-        )}
-
+      <div className="rail-row scroll-x fade-right flex items-stretch gap-1.5 px-3 py-1.5 sm:px-5 tall:gap-2 tall:py-2">
         {notes.map((note) => {
           const key = `note:${note.kind}:${note.korean}`;
           const open = expanded === key;
@@ -101,15 +102,21 @@ export function ContextRail({
                   </span>
                 )}
               </span>
-              {reference.text ? (
+              {/* No second line when there is no verse text.
+                  Most deployments never license verse wording, so "reference
+                  only" was a permanent caption under every Scripture cue,
+                  explaining the absence of something rather than helping with
+                  what is there. It also set the height of the whole rail — on
+                  an iPhone in landscape that was about eighteen pixels of the
+                  English, all service long, to say that a verse is missing.
+                  The reference IS the cue; its absence of text is visible. */}
+              {reference.text && (
                 <span className={cn("mt-0.5 block text-[var(--fg-muted)]", !open && "truncate")}>
                   {reference.text}
                   {reference.translation && (
                     <span className="ml-1.5 text-[var(--fg-dim)]">({reference.translation})</span>
                   )}
                 </span>
-              ) : (
-                <span className="mt-0.5 block text-[var(--fg-dim)]">reference only</span>
               )}
             </Chip>
           );

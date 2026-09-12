@@ -437,12 +437,15 @@ npm run build
 
 ```bash
 npm run e2e
+npm run e2e:live-failure
 npm run bench:llm
 npm run bench:live
 npm run smoke:llm
 npm run health:openrouter
 npm run soak -- --minutes 5
 ```
+
+`e2e:live-failure`는 마이크 거부·인식기 오류·일시적 끊김을 실제 콘솔에 통과시켜, 통역사가 그 순간 무엇을 보게 되는지를 확인합니다. 정상일 때 상태 표시줄이 조용한지, 문제가 생겼을 때 원인에 맞는 안내가 나오는지, 브라우저 오류 코드가 화면에 새지 않는지를 검사합니다. E2E 계열은 모두 `npm run build && npm start` 이후에 실행합니다.
 
 그리고 "나는 모든 것을 한 번에 의심하겠다" 모드:
 

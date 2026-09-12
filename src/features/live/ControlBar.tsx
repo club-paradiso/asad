@@ -3,16 +3,22 @@
 /**
  * The control bar.
  *
- * FREEZE dominates, because it is the only control an interpreter reaches for
- * mid-sentence — when they need the screen to stop moving so they can finish
- * the thought they are already speaking. It is a large target, reachable
- * one-handed at the bottom of an iPhone in landscape, and it is the only
- * button here that changes colour.
+ * Two buttons, and only because both answer "the screen is doing the wrong
+ * thing and I am in the middle of a sentence":
  *
- * Everything else is a small toggle. "Follow live" only exists when it has
- * something to do.
+ *   FREEZE       stop the display moving so a thought can be finished.
+ *   ↓ Live       get back to the live position after scrolling away.
+ *
+ * Everything that used to sit here — teleprompter, Korean, glossary, A−/A+ —
+ * is decided before a service or not at all, and each one was ALSO in the
+ * settings sheet, so the console carried two ways to do the same thing. On an
+ * iPhone in portrait those five buttons squeezed FREEZE, the one control that
+ * matters, down to about a third of the width. They now live in settings only;
+ * the keyboard shortcuts (T / K / G / + / −) are unchanged, because a shortcut
+ * costs no screen and a button costs it on every glance.
+ *
+ * "↓ Live" only exists when it has something to do.
  */
-import type { ConsoleView } from "@/types";
 import { Button } from "@/components/ui/primitives";
 
 export function ControlBar({
@@ -20,110 +26,47 @@ export function ControlBar({
   onToggleFreeze,
   atLive,
   onReturnToLive,
-  view,
-  onToggleView,
-  showKorean,
-  onToggleKorean,
-  showGlossary,
-  onToggleGlossary,
-  onFontScale,
 }: {
   frozen: boolean;
   onToggleFreeze: () => void;
   atLive: boolean;
   onReturnToLive: () => void;
-  view: ConsoleView;
-  onToggleView: () => void;
-  showKorean: boolean;
-  onToggleKorean: () => void;
-  showGlossary: boolean;
-  onToggleGlossary: () => void;
-  onFontScale: (delta: number) => void;
 }) {
   return (
     <div
-      className="flex shrink-0 items-center gap-2 border-t border-[var(--line)] bg-[var(--bg-raised)] px-2 py-1.5 sm:px-4 tall:py-2"
+      className="rail-row flex shrink-0 items-center gap-2 border-t border-[var(--line)] bg-[var(--bg-raised)] px-2 py-1.5 sm:px-4 tall:py-2"
       style={{ paddingBottom: "calc(0.375rem + var(--safe-bottom))" }}
     >
+      {/* `size="md"`, not `lg`, and the height comes from `h-*`.
+          These buttons used to ask for `lg` and then try to shrink with
+          `min-h-0`, which never took: `cn` is a plain join, so the two
+          min-height utilities both landed and Tailwind's own order decided —
+          `min-h-14` won. The button was 56px tall on every screen however it
+          was styled, which on a 390px-tall phone in landscape is twelve pixels
+          of the English spent on a button nobody needed to be bigger. */}
       <Button
         onClick={onToggleFreeze}
-        size="lg"
+        size="md"
         tone={frozen ? "primary" : "neutral"}
-        // Shorter on a phone in landscape, where every pixel of height is
-        // competing with the English.
-        className="h-12 min-h-0 flex-1 max-w-[22rem] font-semibold tracking-wide tall:h-14"
+        className="h-11 flex-1 max-w-[26rem] tracking-wide sm:h-12 tall:h-14"
         title="Freeze the display — processing continues (Space)"
       >
-        {frozen ? "FROZEN — TAP TO RESUME" : "FREEZE"}
+        <span className="text-base font-semibold">
+          {frozen ? "FROZEN — TAP TO RESUME" : "FREEZE"}
+        </span>
       </Button>
 
       {!atLive && !frozen && (
         <Button
           onClick={onReturnToLive}
-          size="lg"
+          size="md"
           tone="neutral"
-          className="h-12 min-h-0 tall:h-14"
+          className="h-11 shrink-0 sm:h-12 tall:h-14"
           title="Jump back to live (F)"
         >
-          ↓ Live
+          <span className="text-base">↓ Live</span>
         </Button>
       )}
-
-      <div className="ml-auto flex items-center gap-0.5">
-        <Button
-          size="md"
-          tone="quiet"
-          className="min-w-11 px-2"
-          active={view === "teleprompter"}
-          onClick={onToggleView}
-          title="Teleprompter view (T)"
-          ariaLabel="Toggle teleprompter view"
-        >
-          T
-        </Button>
-        <Button
-          size="md"
-          tone="quiet"
-          className="min-w-11 px-2"
-          active={showKorean}
-          onClick={onToggleKorean}
-          title="Show or hide Korean (K)"
-          ariaLabel="Toggle Korean transcript"
-        >
-          <span className="font-korean">한</span>
-        </Button>
-        <Button
-          size="md"
-          tone="quiet"
-          className="min-w-11 px-2"
-          active={showGlossary}
-          onClick={onToggleGlossary}
-          title="Show or hide the glossary (G)"
-          ariaLabel="Toggle glossary"
-        >
-          G
-        </Button>
-        <div className="ml-1 flex items-center rounded-md border border-[var(--line-strong)]">
-          <Button
-            size="md"
-            tone="quiet"
-            className="min-w-11 px-2"
-            onClick={() => onFontScale(-0.1)}
-            ariaLabel="Smaller text"
-          >
-            <span className="text-xs">A−</span>
-          </Button>
-          <Button
-            size="md"
-            tone="quiet"
-            className="min-w-11 px-2"
-            onClick={() => onFontScale(0.1)}
-            ariaLabel="Larger text"
-          >
-            <span className="text-base">A+</span>
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
