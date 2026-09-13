@@ -15,6 +15,7 @@
  */
 import { useCallback, useState } from "react";
 import type { GlossaryItem, PrepBrief, PrepSheet } from "@/types";
+import { contextFromMode } from "@/interpreter/context/context-mode";
 import { loadSettings, prepStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
@@ -50,7 +51,10 @@ export function PrepScreen() {
 
   const currentInput = useCallback(
     () => ({
-      mode: loadSettings().mode,
+      // Prep is written before a session, so there is no resolved context to
+      // read yet — only the hint. `auto` means "no domain steer", which for a
+      // brief is exactly `generic`.
+      context: contextFromMode(loadSettings().context, "generic"),
       speaker: prep.speaker,
       title: prep.title,
       organisation: prep.organisation,

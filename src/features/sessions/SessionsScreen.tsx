@@ -14,6 +14,7 @@ import type { StoredSession } from "@/types";
 import { clearSessions, deleteSession, refreshSessions, sessionsStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { downloadSession } from "@/lib/export";
+import { RESOLVED_CONTEXT_LABEL_KO } from "@/interpreter/context/context-mode";
 import { Button, Label } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StateBlock } from "@/components/ui/states";
@@ -66,7 +67,7 @@ export function SessionsScreen() {
                   </p>
                   <p className="brand-caption mt-0.5 normal-case">
                     {new Date(session.startedAt).toLocaleString("ko-KR")} ·{" "}
-                    {session.mode === "sermon" ? "설교" : "일반"} ·{" "}
+                    {RESOLVED_CONTEXT_LABEL_KO[session.context] ?? session.context} ·{" "}
                     {session.segments.length}구절
                   </p>
                 </div>

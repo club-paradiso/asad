@@ -97,6 +97,11 @@ export const INTERPRETER_JSON_SCHEMA: Record<string, unknown> = {
       },
     },
     confidence: { type: "string", enum: ["high", "medium", "low"] },
+    context: {
+      type: "string",
+      enum: ["worship", "lecture", "meeting", "conversation", "event", "generic"],
+      description: "Your read of the setting this speech belongs to.",
+    },
     topic: { type: "string" },
   },
   required: ["safeChunks", "confidence"],

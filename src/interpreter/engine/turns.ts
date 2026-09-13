@@ -149,6 +149,8 @@ export interface LaneStats {
   maxPendingTurns: number;
   maxCloudInFlight: number;
   maxProvisionalInFlight: number;
+  /** Proper-noun spellings rewritten to an already-settled form. */
+  terminologyFixes: number;
 }
 
 export const emptyLaneStats = (): LaneStats => ({
@@ -169,6 +171,7 @@ export const emptyLaneStats = (): LaneStats => ({
   maxPendingTurns: 0,
   maxCloudInFlight: 0,
   maxProvisionalInFlight: 0,
+  terminologyFixes: 0,
 });
 
 /** How many turn records the engine keeps for bookkeeping. */

@@ -8,9 +8,10 @@
  * Matching is longest-first so 하나님 나라 wins over 하나님, and 택하신 족속
  * wins over 족속.
  */
-import type { GlossaryItem, InterpretationMode } from "@/types";
+import type { GlossaryItem, ResolvedContext } from "@/types";
+import { isWorshipContext } from "../context/context-mode";
 import { COMMUNITY_SERMON_GLOSSARY } from "./community-glossary";
-import { lexiconFor } from "./lexicon";
+import { lexiconFor, THEOLOGICAL_LEXICON } from "./lexicon";
 import { findWholeWordOccurrences } from "./match-korean";
 
 export interface GlossaryMatch extends GlossaryItem {
@@ -30,21 +31,22 @@ const byLengthDesc = (a: GlossaryItem, b: GlossaryItem) =>
  * `extra` carries prep-sheet and model-supplied entries, which outrank the
  * built-in lexicon when both match the same Korean string.
  *
- * In sermon mode the volunteer-maintained community glossary extends coverage
- * after the hand-curated lexicon. This ordering is intentional: broad coverage
- * must never silently replace a context-aware decision such as 대속 → atonement.
+ * In a worship context the volunteer-maintained community glossary extends
+ * coverage after the hand-curated lexicon. This ordering is intentional: broad
+ * coverage must never silently replace a context-aware decision such as
+ * 대속 → atonement.
  */
 export function matchGlossary(
   text: string,
-  mode: InterpretationMode,
+  context: ResolvedContext,
   extra: GlossaryItem[] = [],
 ): GlossaryMatch[] {
   if (!text.trim()) return [];
 
-  const community = mode === "sermon" ? COMMUNITY_SERMON_GLOSSARY : [];
+  const community = isWorshipContext(context) ? COMMUNITY_SERMON_GLOSSARY : [];
   const entries = dedupeByKorean([
     ...extra,
-    ...lexiconFor(mode),
+    ...lexiconFor(context),
     ...community,
   ]).sort(byLengthDesc);
 
@@ -88,12 +90,12 @@ export const PROMPT_GLOSSARY_LIMIT = 8;
  */
 export function liveGlossary(
   recentText: string,
-  mode: InterpretationMode,
+  context: ResolvedContext,
   extra: GlossaryItem[] = [],
   limit = LIVE_GLOSSARY_LIMIT,
 ): GlossaryItem[] {
   return (
-    matchGlossary(recentText, mode, extra)
+    matchGlossary(recentText, context, extra)
       .filter((item) => !item.register)
       .slice(0, limit)
       .map(({ index: _index, ...item }) => item)
@@ -113,13 +115,48 @@ export function liveGlossary(
  */
 export function promptGlossary(
   recentText: string,
-  mode: InterpretationMode,
+  context: ResolvedContext,
   extra: GlossaryItem[] = [],
   limit = PROMPT_GLOSSARY_LIMIT,
 ): GlossaryItem[] {
-  return matchGlossary(recentText, mode, extra)
+  return matchGlossary(recentText, context, extra)
     .slice(0, limit)
     .map(({ index: _index, ...item }) => item);
+}
+
+/**
+ * How many DOMAIN terms this text contains — theological vocabulary and the
+ * volunteer community glossary, never the discourse markers.
+ *
+ * This is the terminology signal the context resolver reads. It counts the
+ * same matcher the console already runs rather than introducing a second,
+ * parallel keyword list that could disagree with it.
+ */
+export function worshipTermHits(text: string): number {
+  if (!text.trim()) return 0;
+  const entries = dedupeByKorean([
+    ...THEOLOGICAL_LEXICON,
+    ...COMMUNITY_SERMON_GLOSSARY,
+  ]).sort(byLengthDesc);
+
+  const claimed = new Array<boolean>(text.length).fill(false);
+  let hits = 0;
+  for (const entry of entries) {
+    for (const index of findWholeWordOccurrences(text, entry.korean)) {
+      const end = index + entry.korean.length;
+      let overlaps = false;
+      for (let i = index; i < end; i += 1) {
+        if (claimed[i]) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) continue;
+      for (let i = index; i < end; i += 1) claimed[i] = true;
+      hits += 1;
+    }
+  }
+  return hits;
 }
 
 /** Collapse duplicates, keeping the first (highest-priority) occurrence. */

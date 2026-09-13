@@ -27,10 +27,11 @@ import type {
   CulturalNote,
   EntityResolution,
   GlossaryItem,
+  ContextMode,
   InterpretationChunk,
-  InterpretationMode,
   InterpreterOutput,
   LagProfile,
+  ResolvedContext,
   PartialTranscript,
   PrepSheet,
   SubsystemHealth,
@@ -39,7 +40,19 @@ import type {
 import { emptyPrepSheet } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
 import { detectScriptureReferences } from "../scripture/detect";
-import { liveGlossary, mergeGlossary, promptGlossary } from "../glossary/matcher";
+import {
+  liveGlossary,
+  mergeGlossary,
+  promptGlossary,
+  worshipTermHits,
+} from "../glossary/matcher";
+import {
+  enforceTerminology,
+  settledForms,
+  type SettledForm,
+  type TerminologyFix,
+} from "../glossary/consistency";
+import { ContextResolver, type ContextState } from "../context/context-mode";
 import { detectCultural, dedupeNotes } from "../cultural/detect";
 import { buildRollingContext } from "../context/rolling";
 import {
@@ -96,6 +109,8 @@ export interface EngineSnapshot {
   entities: EntityResolution[];
   corrections: CorrectionRecord[];
   topic?: string;
+  /** What the session is currently interpreting as, and how sure it is. */
+  context: ContextState;
   connection: ConnectionState;
   health: SubsystemHealth;
   /** Set when a subsystem is running in a reduced mode. */
@@ -165,7 +180,11 @@ export interface ProvisionalLane {
 }
 
 export interface EngineOptions {
-  mode: InterpretationMode;
+  /** The user's context hint. `auto` unless they deliberately overrode it. */
+  context?: ContextMode;
+  /** BCP-47 tags for the pair being interpreted. */
+  source?: string;
+  target?: string;
   lag: LagProfile;
   prep?: PrepSheet;
   /** Performs one contextual interpretation call. Injected so tests need no network. */
@@ -209,9 +228,18 @@ export const __resetSegmentIds = () => {
 };
 
 export class InterpretationEngine {
-  private mode: InterpretationMode;
   private lag: LagProfile;
   private prep: PrepSheet;
+  private source: string;
+  private target: string;
+  /**
+   * Context is resolved here rather than chosen on a launcher. The resolver
+   * owns the evidence and the hysteresis; the engine only feeds it and reads
+   * the answer.
+   */
+  private readonly context: ContextResolver;
+  /** Settled proper-noun forms, recomputed whenever memory changes. */
+  private forms: SettledForm[] = [];
 
   private segments: TranscriptSegment[] = [];
   private partial: PartialTranscript | null = null;
@@ -249,10 +277,18 @@ export class InterpretationEngine {
   private lastBoundary: FlushBoundary | null = null;
 
   constructor(private readonly options: EngineOptions) {
-    this.mode = options.mode;
     this.lag = options.lag;
     this.prep = options.prep ?? emptyPrepSheet();
+    this.source = options.source ?? "ko-KR";
+    this.target = options.target ?? "en-US";
     this.memory = memoryFromPrep(this.prep);
+    this.context = new ContextResolver({ mode: options.context ?? "auto", prep: this.prep });
+    this.refreshForms();
+  }
+
+  /** The resolved context every downstream consumer reads. */
+  private get resolvedContext(): ResolvedContext {
+    return this.context.state().resolved;
   }
 
   private get clock(): number {
@@ -299,14 +335,40 @@ export class InterpretationEngine {
   }
 
   /**
-   * A mode switch changes the contract every in-flight request was built on.
-   * Outstanding results are invalidated; their Korean is put back so the next
-   * turn interprets it under the new mode rather than losing it.
+   * The USER changing the context hint. That changes the contract every
+   * in-flight request was built on, so outstanding results are invalidated and
+   * their source speech is put back to be interpreted under the new context
+   * rather than lost.
+   *
+   * Automatic resolution deliberately does NOT do this — see `observeContext`.
    */
-  setMode(mode: InterpretationMode): void {
-    if (mode !== this.mode) this.invalidateOutstanding({ restore: !this.stopped });
-    this.mode = mode;
+  setContextMode(mode: ContextMode): void {
+    const before = this.resolvedContext;
+    this.context.setMode(mode);
+    if (this.resolvedContext !== before) this.invalidateOutstanding({ restore: !this.stopped });
     this.emit();
+  }
+
+  /** The language pair. Changing it mid-session is a new contract, like context. */
+  setLanguages(source: string, target: string): void {
+    if (source === this.source && target === this.target) return;
+    this.source = source;
+    this.target = target;
+    this.invalidateOutstanding({ restore: !this.stopped });
+    this.emit();
+  }
+
+  /**
+   * Fold evidence into the context resolver.
+   *
+   * A change here NEVER invalidates in-flight work. Automatic resolution is a
+   * gradual refinement, and throwing away a request that is about to answer —
+   * to re-ask it with a slightly different domain paragraph — would cost the
+   * interpreter a real sentence to buy a marginally better one. The new
+   * context applies from the next turn, which is the next ~5 seconds.
+   */
+  private observeContext(observation: Parameters<ContextResolver["observe"]>[0]): void {
+    if (this.context.observe(observation)) this.emit();
   }
 
   /** Transcript-free lane counters, for diagnostics and the soak harness. */
@@ -359,6 +421,7 @@ export class InterpretationEngine {
 
   setPrep(prep: PrepSheet): void {
     this.prep = prep;
+    this.context.setPrep(prep);
     // Prep decisions merge in without discarding what the session has learned.
     const seeded = memoryFromPrep(prep);
     this.memory = {
@@ -372,6 +435,7 @@ export class InterpretationEngine {
       ],
       topic: this.memory.topic ?? seeded.topic,
     };
+    this.refreshForms();
     this.emit();
   }
 
@@ -564,7 +628,9 @@ export class InterpretationEngine {
    */
   private applyProvisional(lane: ProvisionalLane, turn: LogicalTurn, output: InterpreterOutput): void {
     const now = this.elapsed();
-    const drafts = output.safeChunks.map((d) => ({ text: d.text, confidence: d.confidence }));
+    const drafts = this.settleTerminology(
+      output.safeChunks.map((d) => ({ text: d.text, confidence: d.confidence })),
+    );
     const { chunks, added } = insertTurnChunks(this.chunks, drafts, [turn.id], now, { provisional: true });
     this.chunks = trimChunks(chunks);
     turn.provisionalAppliedAt = this.clock;
@@ -624,21 +690,23 @@ export class InterpretationEngine {
     );
 
     const request: InterpretRequest = {
-      mode: this.mode,
+      context: this.resolvedContext,
+      source: this.source,
+      target: this.target,
       lag: this.lag,
       pending,
       partial: allowAnticipation ? partial : undefined,
-      context: buildRollingContext({
+      history: buildRollingContext({
         segments: this.segments,
         chunks: contextChunks,
         memory: this.memory,
-        mode: this.mode,
+        context: this.resolvedContext,
         prep: this.prep,
       }),
       detected: {
         scripture: detectedScripture,
         // The model's copy, not the rail's: discourse markers stay in.
-        glossary: promptGlossary(pending, this.mode, this.memory.glossary),
+        glossary: promptGlossary(pending, this.resolvedContext, this.memory.glossary),
         culturalNotes: detectCultural(pending, this.memory.entities),
       },
       boundary: last.boundary,
@@ -743,7 +811,7 @@ export class InterpretationEngine {
     const now = this.elapsed();
     const legality = refinementLegality(this.chunks, turnIds);
     const newest = turnIds.includes(this.turnCounter);
-    const drafts = output.safeChunks;
+    const drafts = this.settleTerminology(output.safeChunks);
 
     let chunks = this.chunks;
     let outcome: ContextualOutcome;
@@ -785,7 +853,7 @@ export class InterpretationEngine {
     const predict =
       newest && legality !== "locked" && allowAnticipation && (output.anticipatedChunks?.length ?? 0) > 0;
     if (predict) {
-      chunks = setAnticipatedChunks(chunks, output.anticipatedChunks!, now);
+      chunks = setAnticipatedChunks(chunks, this.settleTerminology(output.anticipatedChunks!), now);
     } else if (newest || legality === "fresh") {
       chunks = clearAnticipated(chunks);
     }
@@ -820,9 +888,14 @@ export class InterpretationEngine {
       scripture: output.bibleReferences?.map((r) => r.display),
       topic: output.topic,
     });
+    this.refreshForms();
+    // The model's own read of the setting, carried back on a response the turn
+    // had already paid for. This is the whole of the "model" signal family:
+    // context inference never costs an extra call.
+    if (output.context) this.observeContext({ modelHint: output.context });
   }
 
-  /** Detection that runs locally, the instant Korean stabilises. */
+  /** Detection that runs locally, the instant source speech stabilises. */
   private absorbLocalDetection(text: string): void {
     const refs = detectScriptureReferences(text).map(({ index: _index, ...ref }) => ref);
     if (refs.length) this.absorbScripture(refs);
@@ -832,10 +905,56 @@ export class InterpretationEngine {
       this.culturalNotes = dedupeNotes([...notes, ...this.culturalNotes]).slice(0, 12);
     }
 
-    const terms = liveGlossary(text, this.mode, this.memory.glossary);
+    const terms = liveGlossary(text, this.resolvedContext, this.memory.glossary);
     if (terms.length) {
       this.memory = rememberKnowledge(this.memory, { glossary: terms });
+      this.refreshForms();
     }
+
+    // Two of the resolver's six signal families, computed from work this
+    // method was doing anyway: the structural one (Scripture the detector
+    // resolved) and the terminology one (how densely domain vocabulary lands).
+    this.observeContext({
+      text,
+      scriptureHits: refs.length,
+      worshipTermHits: worshipTermHits(text),
+    });
+  }
+
+  /**
+   * Recompute the settled proper-noun forms.
+   *
+   * Cheap and bounded — memory holds at most a couple of dozen entities — and
+   * it runs only when memory actually changed, never per chunk.
+   */
+  private refreshForms(): void {
+    this.forms = settledForms({
+      corrections: this.memory.corrections,
+      entities: this.memory.entities,
+      glossary: this.memory.glossary,
+    });
+  }
+
+  /**
+   * Last stop before produced text reaches the screen: a near-variant of an
+   * already-settled name is rewritten to the settled form.
+   *
+   * The prompt asks for this and the rolling context supplies the forms; this
+   * is what makes it true rather than likely. Deliberately applied to BOTH
+   * lanes — the on-device translator has no glossary at all, so it is the lane
+   * most likely to spell a name a new way.
+   */
+  private settleTerminology<T extends { text: string }>(drafts: T[]): T[] {
+    if (this.forms.length === 0) return drafts;
+    const fixes: TerminologyFix[] = [];
+    const settled = drafts.map((draft) => {
+      const result = enforceTerminology(draft.text, this.forms);
+      if (result.fixes.length === 0) return draft;
+      fixes.push(...result.fixes);
+      return { ...draft, text: result.text };
+    });
+    if (fixes.length > 0) this.stats.terminologyFixes += fixes.length;
+    return settled;
   }
 
   /**
@@ -927,6 +1046,7 @@ export class InterpretationEngine {
   correct(from: string, to: string, english?: string): void {
     const record: CorrectionRecord = { from, to, at: this.elapsed(), english };
     this.memory = applyCorrection(this.memory, record);
+    this.refreshForms();
 
     this.segments = this.segments.map((segment) =>
       segment.text.includes(from)
@@ -957,6 +1077,7 @@ export class InterpretationEngine {
       entities: this.memory.entities,
       corrections: this.memory.corrections,
       topic: this.memory.topic,
+      context: this.context.state(),
       connection: this.connection,
       health: this.health,
       degradedReason: this.degradedReason,

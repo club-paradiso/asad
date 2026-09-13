@@ -11,10 +11,33 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Domain specialisation. The interpretation engine itself is domain-agnostic;
- * the mode selects prompt modules, glossaries and resolvers layered on top.
+ * What the user may say about the setting. `auto` is the default and the
+ * normal state: ASAD infers the context from the speech itself, and the
+ * override exists for the times someone already knows better.
+ *
+ * This replaced a hard choice between "Sermon Mode" and "General Mode" that
+ * had to be made before a word was spoken and could not be revised.
  */
-export type InterpretationMode = "sermon" | "general";
+export type ContextMode =
+  | "auto"
+  | "worship"
+  | "lecture"
+  | "meeting"
+  | "conversation"
+  | "event";
+
+/**
+ * What the system decided, and what every consumer downstream reads. `generic`
+ * is the honest answer when the evidence does not support specialising —
+ * never a failure state, just an unspecialised one.
+ */
+export type ResolvedContext =
+  | "worship"
+  | "lecture"
+  | "meeting"
+  | "conversation"
+  | "event"
+  | "generic";
 
 /**
  * How far behind the speaker the interpreter is choosing to run. This is the
@@ -192,6 +215,12 @@ export interface InterpreterOutput {
   culturalNotes?: CulturalNote[];
   entities?: EntityResolution[];
   confidence: Confidence;
+  /**
+   * The model's read of the SETTING this speech belongs to. One signal among
+   * six in the context resolver, and free: it rides a response the turn was
+   * already paying for.
+   */
+  context?: ResolvedContext;
   /** Optional compressed topic label used to keep rolling context small. */
   topic?: string;
 }
@@ -227,10 +256,16 @@ export interface PrepBrief {
 }
 
 export interface SessionSettings {
-  mode: InterpretationMode;
+  /** The user's context hint. `auto` unless they deliberately overrode it. */
+  context: ContextMode;
+  /** BCP-47 tag of the spoken language. */
+  sourceLanguage: string;
+  /** BCP-47 tag of the language the interpreter is producing. */
+  targetLanguage: string;
   lag: LagProfile;
   view: ConsoleView;
-  showKorean: boolean;
+  /** Whether the source-language transcript pane is shown. */
+  showSource: boolean;
   showGlossary: boolean;
   showScripture: boolean;
   fontScale: number;
@@ -239,10 +274,12 @@ export interface SessionSettings {
 }
 
 export const defaultSettings = (): SessionSettings => ({
-  mode: "sermon",
+  context: "auto",
+  sourceLanguage: "ko-KR",
+  targetLanguage: "en-US",
   lag: "balanced",
   view: "console",
-  showKorean: true,
+  showSource: true,
   showGlossary: true,
   showScripture: true,
   fontScale: 1,
@@ -290,7 +327,10 @@ export interface StoredSession {
   id: string;
   startedAt: number;
   endedAt?: number;
-  mode: InterpretationMode;
+  /** The context the session actually ran in, not the one that was asked for. */
+  context: ResolvedContext;
+  sourceLanguage: string;
+  targetLanguage: string;
   title?: string;
   speaker?: string;
   segments: TranscriptSegment[];

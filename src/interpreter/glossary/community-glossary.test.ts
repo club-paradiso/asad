@@ -16,7 +16,7 @@ describe("community sermon glossary", () => {
   it("adds volunteer terminology to sermon mode", () => {
     const matches = matchGlossary(
       "성령의 충만 가운데 결단의 시간을 갖겠습니다.",
-      "sermon",
+      "worship",
     );
     const terms = new Map(matches.map((item) => [item.korean, item.english]));
     expect(terms.get("성령의 충만")).toBe("The Fullness of the Holy Spirit");
@@ -24,13 +24,13 @@ describe("community sermon glossary", () => {
   });
 
   it("does not leak church-specific vocabulary into general mode", () => {
-    const matches = matchGlossary("성령의 충만 가운데 결단의 시간", "general");
+    const matches = matchGlossary("성령의 충만 가운데 결단의 시간", "generic");
     expect(matches.map((item) => item.korean)).not.toContain("성령의 충만");
     expect(matches.map((item) => item.korean)).not.toContain("결단의 시간");
   });
 
   it("keeps the curated theological rendering ahead of the community fallback", () => {
-    const match = matchGlossary("그리스도의 대속을 믿습니다.", "sermon").find(
+    const match = matchGlossary("그리스도의 대속을 믿습니다.", "worship").find(
       (item) => item.korean === "대속",
     );
     expect(match?.english).toBe("atonement");

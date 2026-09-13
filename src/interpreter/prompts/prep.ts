@@ -41,7 +41,7 @@ Reply with a single JSON object and nothing else:
 
 export function buildPrepUserPrompt(input: z.infer<typeof prepRequestSchema>): string {
   const lines: string[] = [
-    `MODE: ${input.mode === "sermon" ? "SERMON (Korean church)" : "GENERAL"}`,
+    `SETTING: ${input.context === "worship" ? "WORSHIP (Korean church service)" : input.context.toUpperCase()}`,
   ];
   if (input.speaker) lines.push(`SPEAKER: ${input.speaker}`);
   if (input.organisation) lines.push(`VENUE: ${input.organisation}`);

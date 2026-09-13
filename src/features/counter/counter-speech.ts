@@ -19,7 +19,11 @@ import {
   type SttProviderId,
 } from "@/providers/stt";
 import { joinTranscriptParts } from "@/providers/stt/transcript";
-import { cloudSttCandidates, sttLanguageSupport } from "@/providers/stt/capability";
+import {
+  cloudSttCandidates,
+  preferBrowserForScript,
+  sttLanguageSupport,
+} from "@/providers/stt/capability";
 import { sttKeyterms } from "@/counter/domain-vocabulary";
 import type { CounterProfileId } from "@/counter/profiles";
 import { VoiceAttemptTrace, type VoiceFailureCategory } from "./voice-diagnostics";
@@ -249,7 +253,20 @@ export class CounterSpeechController {
     // that socket anyway spends the whole connection deadline learning what
     // the capability table already knew.
     const cloudSupport = cloud ? sttLanguageSupport(cloud, this.language) : "unsupported";
-    if (cloud && cloudSupport !== "unsupported" && this.dependencies.cloudAudioSupported()) {
+    // One case outranks cloud-first: the cloud recogniser cannot carry the
+    // script this tag asks for and the browser's can. Traditional Chinese
+    // transcribed as Simplified is not a faster answer, it is a wrong one.
+    const browserIsMoreFaithful = preferBrowserForScript({
+      language: this.language,
+      cloud,
+      browserAvailable: browserSupportsLanguage && this.dependencies.browserSpeechSupported(),
+    });
+    if (
+      cloud &&
+      cloudSupport !== "unsupported" &&
+      !browserIsMoreFaithful &&
+      this.dependencies.cloudAudioSupported()
+    ) {
       trace.provider(cloud, cloudSupport);
       try {
         const text = await this.attempt(cloud, credentials);

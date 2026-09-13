@@ -11,7 +11,41 @@ import { COUNTER_PROFILE_IDS } from "@/counter/profiles";
 
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 
-export const modeSchema = z.enum(["sermon", "general"]);
+/**
+ * The RESOLVED context — what the session decided, never the user's `auto`.
+ * Inference happens in the browser, where the rolling transcript already lives;
+ * the wire carries a decision, not a question.
+ */
+export const resolvedContextSchema = z.enum([
+  "worship",
+  "lecture",
+  "meeting",
+  "conversation",
+  "event",
+  "generic",
+]);
+
+/** What the user may ask for, including "work it out yourself". */
+export const contextModeSchema = z.enum([
+  "auto",
+  "worship",
+  "lecture",
+  "meeting",
+  "conversation",
+  "event",
+]);
+
+/**
+ * BCP-47, loosely. The registry is the real authority on which tags exist; this
+ * only bounds the shape so a malformed tag is refused before it reaches a
+ * provider.
+ */
+export const languageTagSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(12)
+  .regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, "expected a BCP-47 language tag");
 
 export const lagSchema = z.enum(["fast", "balanced", "safe"]);
 
@@ -98,6 +132,12 @@ export const interpreterOutputSchema = z.object({
   culturalNotes: z.array(culturalNoteSchema).max(4).optional(),
   entities: z.array(entitySchema).max(8).optional(),
   confidence: confidenceSchema.default("medium"),
+  /**
+   * The model's read of the SETTING. One signal among six in the context
+   * resolver, and free: it rides a response the turn was already paying for,
+   * so context inference never costs an extra call.
+   */
+  context: resolvedContextSchema.optional(),
   topic: z.string().max(120).optional(),
 });
 
@@ -105,9 +145,14 @@ export type ParsedInterpreterOutput = z.infer<typeof interpreterOutputSchema>;
 
 /** Request body accepted by `POST /api/interpret`. */
 export const interpretRequestSchema = z.object({
-  mode: modeSchema,
+  /** The resolved context this turn runs under. */
+  context: resolvedContextSchema,
+  /** Spoken language. */
+  source: languageTagSchema.default("ko-KR"),
+  /** Language the interpreter is producing. */
+  target: languageTagSchema.default("en-US"),
   lag: lagSchema,
-  /** Newly stabilised Korean awaiting interpretation. */
+  /** Newly stabilised source speech awaiting interpretation. */
   pending: z.string().min(1).max(4000),
   /** Unstable tail, used only for anticipation. */
   partial: z.string().max(1000).optional(),
@@ -124,7 +169,12 @@ export const interpretRequestSchema = z.object({
   boundary: z.enum(["sentence", "clause", "quiet", "timeout"]).optional(),
   /** True when the previous unit was cut before its predicate resolved. */
   continuesPrevious: z.boolean().default(false),
-  context: z.object({
+  /**
+   * The rolling window — recent speech, delivered output, settled names and
+   * terms. Named `history` rather than `context` because `context` is now the
+   * product's word for the SETTING, and one wire field cannot be both.
+   */
+  history: z.object({
     summary: z.string().max(2000).optional(),
     topic: z.string().max(120).optional(),
     recentKorean: z.array(z.string()).max(12).default([]),
@@ -163,7 +213,7 @@ export type InterpretRequest = z.infer<typeof interpretRequestSchema>;
 
 /** Request body accepted by `POST /api/prep`. */
 export const prepRequestSchema = z.object({
-  mode: modeSchema,
+  context: resolvedContextSchema,
   speaker: z.string().max(120).optional(),
   title: z.string().max(240).optional(),
   organisation: z.string().max(160).optional(),
@@ -261,22 +311,15 @@ export function parseCounterOutput(raw: string): CounterOutput | null {
   return result.success ? result.data : null;
 }
 
-const languageTag = z
-  .string()
-  .trim()
-  .min(2)
-  .max(12)
-  .regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, "expected a BCP-47 language tag");
-
 export const createCounterSessionSchema = z.object({
-  hostLang: languageTag,
+  hostLang: languageTagSchema,
   deskLabel: z.string().trim().max(60).optional(),
   profileId: z.enum(COUNTER_PROFILE_IDS).default("general"),
 });
 
 export const joinCounterSessionSchema = z.object({
   code: z.string().trim().min(1).max(16),
-  guestLang: languageTag,
+  guestLang: languageTagSchema,
 });
 
 export const counterMessageSchema = z.object({

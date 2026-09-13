@@ -12,11 +12,12 @@ import { useEffect, useState } from "react";
 import type {
   ConsoleView,
   CorrectionRecord,
-  InterpretationMode,
+  ContextMode,
   LagProfile,
   SessionSettings,
 } from "@/types";
 import { LAG_PROFILES } from "@/interpreter/engine/lag";
+import { CONTEXT_LABEL_EN, CONTEXT_MODES } from "@/interpreter/context/context-mode";
 import { romaniseName } from "@/lib/romanise";
 import {
   Button,
@@ -101,15 +102,22 @@ export function SettingsSheet({
           </p>
         )}
 
-        <Field label="Mode">
-          <Segmented<InterpretationMode>
-            label="Interpretation mode"
-            value={settings.mode}
-            onChange={(mode) => patch({ mode })}
-            options={[
-              { value: "sermon", label: "Sermon" },
-              { value: "general", label: "General" },
-            ]}
+        {/* Context, not "mode".
+            It is one control with a default of Auto, it can be changed
+            mid-session, and the top bar shows what Auto currently resolved to —
+            so this is a correction, never a prerequisite. */}
+        <Field
+          label="Context"
+          hint="Auto reads the setting from the speech. Override only when you already know better."
+        >
+          <Segmented<ContextMode>
+            label="Interpretation context"
+            value={settings.context}
+            onChange={(context) => patch({ context })}
+            options={CONTEXT_MODES.map((mode) => ({
+              value: mode,
+              label: mode === "auto" ? "Auto" : CONTEXT_LABEL_EN[mode],
+            }))}
           />
         </Field>
 
@@ -148,7 +156,7 @@ export function SettingsSheet({
               size="md"
               className="min-w-14 flex-1"
               onClick={() => onFontScale(-0.1)}
-              ariaLabel="Smaller English text"
+              ariaLabel="Smaller interpretation text"
             >
               <span className="text-sm">A−</span>
             </Button>
@@ -162,7 +170,7 @@ export function SettingsSheet({
               size="md"
               className="min-w-14 flex-1"
               onClick={() => onFontScale(0.1)}
-              ariaLabel="Larger English text"
+              ariaLabel="Larger interpretation text"
             >
               <span className="text-lg">A+</span>
             </Button>
@@ -171,9 +179,9 @@ export function SettingsSheet({
 
         <div className="flex flex-col gap-2">
           <Toggle
-            checked={settings.showKorean}
-            onChange={(showKorean) => patch({ showKorean })}
-            label="Korean transcript"
+            checked={settings.showSource}
+            onChange={(showSource) => patch({ showSource })}
+            label="Source transcript"
           />
           <Toggle
             checked={settings.showGlossary}

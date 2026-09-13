@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The English stream — the dominant element on the console.
+ * The target stream — the dominant element on the console.
  *
  * Everything about this component is subordinated to one question: can the
  * interpreter absorb the current line in a single glance while listening to
@@ -14,6 +14,7 @@
 import { forwardRef } from "react";
 import type { InterpretationChunk } from "@/types";
 import { cn } from "@/lib/cn";
+import { findLanguage } from "@/lib/languages";
 
 interface ChunkLineProps {
   chunk: InterpretationChunk;
@@ -116,31 +117,44 @@ const ChunkLine = forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
   );
 });
 
-export function EnglishStream({
+export function TargetStream({
   chunks,
   activeId,
   containerRef,
   activeRef,
   emptyMessage,
+  language = "en-US",
 }: {
   chunks: InterpretationChunk[];
   activeId?: string;
   containerRef: React.RefObject<HTMLDivElement | null>;
   activeRef: React.MutableRefObject<HTMLElement | null>;
   emptyMessage?: string;
+  /** BCP-47 tag of the language being produced. */
+  language?: string;
 }) {
+  const definition = findLanguage(language);
   return (
     <div
       ref={containerRef}
+      lang={definition?.id ?? language}
+      dir={definition?.direction === "rtl" ? "rtl" : undefined}
       className="scroll-y fade-top h-full px-4 sm:px-8 lg:px-12"
       // `container-type: size` (not Tailwind's inline-size `@container`, which
       // only exposes cqw) so the tail spacer below can be a fraction of THIS
       // region — what is left after the Korean panel and context rail have
       // taken their share — rather than of the whole viewport.
       style={{ containerType: "size" }}
-      aria-live="polite"
-      aria-atomic="false"
-      aria-label="Interpreter-ready English"
+      // NOT a live region.
+      //
+      // It used to be `aria-live="polite"`, which meant a screen reader
+      // announced every line of interpretation as it landed — about eleven a
+      // minute, each interrupting the last, none of them a status change.
+      // A live region is for telling someone something CHANGED; this is the
+      // document, and it is read by moving through it. The console's one live
+      // region is the status strip, which speaks only when the state does.
+      aria-live="off"
+      aria-label="Interpretation"
     >
       {chunks.length === 0 ? (
         <div className="flex h-full items-center justify-center px-6 text-center">

@@ -78,14 +78,15 @@ export async function POST(request: Request) {
     // Rescue is an emergency action. Budget context as aggressively as FAST.
     lag: "fast",
   });
-  const context = applyProfile(input.context, profile.profile);
-  const system = systemPromptFor(input.mode, {
+  const history = applyProfile(input.history, profile.profile);
+  const system = systemPromptFor(input.context, {
     schemaEnforced: caps.structuredOutput,
+    languages: { source: input.source, target: input.target },
   });
   const user = buildRescueUserPrompt({
-    mode: input.mode,
+    context: input.context,
     recentKorean: input.recentKorean,
-    context,
+    history,
   });
 
   if (!user) {
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
       provider: "local",
       model: "none",
       degraded: true,
-      reason: "There is no recent stable Korean to rescue.",
+      reason: "There is no recent stable speech to rescue.",
     });
   }
 

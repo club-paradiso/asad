@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   BibleReference,
   ConnectionState,
-  InterpretationMode,
+  ContextMode,
   LagProfile,
   PrepSheet,
 } from "@/types";
@@ -26,6 +26,8 @@ import {
   type TurnTiming,
 } from "@/interpreter/engine/session";
 import { buildSttHints } from "@/interpreter/glossary/stt-hints";
+import { contextFromMode } from "@/interpreter/context/context-mode";
+import { languageName, translatorPair } from "@/lib/languages";
 import { interpretLocally } from "@/providers/llm/mock";
 import {
   beginBrowserTranslatorPreparation,
@@ -47,6 +49,12 @@ import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
 import { guardedFetch } from "@/lib/session-client";
 import { ClientLatencyQueue } from "./client-latency";
+import {
+  TransportSupervisor,
+  type SessionFailureKind,
+  type SessionFault,
+  type TransportPhase,
+} from "./transport-supervisor";
 import {
   abortableSleep,
   BROWSER_TRANSLATOR_MODEL,
@@ -76,10 +84,38 @@ interface RenderMarker {
   model?: string;
 }
 
-export type SessionPhase = "idle" | "starting" | "running" | "ended";
+export type SessionPhase =
+  | "idle"
+  | "starting"
+  | "running"
+  /** Transport dropped; reopening it automatically. Session state is intact. */
+  | "recovering"
+  /**
+   * Stopped for a reason only a human can clear — a denied microphone, a
+   * removed device. Session state is intact and `resume()` picks it back up.
+   */
+  | "interrupted"
+  | "ended";
+
+/** How the supervisor's transport phase reads to the console. */
+const PHASE_FOR: Record<TransportPhase, SessionPhase | null> = {
+  idle: null,
+  opening: "starting",
+  open: "running",
+  recovering: "recovering",
+  interrupted: "interrupted",
+  // Nothing was ever heard, so Start is the right affordance, not Resume.
+  "failed-to-start": "idle",
+  closed: null,
+};
 
 export interface LiveSessionOptions {
-  mode: InterpretationMode;
+  /** The user's context hint. `auto` unless they deliberately overrode it. */
+  context: ContextMode;
+  /** BCP-47 tag of the spoken language. */
+  sourceLanguage: string;
+  /** BCP-47 tag of the language being produced. */
+  targetLanguage: string;
   lag: LagProfile;
   prep?: PrepSheet;
   /** `demo` needs no key and no microphone. */
@@ -92,7 +128,7 @@ export interface LiveSessionOptions {
   resolveScripture?: boolean;
 }
 
-const emptySnapshot = (): EngineSnapshot => ({
+const emptySnapshot = (context: ContextMode = "auto"): EngineSnapshot => ({
   segments: [],
   partial: null,
   chunks: [],
@@ -101,15 +137,17 @@ const emptySnapshot = (): EngineSnapshot => ({
   culturalNotes: [],
   entities: [],
   corrections: [],
+  context: { mode: context, inferred: "generic", resolved: contextFromMode(context, "generic"), confidence: context === "auto" ? 0 : 1, warmingUp: context === "auto" },
   connection: "idle",
   health: { stt: "ok", llm: "ok", bible: "ok" },
   thinking: false,
 });
 
 export function useLiveSession(options: LiveSessionOptions) {
-  const [snapshot, setSnapshot] = useState<EngineSnapshot>(emptySnapshot);
+  const [snapshot, setSnapshot] = useState<EngineSnapshot>(() => emptySnapshot(options.context));
   const [phase, setPhase] = useState<SessionPhase>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [fault, setFault] = useState<SessionFault | null>(null);
   const [demoBeat, setDemoBeat] = useState<DemoBeat | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   /**
@@ -137,7 +175,15 @@ export function useLiveSession(options: LiveSessionOptions) {
   /** When each turn's provisional English reached the screen, by turn id. */
   const provisionalRenderedAtRef = useRef(new Map<number, number>());
 
-  const script: DemoScript = useMemo(() => demoScriptFor(options.mode), [options.mode]);
+  const supervisorRef = useRef<TransportSupervisor | null>(null);
+
+  // The scripted demo only exists for Korean → English. Its beats are authored
+  // Korean with authored English; running it on another pair would show an
+  // interpreter a translation that is not of the language they selected.
+  const script: DemoScript = useMemo(
+    () => demoScriptFor(options.context === "worship" ? "sermon" : "general"),
+    [options.context],
+  );
 
   // Live-updating ref so the engine's callbacks always see current settings
   // without tearing down the session when a toggle changes. Seeded at mount so
@@ -192,10 +238,22 @@ export function useLiveSession(options: LiveSessionOptions) {
     }
     if (browserTranslatorPreparationRef.current) return;
 
+    // Never guessed from the base subtag. Chrome distinguishes zh-Hans from
+    // zh-Hant, and asking for "zh" when the interpreter chose Traditional is
+    // the same script-variant failure the recogniser layer has.
+    const pair = translatorPair(
+      optionsRef.current.sourceLanguage,
+      optionsRef.current.targetLanguage,
+    );
+    if (!pair) {
+      setBrowserTranslatorStatus("unsupported");
+      return;
+    }
+
     // No download-progress callback: the console does not render a
     // percentage, and interpretation never waits on the pack, so observing it
     // only re-rendered the live surface while a background download ticked.
-    const preparation = beginBrowserTranslatorPreparation();
+    const preparation = beginBrowserTranslatorPreparation(pair);
     if (!preparation.supported) {
       setBrowserTranslatorStatus("unsupported");
       return;
@@ -235,7 +293,7 @@ export function useLiveSession(options: LiveSessionOptions) {
       local: (request) =>
         interpretLocally({
           pending: request.pending,
-          mode: request.mode,
+          context: request.context,
           allowAnticipation: request.allowAnticipation,
         }),
       telemetry: clientLatencyRef.current,
@@ -258,7 +316,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         return {
           output: interpretLocally({
             pending: request.pending,
-            mode: request.mode,
+            context: request.context,
             scriptId: script.id,
             allowAnticipation: request.allowAnticipation,
           }),
@@ -380,13 +438,17 @@ export function useLiveSession(options: LiveSessionOptions) {
 
   const stop = useCallback(async (): Promise<EngineSnapshot> => {
     const engine = engineRef.current;
+    // Ending is explicit and final: no scheduled reconnection may outlive it.
+    await supervisorRef.current?.close();
+    supervisorRef.current = null;
+    setFault(null);
 
     // Seal STT first while the engine is still alive. Browser/cloud recognisers
     // may emit one last stable transcript as capture closes; stopping the engine
     // first used to throw that final sentence away.
     await teardown();
     if (!engine) {
-      const finalSnapshot = emptySnapshot();
+      const finalSnapshot = emptySnapshot(optionsRef.current.context);
       setSnapshot(finalSnapshot);
       setPhase("ended");
       flushClientTelemetry();
@@ -414,80 +476,38 @@ export function useLiveSession(options: LiveSessionOptions) {
     return finalSnapshot;
   }, [flushClientTelemetry, teardown]);
 
-  const start = useCallback(async () => {
-    if (phase === "running" || phase === "starting") return;
+  /**
+   * Open the recogniser and the microphone for an engine that is already
+   * running.
+   *
+   * Split out of `start()` so recovery can reopen the transport WITHOUT
+   * building a new engine. That distinction is the whole of the session
+   * lifecycle work: a dropped socket costs the audio path, not the session's
+   * transcript, glossary, settled names or Scripture list.
+   */
+  const openTransport = useCallback(
+    async (engine: InterpretationEngine, supervisor: TransportSupervisor) => {
+      const current = optionsRef.current;
 
-    const current = optionsRef.current;
-    // This function is called synchronously from the launcher's Start click.
-    // Kick off Translator.create() before the first await so Chrome can use the
-    // user's activation to download/instantiate the local language pack.
-    if (current.source !== "demo") prepareBrowserTranslator();
-
-    setError(null);
-    providerErrorRef.current = null;
-    setPhase("starting");
-    setDemoBeat(null);
-    setLastProvider(undefined);
-    setSnapshot(emptySnapshot());
-    pendingRenderLatencyRef.current = [];
-    provisionalRenderedAtRef.current.clear();
-
-    const engine = new InterpretationEngine({
-      mode: current.mode,
-      lag: current.lag,
-      prep: current.prep ?? emptyPrepSheet(),
-      interpret,
-      provisional: provisionalLane,
-      resolveBible:
-        current.source !== "demo" && current.resolveScripture !== false ? resolveBible : undefined,
-      onTurnTiming: (timing) => {
-        if (current.source === "demo") return;
-        recordTurnTiming(timing);
-      },
-      onChange: setSnapshot,
-    });
-    engineRef.current = engine;
-    engine.start();
-    setStartedAt(Date.now());
-
-    // Hardware/provider terminal failures abort the interpreter engine first,
-    // then close capture/provider resources before exposing Try again. Keeping
-    // the engine instance in this closure prevents an old teardown from
-    // overwriting a newer retry session if the user moves quickly.
-    //
-    // `fallback` really is a fallback. A recogniser reports its own failure
-    // before it reports the status change, and it knows things this does not:
-    // a denied microphone was being described here as a connection problem,
-    // sending the interpreter to check the venue Wi-Fi over a permission
-    // prompt. Whatever the provider said wins.
-    const failTerminally = (fallback: string) => {
-      const message = providerErrorRef.current ?? fallback;
-      setError(message);
-      engine.stop();
-      void teardown().finally(() => {
-        if (engineRef.current !== engine) return;
-        engine.setConnection("error");
-        engine.setHealth("stt", "down", message);
-        setPhase("idle");
-      });
-    };
-
-    try {
-      // The recogniser gets only the highest-value terms. In sermon mode this
-      // includes community-glossary terms that actually occur in today's prep.
-      const hints = buildSttHints(current.mode, current.prep);
+      // The recogniser gets only the highest-value terms. In a worship context
+      // this includes community-glossary terms that occur in today's prep.
+      const hints = buildSttHints(
+        contextFromMode(current.context, engine.snapshot().context.inferred),
+        current.prep,
+      );
 
       const credentials =
         current.source === "demo" || current.source === "webspeech"
           ? undefined
-          : ((await fetchSttCredentials("ko-KR", undefined, "live")) ?? undefined);
+          : ((await fetchSttCredentials(current.sourceLanguage, undefined, "live")) ?? undefined);
 
       // Never silently replace a real microphone with the scripted demo. That
       // looked like a successful session while listening to nothing the speaker
       // actually said. The launcher normally prevents this state; if deployment
       // configuration changes underneath an open page, fail visibly instead.
       if (current.source !== "demo" && current.source !== "webspeech" && !credentials) {
-        throw new Error(
+        throw new TransportError(
+          "unsupported",
           `${STT_PROVIDER_INFO[current.source]?.label ?? current.source} speech recognition is not set up on this deployment. Go back and choose Browser input.`,
         );
       }
@@ -500,11 +520,18 @@ export function useLiveSession(options: LiveSessionOptions) {
         setError(
           `Speech recognition switched to ${STT_PROVIDER_INFO[effectiveSource]?.label ?? effectiveSource} — the input you chose is not available here. Voice is sent to that provider instead.`,
         );
+      } else if (credentials?.scriptFidelity === "variant-lossy") {
+        // The recogniser takes the base language only, so the script the
+        // interpreter chose is not the script that will come back. Said once,
+        // plainly, rather than discovered from the transcript.
+        setError(
+          `This recogniser transcribes ${languageName(current.sourceLanguage)} using the base language only, so the written form may not match the script you chose.`,
+        );
       }
 
       const provider = createSpeechProvider({
         provider: effectiveSource,
-        language: "ko-KR",
+        language: current.sourceLanguage,
         hints,
         credentials,
         demo: {
@@ -531,13 +558,15 @@ export function useLiveSession(options: LiveSessionOptions) {
           status === "error" ? "down" : status === "reconnecting" ? "degraded" : "ok",
         );
 
-        // A recogniser that reports a terminal error is no longer listening.
-        // Tear it down and expose the direct-interaction retry button instead
-        // of leaving the UI saying "running" while the microphone is dead.
+        // A recogniser reporting a terminal error is no longer listening. What
+        // happens next depends entirely on WHY, which the provider knows and
+        // this does not — so its own message is classified rather than
+        // overwritten with a guess about the venue's Wi-Fi.
         if (status === "error") {
-          failTerminally(
-            "Speech recognition stopped unexpectedly. Check the connection, then tap Try again.",
-          );
+          const message =
+            providerErrorRef.current ??
+            "Speech recognition stopped unexpectedly.";
+          supervisor.report(classifyProviderFailure(message), message);
         }
       });
 
@@ -545,17 +574,18 @@ export function useLiveSession(options: LiveSessionOptions) {
 
       if (provider.needsAudio) {
         if (!MicrophoneCapture.isSupported()) {
-          throw new Error("This browser cannot capture microphone audio.");
+          throw new TransportError("unsupported", "This browser cannot capture microphone audio.");
         }
         const mic = new MicrophoneCapture({
           deviceId: current.audioDeviceId || undefined,
           onFrame: (frame) => provider.sendAudio(frame),
           onError: (err) => setError(err.message),
           onEnded: () => {
-            failTerminally(
+            supervisor.report(
+              "device",
               current.audioDeviceId
-                ? "Selected audio input disconnected. Reconnect it or choose System default, then tap Try again."
-                : "Audio input disconnected. Check the input device, then tap Try again.",
+                ? "The selected audio input disconnected. Reconnect it or choose System default, then tap Resume."
+                : "The audio input disconnected. Check the input device, then tap Resume.",
             );
           },
         });
@@ -563,36 +593,112 @@ export function useLiveSession(options: LiveSessionOptions) {
         await mic.start();
         // A track can theoretically end while AudioWorklet setup is still
         // finishing. In that case terminal teardown has already detached this
-        // mic; never let the tail of start() resurrect the session as running.
-        if (micRef.current !== mic) return;
+        // mic; never let the tail of this call resurrect the session.
+        if (micRef.current !== mic) return false;
       }
 
       tickRef.current = setInterval(() => engineRef.current?.tick(), TICK_MS);
-      setPhase("running");
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.name === "NotAllowedError"
-            ? "Microphone permission was denied. Grant access, then tap Try again."
-            : err.name === "OverconstrainedError" || err.name === "NotFoundError"
-              ? "The selected audio input is unavailable. Reconnect it or choose System default, then tap Try again."
-              : err.message
-          : "Could not start the session.";
-      setError(message);
-      engine.stop();
-      await teardown();
-      if (engineRef.current === engine) {
-        engine.setConnection("error");
-        engine.setHealth("stt", "down", message);
-        setPhase("idle");
-      }
-    }
-  }, [phase, interpret, prepareBrowserTranslator, provisionalLane, recordTurnTiming, resolveBible, script, teardown]);
+      return true;
+    },
+    [script],
+  );
+
+  /**
+   * Pick the session back up after an interruption a person has now cleared.
+   *
+   * Unlike `start()` this keeps the existing engine, so the transcript, the
+   * settled names, the glossary and the Scripture list all survive. `start()`
+   * remains the way to begin a NEW session.
+   */
+  const resume = useCallback(async () => {
+    providerErrorRef.current = null;
+    setError(null);
+    await supervisorRef.current?.resume();
+  }, []);
+
+  const start = useCallback(async () => {
+    if (phase === "running" || phase === "starting" || phase === "recovering") return;
+
+    const current = optionsRef.current;
+    // This function is called synchronously from the launcher's Start click.
+    // Kick off Translator.create() before the first await so Chrome can use the
+    // user's activation to download/instantiate the local language pack.
+    if (current.source !== "demo") prepareBrowserTranslator();
+
+    setError(null);
+    setFault(null);
+    providerErrorRef.current = null;
+    setPhase("starting");
+    setDemoBeat(null);
+    setLastProvider(undefined);
+    setSnapshot(emptySnapshot(current.context));
+    pendingRenderLatencyRef.current = [];
+    provisionalRenderedAtRef.current.clear();
+
+    const engine = new InterpretationEngine({
+      context: current.context,
+      source: current.sourceLanguage,
+      target: current.targetLanguage,
+      lag: current.lag,
+      prep: current.prep ?? emptyPrepSheet(),
+      interpret,
+      provisional: provisionalLane,
+      resolveBible:
+        current.source !== "demo" && current.resolveScripture !== false ? resolveBible : undefined,
+      onTurnTiming: (timing) => {
+        if (current.source === "demo") return;
+        recordTurnTiming(timing);
+      },
+      onChange: setSnapshot,
+    });
+    engineRef.current = engine;
+    engine.start();
+    setStartedAt(Date.now());
+
+    supervisorRef.current?.dispose();
+    const supervisor: TransportSupervisor = new TransportSupervisor({
+      open: () => openTransport(engine, supervisor),
+      close: teardown,
+      classify: describeStartFailure,
+      onState: ({ phase: transportPhase, fault: nextFault }) => {
+        if (engineRef.current !== engine) return;
+        const mapped = PHASE_FOR[transportPhase];
+        if (mapped) setPhase(mapped);
+        setFault(nextFault);
+        if (nextFault) {
+          setError(nextFault.message);
+          engine.setConnection(nextFault.recovering ? "reconnecting" : "error");
+          engine.setHealth(
+            "stt",
+            nextFault.recovering ? "degraded" : "down",
+            nextFault.message,
+          );
+        } else if (transportPhase === "open") {
+          engine.setHealth("stt", "ok");
+        }
+      },
+    });
+    supervisorRef.current = supervisor;
+    await supervisor.start();
+  }, [
+    phase,
+    interpret,
+    openTransport,
+    prepareBrowserTranslator,
+    provisionalLane,
+    recordTurnTiming,
+    resolveBible,
+    teardown,
+  ]);
 
   // Push setting changes into the running engine rather than restarting it.
   useEffect(() => {
-    engineRef.current?.setMode(options.mode);
-  }, [options.mode]);
+    engineRef.current?.setContextMode(options.context);
+  }, [options.context]);
+
+  useEffect(() => {
+    engineRef.current?.setLanguages(options.sourceLanguage, options.targetLanguage);
+  }, [options.sourceLanguage, options.targetLanguage]);
 
   useEffect(() => {
     engineRef.current?.setLag(options.lag);
@@ -605,6 +711,8 @@ export function useLiveSession(options: LiveSessionOptions) {
   useEffect(
     () => () => {
       mountedRef.current = false;
+      supervisorRef.current?.dispose();
+      supervisorRef.current = null;
       browserTranslatorRef.current?.destroy();
       browserTranslatorRef.current = null;
       flushClientTelemetry();
@@ -621,22 +729,88 @@ export function useLiveSession(options: LiveSessionOptions) {
     snapshot,
     phase,
     error,
+    fault,
     demoBeat,
     lastProvider,
     browserTranslatorStatus,
     startedAt,
     script,
     start,
+    resume,
     stop,
     correct,
     dismissError: useCallback(() => {
       providerErrorRef.current = null;
       setError(null);
     }, []),
+    /** Transcript-free lane counters, for diagnostics and the soak harness. */
+    laneStats: useCallback(() => engineRef.current?.laneStats(), []),
   };
 }
 
 export type LiveSession = ReturnType<typeof useLiveSession>;
+
+export type { SessionFailureKind, SessionFault };
+
+/** A start/recovery failure carrying its own classification. */
+export class TransportError extends Error {
+  constructor(
+    readonly kind: SessionFailureKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = "TransportError";
+  }
+}
+
+/**
+ * Classify a recogniser's own terminal error message.
+ *
+ * The provider layer already writes these for the interpreter rather than for
+ * a log, and `speechFailureMessage` produces a small, known set. Anything that
+ * does not name a permission or a device is treated as transport, because
+ * transport is the recoverable answer and guessing "unrecoverable" costs a
+ * session.
+ */
+export function classifyProviderFailure(message: string): SessionFailureKind {
+  const text = message.toLowerCase();
+  if (/(permission|not-?allowed|denied|blocked|allow (?:the )?microphone)/u.test(text)) {
+    return "permission";
+  }
+  if (/(microphone|audio input|device|no input|disconnected)/u.test(text)) return "device";
+  if (/(not supported|unsupported|cannot|does not support|not set up)/u.test(text)) {
+    return "unsupported";
+  }
+  return "transport";
+}
+
+/** Turn anything thrown by `openTransport` into a classified, sayable fault. */
+export function describeStartFailure(error: unknown): { kind: SessionFailureKind; message: string } {
+  if (error instanceof TransportError) return { kind: error.kind, message: error.message };
+  if (error instanceof Error) {
+    if (error.name === "NotAllowedError" || error.name === "SecurityError") {
+      return {
+        kind: "permission",
+        message: "Microphone permission was denied. Grant access, then tap Resume.",
+      };
+    }
+    if (error.name === "OverconstrainedError" || error.name === "NotFoundError") {
+      return {
+        kind: "device",
+        message:
+          "The selected audio input is unavailable. Reconnect it or choose System default, then tap Resume.",
+      };
+    }
+    if (error.name === "NotReadableError" || error.name === "AbortError") {
+      return {
+        kind: "device",
+        message: "The audio input could not be opened — another application may be using it.",
+      };
+    }
+    return { kind: classifyProviderFailure(error.message), message: error.message };
+  }
+  return { kind: "transport", message: "Could not start the session." };
+}
 
 const mapStatus = (status: SttStatus): ConnectionState => {
   switch (status) {

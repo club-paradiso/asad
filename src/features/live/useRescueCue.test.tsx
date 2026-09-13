@@ -22,6 +22,7 @@ const snapshot = (segmentAt = 9_000): EngineSnapshot => ({
   culturalNotes: [],
   entities: [],
   corrections: [],
+  context: { mode: "auto", inferred: "worship", resolved: "worship", confidence: 0.8, warmingUp: false },
   connection: "live",
   health: { stt: "ok", llm: "ok", bible: "ok" },
   thinking: false,
@@ -53,7 +54,9 @@ describe("useRescueCue", () => {
     const { result } = renderHook(() =>
       useRescueCue({
         snapshot: snapshot(),
-        mode: "sermon",
+        context: "worship",
+        sourceLanguage: "ko-KR",
+        targetLanguage: "en-US",
         prep: emptyPrepSheet(),
         startedAt,
         visibleMs: 3_000,
@@ -77,12 +80,14 @@ describe("useRescueCue", () => {
     expect(result.current.state).toEqual({ phase: "idle", chunks: [] });
   });
 
-  it("does not call Rescue when the stable Korean window is stale", async () => {
+  it("does not call Rescue when the stable source window is stale", async () => {
     const startedAt = Date.now() - 30_000;
     const { result } = renderHook(() =>
       useRescueCue({
         snapshot: snapshot(1_000),
-        mode: "sermon",
+        context: "worship",
+        sourceLanguage: "ko-KR",
+        targetLanguage: "en-US",
         prep: emptyPrepSheet(),
         startedAt,
       }),
@@ -94,7 +99,7 @@ describe("useRescueCue", () => {
 
     expect(requestRescueMock).not.toHaveBeenCalled();
     expect(result.current.state.phase).toBe("unavailable");
-    expect(result.current.state.reason).toMatch(/No recent stable Korean/i);
+    expect(result.current.state.reason).toMatch(/No recent stable speech/i);
   });
 
   it("aborts the previous Rescue request when the interpreter taps again", async () => {
@@ -118,7 +123,9 @@ describe("useRescueCue", () => {
     const { result } = renderHook(() =>
       useRescueCue({
         snapshot: snapshot(),
-        mode: "sermon",
+        context: "worship",
+        sourceLanguage: "ko-KR",
+        targetLanguage: "en-US",
         prep: emptyPrepSheet(),
         startedAt,
       }),
@@ -159,7 +166,9 @@ describe("useRescueCue", () => {
     const { result } = renderHook(() =>
       useRescueCue({
         snapshot: snapshot(),
-        mode: "sermon",
+        context: "worship",
+        sourceLanguage: "ko-KR",
+        targetLanguage: "en-US",
         prep: emptyPrepSheet(),
         startedAt,
       }),
@@ -195,7 +204,9 @@ describe("useRescueCue", () => {
     const { result, unmount } = renderHook(() =>
       useRescueCue({
         snapshot: snapshot(),
-        mode: "sermon",
+        context: "worship",
+        sourceLanguage: "ko-KR",
+        targetLanguage: "en-US",
         prep: emptyPrepSheet(),
         startedAt,
       }),

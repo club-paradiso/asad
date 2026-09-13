@@ -28,7 +28,7 @@ function harness() {
   const requests: InterpretRequest[] = [];
 
   const engine = new InterpretationEngine({
-    mode: "sermon",
+    context: "worship",
     lag: "balanced",
     prep: emptyPrepSheet(),
     now: () => now,
@@ -98,7 +98,7 @@ describe("scripture hints", () => {
     let now = 0;
     const requests: InterpretRequest[] = [];
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "worship",
       lag: "balanced",
       prep: emptyPrepSheet(),
       now: () => now,

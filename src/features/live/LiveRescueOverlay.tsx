@@ -9,15 +9,24 @@ export function LiveRescueOverlay({
   snapshot,
   prep,
   startedAt,
+  sourceLanguage,
+  targetLanguage,
 }: {
   snapshot: EngineSnapshot;
   prep: PrepSheet;
   startedAt: number | null;
+  sourceLanguage: string;
+  targetLanguage: string;
 }) {
   const rescue = useRescueCue({
     enabled: true,
     snapshot,
-    mode: "sermon",
+    // The session's own resolved context, not a hardcoded "sermon". Rescue is
+    // only offered in a worship context, but it now says so by reading the
+    // resolver rather than by asserting it.
+    context: snapshot.context.resolved,
+    sourceLanguage,
+    targetLanguage,
     prep,
     startedAt,
   });

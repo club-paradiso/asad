@@ -27,9 +27,9 @@ const configWithDisclosure = {
 
 describe("launcher booth preflight readiness", () => {
   it("marks an unverified raw Sermon input as limited without blocking it", () => {
-    const [input] = readinessRows({
+    const [, input] = readinessRows({
       config: null,
-      mode: "sermon",
+      context: "worship",
       source: "deepgram",
       audioInputLabel: "USB Mixer",
       audioInputSupported: true,
@@ -45,9 +45,9 @@ describe("launcher booth preflight readiness", () => {
   });
 
   it("returns the same Sermon input to ready after a matching fresh preflight", () => {
-    const [input] = readinessRows({
+    const [, input] = readinessRows({
       config: null,
-      mode: "sermon",
+      context: "worship",
       source: "deepgram",
       audioInputLabel: "USB Mixer",
       audioInputSupported: true,
@@ -61,10 +61,10 @@ describe("launcher booth preflight readiness", () => {
     });
   });
 
-  it("does not require church booth preflight in General mode", () => {
-    const [input] = readinessRows({
+  it("does not require a booth preflight outside a worship context", () => {
+    const [, input] = readinessRows({
       config: null,
-      mode: "general",
+      context: "generic",
       source: "deepgram",
       audioInputLabel: "USB Mixer",
       audioInputSupported: true,
@@ -75,9 +75,9 @@ describe("launcher booth preflight readiness", () => {
   });
 
   it("blocks a remembered input after that physical device disappears", () => {
-    const [input] = readinessRows({
+    const [, input] = readinessRows({
       config: null,
-      mode: "sermon",
+      context: "worship",
       source: "deepgram",
       audioInputLabel: "선택한 입력을 찾을 수 없음",
       audioInputSupported: true,
@@ -96,7 +96,7 @@ describe("launcher privacy readiness", () => {
       config: configWithDisclosure,
       source: "webspeech",
       consent: "needed",
-    })[3];
+    })[4];
 
     expect(privacy).toMatchObject({
       label: "개인정보",
@@ -110,7 +110,7 @@ describe("launcher privacy readiness", () => {
       config: configWithDisclosure,
       source: "webspeech",
       consent: "granted",
-    })[3];
+    })[4];
 
     expect(privacy).toMatchObject({
       label: "개인정보",
@@ -126,7 +126,7 @@ describe("launcher privacy readiness", () => {
       config: configWithDisclosure,
       source: "webspeech",
       consent: "clear",
-    })[3];
+    })[4];
 
     expect(privacy.value).toBe("외부 제공자 정책 확인됨");
     expect(privacy.value).not.toMatch(/학습하지 않습니다/);

@@ -14,8 +14,8 @@ import { systemPromptFor } from "./live";
 import { CORE_CONTRACT } from "./shared";
 import { estimateTokens } from "@/lib/telemetry";
 
-const sermon = systemPromptFor("sermon", { schemaEnforced: true });
-const general = systemPromptFor("general", { schemaEnforced: true });
+const sermon = systemPromptFor("worship", { schemaEnforced: true });
+const general = systemPromptFor("generic", { schemaEnforced: true });
 const both = [sermon, general];
 
 /** Case-insensitive substring, so capitalisation is free to change. */

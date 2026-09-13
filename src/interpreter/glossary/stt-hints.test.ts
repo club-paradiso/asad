@@ -11,7 +11,7 @@ const prep = (overrides: Partial<PrepSheet> = {}): PrepSheet => ({
 describe("sermon STT hints", () => {
   it("prioritises the speaker, prepared names and explicit glossary", () => {
     const hints = buildSttHints(
-      "sermon",
+      "worship",
       prep({
         speaker: "류정길",
         entities: [{ korean: "성안교회", english: "Seongan Church", kind: "organisation" }],
@@ -24,7 +24,7 @@ describe("sermon STT hints", () => {
 
   it("promotes a volunteer-glossary term when it appears in today's prep", () => {
     const hints = buildSttHints(
-      "sermon",
+      "worship",
       prep({ notes: "설교 후 성령의 충만 가운데 결단의 시간을 갖겠습니다." }),
     );
 
@@ -33,14 +33,14 @@ describe("sermon STT hints", () => {
   });
 
   it("does not inject sermon theology into general mode", () => {
-    const hints = buildSttHints("general", prep());
+    const hints = buildSttHints("generic", prep());
     expect(hints).not.toContain("대속");
     expect(hints).not.toContain("성화");
   });
 
   it("deduplicates and never exceeds the provider budget", () => {
     const hints = buildSttHints(
-      "sermon",
+      "worship",
       prep({
         speaker: "하나님",
         glossary: Array.from({ length: 80 }, (_, index) => ({

@@ -29,7 +29,7 @@ function harness(options: { lag?: "fast" | "balanced" | "safe" } = {}) {
   const requests: InterpretRequest[] = [];
 
   const engine = new InterpretationEngine({
-    mode: "sermon",
+    context: "worship",
     lag: options.lag ?? "balanced",
     prep: {
       ...emptyPrepSheet(),
@@ -46,7 +46,7 @@ function harness(options: { lag?: "fast" | "balanced" | "safe" } = {}) {
       return {
         output: interpretLocally({
           pending: request.pending,
-          mode: request.mode,
+          context: request.context,
           scriptId: SERMON_DEMO.id,
           allowAnticipation: request.allowAnticipation,
         }),
@@ -253,7 +253,7 @@ describe("interpreter corrections are absolute", () => {
     h.engine.correct("유정길", "류정길");
     await h.say("우리가 오늘 함께 살펴볼 말씀은 베드로전서 2장 9절입니다.");
 
-    const correction = h.requests[0].context.corrections.find((c) => c.from === "유정길");
+    const correction = h.requests[0].history.corrections.find((c) => c.from === "유정길");
     expect(correction?.to).toBe("류정길");
     expect(correction?.english).toBe("Ryu Jeong-gil");
   });
@@ -267,7 +267,7 @@ describe("subsystem failure never ends the session", () => {
     let snapshot: EngineSnapshot | null = null;
 
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "worship",
       lag: "balanced",
       now: () => now,
       onChange: (next) => {

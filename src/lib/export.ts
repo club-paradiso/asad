@@ -24,7 +24,8 @@ const header = (session: StoredSession): string[] => {
   return [
     session.title || "ASAD session",
     session.speaker ? `Speaker: ${session.speaker}` : "",
-    `Mode: ${session.mode}`,
+    `Context: ${session.context}`,
+    `Languages: ${session.sourceLanguage} → ${session.targetLanguage}`,
     `Date: ${started.toISOString()}`,
     `Duration: ${stamp(durationMs)}`,
   ].filter(Boolean);

@@ -9,9 +9,9 @@ import { contextBlock } from "./shared";
  * stabiliser drain. The caller must keep it short via `rescueKoreanText`.
  */
 export interface RescuePromptInput {
-  mode: InterpretRequest["mode"];
-  recentKorean: string;
   context: InterpretRequest["context"];
+  recentKorean: string;
+  history: InterpretRequest["history"];
 }
 
 /**
@@ -27,8 +27,8 @@ export function buildRescueUserPrompt(input: RescuePromptInput): string {
   if (!korean) return "";
 
   const sections: string[] = [];
-  const context = contextBlock(input.context);
-  if (context) sections.push(context);
+  const history = contextBlock(input.history);
+  if (history) sections.push(history);
 
   sections.push(`RESCUE MODE — HUMAN INTERPRETER HAS FALLEN BEHIND
 The text below is a short RECENT WINDOW, not a fresh sentence to translate in full.
@@ -45,11 +45,11 @@ Return only the minimum safe English bridge into the LATEST resolved idea:
 - return NO anticipatedChunks;
 - if there is no safe current idea, return an empty safeChunks array with low confidence.`);
 
-  sections.push(`RECENT KOREAN WINDOW (oldest → newest):\n${korean}`);
+  sections.push(`RECENT SOURCE WINDOW (oldest → newest):\n${korean}`);
 
-  if (input.mode === "sermon") {
+  if (input.context === "worship") {
     sections.push(
-      "SERMON RESCUE: preserve theological precision and an explicitly detected Scripture reference, but never recite verse wording that was not supplied.",
+      "WORSHIP RESCUE: preserve theological precision and an explicitly detected Scripture reference, but never recite verse wording that was not supplied.",
     );
   }
 

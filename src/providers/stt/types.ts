@@ -57,6 +57,12 @@ export interface SttCredentials {
   url?: string;
   model?: string;
   expiresAt?: number;
+  /**
+   * Set when the recogniser this credential is for cannot honour the script
+   * the requested tag carries — Whisper takes `zh`, not `zh-TW`. The caller
+   * decides what to do with that; what it must not do is report success.
+   */
+  scriptFidelity?: "native" | "experimental" | "variant-lossy";
 }
 
 /**

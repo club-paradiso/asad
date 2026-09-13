@@ -5,11 +5,18 @@
  * caches well. Only this user turn changes, and it is kept deliberately small
  * — the rolling context has already been compressed before it gets here.
  */
+import type { ResolvedContext } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
 import { compactSystemPrompt } from "./compact";
-import { generalSystemPrompt } from "./general";
-import { sermonSystemPrompt } from "./sermon";
-import { contextBlock } from "./shared";
+import { contextDelta } from "./domains";
+import {
+  contextBlock,
+  coreContract,
+  DEFAULT_PROMPT_LANGUAGES,
+  OUTPUT_CONTRACT,
+  OUTPUT_CONTRACT_SCHEMA_ENFORCED,
+  type PromptLanguages,
+} from "./shared";
 
 /**
  * The system prompt for a live turn.
@@ -20,16 +27,26 @@ import { contextBlock } from "./shared";
  * `ultraCompact` is deliberately explicit rather than inferred here. Context
  * budgeting belongs to the router; prompt assembly only renders the contract
  * it was asked for. This keeps rescue/full-context flows unchanged.
+ *
+ * The context is the RESOLVED one — what the session decided, never the user's
+ * `auto`. Prompt assembly does not infer; it renders.
  */
 export const systemPromptFor = (
-  mode: "sermon" | "general",
-  options: { schemaEnforced?: boolean; ultraCompact?: boolean } = {},
+  context: ResolvedContext,
+  options: {
+    schemaEnforced?: boolean;
+    ultraCompact?: boolean;
+    languages?: PromptLanguages;
+  } = {},
 ): string => {
   const schemaEnforced = options.schemaEnforced ?? false;
-  if (options.ultraCompact) return compactSystemPrompt(mode, schemaEnforced);
-  return mode === "sermon"
-    ? sermonSystemPrompt(schemaEnforced)
-    : generalSystemPrompt(schemaEnforced);
+  const languages = options.languages ?? DEFAULT_PROMPT_LANGUAGES;
+  if (options.ultraCompact) return compactSystemPrompt(context, schemaEnforced, languages);
+  return [
+    coreContract(languages),
+    contextDelta(context, languages),
+    schemaEnforced ? OUTPUT_CONTRACT_SCHEMA_ENFORCED : OUTPUT_CONTRACT,
+  ].join("\n\n");
 };
 
 /** Per-lag steer, appended to the user turn. */
@@ -74,8 +91,8 @@ function boundarySteer(request: InterpretRequest): string | null {
 export function buildLiveUserPrompt(request: InterpretRequest): string {
   const sections: string[] = [];
 
-  const context = contextBlock(request.context);
-  if (context) sections.push(context);
+  const history = contextBlock(request.history);
+  if (history) sections.push(history);
 
   const detected = request.detected;
   if (detected) {
@@ -124,7 +141,7 @@ export function buildLiveUserPrompt(request: InterpretRequest): string {
     if (hints.length) sections.push(`LOCAL DETECTION\n${hints.join("\n\n")}`);
   }
 
-  sections.push(`KOREAN TO INTERPRET NOW (stabilised):\n${request.pending}`);
+  sections.push(`SOURCE TO INTERPRET NOW (stabilised):\n${request.pending}`);
 
   if (request.partial?.trim()) {
     sections.push(

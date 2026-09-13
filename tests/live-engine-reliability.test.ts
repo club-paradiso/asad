@@ -27,7 +27,7 @@ describe("live interpretation reliability", () => {
   it("folds a punctuation-only stable result into the sentence it terminates", () => {
     let snapshot: EngineSnapshot | null = null;
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "worship",
       lag: "balanced",
       now: () => 0,
       onChange: (next) => {
@@ -49,7 +49,7 @@ describe("live interpretation reliability", () => {
   it("keeps a punctuation-only result as its own segment when nothing precedes it", () => {
     let snapshot: EngineSnapshot | null = null;
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "worship",
       lag: "balanced",
       now: () => 0,
       onChange: (next) => {
@@ -72,7 +72,7 @@ describe("live interpretation reliability", () => {
     let calls = 0;
 
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "worship",
       lag: "balanced",
       now: () => now,
       onChange: (next) => {
@@ -112,7 +112,7 @@ describe("live interpretation reliability", () => {
     let now = 1000;
     let timing: import("@/interpreter/engine/session").TurnTiming | null = null;
     const engine = new InterpretationEngine({
-      mode: "sermon", lag: "balanced", now: () => now, onChange: () => {},
+      context: "worship", lag: "balanced", now: () => now, onChange: () => {},
       onTurnTiming: (next) => { timing = next; },
       interpret: async () => ({ output: output("Measured English"), clientDispatchedAt: now, provider: "test-provider", model: "test-model" }),
     });
@@ -135,7 +135,7 @@ describe("live interpretation reliability", () => {
     const pending: string[] = [];
 
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "worship",
       lag: "safe",
       now: () => now,
       onChange: (next) => {

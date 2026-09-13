@@ -27,6 +27,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SessionSettings, StoredSession } from "@/types";
+import { isWorshipContext } from "@/interpreter/context/context-mode";
 import { activeChunk } from "@/interpreter/engine/chunks";
 import type { EngineSnapshot } from "@/interpreter/engine/session";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
@@ -40,8 +41,8 @@ import type { LiveSession } from "./useLiveSession";
 import { ConsoleTopBar } from "./ConsoleTopBar";
 import { ControlBar } from "./ControlBar";
 import { ContextRail } from "./ContextRail";
-import { EnglishStream } from "./EnglishStream";
-import { KoreanStream } from "./KoreanStream";
+import { TargetStream } from "./TargetStream";
+import { SourceStream } from "./SourceStream";
 import { SettingsSheet } from "./SettingsSheet";
 import { Teleprompter } from "./Teleprompter";
 import { DemoRibbon } from "./DemoRibbon";
@@ -74,11 +75,13 @@ export function LiveConsole({
     snapshot,
     phase,
     error,
+    fault,
     demoBeat,
     startedAt,
     lastProvider,
     browserTranslatorStatus,
     start,
+    resume,
     stop,
     correct,
   } = session;
@@ -137,7 +140,11 @@ export function LiveConsole({
       id: `session-${startedAt ?? Date.now()}`,
       startedAt: startedAt ?? Date.now(),
       endedAt: Date.now(),
-      mode: settings.mode,
+      // What the session actually RAN as, not what was asked for. A stored
+      // session labelled "auto" would tell a later reader nothing.
+      context: sourceSnapshot.context.resolved,
+      sourceLanguage: settings.sourceLanguage,
+      targetLanguage: settings.targetLanguage,
       title: prep.title,
       speaker: prep.speaker,
       segments: sourceSnapshot.segments,
@@ -148,7 +155,7 @@ export function LiveConsole({
       entities: sourceSnapshot.entities,
       corrections: sourceSnapshot.corrections,
     }),
-    [snapshot, settings.mode, prep, startedAt],
+    [snapshot, settings.sourceLanguage, settings.targetLanguage, prep, startedAt],
   );
 
   const handleEnd = useCallback(async () => {
@@ -172,7 +179,7 @@ export function LiveConsole({
             ...settings,
             view: settings.view === "teleprompter" ? "console" : "teleprompter",
           }),
-        k: () => onSettingsChange({ ...settings, showKorean: !settings.showKorean }),
+        k: () => onSettingsChange({ ...settings, showSource: !settings.showSource }),
         g: () => onSettingsChange({ ...settings, showGlossary: !settings.showGlossary }),
         b: () => onSettingsChange({ ...settings, showScripture: !settings.showScripture }),
         "+": () => adjustFontScale(0.1),
@@ -186,8 +193,12 @@ export function LiveConsole({
   );
 
   const teleprompter = settings.view === "teleprompter";
+  // Rescue is worship-shaped help — Scripture, theological register, the
+  // bridge back into a sermon. It follows the RESOLVED context rather than a
+  // mode chosen before anyone spoke, so it appears when it is relevant and
+  // stays out of the way when it is not.
   const rescueAvailable =
-    settings.mode === "sermon" && source !== "demo" && phase === "running";
+    isWorshipContext(snapshot.context.resolved) && source !== "demo" && phase === "running";
 
   return (
     <div
@@ -211,6 +222,10 @@ export function LiveConsole({
           lastProvider,
           started: phase === "running",
         })}
+        context={snapshot.context}
+        sourceLanguage={settings.sourceLanguage}
+        targetLanguage={settings.targetLanguage}
+        onContextChange={(context) => onSettingsChange({ ...settings, context })}
         scripted={source === "demo"}
         onOpenSettings={() => setSettingsOpen(true)}
         onEnd={() => void handleEnd()}
@@ -243,12 +258,13 @@ export function LiveConsole({
             chunks={snapshot.chunks}
             segments={snapshot.segments}
             partial={snapshot.partial}
-            showKorean={settings.showKorean}
+            showKorean={settings.showSource}
           />
         ) : (
-          <EnglishStream
+          <TargetStream
             chunks={snapshot.chunks}
             activeId={active?.id}
+            language={settings.targetLanguage}
             containerRef={autoScroll.containerRef}
             activeRef={autoScroll.activeRef}
             // Short enough to take in without reading. The interpreter is
@@ -256,15 +272,25 @@ export function LiveConsole({
             emptyMessage={
               phase === "starting"
                 ? "Connecting…"
-                : phase === "idle" && source !== "demo"
-                  ? "Not listening."
-                  : "Waiting for the speaker."
+                : phase === "recovering"
+                  ? "Reconnecting…"
+                  : phase === "interrupted"
+                    ? "Paused."
+                    : phase === "idle" && source !== "demo"
+                      ? "Not listening."
+                      : "Waiting for the speaker."
             }
           />
         )}
 
         {rescueAvailable && !settingsOpen && (
-          <LiveRescueOverlay snapshot={snapshot} prep={prep} startedAt={startedAt} />
+          <LiveRescueOverlay
+            snapshot={snapshot}
+            prep={prep}
+            startedAt={startedAt}
+            sourceLanguage={settings.sourceLanguage}
+            targetLanguage={settings.targetLanguage}
+          />
         )}
 
         {frozen && (
@@ -278,9 +304,25 @@ export function LiveConsole({
           </div>
         )}
 
-        {error && (
-          <div className="absolute inset-x-3 bottom-3 z-20 flex flex-wrap items-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_50%,transparent)] bg-[var(--bg-overlay)] px-3 py-2 shadow-lg">
-            <p className="min-w-48 flex-1 text-xs leading-relaxed text-[var(--danger)]">{error}</p>
+        {/* One bar, three different situations, and the difference is the
+            whole point: a dropped socket recovers itself and says so, a denied
+            microphone waits for the person who can grant it, and a failure
+            before anything was heard sends you back to Start. In none of them
+            is what is already on screen thrown away. */}
+        {(error || fault) && (
+          <div
+            role="status"
+            className="absolute inset-x-3 bottom-3 z-20 flex flex-wrap items-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_50%,transparent)] bg-[var(--bg-overlay)] px-3 py-2 shadow-lg"
+          >
+            <p className="min-w-48 flex-1 text-xs leading-relaxed text-[var(--danger)]">
+              {fault?.message ?? error}
+              {fault?.recovering && " Reconnecting — the transcript is kept."}
+            </p>
+            {phase === "interrupted" && (
+              <Button size="md" tone="primary" onClick={() => void resume()}>
+                Resume
+              </Button>
+            )}
             {phase === "idle" && (
               <Button
                 size="md"
@@ -293,7 +335,7 @@ export function LiveConsole({
                 Try again
               </Button>
             )}
-            {phase !== "idle" && (
+            {phase !== "idle" && phase !== "interrupted" && !fault?.recovering && (
               <Button size="md" tone="quiet" onClick={session.dismissError}>
                 Dismiss
               </Button>
@@ -303,13 +345,14 @@ export function LiveConsole({
       </main>
 
       {/* --- Korean: secondary, capped ------------------------------------- */}
-      {settings.showKorean && !teleprompter && (
+      {settings.showSource && !teleprompter && (
         // Capped as a fraction of the viewport, and capped harder on a short
         // one: on an iPhone in landscape the Korean must not eat the English.
         <section className="max-h-[17dvh] min-h-0 min-w-0 border-t border-[var(--line)] bg-[var(--bg)] tall:max-h-[22dvh]">
-          <KoreanStream
+          <SourceStream
             segments={snapshot.segments}
             partial={snapshot.partial}
+            language={settings.sourceLanguage}
             frozen={frozen}
           />
         </section>

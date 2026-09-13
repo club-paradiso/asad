@@ -56,7 +56,7 @@ export function localPrepBrief(
   options: { localOnly?: boolean } = {},
 ): PrepBrief {
   const corpus = [input.title, input.notes, input.outline].filter(Boolean).join("\n");
-  const sermon = input.mode === "sermon";
+  const sermon = input.context === "worship";
 
   // Scripture: the typed main passage plus anything found in the outline.
   const scripture = [
@@ -71,7 +71,7 @@ export function localPrepBrief(
     return true;
   });
 
-  const keyTerms = matchGlossary(corpus, input.mode)
+  const keyTerms = matchGlossary(corpus, input.context)
     .slice(0, 20)
     .map(({ index: _index, ...item }) => item);
 

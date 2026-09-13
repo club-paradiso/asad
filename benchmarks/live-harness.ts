@@ -221,7 +221,7 @@ export async function runLiveBenchmark(options: LiveBenchOptions): Promise<LiveB
           // translator; it exists for every beat and is deterministic.
           const output = interpretLocally({
             pending: text,
-            mode: "sermon",
+            context: "worship",
             scriptId: SERMON_DEMO.id,
             allowAnticipation: false,
           });
@@ -271,8 +271,8 @@ export async function runLiveBenchmark(options: LiveBenchOptions): Promise<LiveB
         });
     profileCounts[decision.profile] = (profileCounts[decision.profile] ?? 0) + 1;
 
-    const budgeted = { ...request, context: applyProfile(request.context, decision.profile) };
-    const system = systemPromptFor(request.mode, {
+    const budgeted = { ...request, history: applyProfile(request.history, decision.profile) };
+    const system = systemPromptFor(request.context, {
       schemaEnforced: caps.structuredOutput,
       ultraCompact: decision.profile === "ultra-compact",
     });
@@ -327,7 +327,7 @@ export async function runLiveBenchmark(options: LiveBenchOptions): Promise<LiveB
   };
 
   const engine = new InterpretationEngine({
-    mode: "sermon",
+    context: "worship",
     lag,
     prep: emptyPrepSheet(),
     now: clock,

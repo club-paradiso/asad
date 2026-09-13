@@ -78,10 +78,10 @@ describe("interpreter output validation", () => {
 
 describe("interpret request validation", () => {
   const base = {
-    mode: "sermon",
+    context: "worship",
     lag: "balanced",
     pending: "우리가 오늘 함께 살펴볼 말씀은 베드로전서 2장 9절입니다.",
-    context: { recentKorean: [], recentEnglish: [], glossary: [], entities: [], scripture: [], corrections: [] },
+    history: { recentKorean: [], recentEnglish: [], glossary: [], entities: [], scripture: [], corrections: [] },
   };
 
   it("accepts a minimal request and applies defaults", () => {
@@ -104,8 +104,26 @@ describe("interpret request validation", () => {
     expect(interpretRequestSchema.safeParse({ ...base, pending: "" }).success).toBe(false);
   });
 
-  it("rejects an unknown mode", () => {
-    expect(interpretRequestSchema.safeParse({ ...base, mode: "courtroom" }).success).toBe(false);
+  it("rejects an unknown context", () => {
+    expect(interpretRequestSchema.safeParse({ ...base, context: "courtroom" }).success).toBe(false);
+    // `auto` is what the USER may ask for. It is resolved in the browser, so a
+    // request carrying it is a request that skipped the resolver.
+    expect(interpretRequestSchema.safeParse({ ...base, context: "auto" }).success).toBe(false);
+  });
+
+  it("rejects a malformed language tag before it reaches a provider", () => {
+    expect(interpretRequestSchema.safeParse({ ...base, source: "not a tag" }).success).toBe(false);
+    expect(interpretRequestSchema.safeParse({ ...base, target: "" }).success).toBe(false);
+    expect(interpretRequestSchema.safeParse({ ...base, source: "zh-TW" }).success).toBe(true);
+  });
+
+  it("defaults the pair to Korean → English", () => {
+    const result = interpretRequestSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.source).toBe("ko-KR");
+      expect(result.data.target).toBe("en-US");
+    }
   });
 
   it("bounds the pending buffer so one call cannot blow up", () => {

@@ -16,7 +16,8 @@
 import { NextResponse } from "next/server";
 import { appEnv } from "@/lib/env";
 import { guardInferenceRoute } from "@/lib/guard";
-import { findLanguage } from "@/counter/languages";
+import { findLanguage } from "@/lib/languages";
+import { whisperLanguage } from "@/providers/stt/language";
 import type { SttCredentials } from "@/providers/stt/types";
 import {
   COUNTER_TOKEN_HEADER,
@@ -103,7 +104,12 @@ export async function POST(request: Request) {
   if (!key) return fallback("OPENAI_API_KEY is not set.");
 
   const model = env.stt.openaiModel;
-  const session = await mintOpenAiSession(key, model, requestedLanguage);
+  // Whisper selects a LANGUAGE, never a script. The registry knows the code it
+  // accepts and what using it costs, so a `zh-TW` request is transcribed as
+  // `zh` and SAYS SO rather than quietly returning Simplified characters and
+  // reporting success.
+  const whisper = whisperLanguage(requestedLanguage);
+  const session = await mintOpenAiSession(key, model, whisper?.code ?? requestedLanguage.split("-")[0]);
 
   if (counterTurn && !session) {
     return fallback("An ephemeral OpenAI transcription session could not be issued.");
@@ -113,6 +119,7 @@ export async function POST(request: Request) {
     provider: "openai",
     token: session ?? key,
     model,
+    ...(whisper && whisper.fidelity !== "native" ? { scriptFidelity: whisper.fidelity } : {}),
     ...(session ? {} : { ephemeral: false }),
   });
 }
@@ -150,6 +157,7 @@ async function mintDeepgramKey(accountKey: string): Promise<string | null> {
 async function mintOpenAiSession(
   apiKey: string,
   model: string,
+  /** Already resolved to what the vendor accepts — never a raw BCP-47 tag. */
   language: string,
 ): Promise<string | null> {
   try {
@@ -162,7 +170,7 @@ async function mintOpenAiSession(
       },
       body: JSON.stringify({
         input_audio_format: "pcm16",
-        input_audio_transcription: { model, language: language.split("-")[0] },
+        input_audio_transcription: { model, language },
       }),
     });
     if (!response.ok) return null;

@@ -25,7 +25,7 @@ describe("evaluation fixtures", () => {
     describe(`${fixture.id} · ${fixture.category}`, () => {
       const output = interpretLocally({
         pending: fixture.korean,
-        mode: "sermon",
+        context: "worship",
         scriptId: SERMON_DEMO.id,
       });
       const english = output.safeChunks.map((chunk) => chunk.text).join(" ");
@@ -39,7 +39,7 @@ describe("evaluation fixtures", () => {
 
       if (fixture.expect.terms) {
         it("offers the terminology", () => {
-          const found = matchGlossary(fixture.korean, "sermon").map((m) => m.korean);
+          const found = matchGlossary(fixture.korean, "worship").map((m) => m.korean);
           for (const term of fixture.expect.terms!) expect(found).toContain(term);
         });
       }

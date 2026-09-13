@@ -17,7 +17,7 @@
  *     and does not pretend to be — it marks anything it cannot support as low
  *     confidence and never invents content.
  */
-import type { InterpreterOutput } from "@/types";
+import type { InterpreterOutput, ResolvedContext } from "@/types";
 import type { DemoBeat, DemoScript } from "@/demo/types";
 import { DEMO_SCRIPTS } from "@/demo/sermon-script";
 import { detectScriptureReferences } from "@/interpreter/scripture/detect";
@@ -78,10 +78,10 @@ export function mergeOutputs(outputs: InterpreterOutput[]): InterpreterOutput {
 /** Rule-based assistance for Korean that is not in any script. */
 export function deterministicOutput(
   pending: string,
-  mode: "sermon" | "general",
+  context: ResolvedContext,
 ): InterpreterOutput {
   const scripture = detectScriptureReferences(pending).map(({ index: _index, ...ref }) => ref);
-  const glossary = liveGlossary(pending, mode);
+  const glossary = liveGlossary(pending, context);
   const culturalNotes = detectCultural(pending);
   const frame = frameShortcut(pending);
 
@@ -127,7 +127,7 @@ export function deterministicOutput(
 
 export interface MockInterpretInput {
   pending: string;
-  mode: "sermon" | "general";
+  context: ResolvedContext;
   /**
    * The demo script to match against. Omitting it disables scripted beats
    * entirely — that is what every live caller does, and it is load-bearing.
@@ -158,7 +158,7 @@ export function interpretLocally(input: MockInterpretInput): InterpreterOutput {
     }
   }
 
-  return deterministicOutput(input.pending, input.mode);
+  return deterministicOutput(input.pending, input.context);
 }
 
 /**
@@ -175,10 +175,10 @@ export class LocalLlmProvider implements LlmProvider {
   async complete(request: LlmRequest): Promise<LlmResponse> {
     const started = Date.now();
     const pending = extractPending(request.user);
-    const mode = /DOMAIN: KOREAN CHURCH SERMON/.test(request.system) ? "sermon" : "general";
+    const context = contextFromSystemPrompt(request.system);
     const allowAnticipation = !/Do not return anticipatedChunks/.test(request.user);
     return {
-      text: JSON.stringify(interpretLocally({ pending, mode, allowAnticipation })),
+      text: JSON.stringify(interpretLocally({ pending, context, allowAnticipation })),
       model: "deterministic",
       latencyMs: Date.now() - started,
     };
@@ -188,8 +188,30 @@ export class LocalLlmProvider implements LlmProvider {
 /** Phase 1 name, kept so existing imports and tests keep working. */
 export { LocalLlmProvider as MockLlmProvider };
 
-/** Recover the Korean from the assembled user prompt. */
+/** Recover the source speech from the assembled user prompt. */
 export function extractPending(user: string): string {
-  const match = user.match(/KOREAN TO INTERPRET NOW \(stabilised\):\n([\s\S]*?)(?:\n\n|$)/);
+  const match = user.match(/SOURCE TO INTERPRET NOW \(stabilised\):\n([\s\S]*?)(?:\n\n|$)/);
   return match ? match[1].trim() : user.trim();
+}
+
+/**
+ * Recover the resolved context from the system prompt the router was given.
+ *
+ * The local provider sits behind the same port as the vendors, so a prompt is
+ * all it receives. Each context delta opens with its own DOMAIN line, which is
+ * the one thing in the prompt that names the setting unambiguously.
+ */
+const DOMAIN_LINES: Array<[RegExp, ResolvedContext]> = [
+  [/DOMAIN: KOREAN CHURCH SERMON/, "worship"],
+  [/DOMAIN: LECTURE/, "lecture"],
+  [/DOMAIN: MEETING/, "meeting"],
+  [/DOMAIN: CONVERSATION/, "conversation"],
+  [/DOMAIN: EVENT/, "event"],
+];
+
+export function contextFromSystemPrompt(system: string): ResolvedContext {
+  for (const [pattern, context] of DOMAIN_LINES) {
+    if (pattern.test(system)) return context;
+  }
+  return "generic";
 }

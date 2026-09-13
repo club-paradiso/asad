@@ -114,7 +114,9 @@ export function availableProviders(env = parseEnv()): {
 /** Turn a bench case into the same request shape the live route builds. */
 export function requestFor(benchCase: BenchCase): InterpretRequest {
   return {
-    mode: benchCase.mode,
+    context: benchCase.context,
+    source: "ko-KR",
+    target: "en-US",
     lag: "balanced",
     pending: benchCase.korean,
     // Bench cases are whole utterances, and the `incomplete` category is the
@@ -123,12 +125,12 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
     // never finished.
     boundary: benchCase.category === "incomplete" ? "timeout" : "sentence",
     continuesPrevious: false,
-    context: {
+    history: {
       recentKorean: benchCase.priorKorean ?? [],
       recentEnglish: benchCase.priorEnglish ?? [],
       glossary: [],
-      entities: benchCase.context?.entities
-        ? benchCase.context.entities.map((e) => ({ ...e, kind: "person" as const }))
+      entities: benchCase.history?.entities
+        ? benchCase.history.entities.map((e) => ({ ...e, kind: "person" as const }))
         : benchCase.category === "wordplay"
           ? [
               {
@@ -142,7 +144,7 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
       // A case that ships corrections needs them delivered, or it is testing
       // nothing: "does an interpreter's correction win?" cannot be answered
       // by a request that does not carry one.
-      corrections: benchCase.context?.corrections ?? [],
+      corrections: benchCase.history?.corrections ?? [],
     },
     allowAnticipation: !benchCase.expect.forbidAnticipation,
   };
@@ -181,13 +183,13 @@ export function livePromptFor(
     lag: request.lag,
   });
   return {
-    system: systemPromptFor(benchCase.mode, {
+    system: systemPromptFor(benchCase.context, {
       schemaEnforced: caps.structuredOutput,
       ultraCompact: decision.profile === "ultra-compact",
     }),
     user: buildLiveUserPrompt({
       ...request,
-      context: applyProfile(request.context, decision.profile),
+      history: applyProfile(request.history, decision.profile),
     }),
     profile: decision.profile,
     schemaEnforced: caps.structuredOutput,

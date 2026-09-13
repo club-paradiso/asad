@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Chrome's built-in Translator API as a last-resort Korean → English path.
+ * Chrome's built-in Translator API as a last-resort on-device translation path.
  *
  * This deliberately does NOT try to replace the interpretation model. It has
  * no sermon context, glossary memory, anticipation or rhetorical adaptation.
@@ -61,6 +61,9 @@ export interface BrowserTranslatorPreparation {
  * so can squander the gesture we specifically need for `create()`.
  */
 export function beginBrowserTranslatorPreparation(input: {
+  /** Chrome's own language codes — resolved from the registry, never guessed. */
+  source?: string;
+  target?: string;
   signal?: AbortSignal;
   onDownloadProgress?: (progress: number) => void;
 } = {}): BrowserTranslatorPreparation {
@@ -72,8 +75,8 @@ export function beginBrowserTranslatorPreparation(input: {
   try {
     const session = factory
       .create({
-        sourceLanguage: "ko",
-        targetLanguage: "en",
+        sourceLanguage: input.source ?? "ko",
+        targetLanguage: input.target ?? "en",
         signal: input.signal,
         monitor(monitor) {
           monitor.addEventListener("downloadprogress", (event) => {
@@ -93,7 +96,7 @@ export function beginBrowserTranslatorPreparation(input: {
 }
 
 /**
- * Translate one already-stabilised Korean unit and shape it for the existing
+ * Translate one already-stabilised source unit and shape it for the existing
  * InterpreterOutput contract.
  */
 export async function translateWithBrowserTranslator(

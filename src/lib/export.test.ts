@@ -6,7 +6,9 @@ const session: StoredSession = {
   id: "s1",
   startedAt: Date.UTC(2026, 7, 24, 10, 0, 0),
   endedAt: Date.UTC(2026, 7, 24, 10, 45, 0),
-  mode: "sermon",
+  context: "worship",
+  sourceLanguage: "ko-KR",
+  targetLanguage: "en-US",
   title: "Our Identity in Christ",
   speaker: "류정길",
   segments: [

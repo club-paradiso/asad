@@ -5,7 +5,7 @@
  *
  * An instrument panel, not a dashboard. When everything is working this reads
  *
- *     ● Live                                        18:42   ⋯   End
+ *     ● Live      ko → en · Worship                  18:42   ⋯   End
  *
  * and nothing else, because an interpreter mid-sentence cannot act on the
  * provider's name, the lag profile they chose before they started, or whether a
@@ -20,10 +20,24 @@
  * Interactive controls still keep a 44px touch target; shaving eight pixels off
  * a button is not worth missed taps in the middle of a sentence.
  */
-import type { ConnectionState, SubsystemHealth } from "@/types";
+import type { ConnectionState, ContextMode, SubsystemHealth } from "@/types";
 import { Button, StatusDot } from "@/components/ui/primitives";
 import type { AiState } from "./AiStatus";
 import { cn } from "@/lib/cn";
+import { findLanguage } from "@/lib/languages";
+import {
+  CONTEXT_LABEL_EN,
+  CONTEXT_MODES,
+  type ContextState,
+} from "@/interpreter/context/context-mode";
+
+/** `ko-KR` reads as `ko` in a strip an interpreter glances at for a second. */
+export function shortTag(language: string): string {
+  const definition = findLanguage(language);
+  if (!definition) return language;
+  // A script variant is exactly the case where the bare base subtag would lie.
+  return definition.scriptVariant ? definition.id : definition.base;
+}
 
 export function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -132,6 +146,10 @@ export function ConsoleTopBar({
   health,
   elapsedMs,
   aiState,
+  context,
+  sourceLanguage,
+  targetLanguage,
+  onContextChange,
   scripted,
   onOpenSettings,
   onEnd,
@@ -140,11 +158,20 @@ export function ConsoleTopBar({
   health: SubsystemHealth;
   elapsedMs: number;
   aiState: AiState;
+  /** What the session resolved the setting to, and how it got there. */
+  context?: ContextState;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+  onContextChange?: (mode: ContextMode) => void;
   scripted?: boolean;
   onOpenSettings: () => void;
   onEnd: () => void;
 }) {
   const status = consoleStatus({ connection, health, ai: aiState, scripted });
+  const pair =
+    sourceLanguage && targetLanguage
+      ? `${shortTag(sourceLanguage)} → ${shortTag(targetLanguage)}`
+      : null;
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--bg-raised)] pl-3 pr-1 text-[0.7rem] sm:pl-4 tall:h-12 tall:text-[0.75rem]">
@@ -179,8 +206,48 @@ export function ConsoleTopBar({
         )}
       </p>
 
+      {/* The pair and the context, in the order an interpreter would ask:
+          what am I doing, and what has ASAD decided about it. The context is a
+          select rather than a label because overriding it must cost one tap —
+          it is the ONLY place the old mode choice still exists, and it is now
+          optional, revisable and mid-session. */}
+      {pair && (
+        <span className="ml-auto hidden shrink-0 tabular-nums text-[var(--fg-dim)] sm:inline">
+          {pair}
+        </span>
+      )}
+
+      {context && onContextChange && (
+        <select
+          aria-label="Interpretation context"
+          title={
+            context.mode === "auto"
+              ? `Detected automatically${context.warmingUp ? " — still listening" : ""}. Choose one to override.`
+              : "Manually set. Choose Auto to hand it back to ASAD."
+          }
+          value={context.mode}
+          onChange={(event) => onContextChange(event.target.value as ContextMode)}
+          className={cn(
+            "shrink-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[0.7rem] outline-none hover:border-[var(--line)] focus-visible:border-[var(--accent)] tall:text-[0.75rem]",
+            context.mode === "auto" ? "text-[var(--fg-dim)]" : "text-[var(--accent)]",
+            !pair && "ml-auto",
+          )}
+        >
+          {CONTEXT_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode === "auto"
+                ? `Auto${context.warmingUp ? "" : ` · ${CONTEXT_LABEL_EN[context.resolved]}`}`
+                : CONTEXT_LABEL_EN[mode]}
+            </option>
+          ))}
+        </select>
+      )}
+
       <span
-        className="ml-auto shrink-0 tabular-nums text-[var(--fg-muted)]"
+        className={cn(
+          "shrink-0 tabular-nums text-[var(--fg-muted)]",
+          !pair && !context && "ml-auto",
+        )}
         aria-label="Elapsed time"
       >
         {formatElapsed(elapsedMs)}
