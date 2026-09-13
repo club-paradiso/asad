@@ -23,11 +23,22 @@
  *   prep           a prep sheet with Scripture or a church venue → worship prior
  *   topic          the model's own topic label                  → whichever it names
  *
- * Scores decay by 0.9 per unit so the domain can drift with the room, and a
- * switch away from an established domain needs a challenger that clearly
- * leads (margin 1.5) on at least two units of support — one stray "amen" in a
- * budget review must not turn on the sermon layer. Below 1.0 total evidence
- * nothing is claimed and the domain is `generic`.
+ * Scores decay by 0.9 per observation so the domain can drift with the room,
+ * and a switch away from an established domain needs a challenger that
+ * clearly leads (margin 1.5) on at least two units of support — one stray
+ * "amen" in a budget review must not turn on the sermon layer. Below 1.0
+ * total evidence nothing is claimed and the domain is `generic`.
+ *
+ * Two kinds of observation arrive. A UNIT carries `stableText` — one newly
+ * stable piece of speech — and is what `unitsSeen` and the support counters
+ * count. FEEDBACK carries no text: the model's topic label, the references it
+ * reported, the entities it resolved. Both decay the scores, because the
+ * engine's own caller sends feedback after every turn and an undecayed
+ * feedback stream would grow without bound and pin the domain forever.
+ * Feedback weights are softer than detection weights for the same reason.
+ *
+ * The prep sheet is a PRIOR, applied once per distinct sheet however many
+ * times it is passed — the caller hands it over with every unit.
  *
  * A manual override always wins, at confidence 1. It is the interpreter's
  * call and the engine keeps scoring underneath it so lifting the override
@@ -77,6 +88,8 @@ export interface ContextEngineState {
   signals: Record<ResolvedDomain, string[]>;
   /** True once any observed unit contributed evidence (as opposed to the prep prior). */
   observedEvidence: boolean;
+  /** Fingerprint of the prep sheet whose prior has been applied, so it is applied once. */
+  prepKey?: string;
 }
 
 /* --------------------------------------------------------------------------
@@ -317,6 +330,10 @@ function topicContributions(topic: string): Contribution[] {
   return out;
 }
 
+/** What the prior reads from the sheet; a different key is a different prior. */
+const prepFingerprint = (prep: PrepSheet): string =>
+  [prep.scripture ?? "", prep.organisation ?? "", prep.title ?? ""].join("\u0000");
+
 /** (i) The prep sheet as a prior. */
 function prepContributions(prep: PrepSheet): Contribution[] {
   const out: Contribution[] = [];
@@ -364,18 +381,37 @@ export function createContextEngine(options: {
     signals: emptySignals(),
     observedEvidence: false,
   };
-  const seeded = options.prep ? apply(base, prepContributions(options.prep), false) : base;
+  const seeded = options.prep ? applyPrep(base, options.prep) : base;
   return { ...seeded, inference: resolve(seeded) };
 }
 
-/** Fold contributions into a copy of the state. `unit` says whether this counts as an observed unit. */
-function apply(state: ContextEngineState, contributions: Contribution[], unit: boolean): ContextEngineState {
+/** Apply the prep prior once per distinct sheet. No decay: a prior is not an observation. */
+function applyPrep(state: ContextEngineState, prep: PrepSheet): ContextEngineState {
+  const key = prepFingerprint(prep);
+  if (state.prepKey === key) return state;
+  return { ...apply(state, prepContributions(prep), "prior"), prepKey: key };
+}
+
+type ObservationKind = "unit" | "feedback" | "prior";
+
+/**
+ * Fold contributions into a copy of the state.
+ *
+ * Units and feedback both decay the scores first; only units advance
+ * `unitsSeen` and the support counters that hysteresis reads.
+ */
+function apply(
+  state: ContextEngineState,
+  contributions: Contribution[],
+  kind: ObservationKind,
+): ContextEngineState {
   const scores = { ...state.scores };
   const support = { ...state.support };
   const signals = { ...state.signals };
   const touched = new Set<ResolvedDomain>();
+  const unit = kind === "unit";
 
-  if (unit) for (const domain of RESOLVED_DOMAINS) scores[domain] *= DECAY;
+  if (kind !== "prior") for (const domain of RESOLVED_DOMAINS) scores[domain] *= DECAY;
 
   for (const { domain, weight, signal } of contributions) {
     scores[domain] += weight;
@@ -397,7 +433,7 @@ function apply(state: ContextEngineState, contributions: Contribution[], unit: b
     support,
     signals,
     unitsSeen: state.unitsSeen + (unit ? 1 : 0),
-    observedEvidence: state.observedEvidence || (unit && touched.size > 0),
+    observedEvidence: state.observedEvidence || (kind !== "prior" && touched.size > 0),
   };
 }
 
@@ -437,20 +473,29 @@ function resolve(state: ContextEngineState): DomainInference {
   };
 }
 
-/** Observe one unit of evidence. Pure: returns the next state, never mutates. */
+/** Observe one unit of evidence, or one round of model feedback. Pure: returns the next state. */
 export function observe(state: ContextEngineState, evidence: ContextEvidence): ContextEngineState {
+  const primed = evidence.prep ? applyPrep(state, evidence.prep) : state;
   const contributions: Contribution[] = [];
   const unit = typeof evidence.stableText === "string";
 
-  if (evidence.prep) contributions.push(...prepContributions(evidence.prep));
-  if (unit) contributions.push(...textContributions(evidence.stableText ?? "", evidence));
-  else if (evidence.scriptureCount) {
-    contributions.push({ domain: "sermon", weight: 3, signal: "scripture" });
-    contributions.push({ domain: "worship", weight: 1, signal: "scripture" });
+  if (unit) {
+    contributions.push(...textContributions(evidence.stableText ?? "", evidence));
+  } else if (evidence.scriptureCount) {
+    // Model-reported references: real evidence, but the model is not the
+    // detector, and the caller already counted what the detector found.
+    contributions.push({ domain: "sermon", weight: 1, signal: "scripture" });
+    contributions.push({ domain: "worship", weight: 0.3, signal: "scripture" });
+  }
+  if (!unit) {
+    for (const kind of new Set(evidence.entityKinds ?? [])) {
+      if (kind === "organisation") contributions.push({ domain: "meeting", weight: 0.2, signal: "entities" });
+      else if (kind === "work") contributions.push({ domain: "lecture", weight: 0.2, signal: "entities" });
+    }
   }
   if (evidence.topic?.trim()) contributions.push(...topicContributions(evidence.topic));
 
-  const next = apply(state, contributions, unit);
+  const next = apply(primed, contributions, unit ? "unit" : "feedback");
   return { ...next, inference: resolve(next) };
 }
 

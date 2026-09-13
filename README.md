@@ -40,16 +40,20 @@ ASAD에는 크게 두 가지 모드가 있습니다.
 - 인터뷰
 - 기타 "말은 계속 나오는데 통역사의 뇌는 하나뿐인" 상황
 
+사용법은 이게 전부입니다: **원어 → 통역어**를 고르고, **통역 시작**을 누르고, 말합니다. 설교인지 회의인지 미리 고를 필요가 없습니다. 맥락 엔진이 성경 구절, 용어, 담화 패턴, 준비 시트 같은 증거로 예배·설교·강의·회의·대화·발표·행사를 스스로 판단하고, 필요하면 보조 메뉴에서 직접 지정할 수 있습니다.
+
 ASAD가 하는 일:
 
+- 첫 번째 쓸 만한 번역을 모델 응답을 기다리지 않고 먼저 띄우기(검증된 번역 메모리 → 기억된 번역 → 기기 내 번역기)
 - 놓치기 쉬운 문맥 붙잡기
-- 고유명사와 용어 기억하기
+- 고유명사와 용어 기억하기 — 한 번 확정한 이름은 인식기가 다르게 적어도 같은 이름으로 되돌리기
 - 성경 구절 참조 잡기
+- 숫자·날짜·부정이 번역에서 사라지면 표시하기
 - 한국어의 뒤늦게 등장하는 술어 때문에 통역사가 영혼까지 기다리지 않도록 문장 골격 보조하기
 - 말장난, 관용어, 문화적 표현 감지하기
-- 이미 통역사가 말해버린 문장을 뒤늦게 몰래 갈아엎지 않기
+- 이미 통역사가 말해버린 문장을 뒤늦게 몰래 갈아엎지 않기 — 의미가 아니라 문체만 다른 수정은 아예 보여주지 않기
 
-즉, **통역사를 없애는 AI가 아니라 통역사 옆에서 메모 잘하는 매우 과몰입한 조수**에 가깝습니다.
+즉, **통역사를 없애는 AI가 아니라 통역사 옆에서 메모 잘하는 매우 과몰입한 조수**에 가깝습니다. 설계는 [`docs/live-interpretation-engine.md`](docs/live-interpretation-engine.md)에 있습니다.
 
 ### 2. Counter Mode
 
@@ -440,6 +444,7 @@ npm run e2e
 npm run e2e:live-failure
 npm run bench:llm
 npm run bench:live
+npm run bench:quality
 npm run smoke:llm
 npm run health:openrouter
 npm run soak -- --minutes 5
@@ -464,7 +469,8 @@ npm run verify
 | 문서 | 내용 |
 | --- | --- |
 | [`docs/architecture.md`](docs/architecture.md) | 전체 아키텍처 |
-| [`docs/interpreter-engine.md`](docs/interpreter-engine.md) | 라이브 통역 엔진 |
+| [`docs/live-interpretation-engine.md`](docs/live-interpretation-engine.md) | 통합 라이브 엔진 (언어 쌍, 맥락 엔진, 메모리, 수리 엔진) |
+| [`docs/interpreter-engine.md`](docs/interpreter-engine.md) | 라이브 통역 엔진 (초기 설계) |
 | [`docs/sermon-booth.md`](docs/sermon-booth.md) | 설교 통역/부스 운영 |
 | [`docs/counter-mode.md`](docs/counter-mode.md) | Counter Mode 설계 |
 | [`docs/counter-storage.md`](docs/counter-storage.md) | Counter 공유 저장소 |

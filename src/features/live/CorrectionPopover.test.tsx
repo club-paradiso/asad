@@ -83,12 +83,17 @@ describe("CorrectionPopover", () => {
   it("keeps focus inside while open", () => {
     setup();
     const dialog = screen.getByRole("dialog");
-    const apply = screen.getByRole("button", { name: "Apply" });
-    apply.focus();
-    // Tab from the last control wraps to the first.
+    fireEvent.change(screen.getByLabelText("Correct to"), { target: { value: "류정길" } });
+
+    // Tab from the last control wraps to the first…
+    screen.getByRole("button", { name: "Apply" }).focus();
     fireEvent.keyDown(window, { key: "Tab" });
     expect(dialog.contains(document.activeElement)).toBe(true);
     expect(document.activeElement).toBe(screen.getByLabelText("Heard"));
+
+    // …and Shift+Tab from the first wraps to the last.
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Apply" }));
   });
 
   it("renders nothing while closed", () => {

@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AppConfig } from "@/app/api/config/route";
 import { boothPreflightApplies, readinessRows } from "./StartScreen";
+
+// The rows are pure. The launcher module also binds the live-session hook,
+// which drags in the recogniser and engine graph; none of it is exercised here.
+vi.mock("./useLiveSession", () => ({ useLiveSession: () => ({}) }));
 
 const configWithDisclosure = {
   stt: { configured: "webspeech", cloudAvailable: false },
