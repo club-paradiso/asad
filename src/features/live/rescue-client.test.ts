@@ -12,11 +12,10 @@ const snapshot = (overrides: Partial<EngineSnapshot> = {}): EngineSnapshot => ({
   culturalNotes: [],
   entities: [],
   corrections: [],
+  context: { mode: "auto", inferred: "worship", resolved: "worship", confidence: 0.8, warmingUp: false },
   connection: "live",
   health: { stt: "ok", llm: "ok", bible: "ok" },
   thinking: false,
-  languagePair: { source: "ko-KR", target: "en-US" },
-  domain: { domain: "sermon", confidence: 0.8, source: "inferred", signals: [] },
   ...overrides,
 });
 
@@ -48,7 +47,9 @@ describe("Rescue client", () => {
         glossary: [{ korean: "은혜", english: "grace", source: "lexicon" }],
         topic: "Grace",
       }),
-      mode: "sermon",
+      context: "worship",
+      source: "ko-KR",
+      target: "en-US",
       prep: emptyPrepSheet(),
       elapsedMs: 16_000,
     });
@@ -57,11 +58,11 @@ describe("Rescue client", () => {
     expect(request?.recentKorean).toBe(
       "우리는 은혜로 구원을 받습니다 그러므로 두려워하지 마십시오",
     );
-    expect(request?.context.recentEnglish).toContain("We are saved by grace.");
-    expect(request?.context.recentEnglish).not.toContain(
+    expect(request?.history.recentEnglish).toContain("We are saved by grace.");
+    expect(request?.history.recentEnglish).not.toContain(
       "Maybe he will say something next.",
     );
-    expect(request?.context.glossary).toEqual([
+    expect(request?.history.glossary).toEqual([
       { korean: "은혜", english: "grace", source: "lexicon" },
     ]);
   });
@@ -71,7 +72,9 @@ describe("Rescue client", () => {
       snapshot: snapshot({
         segments: [{ id: "s1", text: "이미 오래전에 끝난 문장", at: 1_000 }],
       }),
-      mode: "sermon",
+      context: "worship",
+      source: "ko-KR",
+      target: "en-US",
       prep: emptyPrepSheet(),
       elapsedMs: 30_000,
     });
@@ -100,19 +103,21 @@ describe("Rescue client", () => {
         ],
         glossary: [{ korean: "대속", english: "atonement", source: "lexicon" }],
       }),
-      mode: "sermon",
+      context: "worship",
+      source: "ko-KR",
+      target: "en-US",
       prep: emptyPrepSheet(),
       elapsedMs: 11_000,
     });
 
-    expect(request?.context.entities[0]?.english).toBe("Ryu Jeong-gil");
-    expect(request?.context.corrections[0]).toMatchObject({
+    expect(request?.history.entities[0]?.english).toBe("Ryu Jeong-gil");
+    expect(request?.history.corrections[0]).toMatchObject({
       from: "유정길",
       to: "류정길",
       english: "Ryu Jeong-gil",
     });
-    expect(request?.context.scripture).toContain("1 Peter 2:9");
-    expect(request?.context.glossary[0]?.english).toBe("atonement");
+    expect(request?.history.scripture).toContain("1 Peter 2:9");
+    expect(request?.history.glossary[0]?.english).toBe("atonement");
   });
 
   it("validates server output before exposing a recovery cue", () => {

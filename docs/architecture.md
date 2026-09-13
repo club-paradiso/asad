@@ -68,10 +68,10 @@ limits it. Native is a later platform decision, not an MVP one.
         │                     (providers/stt/audio.ts)
         ▼
  SpeechProvider  ◄─── short-lived token from /api/stt/token
-   demo │ webspeech │ deepgram │ openai
-        │
-        │  onPartial(text)          onStable(text)
-        ▼                                │
+   demo │ webspeech │ deepgram │ openai      ◄── locale from lib/languages.ts
+        │                                    ◄── supervised by
+        │  onPartial(text)   onStable(text)      transport-supervisor.ts
+        ▼                          │
  ┌──────────────────────────────────────────────────────────────┐
  │ InterpretationEngine  (interpreter/engine/session.ts)         │
  │                                                               │
@@ -81,22 +81,47 @@ limits it. Native is a later platform decision, not an MVP one.
  │  Local detection ─── runs instantly, needs no model           │
  │    scripture/detect · glossary/matcher · cultural/detect      │
  │                                                               │
- │  Rolling context ─── bounded window + local compression       │
+ │  Context resolver ─── six signal families, no extra call      │
+ │    context/context-mode.ts                                    │
+ │                                                               │
+ │  Rolling history ─── bounded window + local compression       │
  │    context/rolling.ts · context/memory.ts                     │
  │                                                               │
  │  ──► POST /api/interpret ──► LlmProvider ──► Zod validation   │
+ │                                                               │
+ │  Terminology resolver ─── settled names enforced, not hoped   │
+ │    glossary/consistency.ts                                    │
  │                                                               │
  │  Chunk store ─── temporal locking                             │
  │    anticipated → current → committed (never rewritten)        │
  └──────────────────────────────────────────────────────────────┘
         │  EngineSnapshot
         ▼
- LiveConsole ─── English (dominant) · Korean · context rail
+ LiveConsole ─── target (dominant) · source · context rail
 ```
+
+Both the language pair and the resolved context travel the whole way down that
+diagram. Neither is a question the user has to answer first: the pair is the
+launcher's only control, and the context is inferred. See
+[`context-intelligence.md`](./context-intelligence.md).
 
 The pipeline is continuous. Nothing waits for a paragraph, or even for a
 sentence — the stabiliser's hold ceiling guarantees a flush even for a speaker
 who never pauses.
+
+### One language registry
+
+Everything the product knows about a language — its tag, script, direction,
+word spacing, per-recogniser coverage and fidelity, Chrome Translator code and
+where it may be offered — lives in `src/lib/languages.ts`. The counter picker,
+the STT tag maps, the capability table and the transcript helpers are all views
+of it.
+
+That matters beyond tidiness: while the registry lived under `counter/`, Live
+Interpretation could not use it, which is why Live was hardcoded Korean into
+English while Counter carried twenty-five languages. It is also where the
+Simplified/Traditional Chinese fidelity problem is stated once rather than
+patched per caller.
 
 ### The engine is deliberately not React
 
@@ -161,6 +186,23 @@ make easy: exponential-backoff reconnection, buffering the ~10s of audio
 produced while a socket is down, and telling a deliberate close apart from a
 dropped one. A dropped socket mid-service is normal; losing the session
 because of one is not.
+
+Above it, `TransportSupervisor` owns the question the provider cannot answer:
+whose problem is it that we stopped listening?
+
+| kind | what happens |
+| --- | --- |
+| `transport` | reopen automatically with backoff, keeping everything on screen |
+| `permission` | stop, say so, wait — only a person can grant a microphone |
+| `device` | stop, say so, wait — only a person can plug an interface back in |
+| `unsupported` | stop, say so — this browser or deployment cannot do it |
+
+**In no case is the engine destroyed.** That is the point: the console used to
+have exactly one failure path, it ran on any recogniser error, and the only
+recovery it offered (`Try again`) rebuilt the engine — so a Wi-Fi dip in the
+fourth minute cost the transcript, the settled names, the glossary and the
+Scripture list. `Resume` now reopens the transport around the engine that is
+already running.
 
 ---
 
@@ -300,15 +342,17 @@ src/
   interpreter/
     engine/                session state machine, stabiliser, chunk store, lag
     context/profiles.ts    provider-aware context budgeting
-    prompts/               prompt modules by mode — never inline in components
+    context/context-mode   context inference: six signal families, no extra call
+    prompts/               prompt modules by context — never inline in components
     context/               rolling window, compression, session memory
+    glossary/consistency   settled proper nouns enforced deterministically
     glossary/              lexicons + whole-word Korean matching
     scripture/             66-book table, numerals, reference detection
     cultural/              idioms, wordplay, name puns
     prep/                  deterministic brief
   demo/                    scripted sermon fixtures
-  lib/                     schema, export, storage, romanisation, env, telemetry,
-                           speakability heuristics
+  lib/                     languages (THE registry), schema, export, storage,
+                           romanisation, env, telemetry, speakability heuristics
 benchmarks/                dataset, scoring, runner, live harness, reports
   hooks/                   auto-scroll, hotkeys, wake lock, capability
 tests/                     acceptance cases + evaluation fixtures

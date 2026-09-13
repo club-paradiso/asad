@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { InterpretRequest } from "@/lib/schema";
 import { buildRescueUserPrompt } from "./rescue";
 
-const context = (overrides: Partial<InterpretRequest["context"]> = {}): InterpretRequest["context"] => ({
+const history = (overrides: Partial<InterpretRequest["history"]> = {}): InterpretRequest["history"] => ({
   recentKorean: [],
   recentEnglish: [],
   glossary: [],
@@ -15,10 +15,10 @@ const context = (overrides: Partial<InterpretRequest["context"]> = {}): Interpre
 describe("Rescue prompt", () => {
   it("asks for a resume bridge, not a translation of the whole recent window", () => {
     const prompt = buildRescueUserPrompt({
-      mode: "sermon",
+      context: "worship",
       recentKorean:
         "우리는 지난주에 믿음에 대해 살펴봤습니다. 오늘은 소망에 대해 말씀드리겠습니다. 우리의 소망은 예수 그리스도 안에 있습니다.",
-      context: context({ recentEnglish: ["Last week we looked at faith."] }),
+      history: history({ recentEnglish: ["Last week we looked at faith."] }),
     });
 
     expect(prompt).toMatch(/resume speaking NOW/i);
@@ -31,9 +31,9 @@ describe("Rescue prompt", () => {
 
   it("keeps sermon-specific theological and Scripture safety rules", () => {
     const prompt = buildRescueUserPrompt({
-      mode: "sermon",
+      context: "worship",
       recentKorean: "베드로전서 2장 9절 말씀처럼 우리는 택하신 족속입니다.",
-      context: context(),
+      history: history(),
     });
 
     expect(prompt).toMatch(/theological precision/i);
@@ -43,7 +43,7 @@ describe("Rescue prompt", () => {
 
   it("returns an empty prompt when there is no current Korean to rescue", () => {
     expect(
-      buildRescueUserPrompt({ mode: "sermon", recentKorean: "   ", context: context() }),
+      buildRescueUserPrompt({ context: "worship", recentKorean: "   ", history: history() }),
     ).toBe("");
   });
 });

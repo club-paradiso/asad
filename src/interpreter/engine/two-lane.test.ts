@@ -82,7 +82,7 @@ function harness(options: { laneReady?: boolean; lane?: boolean; lag?: LagProfil
   const timings: TurnTiming[] = [];
 
   const engine = new InterpretationEngine({
-    context: "sermon",
+    context: "worship",
     lag: options.lag ?? "balanced",
     prep: emptyPrepSheet(),
     now: () => now,
@@ -361,25 +361,28 @@ describe("invalidation", () => {
     expect(h.stats().contextualStale).toBe(1);
   });
 
-  it("a mode change invalidates outstanding results without losing the Korean", async () => {
+  it("a context override invalidates outstanding results without losing the Korean", async () => {
     const h = harness();
     h.say(A);
     const lane = h.lastLane();
     const request = h.lastCloud();
-    h.engine.setContext("generic");
+    // A USER override changes the contract every in-flight request was built
+    // on. Automatic resolution deliberately does not — see `observeContext`.
+    h.engine.setContextMode("meeting");
     expect(lane.signal.aborted).toBe(true);
     expect(request.signal.aborted).toBe(true);
 
-    lane.d.resolve(safe("Sermon-mode provisional."));
-    request.d.resolve(cloud(safe("Sermon-mode cloud.")));
+    lane.d.resolve(safe("Worship-context provisional."));
+    request.d.resolve(cloud(safe("Worship-context cloud.")));
     await settle();
     expect(h.chunks()).toEqual([]);
 
-    // The unit is back in front of the stabiliser and re-flushes under general.
+    // The unit is back in front of the stabiliser and re-flushes under the new
+    // context rather than being lost.
     h.advance(100);
     expect(h.cloudCalls).toHaveLength(2);
     expect(h.lastCloud().request.pending).toBe(A);
-    expect(h.lastCloud().request.mode).toBe("general");
+    expect(h.lastCloud().request.context).toBe("meeting");
   });
 
   it("a lag change does not disturb an in-flight turn", async () => {
@@ -574,9 +577,9 @@ describe("bounded cloud lane", () => {
     await settle();
     h.cloudCalls[0].d.resolve(cloud(safe("Turn one provisional.")));
     await settle();
-    const context = h.lastCloud().request.context;
-    expect(context.recentEnglish).toContain("Turn one provisional.");
-    expect(context.recentEnglish).not.toContain("Turn two provisional.");
+    const history = h.lastCloud().request.history;
+    expect(history.recentEnglish).toContain("Turn one provisional.");
+    expect(history.recentEnglish).not.toContain("Turn two provisional.");
   });
 });
 

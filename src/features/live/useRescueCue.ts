@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Confidence, InterpretationMode, PrepSheet } from "@/types";
+import type { Confidence, PrepSheet, ResolvedContext } from "@/types";
 import type { EngineSnapshot } from "@/interpreter/engine/session";
 import { buildRescueRequest, requestRescue } from "./rescue-client";
 
@@ -19,7 +19,9 @@ export interface RescueCueState {
 export interface UseRescueCueOptions {
   enabled?: boolean;
   snapshot: EngineSnapshot;
-  mode: InterpretationMode;
+  context: ResolvedContext;
+  sourceLanguage: string;
+  targetLanguage: string;
   prep: PrepSheet;
   /** Epoch milliseconds captured when the live session started. */
   startedAt: number | null;
@@ -75,7 +77,9 @@ export function useRescueCue(options: UseRescueCueOptions) {
     const elapsedMs = Math.max(0, Date.now() - options.startedAt);
     const request = buildRescueRequest({
       snapshot: options.snapshot,
-      mode: options.mode,
+      context: options.context,
+      source: options.sourceLanguage,
+      target: options.targetLanguage,
       prep: options.prep,
       elapsedMs,
     });
@@ -87,7 +91,7 @@ export function useRescueCue(options: UseRescueCueOptions) {
       setState({
         phase: "unavailable",
         chunks: [],
-        reason: "No recent stable Korean is available to rescue.",
+        reason: "No recent stable speech is available to rescue.",
       });
       scheduleClear(UNAVAILABLE_VISIBLE_MS);
       return false;

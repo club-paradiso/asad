@@ -44,3 +44,29 @@ export function speechFailureMessage(code: string, spent = false): string {
   if (spent) return EXHAUSTED;
   return MESSAGES[code] ?? FALLBACK;
 }
+
+/**
+ * Whose problem a recogniser failure is.
+ *
+ * Keyed on the CODE, not on the sentence above it. The session lifecycle turns
+ * on this distinction — a refused microphone waits for a person, a dropped
+ * connection reopens itself — and reading it back out of human copy is how
+ * "Microphone access was refused" came to be classified as a lost device: the
+ * word "microphone" is in the sentence, and the word "permission" is not.
+ *
+ * An unknown code is `transport`, because transport is the recoverable answer
+ * and guessing "unrecoverable" costs a session.
+ */
+export type SpeechFailureKind = "permission" | "device" | "unsupported" | "transport";
+
+const KINDS: Record<string, SpeechFailureKind> = {
+  "not-allowed": "permission",
+  "service-not-allowed": "permission",
+  "language-not-supported": "unsupported",
+  "language-unavailable": "unsupported",
+  "audio-capture": "device",
+  network: "transport",
+};
+
+export const speechFailureKind = (code: string | undefined): SpeechFailureKind =>
+  (code && KINDS[code]) || "transport";

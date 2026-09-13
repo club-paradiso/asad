@@ -51,7 +51,7 @@ describe("benchmark provider tiers", () => {
  * measured on a document the live route never sends them.
  */
 describe("the benchmark sends what production sends", () => {
-  const sermon = BENCH_CASES.find((c) => c.mode === "sermon") ?? BENCH_CASES[0];
+  const sermon = BENCH_CASES.find((c) => c.context === "worship") ?? BENCH_CASES[0];
 
   it("selects the same context profile the live route would", () => {
     for (const id of ["local", "gemini", "groq", "openrouter", "openai", "anthropic"] as const) {
@@ -87,13 +87,13 @@ describe("the benchmark sends what production sends", () => {
 
       // The route's own two lines, spelled out rather than imported, so a
       // change to either side has to be made deliberately on both.
-      const system = systemPromptFor(sermon.mode, {
+      const system = systemPromptFor(sermon.context, {
         schemaEnforced: caps.structuredOutput,
         ultraCompact: decision.profile === "ultra-compact",
       });
       const user = buildLiveUserPrompt({
         ...request,
-        context: applyProfile(request.context, decision.profile),
+        history: applyProfile(request.history, decision.profile),
       });
 
       const shaped = livePromptFor(id, sermon, request);
@@ -104,7 +104,7 @@ describe("the benchmark sends what production sends", () => {
 
   it("no longer sends every provider the same prompt", () => {
     const request = requestFor(sermon);
-    const bare = systemPromptFor(sermon.mode);
+    const bare = systemPromptFor(sermon.context);
     // Groq is run ultra-compact in production; it must not receive the full
     // sermon contract the benchmark used to measure it on.
     expect(livePromptFor("groq", sermon, request).system).not.toBe(bare);

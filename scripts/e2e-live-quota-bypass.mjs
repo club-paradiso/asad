@@ -5,6 +5,7 @@
  */
 import { chromium } from "playwright";
 import { chromiumLaunchOptions } from "./browser.mjs";
+import { chooseLag, chooseRecogniser, start } from "./launcher.mjs";
 
 const base = process.argv[2] ?? "http://localhost:3000";
 const browser = await chromium.launch(chromiumLaunchOptions());
@@ -83,9 +84,9 @@ await page.route("**/api/interpret", async (route) => {
 });
 
 await page.goto(`${base}/live`, { waitUntil: "networkidle" });
-await page.getByRole("radio", { name: /^브라우저/ }).click();
-await page.getByRole("radio", { name: /^빠르게/ }).click();
-await page.getByRole("button", { name: "통역 시작" }).click();
+await chooseRecogniser(page, "webspeech");
+await chooseLag(page, "fast");
+await start(page);
 await page.waitForFunction(
   () => (window.__quotaTranslations?.length ?? 0) >= 2,
   undefined,

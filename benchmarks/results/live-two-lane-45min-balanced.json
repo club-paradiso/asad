@@ -18,20 +18,20 @@
       "p50": 200,
       "p90": 800,
       "p95": 1000,
-      "max": 2401,
+      "max": 2400,
       "mean": 305
     }
   },
   "tokens": {
     "perCall": {
       "count": 481,
-      "p50": 851,
-      "p90": 905,
-      "p95": 930,
-      "max": 960,
-      "mean": 854
+      "p50": 870,
+      "p90": 925,
+      "p95": 950,
+      "max": 980,
+      "mean": 874
     },
-    "sessionTotal": 410839,
+    "sessionTotal": 420316,
     "profileCounts": {
       "ultra-compact": 481
     }
@@ -44,7 +44,7 @@
   "bounds": {
     "finalChunks": 400,
     "finalSegments": 499,
-    "peakContextTokens": 960,
+    "peakContextTokens": 980,
     "maxInFlight": 1
   },
   "slo": {
@@ -107,7 +107,8 @@
       "coalesceOverflowDrops": 0,
       "maxPendingTurns": 2,
       "maxCloudInFlight": 1,
-      "maxProvisionalInFlight": 1
+      "maxProvisionalInFlight": 1,
+      "terminologyFixes": 30
     },
     "cloudFailuresInjected": 15,
     "translatorFailuresInjected": 12,

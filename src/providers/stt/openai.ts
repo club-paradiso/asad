@@ -9,7 +9,6 @@
  * minted by `/api/stt/token`.
  */
 import { SocketSpeechProvider } from "./socket";
-import { openaiTranscriptionLanguage, whisperScriptPrompt } from "./language";
 import type { SttProviderId, SttProviderOptions } from "./types";
 
 interface OpenAiRealtimeMessage {
@@ -28,24 +27,6 @@ const toBase64 = (buffer: ArrayBuffer): string => {
   }
   return btoa(binary);
 };
-
-/**
- * The transcription prompt Whisper sees: the registry's script-biasing
- * sentence first (so zh-TW is transcribed in Traditional characters and zh-CN
- * in Simplified), then the vocabulary hints. Undefined when there is nothing
- * to say.
- */
-export function openaiTranscriptionPrompt(
-  language: string | undefined,
-  hints: readonly string[] | undefined,
-): string | undefined {
-  const script = whisperScriptPrompt(language);
-  const vocabulary = (hints ?? []).slice(0, 40).map((hint) => hint.trim()).filter(Boolean);
-  const parts = [script, vocabulary.length ? vocabulary.join(", ") : undefined].filter(
-    (part): part is string => !!part,
-  );
-  return parts.length ? parts.join(" ") : undefined;
-}
 
 export class OpenAiSpeechProvider extends SocketSpeechProvider {
   readonly id: SttProviderId = "openai";
@@ -70,20 +51,14 @@ export class OpenAiSpeechProvider extends SocketSpeechProvider {
   }
 
   protected openMessage(): string {
-    // A language the Whisper family cannot transcribe never gets here: the
-    // capability matrix removes this provider from the plan first. Should a
-    // caller bypass it, the registry's null is still not turned into a guess —
-    // the field is omitted and the model auto-detects, which is the lesser
-    // evil compared with forcing a neighbouring language.
-    const language = openaiTranscriptionLanguage(this.options.language) ?? undefined;
     return JSON.stringify({
       type: "transcription_session.update",
       session: {
         input_audio_format: "pcm16",
         input_audio_transcription: {
           model: this.options.credentials?.model ?? "gpt-live-transcribe",
-          language,
-          prompt: openaiTranscriptionPrompt(this.options.language, this.options.hints),
+          language: this.options.language?.split("-")[0] ?? "ko",
+          prompt: (this.options.hints ?? []).slice(0, 40).join(", ") || undefined,
         },
         turn_detection: {
           type: "server_vad",

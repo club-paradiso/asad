@@ -58,7 +58,7 @@ describe("scenario C · primary free provider returns 429 mid-sermon", () => {
     let now = 0;
     let snapshot: EngineSnapshot | null = null;
     const engine = new InterpretationEngine({
-      context: "sermon",
+      context: "worship",
       lag: "balanced",
       now: () => now,
       onChange: (next) => {
@@ -237,7 +237,7 @@ describe("the local floor always answers", () => {
   it("normalises Scripture with no provider at all", () => {
     const output = interpretLocally({
       pending: "우리가 오늘 함께 살펴볼 말씀은 베드로전서 2장 9절입니다.",
-      mode: "sermon",
+      context: "worship",
     });
     expect(output.bibleReferences?.[0]?.display).toBe("1 Peter 2:9");
   });
@@ -245,7 +245,7 @@ describe("the local floor always answers", () => {
   it("still adapts the wordplay acceptance case", () => {
     const output = interpretLocally({
       pending: "그래서 우리는 길을 잘 찾아야 됩니다. 제 이름에도 길이 있어요.",
-      mode: "sermon",
+      context: "worship",
     });
     const english = output.safeChunks.map((c) => c.text).join(" ").toLowerCase();
     expect(english).not.toContain("road in my name");
@@ -261,7 +261,7 @@ describe("the local floor always answers", () => {
   it("never answers a live turn with scripted demo content", () => {
     const output = interpretLocally({
       pending: "우리가 오늘 함께 살펴볼 말씀은",
-      mode: "sermon",
+      context: "worship",
     });
     const english = output.safeChunks.map((c) => c.text).join(" ");
     expect(english).not.toContain("1 Peter 2:9");
@@ -271,7 +271,7 @@ describe("the local floor always answers", () => {
   it("never invents the payload of an unfinished Korean thought", () => {
     const output = interpretLocally({
       pending: "제가 오늘 여러분과 함께 나누고 싶은 것은",
-      mode: "sermon",
+      context: "worship",
     });
     const english = output.safeChunks.map((c) => c.text).join(" ").toLowerCase();
     // The scaffold is honest; "who we actually are" was the demo's punchline.
@@ -282,7 +282,7 @@ describe("the local floor always answers", () => {
   it("still replays a scripted beat when demo mode names the script", () => {
     const output = interpretLocally({
       pending: "우리가 오늘 함께 살펴볼 말씀은 베드로전서 2장 9절입니다.",
-      mode: "sermon",
+      context: "worship",
       scriptId: "demo-1peter-2-9",
     });
     expect(output.safeChunks.map((c) => c.text).join(" ")).toContain("1 Peter 2:9.");

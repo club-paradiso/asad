@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { estimateTokens } from "@/lib/telemetry";
 import { systemPromptFor } from "./live";
 
-const sermon = systemPromptFor("sermon", { schemaEnforced: true, ultraCompact: true });
-const general = systemPromptFor("general", { schemaEnforced: true, ultraCompact: true });
-const fullSermon = systemPromptFor("sermon", { schemaEnforced: true });
+const sermon = systemPromptFor("worship", { schemaEnforced: true, ultraCompact: true });
+const general = systemPromptFor("generic", { schemaEnforced: true, ultraCompact: true });
+const fullSermon = systemPromptFor("worship", { schemaEnforced: true });
 
 const lower = (text: string) => text.toLowerCase();
 

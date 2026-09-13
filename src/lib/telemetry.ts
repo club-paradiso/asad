@@ -14,18 +14,6 @@ import type { ClientLatencySample } from "@/lib/schema";
 
 /** The stages the live path is measured across. */
 export type LatencyStage =
-  /** T0→T1: speech activity → first interim text. */
-  | "speech_to_first_partial"
-  /** T1→T2: first interim text → finalised text. */
-  | "partial_to_stable"
-  /** T2→T4: finalised → first target-language content in engine state, whichever lane. */
-  | "stable_to_first_useful"
-  /** T2→T6: finalised → the quality path started evaluating the turn. */
-  | "quality_repair_start"
-  /** T2→T7: finalised → a quality repair reached the screen. */
-  | "quality_repair_rendered"
-  /** Finalised → a validated Translation Memory hit answered without a model. */
-  | "stable_to_memory_hit"
   /** Browser stable event → the first network dispatch for that turn. */
   | "stable_to_client_dispatch"
   /** Server received request → provider dispatch. */
@@ -223,12 +211,6 @@ export class TelemetryRecorder {
   snapshot() {
     return {
       latency: {
-        speech_to_first_partial: this.stage("speech_to_first_partial"),
-        partial_to_stable: this.stage("partial_to_stable"),
-        stable_to_first_useful: this.stage("stable_to_first_useful"),
-        quality_repair_start: this.stage("quality_repair_start"),
-        quality_repair_rendered: this.stage("quality_repair_rendered"),
-        stable_to_memory_hit: this.stage("stable_to_memory_hit"),
         stable_to_client_dispatch: this.stage("stable_to_client_dispatch"),
         trigger_to_dispatch: this.stage("trigger_to_dispatch"),
         provider_response: this.stage("provider_response"),

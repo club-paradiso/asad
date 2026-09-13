@@ -7,17 +7,11 @@
  *
  * Matching is longest-first so 하나님 나라 wins over 하나님, and 택하신 족속
  * wins over 족속.
- *
- * LANGUAGES. The built-in lexicons are Korean, and Korean only: the Korean
- * whole-word matcher knows Korean particles and nothing about Thai or
- * Mandarin. For any other source language only the `extra` entries — the prep
- * sheet's and the session's own — are matched, with a boundary rule that
- * suits the script, and the Korean lexicon is never consulted.
  */
-import type { GlossaryItem, InterpretationMode } from "@/types";
-import { isSpacelessLanguage, languageBase } from "@/languages/registry";
+import type { GlossaryItem, ResolvedContext } from "@/types";
+import { isWorshipContext } from "../context/context-mode";
 import { COMMUNITY_SERMON_GLOSSARY } from "./community-glossary";
-import { lexiconFor } from "./lexicon";
+import { lexiconFor, THEOLOGICAL_LEXICON } from "./lexicon";
 import { findWholeWordOccurrences } from "./match-korean";
 
 export interface GlossaryMatch extends GlossaryItem {
@@ -28,63 +22,31 @@ export interface GlossaryMatch extends GlossaryItem {
 /** Maximum entries shown on the live console at once. */
 export const LIVE_GLOSSARY_LIMIT = 6;
 
-/** The source language every matcher assumes when none is given. */
-export const DEFAULT_GLOSSARY_LANGUAGE = "ko-KR";
-
 const byLengthDesc = (a: GlossaryItem, b: GlossaryItem) =>
   b.korean.length - a.korean.length;
 
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 /**
- * Every occurrence of `term` in `text`, with the boundary rule the language
- * needs: Korean particles for Korean, plain substring for scripts that do not
- * space words, Unicode word boundaries (case-insensitive) for the rest.
- */
-export function findOccurrences(text: string, term: string, language: string): number[] {
-  if (!term) return [];
-  if (languageBase(language) === "ko") return findWholeWordOccurrences(text, term);
-
-  const out: number[] = [];
-  if (isSpacelessLanguage(language)) {
-    const haystack = text.toLowerCase();
-    const needle = term.toLowerCase();
-    for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, at + 1)) out.push(at);
-    return out;
-  }
-
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(term)}(?![\\p{L}\\p{N}])`, "giu");
-  for (let match = re.exec(text); match !== null; match = re.exec(text)) {
-    out.push(match.index);
-    if (match[0].length === 0) re.lastIndex += 1;
-  }
-  return out;
-}
-
-/**
- * Find glossary terms present in a piece of source text.
+ * Find glossary terms present in a piece of Korean text.
  *
  * `extra` carries prep-sheet and model-supplied entries, which outrank the
- * built-in lexicon when both match the same source string.
+ * built-in lexicon when both match the same Korean string.
  *
- * In the sermon layer the volunteer-maintained community glossary extends
+ * In a worship context the volunteer-maintained community glossary extends
  * coverage after the hand-curated lexicon. This ordering is intentional: broad
  * coverage must never silently replace a context-aware decision such as
  * 대속 → atonement.
  */
 export function matchGlossary(
   text: string,
-  mode: InterpretationMode,
+  context: ResolvedContext,
   extra: GlossaryItem[] = [],
-  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): GlossaryMatch[] {
   if (!text.trim()) return [];
 
-  const korean = languageBase(language) === "ko";
-  const community = korean && mode === "sermon" ? COMMUNITY_SERMON_GLOSSARY : [];
+  const community = isWorshipContext(context) ? COMMUNITY_SERMON_GLOSSARY : [];
   const entries = dedupeByKorean([
     ...extra,
-    ...(korean ? lexiconFor(mode) : []),
+    ...lexiconFor(context),
     ...community,
   ]).sort(byLengthDesc);
 
@@ -96,7 +58,7 @@ export function matchGlossary(
   for (const entry of entries) {
     // Whole-word only. Korean agglutinates, so substring search would report
     // 감사 ("thanksgiving") inside 감사합니다 ("thank you").
-    for (const index of findOccurrences(text, entry.korean, language)) {
+    for (const index of findWholeWordOccurrences(text, entry.korean)) {
       const end = index + entry.korean.length;
       let overlaps = false;
       for (let i = index; i < end; i += 1) {
@@ -128,13 +90,12 @@ export const PROMPT_GLOSSARY_LIMIT = 8;
  */
 export function liveGlossary(
   recentText: string,
-  mode: InterpretationMode,
+  context: ResolvedContext,
   extra: GlossaryItem[] = [],
   limit = LIVE_GLOSSARY_LIMIT,
-  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): GlossaryItem[] {
   return (
-    matchGlossary(recentText, mode, extra, language)
+    matchGlossary(recentText, context, extra)
       .filter((item) => !item.register)
       .slice(0, limit)
       .map(({ index: _index, ...item }) => item)
@@ -154,14 +115,48 @@ export function liveGlossary(
  */
 export function promptGlossary(
   recentText: string,
-  mode: InterpretationMode,
+  context: ResolvedContext,
   extra: GlossaryItem[] = [],
   limit = PROMPT_GLOSSARY_LIMIT,
-  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): GlossaryItem[] {
-  return matchGlossary(recentText, mode, extra, language)
+  return matchGlossary(recentText, context, extra)
     .slice(0, limit)
     .map(({ index: _index, ...item }) => item);
+}
+
+/**
+ * How many DOMAIN terms this text contains — theological vocabulary and the
+ * volunteer community glossary, never the discourse markers.
+ *
+ * This is the terminology signal the context resolver reads. It counts the
+ * same matcher the console already runs rather than introducing a second,
+ * parallel keyword list that could disagree with it.
+ */
+export function worshipTermHits(text: string): number {
+  if (!text.trim()) return 0;
+  const entries = dedupeByKorean([
+    ...THEOLOGICAL_LEXICON,
+    ...COMMUNITY_SERMON_GLOSSARY,
+  ]).sort(byLengthDesc);
+
+  const claimed = new Array<boolean>(text.length).fill(false);
+  let hits = 0;
+  for (const entry of entries) {
+    for (const index of findWholeWordOccurrences(text, entry.korean)) {
+      const end = index + entry.korean.length;
+      let overlaps = false;
+      for (let i = index; i < end; i += 1) {
+        if (claimed[i]) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) continue;
+      for (let i = index; i < end; i += 1) claimed[i] = true;
+      hits += 1;
+    }
+  }
+  return hits;
 }
 
 /** Collapse duplicates, keeping the first (highest-priority) occurrence. */

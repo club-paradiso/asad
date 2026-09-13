@@ -1,18 +1,18 @@
-import type { InterpretationMode, PrepSheet } from "@/types";
-import { languageBase } from "@/languages/registry";
+import type { PrepSheet, ResolvedContext } from "@/types";
+import { isWorshipContext } from "../context/context-mode";
 import { THEOLOGICAL_LEXICON } from "./lexicon";
-import { DEFAULT_GLOSSARY_LANGUAGE, matchGlossary } from "./matcher";
+import { matchGlossary } from "./matcher";
 
 /** Deepgram currently receives at most this many `keyterm` hints. */
 export const STT_HINT_LIMIT = 50;
 
 /**
- * Core sermon vocabulary worth keeping in the recogniser even when no prep
+ * Core worship vocabulary worth keeping in the recogniser even when no prep
  * material was supplied. The order is deliberate: these are common, costly to
  * misrecognise, and useful across denominations without trying to stuff the
  * entire 447-entry community glossary into every socket URL.
  */
-const SERMON_BASELINE = [
+const WORSHIP_BASELINE = [
   "하나님",
   "예수님",
   "그리스도",
@@ -47,23 +47,17 @@ const SERMON_BASELINE = [
  * Priority:
  * 1. session-specific people and terms the interpreter explicitly prepared;
  * 2. terms actually found in the title/scripture/notes/outline, including the
- *    volunteer community glossary in sermon mode;
- * 3. a conservative sermon baseline from the curated theological lexicon.
+ *    volunteer community glossary in a worship context;
+ * 3. a conservative worship baseline from the curated theological lexicon.
  *
  * This is intentionally not "send all 447 terms". Recognition hints bias the
  * acoustic model; irrelevant hints can make recognition worse, not better.
- *
- * `language` is the SOURCE language. The sermon baseline and the lexicons are
- * Korean, so for any other language only the prep sheet's own terms are sent
- * — a Mandarin recogniser fed Hangul keyterms is not being helped.
  */
 export function buildSttHints(
-  mode: InterpretationMode,
+  context: ResolvedContext,
   prep: PrepSheet | undefined,
   limit = STT_HINT_LIMIT,
-  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): string[] {
-  const korean = languageBase(language) === "ko";
   const out: string[] = [];
   const seen = new Set<string>();
 
@@ -89,16 +83,16 @@ export function buildSttHints(
     .join("\n");
 
   if (prepCorpus) {
-    // matchGlossary includes the 447-entry volunteer glossary in sermon mode,
+    // matchGlossary includes the 447-entry volunteer glossary in worship,
     // but only terms present in today's prep material earn recogniser budget.
-    for (const match of matchGlossary(prepCorpus, mode, prep?.glossary ?? [], language)) {
+    for (const match of matchGlossary(prepCorpus, context, prep?.glossary ?? [])) {
       add(match.korean);
     }
   }
 
-  if (korean && mode === "sermon") {
+  if (isWorshipContext(context)) {
     const curated = new Set(THEOLOGICAL_LEXICON.map((item) => item.korean));
-    for (const term of SERMON_BASELINE) {
+    for (const term of WORSHIP_BASELINE) {
       if (curated.has(term)) add(term);
     }
   }

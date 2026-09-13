@@ -8,7 +8,8 @@
  * Where a term is genuinely context-dependent (대속, 은혜 in a greeting), the
  * note says so and `alternatives` carries the other reading.
  */
-import type { GlossaryItem } from "@/types";
+import type { GlossaryItem, ResolvedContext } from "@/types";
+import { isWorshipContext } from "../context/context-mode";
 
 /** Core theological vocabulary — active in SERMON mode. */
 export const THEOLOGICAL_LEXICON: GlossaryItem[] = [
@@ -112,7 +113,14 @@ export const GENERAL_LEXICON: GlossaryItem[] = [
   { korean: "무엇보다", english: "above all", source: "lexicon", register: true },
 ];
 
-export const lexiconFor = (mode: "sermon" | "general"): GlossaryItem[] =>
-  mode === "sermon"
+/**
+ * The lexicon for a resolved context.
+ *
+ * Only worship earns the theological layer. Every other context gets the
+ * discourse-marker set, which is about rhetoric rather than domain and is
+ * therefore useful everywhere.
+ */
+export const lexiconFor = (context: ResolvedContext): GlossaryItem[] =>
+  isWorshipContext(context)
     ? [...THEOLOGICAL_LEXICON, ...GENERAL_LEXICON]
     : GENERAL_LEXICON;

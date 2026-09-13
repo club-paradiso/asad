@@ -21,12 +21,6 @@ const SAFE_ID = /^[A-Za-z0-9:_-]{1,80}$/;
 const SAFE_LABEL = /^[A-Za-z0-9._:/@+-]{1,160}$/;
 
 export const LIVE_LATENCY_STAGES = [
-  "speech_to_first_partial",
-  "partial_to_stable",
-  "stable_to_first_useful",
-  "quality_repair_start",
-  "quality_repair_rendered",
-  "stable_to_memory_hit",
   "stable_to_client_dispatch",
   "trigger_to_dispatch",
   "provider_response",

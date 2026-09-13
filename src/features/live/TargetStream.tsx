@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * The target-language stream — the dominant element on the console.
+ * The target stream — the dominant element on the console.
  *
  * Everything about this component is subordinated to one question: can the
  * interpreter absorb the current line in a single glance while listening to
- * the speaker and talking?
+ * Korean and speaking English?
  *
  * So: no bubbles, no timestamps in the reading path, no per-chunk chrome. Just
  * large text, a marker in the margin for the line that is live, and a visually
@@ -13,8 +13,8 @@
  */
 import { forwardRef } from "react";
 import type { InterpretationChunk } from "@/types";
-import { resolveLanguage } from "@/languages/registry";
 import { cn } from "@/lib/cn";
+import { findLanguage } from "@/lib/languages";
 
 interface ChunkLineProps {
   chunk: InterpretationChunk;
@@ -27,7 +27,7 @@ const ChunkLine = forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
 ) {
   const anticipated = chunk.state === "anticipated";
   const correction = !!chunk.correctsChunkId;
-  // Fast on-device output the contextual lane may still replace. Marked so
+  // Fast on-device English the contextual lane may still replace. Marked so
   // the interpreter knows the line is provisional, and so a test can prove
   // the two lanes without reading any text.
   const provisional = chunk.provisional === true && chunk.state === "current";
@@ -81,7 +81,7 @@ const ChunkLine = forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
         {provisional && (
           <span
             className="mr-2 align-middle text-[0.5em] text-[var(--fg-dim)]"
-            title="Provisional on-device translation — may still be refined"
+            title="Provisional on-device English — may still be refined"
           >
             ≈
           </span>
@@ -130,33 +130,36 @@ export function TargetStream({
   containerRef: React.RefObject<HTMLDivElement | null>;
   activeRef: React.MutableRefObject<HTMLElement | null>;
   emptyMessage?: string;
-  /** Canonical registry id of the language being produced. */
+  /** BCP-47 tag of the language being produced. */
   language?: string;
 }) {
-  const definition = resolveLanguage(language);
+  const definition = findLanguage(language);
   return (
     <div
       ref={containerRef}
       lang={definition?.id ?? language}
-      dir={definition?.direction ?? "ltr"}
-      className={cn(
-        "scroll-y fade-top h-full px-4 sm:px-8 lg:px-12",
-        definition?.base === "ko" && "font-korean",
-        definition?.spacing === "none" && "source-text-spaceless",
-      )}
+      dir={definition?.direction === "rtl" ? "rtl" : undefined}
+      className="scroll-y fade-top h-full px-4 sm:px-8 lg:px-12"
       // `container-type: size` (not Tailwind's inline-size `@container`, which
       // only exposes cqw) so the tail spacer below can be a fraction of THIS
-      // region — what is left after the source pane and context rail have
+      // region — what is left after the Korean panel and context rail have
       // taken their share — rather than of the whole viewport.
       style={{ containerType: "size" }}
-      aria-live="polite"
-      aria-atomic="false"
-      aria-label="Interpreter-ready translation"
+      // NOT a live region.
+      //
+      // It used to be `aria-live="polite"`, which meant a screen reader
+      // announced every line of interpretation as it landed — about eleven a
+      // minute, each interrupting the last, none of them a status change.
+      // A live region is for telling someone something CHANGED; this is the
+      // document, and it is read by moving through it. The console's one live
+      // region is the status strip, which speaks only when the state does.
+      aria-live="off"
+      aria-label="Interpretation"
     >
       {chunks.length === 0 ? (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <p className="max-w-md text-sm leading-relaxed text-[var(--fg-dim)]">
-            {emptyMessage ?? "Interpretation will appear here as the speaker begins."}
+            {emptyMessage ?? "English assistance will appear here as the speaker begins."}
           </p>
         </div>
       ) : (

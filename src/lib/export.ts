@@ -8,7 +8,6 @@
  * Audio is never exported, because it is never retained. See docs/privacy.md.
  */
 import type { StoredSession } from "@/types";
-import { canonicalPair, languageDisplayName, pairLabel } from "@/languages/registry";
 
 export type ExportFormat = "txt" | "markdown" | "json";
 
@@ -19,48 +18,27 @@ const stamp = (ms: number): string => {
   return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 };
 
-/**
- * Which languages a stored session carried. Sessions saved before the unified
- * console have no pair — they were all Korean → English, and they carry a
- * legacy `mode` instead.
- */
-const languagesOf = (session: StoredSession) => {
-  const hasPair = !!(session.sourceLanguage || session.targetLanguage);
-  const pair = canonicalPair({ source: session.sourceLanguage, target: session.targetLanguage });
-  return {
-    hasPair,
-    pair,
-    sourceName: languageDisplayName(pair.source),
-    targetName: languageDisplayName(pair.target),
-  };
-};
-
 const header = (session: StoredSession): string[] => {
   const started = new Date(session.startedAt);
   const durationMs = (session.endedAt ?? session.startedAt) - session.startedAt;
-  const languages = languagesOf(session);
   return [
     session.title || "ASAD session",
     session.speaker ? `Speaker: ${session.speaker}` : "",
-    languages.hasPair ? `Languages: ${pairLabel(languages.pair)}` : "",
-    session.domain ? `Context: ${session.domain}` : "",
-    // Only a legacy session — saved with a mode and without a pair — still
-    // reports one. A current session's layer is the Context Engine's business.
-    !languages.hasPair && session.mode ? `Mode: ${session.mode}` : "",
+    `Context: ${session.context}`,
+    `Languages: ${session.sourceLanguage} → ${session.targetLanguage}`,
     `Date: ${started.toISOString()}`,
     `Duration: ${stamp(durationMs)}`,
   ].filter(Boolean);
 };
 
 export function toPlainText(session: StoredSession): string {
-  const { sourceName, targetName } = languagesOf(session);
-  const lines = [...header(session), "", `— ${sourceName.toUpperCase()} TRANSCRIPT —`, ""];
+  const lines = [...header(session), "", "— KOREAN TRANSCRIPT —", ""];
 
   for (const segment of session.segments) {
     lines.push(`[${stamp(segment.at)}] ${segment.text}`);
   }
 
-  lines.push("", `— INTERPRETER ${targetName.toUpperCase()} —`, "");
+  lines.push("", "— INTERPRETER ENGLISH —", "");
   for (const chunk of session.chunks) {
     const marks = [chunk.adapted ? "(adapted)" : "", chunk.confidence === "low" ? "(?)" : ""]
       .filter(Boolean)
@@ -102,11 +80,10 @@ export function toPlainText(session: StoredSession): string {
 }
 
 export function toMarkdown(session: StoredSession): string {
-  const { sourceName, targetName } = languagesOf(session);
   const [title, ...meta] = header(session);
   const lines = [`# ${title}`, "", ...meta.map((line) => `- ${line}`), ""];
 
-  lines.push(`## Interpreter ${targetName}`, "");
+  lines.push("## Interpreter English", "");
   lines.push("| Time | English | Notes |", "| --- | --- | --- |");
   for (const chunk of session.chunks) {
     const notes = [
@@ -120,7 +97,7 @@ export function toMarkdown(session: StoredSession): string {
     lines.push(`| ${stamp(chunk.at)} | ${escapeCell(chunk.text)} | ${escapeCell(notes)} |`);
   }
 
-  lines.push("", `## ${sourceName} transcript`, "");
+  lines.push("", "## Korean transcript", "");
   for (const segment of session.segments) {
     lines.push(`**${stamp(segment.at)}** ${segment.text}`, "");
   }

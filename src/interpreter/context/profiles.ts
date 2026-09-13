@@ -18,7 +18,7 @@ import type { InterpretRequest } from "@/lib/schema";
  * internal `RollingContext` — `summary` is optional here because a client may
  * legitimately omit it.
  */
-export type WireContext = InterpretRequest["context"];
+export type WireContext = InterpretRequest["history"];
 
 export type ContextProfile = "full" | "compact" | "ultra-compact";
 

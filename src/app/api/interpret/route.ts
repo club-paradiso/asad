@@ -19,13 +19,7 @@ import { after, NextResponse } from "next/server";
 import { interpretRequestSchema, interpreterOutputSchema, parseInterpreterOutput } from "@/lib/schema";
 import { buildLiveUserPrompt, systemPromptFor } from "@/interpreter/prompts/live";
 import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
-import {
-  applyProfile,
-  chooseProfile,
-  PROFILE_BUDGETS,
-  type ProfileDecision,
-} from "@/interpreter/context/profiles";
-import { canonicalPair } from "@/languages/registry";
+import { applyProfile, chooseProfile } from "@/interpreter/context/profiles";
 import {
   assessFreeTierViability,
   capabilitiesFor,
@@ -97,9 +91,6 @@ export async function POST(request: Request) {
     );
   }
   const input = parsed.data;
-  // Canonical registry ids, whatever tag the client sent. The prompts, the
-  // local interpreter and the response all speak in these.
-  const pair = canonicalPair(input.languagePair);
   const sharedLatency: SharedLatencySample[] = [...(input.clientTelemetry ?? [])];
   for (const sample of input.clientTelemetry ?? []) telemetry.recordClientLatency(sample);
 
@@ -126,9 +117,8 @@ export async function POST(request: Request) {
   const localOutput = () =>
     interpretLocally({
       pending: input.pending,
-      mode: input.mode,
+      context: input.context,
       allowAnticipation: input.allowAnticipation,
-      pair,
     });
 
   // Prefer a provider whose documented capacity can carry the service. A
@@ -149,40 +139,28 @@ export async function POST(request: Request) {
       degraded: true,
       reason: "No cloud interpretation provider is available — using the local interpreter.",
       profile: "full",
-      domain: input.domain,
     });
   }
 
   /* --- Context budgeting ------------------------------------------------ */
   const caps = capabilitiesFor(preferred);
-  const quotaPressure = router.pressureFor(preferred);
-  const decision = routeTierProfile(
-    chooseProfile({
-      recommendedLiveTokens: caps.recommendedLiveContextTokens,
-      quotaPressure,
-      latencyP95Ms: telemetry.stage("provider_response", preferred).p95 || undefined,
-      lag: input.lag,
-    }),
-    input.routeTier,
-    {
-      recommendedLiveTokens: caps.recommendedLiveContextTokens,
-      quotaPressure,
-    },
-  );
+  const decision = chooseProfile({
+    recommendedLiveTokens: caps.recommendedLiveContextTokens,
+    quotaPressure: router.pressureFor(preferred),
+    latencyP95Ms: telemetry.stage("provider_response", preferred).p95 || undefined,
+    lag: input.lag,
+  });
 
-  const budgeted = { ...input, context: applyProfile(input.context, decision.profile) };
+  const budgeted = { ...input, history: applyProfile(input.history, decision.profile) };
   // When the provider validates against INTERPRETER_JSON_SCHEMA itself, the
   // prose restatement of that shape is ~188 tokens of duplicated effort on
-  // every one of ~11 calls a minute. The pair and the layer are constant for
-  // the session, so the system prompt still caches; the domain rides in the
-  // user turn.
-  const system = systemPromptFor(input.mode, {
+  // every one of ~11 calls a minute.
+  const system = systemPromptFor(input.context, {
     schemaEnforced: caps.structuredOutput,
     ultraCompact: decision.profile === "ultra-compact",
-    pair,
-    domain: input.domain,
+    languages: { source: input.source, target: input.target },
   });
-  const user = buildLiveUserPrompt({ ...budgeted, languagePair: pair });
+  const user = buildLiveUserPrompt(budgeted);
 
   const systemTokens = estimateTokens(system);
   const pendingTokens = estimateTokens(input.pending);
@@ -241,7 +219,6 @@ export async function POST(request: Request) {
         degraded: true,
         reason: "The interpretation model returned output that did not match the schema.",
         profile: decision.profile,
-        domain: input.domain,
         attempts: result.attempts,
       });
     }
@@ -250,15 +227,9 @@ export async function POST(request: Request) {
      * Only ever attempted with measured budget left in the turn, and its
      * result is dropped rather than waited for. The interpreter's answer is
      * the primary one unless a better one arrived in time to still be useful.
-     *
-     * The client's route tier gates it: a turn it judged `fast` or
-     * `contextual` is not worth a second model, and only `deep` (or a client
-     * that did not say) lets the existing decision stand.
      */
     const escalation = escalationDecision({
-      enabled:
-        appEnv().llm.openrouter.qualityEscalation &&
-        (input.routeTier === undefined || input.routeTier === "deep"),
+      enabled: appEnv().llm.openrouter.qualityEscalation,
       lag: input.lag,
       detectedKinds: (input.detected?.culturalNotes ?? []).map((note) => note.kind),
       primary: output,
@@ -316,7 +287,6 @@ export async function POST(request: Request) {
       reason: result.reason,
       profile: decision.profile,
       profileReason: decision.reason,
-      domain: input.domain,
       latencyMs: result.response.latencyMs,
       attempts: result.attempts,
     });
@@ -332,38 +302,10 @@ export async function POST(request: Request) {
           ? `Interpretation unavailable: ${error.message}`
           : "Interpretation is unavailable.",
       profile: decision.profile,
-      domain: input.domain,
     });
   } finally {
     clearTimeout(turnTimer);
   }
-}
-
-/**
- * Adaptive routing: let the client's judgement of the turn move the profile.
- *
- * The client's Context Engine scores each unit — a greeting is `fast`, a
- * sentence with a pun and a Scripture reference is `deep` — and the server
- * spends accordingly. Two limits keep it honest: a `fast` turn never widens
- * a profile the provider's quota forced to ultra-compact, and a `deep` turn
- * only gets `full` from a provider whose documented budget can carry it.
- */
-export function routeTierProfile(
-  decision: ProfileDecision,
-  routeTier: "fast" | "contextual" | "deep" | undefined,
-  provider: { recommendedLiveTokens?: number; quotaPressure: number },
-): ProfileDecision {
-  if (routeTier === "fast" && decision.profile === "full") {
-    return { profile: "compact", reason: "FAST route tier — the client judged this turn easy." };
-  }
-  if (routeTier === "deep" && decision.profile === "compact") {
-    const recommended = provider.recommendedLiveTokens ?? PROFILE_BUDGETS.full.targetTokens;
-    const sustains = recommended >= PROFILE_BUDGETS.full.targetTokens && provider.quotaPressure < 0.85;
-    if (sustains) {
-      return { profile: "full", reason: "DEEP route tier — the client judged this turn hard." };
-    }
-  }
-  return decision;
 }
 
 /**

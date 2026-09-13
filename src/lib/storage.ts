@@ -9,16 +9,9 @@
  * Everything is wrapped: a private window, disabled site data or a full quota
  * must degrade to "not saved", never to a thrown error mid-service.
  */
-import type {
-  ConsoleView,
-  ContextDomain,
-  LagProfile,
-  PrepSheet,
-  SessionSettings,
-  StoredSession,
-} from "@/types";
-import { CONTEXT_DOMAINS, defaultSettings, emptyPrepSheet } from "@/types";
-import { canonicalPair } from "@/languages/registry";
+import type { PrepSheet, SessionSettings, StoredSession } from "@/types";
+import { defaultSettings, emptyPrepSheet } from "@/types";
+import { isContextMode, isResolvedContext } from "@/interpreter/context/context-mode";
 
 const KEYS = {
   settings: "tong-yuck:settings",
@@ -28,21 +21,15 @@ const KEYS = {
 
 const MAX_STORED_SESSIONS = 30;
 
-function readRaw(key: string): unknown {
-  if (typeof window === "undefined") return undefined;
+function read<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(key);
-    if (!raw) return undefined;
-    return JSON.parse(raw) as unknown;
+    if (!raw) return fallback;
+    return { ...fallback, ...(JSON.parse(raw) as T) };
   } catch {
-    return undefined;
+    return fallback;
   }
-}
-
-function read<T>(key: string, fallback: T): T {
-  const value = readRaw(key);
-  if (!value || typeof value !== "object") return fallback;
-  return { ...fallback, ...(value as T) };
 }
 
 function write(key: string, value: unknown): boolean {
@@ -55,73 +42,93 @@ function write(key: string, value: unknown): boolean {
   }
 }
 
-const LAGS: readonly LagProfile[] = ["fast", "balanced", "safe"];
-const VIEWS: readonly ConsoleView[] = ["console", "teleprompter"];
-const FONT_SCALE_RANGE = { min: 0.7, max: 1.9 } as const;
-
-const bool = (value: unknown, fallback: boolean): boolean =>
-  typeof value === "boolean" ? value : fallback;
-
-const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
-  typeof value === "string" && (allowed as readonly string[]).includes(value)
-    ? (value as T)
-    : fallback;
-
 /**
- * Turn whatever is in storage into the current settings shape.
+ * Settings written before "Sermon Mode vs General Mode" became an inferred
+ * context, and before Live carried a language pair.
  *
- * The launcher used to ask for a Mode (Sermon / General) and stored it as
- * `mode`; the source pane was `showKorean`. Neither exists any more: the
- * Context Engine infers the domain, so a stored `mode` is simply dropped —
- * `context` starts at `auto` — and `showKorean` becomes `showSource`. Language
- * ids always come back canonical so nothing downstream has to resolve them.
- *
- * Exported so the migration is a unit test rather than a hope.
+ * A browser that has used ASAD before holds `{ mode: "sermon", showKorean }`.
+ * Spreading that over the defaults leaves `context: "auto"` — which is right,
+ * and is also silently a different product to someone who deliberately chose
+ * Sermon. So the old choice is honoured as an explicit override, once, and the
+ * stale keys are dropped rather than left to rot in local storage.
  */
-export function normaliseSettings(raw: unknown): SessionSettings {
+export function migrateSettings(stored: Record<string, unknown>): SessionSettings {
   const defaults = defaultSettings();
-  if (!raw || typeof raw !== "object") return defaults;
-  const record = raw as Record<string, unknown>;
-
-  const pair = canonicalPair({
-    source: typeof record.sourceLanguage === "string" ? record.sourceLanguage : undefined,
-    target: typeof record.targetLanguage === "string" ? record.targetLanguage : undefined,
-  });
-
-  const fontScale =
-    typeof record.fontScale === "number" && Number.isFinite(record.fontScale)
-      ? Math.min(FONT_SCALE_RANGE.max, Math.max(FONT_SCALE_RANGE.min, record.fontScale))
-      : defaults.fontScale;
+  const { mode, showKorean, ...rest } = stored;
+  const carried = rest as Partial<SessionSettings>;
 
   return {
-    sourceLanguage: pair.source,
-    targetLanguage: pair.target,
-    context: oneOf<ContextDomain>(record.context, CONTEXT_DOMAINS, defaults.context),
-    lag: oneOf<LagProfile>(record.lag, LAGS, defaults.lag),
-    view: oneOf<ConsoleView>(record.view, VIEWS, defaults.view),
-    showSource: bool(
-      record.showSource,
-      // The legacy name, honoured once and never written back.
-      bool(record.showKorean, defaults.showSource),
-    ),
-    showGlossary: bool(record.showGlossary, defaults.showGlossary),
-    showScripture: bool(record.showScripture, defaults.showScripture),
-    fontScale,
-    saveHistory: bool(record.saveHistory, defaults.saveHistory),
-    rememberCorrections: bool(record.rememberCorrections, defaults.rememberCorrections),
+    ...defaults,
+    ...carried,
+    context: isContextMode(carried.context)
+      ? carried.context
+      : mode === "sermon"
+        ? "worship"
+        : mode === "general"
+          // `generic` is not a ContextMode — the user never chooses it. The
+          // honest migration of "General Mode" is "stop asking": auto.
+          ? "auto"
+          : defaults.context,
+    showSource:
+      typeof carried.showSource === "boolean"
+        ? carried.showSource
+        : typeof showKorean === "boolean"
+          ? showKorean
+          : defaults.showSource,
   };
 }
 
-export const loadSettings = (): SessionSettings => normaliseSettings(readRaw(KEYS.settings));
+export const loadSettings = (): SessionSettings => {
+  if (typeof window === "undefined") return defaultSettings();
+  try {
+    const raw = window.localStorage.getItem(KEYS.settings);
+    if (!raw) return defaultSettings();
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object") return defaultSettings();
+    return migrateSettings(value as Record<string, unknown>);
+  } catch {
+    return defaultSettings();
+  }
+};
 export const saveSettings = (settings: SessionSettings): boolean =>
-  write(KEYS.settings, normaliseSettings(settings));
+  write(KEYS.settings, settings);
 
 export const loadPrep = (): PrepSheet => read(KEYS.prep, emptyPrepSheet());
 export const savePrep = (prep: PrepSheet): boolean => write(KEYS.prep, prep);
 
+/**
+ * A session saved before this change carries `mode`, no context and no
+ * languages. It is still the interpreter's own record of a service they did,
+ * so it is read forward rather than discarded.
+ */
+export function migrateSession(stored: Record<string, unknown>): StoredSession {
+  const { mode, ...rest } = stored;
+  const session = rest as unknown as StoredSession;
+  return {
+    ...session,
+    context: isResolvedContext(session.context)
+      ? session.context
+      : mode === "sermon"
+        ? "worship"
+        : "generic",
+    sourceLanguage: session.sourceLanguage ?? "ko-KR",
+    targetLanguage: session.targetLanguage ?? "en-US",
+  };
+}
+
 export function loadSessions(): StoredSession[] {
-  const value = readRaw(KEYS.sessions);
-  return Array.isArray(value) ? (value as StoredSession[]) : [];
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(KEYS.sessions);
+    if (!raw) return [];
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object")
+      .map(migrateSession);
+  } catch {
+    return [];
+  }
 }
 
 /** Persist a finished session. Called only on explicit opt-in. */

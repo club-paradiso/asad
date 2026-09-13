@@ -10,7 +10,7 @@
  * *specifically wrong* for this product, most notably the literal wordplay
  * failure the brief names as disqualifying.
  */
-import type { InterpretationMode } from "@/types";
+import type { ResolvedContext } from "@/types";
 
 export type BenchCategory =
   | "declarative"
@@ -58,7 +58,7 @@ export type BenchCategory =
 export interface BenchCase {
   id: string;
   category: BenchCategory;
-  mode: InterpretationMode;
+  context: ResolvedContext;
   korean: string;
   /** Why this case is hard, shown in the human review sheet. */
   challenge: string;
@@ -82,14 +82,14 @@ export interface BenchCase {
     forbidAnticipation?: boolean;
   };
   /**
-   * Extra rolling context this case needs.
+   * Extra rolling history this case needs.
    *
    * Most cases are context-free by design. A few are not, and they are the
    * realistic ones: an interpreter twenty minutes into a service has already
    * corrected the pastor's name once, and what the model does with that
    * correction is the whole question.
    */
-  context?: {
+  history?: {
     entities?: Array<{ korean: string; english: string }>;
     corrections?: Array<{ from: string; to: string; english?: string }>;
   };
@@ -101,7 +101,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b01",
     category: "declarative",
-    mode: "sermon",
+    context: "worship",
     korean: "여러분, 반갑습니다. 오늘 이 자리에 함께해 주셔서 감사합니다.",
     challenge: "Ordinary sermon opening — the baseline everything else is measured against.",
     expect: { maxChunks: 4, maxWordsPerChunk: 14, forbidden: ["thanksgiving"] },
@@ -110,7 +110,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b02",
     category: "delayed-predicate",
-    mode: "sermon",
+    context: "worship",
     korean:
       "제가 오늘 이 자리에서 여러분과 함께 꼭 나누고 싶은 한 가지 이야기가 있는데 그것은 바로 우리의 정체성에 관한 것입니다.",
     challenge:
@@ -121,7 +121,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b03",
     category: "fast-rhetorical",
-    mode: "sermon",
+    context: "worship",
     korean:
       "여러분 그렇지 않습니까? 정말 그렇지 않습니까? 우리가 정말 그렇게 살고 있습니까?",
     challenge: "Rapid rhetorical questions to the room. Must stay short and keep the drive.",
@@ -131,7 +131,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b04",
     category: "incomplete",
-    mode: "sermon",
+    context: "worship",
     korean: "그런데 우리가 이 놀라운 은혜를 받고도",
     challenge:
       "Unfinished. A scaffold is honest; completing the thought is invention.",
@@ -145,7 +145,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b05",
     category: "self-correction",
-    mode: "general",
+    context: "generic",
     korean: "그 자리에는 한 삼천... 아니, 삼백 명 정도가 모였습니다.",
     challenge: "Speaker corrects a number mid-sentence. The wrong figure must not survive.",
     expect: { forbidden: ["three thousand", "3,000", "3000"] },
@@ -154,7 +154,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b06",
     category: "scripture-reference",
-    mode: "sermon",
+    context: "worship",
     korean: "우리가 오늘 함께 살펴볼 말씀은 베드로전서 2장 9절입니다.",
     challenge: "The acceptance case. Reference must normalise; wording must not be invented.",
     expect: {
@@ -168,7 +168,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b07",
     category: "scripture-paraphrase",
-    mode: "sermon",
+    context: "worship",
     korean: "베드로 사도는 우리가 택하신 족속이라고 말합니다.",
     challenge:
       "Paraphrase rather than citation. Must render the paraphrase, not quote a translation it was not given.",
@@ -178,7 +178,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b08",
     category: "terminology",
-    mode: "sermon",
+    context: "worship",
     korean: "칭의는 단번에 이루어지지만 성화는 평생에 걸쳐 계속됩니다.",
     challenge:
       "Two technical terms that must stay technical. Softening them loses the distinction the sentence exists to make.",
@@ -188,7 +188,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b09",
     category: "idiom",
-    mode: "general",
+    context: "generic",
     korean: "티끌 모아 태산이라고 하지 않습니까?",
     challenge: "Literal rendering destroys the proverb.",
     expect: {
@@ -200,7 +200,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b10",
     category: "proper-noun",
-    mode: "sermon",
+    context: "worship",
     korean: "오늘 말씀은 류정길 목사님께서 전해 주시겠습니다.",
     challenge:
       "Korean name must romanise conventionally. 'Ryu', not the strict-RR 'Lyu'; surname first.",
@@ -210,7 +210,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b11",
     category: "wordplay",
-    mode: "sermon",
+    context: "worship",
     korean: "그래서 우리는 길을 잘 찾아야 됩니다. 제 이름에도 길이 있어요.",
     priorKorean: ["오늘 말씀은 류정길 목사님께서 전해 주시겠습니다."],
     challenge:
@@ -226,7 +226,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b12",
     category: "testimony",
-    mode: "sermon",
+    context: "worship",
     korean: "제가 스무 살 때 정말 힘든 시간을 보냈습니다. 그때 하나님을 만났습니다.",
     challenge: "Narrative past, personal register. Must not become expository.",
     expect: { maxWordsPerChunk: 14, forbidden: ["it is worth noting"] },
@@ -235,7 +235,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b13",
     category: "prayer",
-    mode: "sermon",
+    context: "worship",
     korean: "사랑의 하나님, 오늘 이 말씀을 통해 우리를 만나 주시옵소서.",
     challenge: "Register shifts to direct address. English must follow.",
     expect: { required: ["god"], maxWordsPerChunk: 14 },
@@ -244,7 +244,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b14",
     category: "humour",
-    mode: "sermon",
+    context: "worship",
     korean: "사실 제가 어젯밤에 설교 준비하다가 그만 잠들었습니다. 아멘 하실 분?",
     challenge:
       "아멘 하실 분 invites a response an English-speaking room may not give. Needs a flag, not a literal render.",
@@ -255,7 +255,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b15",
     category: "repetition",
-    mode: "sermon",
+    context: "worship",
     korean:
       "여러분은 택하신 족속입니다. 여러분은 왕 같은 제사장입니다. 여러분은 거룩한 나라입니다.",
     challenge: "Repetition IS the rhetoric here. Compressing it flattens the sermon.",
@@ -265,7 +265,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b16",
     category: "cultural",
-    mode: "sermon",
+    context: "worship",
     korean: "우리 교회는 새벽기도로 유명한 교회입니다.",
     challenge: "새벽기도 is a Korean church institution, not a time of day.",
     expect: { required: ["early morning prayer"], forbidden: ["dawn prayer at 5"] },
@@ -274,7 +274,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b17",
     category: "ambiguous-pronoun",
-    mode: "general",
+    context: "generic",
     korean: "그분이 그렇게 말씀하셨을 때, 그 사람은 아무 대답도 하지 않았습니다.",
     priorKorean: ["김 목사님이 이재훈 집사님을 만나셨습니다."],
     priorEnglish: ["Pastor Kim met with Deacon Lee Jae-hoon."],
@@ -286,7 +286,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b18",
     category: "context-dependent-term",
-    mode: "sermon",
+    context: "worship",
     korean: "오늘 하루도 은혜 많이 받으세요.",
     challenge:
       "은혜 is 'grace' as theology but a blessing in a farewell. Technical rendering here is wrong.",
@@ -296,7 +296,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b19",
     category: "early-restructuring",
-    mode: "general",
+    context: "generic",
     korean:
       "제가 지난 삼 년 동안 이 프로젝트를 준비하면서 가장 크게 배운 것은 결국 사람이 전부라는 사실이었습니다.",
     challenge:
@@ -308,7 +308,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b20",
     category: "anticipation-hazard",
-    mode: "sermon",
+    context: "worship",
     korean: "그래서 제가 여러분께 드리고 싶은 질문은 바로",
     challenge:
       "Cut mid-frame before the question exists. Predicting the content here is exactly the failure mode that destroys trust.",
@@ -325,7 +325,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b21",
     category: "quoted-casual",
-    mode: "sermon",
+    context: "worship",
     korean: "그때 그 친구가 저한테 이러는 거예요. \"야, 진짜 괜찮겠어?\"",
     challenge:
       "반말 quoted inside polite narration. The quote has to sound like a friend talking; the narration around it has to stay polite. Flattening both to one register loses the story.",
@@ -338,7 +338,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b22",
     category: "date-and-time",
-    mode: "general",
+    context: "generic",
     korean: "다음 주 화요일, 그러니까 시월 이십삼일 오후 세 시에 모이겠습니다.",
     challenge:
       "A date and a time, both of which the room will act on. 시월 is October, not the tenth month read aloud, and a wrong month sends people to an empty building.",
@@ -348,7 +348,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b23",
     category: "place-name",
-    mode: "sermon",
+    context: "worship",
     korean: "이번 수련회는 제주도 서귀포시 성산일출봉 근처에서 열립니다.",
     challenge:
       "Jeju place names. Every one of them has a literal meaning, and translating rather than romanising them produces confident nonsense nobody can navigate by.",
@@ -362,7 +362,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b24",
     category: "loanword",
-    mode: "general",
+    context: "generic",
     korean: "오늘 스케줄은 오리엔테이션 먼저 하고, 그 다음에 워크숍 세션이 있습니다.",
     challenge:
       "Korean loanwords that are already English. Re-romanising them, or reaching for a synonym because they look foreign, is a self-inflicted wound.",
@@ -372,7 +372,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b25",
     category: "disfluency",
-    mode: "sermon",
+    context: "worship",
     korean: "그, 그러니까 제 말은... 어... 우리가, 우리가 좀 더 진지해져야 한다는 거예요.",
     challenge:
       "Stutters and fillers. They carry no meaning, and reproducing them makes the interpreter sound like the one who is struggling.",
@@ -382,7 +382,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b26",
     category: "mid-sentence-cancel",
-    mode: "general",
+    context: "generic",
     korean: "저희가 작년에 그 프로그램을... 아니, 재작년에 시작했습니다.",
     challenge:
       "The speaker abandons a wrong year mid-sentence and supplies the right one. Only the corrected figure may reach the English.",
@@ -392,7 +392,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b27",
     category: "dropped-subject",
-    mode: "sermon",
+    context: "worship",
     korean: "어제 만났어요. 많이 좋아졌더라고요. 다음 주에 퇴원한대요.",
     priorKorean: ["김 집사님이 병원에 입원하셨습니다."],
     priorEnglish: ["Deacon Kim has been admitted to hospital."],
@@ -405,7 +405,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b28",
     category: "long-modifier",
-    mode: "sermon",
+    context: "worship",
     korean:
       "지난 삼십 년 동안 이 교회를 묵묵히 섬겨 오신, 그리고 한 번도 자기 이름을 드러내지 않으신 권사님을 오늘 소개하고 싶습니다.",
     challenge:
@@ -417,7 +417,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b29",
     category: "proverb",
-    mode: "sermon",
+    context: "worship",
     korean: "여러분, 소 잃고 외양간 고친다는 말이 있지 않습니까?",
     challenge:
       "A proverb with a direct English equivalent. The literal version is comprehensible and still lands as a translation rather than as a saying.",
@@ -432,7 +432,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b30",
     category: "lecture-register",
-    mode: "general",
+    context: "generic",
     korean:
       "자, 그러면 다음 장으로 넘어가겠습니다. 이 부분은 시험에 나올 가능성이 높으니까 집중해 주시기 바랍니다.",
     challenge:
@@ -447,7 +447,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b31",
     category: "public-notice",
-    mode: "general",
+    context: "generic",
     korean: "민원 접수는 오후 여섯 시까지이며, 신분증을 반드시 지참하셔야 합니다.",
     challenge:
       "A public-service announcement a visitor will act on. 반드시 is not a suggestion, and softening it into one sends someone home for their ID a second time.",
@@ -457,7 +457,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b32",
     category: "code-mixed",
-    mode: "general",
+    context: "generic",
     korean:
       "이번 분기 KPI는 달성했는데, 다음 스프린트에서 리소스가 좀 타이트할 것 같아요.",
     challenge:
@@ -469,11 +469,11 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b33",
     category: "stt-error",
-    mode: "sermon",
+    context: "worship",
     korean: "오늘 말씀은 유정기 목사님께서 전해 주시겠습니다.",
     // The interpreter has already overruled the recogniser once. That
     // correction is absolute, and this case exists to check it actually wins.
-    context: {
+    history: {
       corrections: [{ from: "유정기", to: "류정길", english: "Ryu Jeong-gil" }],
     },
     challenge:
@@ -487,7 +487,7 @@ export const BENCH_CASES: BenchCase[] = [
   {
     id: "b34",
     category: "abandoned-number",
-    mode: "sermon",
+    context: "worship",
     korean: "헌금은 총 삼백... 아니 잠시만요, 확인해 보겠습니다.",
     challenge:
       "A figure is started and abandoned with nothing put in its place. There is no correct number to give, so any number is invented — and this one is about money.",

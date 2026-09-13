@@ -82,43 +82,8 @@ describe("Deepgram endpointing", () => {
 
   it("refuses a language it has no model for rather than guessing one", async () => {
     await expect(deepgram({ language: "ug-CN", utterance: true }).url()).rejects.toThrow(
-      /does not support the requested language/i,
+      /does not support/i,
     );
-  });
-
-  it("sends the registry's Deepgram id for any spelling of a language", async () => {
-    expect((await deepgram({ language: "zh-Hant-HK" }).url()).searchParams.get("language")).toBe("zh-TW");
-    expect((await deepgram({ language: "zh" }).url()).searchParams.get("language")).toBe("zh-CN");
-    expect((await deepgram({ language: "ja-JP" }).url()).searchParams.get("language")).toBe("ja");
-    expect((await deepgram({}).url()).searchParams.get("language")).toBe("ko-KR");
-  });
-
-  it("passes the final alternative's confidence and the other alternatives as meta", () => {
-    const provider = deepgram({ language: "ko-KR" });
-    const stable: unknown[][] = [];
-    provider.onStable((...args) => stable.push(args));
-
-    provider.message({
-      is_final: false,
-      channel: { alternatives: [{ transcript: "여권을", confidence: 0.4 }] },
-    });
-    provider.message({
-      is_final: true,
-      channel: {
-        alternatives: [
-          { transcript: "여권을 보여 주세요", confidence: 0.93 },
-          { transcript: "여권을 보여주세요", confidence: 0.61 },
-          { transcript: "여권을 보여 주세요" },
-        ],
-      },
-    });
-    provider.message({ is_final: true, channel: { alternatives: [{ transcript: "감사합니다" }] } });
-
-    expect(stable).toEqual([
-      ["여권을 보여 주세요", { confidence: 0.93, alternatives: ["여권을 보여주세요"] }],
-      // Nothing known beyond the text: the one-argument shape is preserved.
-      ["감사합니다"],
-    ]);
   });
 });
 

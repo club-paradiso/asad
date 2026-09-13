@@ -15,8 +15,7 @@
  */
 import { useCallback, useState } from "react";
 import type { GlossaryItem, PrepBrief, PrepSheet } from "@/types";
-import { layerForDomain } from "@/types";
-import { canonicalPair } from "@/languages/registry";
+import { contextFromMode } from "@/interpreter/context/context-mode";
 import { loadSettings, prepStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
@@ -50,27 +49,21 @@ export function PrepScreen() {
     [prep, setPrep],
   );
 
-  const currentInput = useCallback(() => {
-    const settings = loadSettings();
-    const context = settings.context;
-    return {
-      // The request schema still keys its prompt modules by layer, so the
-      // layer is derived here — from the interpreter's override when there
-      // is one, otherwise from nothing, because no room has been heard yet.
-      mode: layerForDomain(context === "auto" ? "generic" : context),
-      languagePair: canonicalPair({
-        source: settings.sourceLanguage,
-        target: settings.targetLanguage,
-      }),
-      domain: context,
+  const currentInput = useCallback(
+    () => ({
+      // Prep is written before a session, so there is no resolved context to
+      // read yet — only the hint. `auto` means "no domain steer", which for a
+      // brief is exactly `generic`.
+      context: contextFromMode(loadSettings().context, "generic"),
       speaker: prep.speaker,
       title: prep.title,
       organisation: prep.organisation,
       scripture: prep.scripture,
       notes: prep.notes,
       outline: prep.outline,
-    };
-  }, [prep]);
+    }),
+    [prep],
+  );
 
   const applyBrief = useCallback(
     (nextBrief: PrepBrief, reason?: string) => {

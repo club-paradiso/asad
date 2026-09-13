@@ -12,11 +12,12 @@ import { createCloudLane, INTERPRET_RETRY_DELAYS_MS } from "./cloud-lane";
 import { SESSION_QUOTA_BYPASS_MS, TEMPORARY_RATE_LIMIT_BYPASS_MS } from "./cloud-degradation";
 
 const request: InterpretRequest = {
-  mode: "sermon",
+  context: "worship",
+  source: "ko-KR",
+  target: "en-US",
   lag: "fast",
-  languagePair: { source: "ko-KR", target: "en-US" },
   pending: "오늘 우리는 서로를 사랑해야 합니다.",
-  context: { recentKorean: [], recentEnglish: [], glossary: [], entities: [], scripture: [], corrections: [] },
+  history: { recentKorean: [], recentEnglish: [], glossary: [], entities: [], scripture: [], corrections: [] },
   continuesPrevious: false,
   allowAnticipation: false,
 };

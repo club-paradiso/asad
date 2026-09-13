@@ -1,23 +1,19 @@
 "use client";
 
 /**
- * Chrome's built-in Translator API as a last-resort on-device path.
+ * Chrome's built-in Translator API as a last-resort on-device translation path.
  *
  * This deliberately does NOT try to replace the interpretation model. It has
  * no sermon context, glossary memory, anticipation or rhetorical adaptation.
  * Its job is narrower and more valuable: when the cloud is unavailable or the
- * free quota is exhausted, show usable target-language text instead of echoing
- * the source back to a human interpreter.
+ * free quota is exhausted, show usable English instead of echoing Korean back
+ * to a human interpreter.
  *
  * The API is feature-detected because it is currently a desktop-Chrome
  * capability rather than a baseline web API. No polyfill is used: a remote
  * polyfill would defeat the point of a zero-cost, on-device fallback.
- *
- * Which languages Chrome's translator keys, and how (Simplified Chinese is
- * plain `zh`, Traditional is `zh-Hant`), is recorded in the language registry.
  */
 import type { ParsedInterpreterOutput } from "@/lib/schema";
-import { browserTranslatorTagFor, type LanguagePairIds } from "@/languages/registry";
 
 export type BrowserTranslatorStatus = "unsupported" | "preparing" | "ready" | "failed";
 
@@ -57,39 +53,20 @@ export interface BrowserTranslatorPreparation {
   supported: boolean;
 }
 
-/** Chrome Translator tags for both sides of a pair, or null when either side is not offered. */
-function browserTranslatorTags(
-  pair: LanguagePairIds,
-): { sourceLanguage: string; targetLanguage: string } | null {
-  const sourceLanguage = browserTranslatorTagFor(pair.source);
-  const targetLanguage = browserTranslatorTagFor(pair.target);
-  if (!sourceLanguage || !targetLanguage) return null;
-  return { sourceLanguage, targetLanguage };
-}
-
-/** Whether the registry offers Chrome's on-device translator for this pair at all. */
-export const browserTranslatorSupportsPair = (pair: LanguagePairIds): boolean =>
-  browserTranslatorTags(pair) !== null;
-
 /**
  * Begin creation synchronously from the Start button's user gesture.
  *
  * Chrome may require user activation when the language pack is not downloaded.
  * Do not put an `await Translator.availability()` in front of this call: doing
  * so can squander the gesture we specifically need for `create()`.
- *
- * A pair the registry does not offer through the browser reports
- * `supported: false` without touching the API: asking Chrome for a Uyghur
- * pack it does not have would fail anyway, only later and less clearly.
  */
 export function beginBrowserTranslatorPreparation(input: {
-  pair: LanguagePairIds;
+  /** Chrome's own language codes — resolved from the registry, never guessed. */
+  source?: string;
+  target?: string;
   signal?: AbortSignal;
   onDownloadProgress?: (progress: number) => void;
-}): BrowserTranslatorPreparation {
-  const tags = browserTranslatorTags(input.pair);
-  if (!tags) return { supported: false, session: Promise.resolve(null) };
-
+} = {}): BrowserTranslatorPreparation {
   const factory = (globalThis as TranslatorGlobal).Translator;
   if (!factory?.create) {
     return { supported: false, session: Promise.resolve(null) };
@@ -98,7 +75,8 @@ export function beginBrowserTranslatorPreparation(input: {
   try {
     const session = factory
       .create({
-        ...tags,
+        sourceLanguage: input.source ?? "ko",
+        targetLanguage: input.target ?? "en",
         signal: input.signal,
         monitor(monitor) {
           monitor.addEventListener("downloadprogress", (event) => {

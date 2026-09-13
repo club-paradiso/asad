@@ -1,8 +1,13 @@
-# Sermon Mode: booth product contract
+# The worship booth: product contract
+
+> **A note on naming.** There is no longer a "Sermon Mode" to enter. ASAD
+> infers a worship context from the speech (see
+> [`context-intelligence.md`](./context-intelligence.md)), and everything below
+> describes what the product does once it has — not a mode anyone selects.
 
 ## Product premise
 
-ASAD Sermon Mode is an **AI copilot for a human simultaneous interpreter working inside an existing church interpretation setup**.
+ASAD in a worship context is an **AI copilot for a human simultaneous interpreter working inside an existing church interpretation setup**.
 
 A supported church already has:
 
@@ -42,7 +47,7 @@ church mixer / broadcast system
                        foreign congregants
 ```
 
-The congregation receives the **human interpreter's voice through the church's existing equipment**. ASAD has no congregation-facing output path in Sermon Mode.
+The congregation receives the **human interpreter's voice through the church's existing equipment**. ASAD has no congregation-facing output path.
 
 ## What ASAD is responsible for
 
@@ -66,7 +71,7 @@ The congregation receives the **human interpreter's voice through the church's e
 
 ## Non-goals
 
-Sermon Mode is deliberately **not**:
+This is deliberately **not**:
 
 - audience-facing live captions;
 - a QR sermon-translation page;
@@ -75,7 +80,7 @@ Sermon Mode is deliberately **not**:
 - a replacement for an interpretation booth or church distribution hardware;
 - a replacement for a human interpreter.
 
-Counter Mode is a separate product surface and may continue to use QR/session links. These non-goals apply specifically to Sermon Mode.
+Counter Mode is a separate product surface and may continue to use QR/session links. These non-goals apply specifically to the booth.
 
 ## Booth audio policy
 
@@ -109,7 +114,7 @@ ASAD does not automatically fail over to another physical microphone.
 
 ## Booth preflight
 
-Before a real service, open `/booth-preflight` from the home screen and verify the hardware path before starting Sermon Mode.
+Before a real service, open `/booth-preflight` from the home screen and verify the hardware path before starting a session.
 
 The preflight is deliberately local-only:
 

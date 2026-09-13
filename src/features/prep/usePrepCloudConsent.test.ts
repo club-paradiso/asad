@@ -77,7 +77,7 @@ describe("Prep cloud consent", () => {
   it("labels an explicit local-only brief without suggesting cloud setup", () => {
     const brief = localPrepBrief(
       {
-        mode: "sermon",
+        context: "worship",
         speaker: "류정길",
         title: "은혜",
         notes: "민감한 목회 메모",

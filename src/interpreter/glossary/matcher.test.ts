@@ -28,42 +28,42 @@ describe("Korean whole-word matching", () => {
 });
 
 describe("glossary matching", () => {
-  it("finds theological terms in sermon mode", () => {
-    const matches = matchGlossary("우리는 하나님의 부르심을 받은 사람들입니다.", "sermon");
+  it("finds theological terms in a worship context", () => {
+    const matches = matchGlossary("우리는 하나님의 부르심을 받은 사람들입니다.", "worship");
     const terms = matches.map((m) => m.korean);
     expect(terms).toContain("부르심");
     expect(terms).toContain("하나님");
   });
 
   it("prefers the longest term and suppresses nested ones", () => {
-    const matches = matchGlossary("우리는 하나님 나라의 백성입니다.", "sermon");
+    const matches = matchGlossary("우리는 하나님 나라의 백성입니다.", "worship");
     const terms = matches.map((m) => m.korean);
     expect(terms).toContain("하나님 나라");
     expect(terms).not.toContain("하나님");
   });
 
   it("applies no theological vocabulary in general mode", () => {
-    const matches = matchGlossary("우리는 하나님의 부르심을 받았습니다.", "general");
+    const matches = matchGlossary("우리는 하나님의 부르심을 받았습니다.", "generic");
     expect(matches.map((m) => m.korean)).not.toContain("부르심");
   });
 
   it("orders the live rail by recency and keeps it short", () => {
     const text =
       "은혜 그리고 구원 그리고 회개 그리고 언약 그리고 성령 그리고 복음 그리고 믿음 그리고 소망";
-    const live = liveGlossary(text, "sermon");
+    const live = liveGlossary(text, "worship");
     expect(live.length).toBeLessThanOrEqual(6);
     // Most recent first.
     expect(live[0].korean).toBe("소망");
   });
 
   it("keeps discourse markers off the live rail", () => {
-    const live = liveGlossary("여러분, 사실은 그러니까 은혜입니다", "sermon");
+    const live = liveGlossary("여러분, 사실은 그러니까 은혜입니다", "worship");
     expect(live.map((item) => item.korean)).not.toContain("여러분");
     expect(live.map((item) => item.korean)).toContain("은혜");
   });
 
   it("lets a prep decision outrank the built-in lexicon", () => {
-    const matches = matchGlossary("은혜가 넘칩니다", "sermon", [
+    const matches = matchGlossary("은혜가 넘칩니다", "worship", [
       { korean: "은혜", english: "favour", source: "prep" },
     ]);
     expect(matches.find((m) => m.korean === "은혜")?.english).toBe("favour");

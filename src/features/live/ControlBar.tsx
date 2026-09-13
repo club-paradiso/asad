@@ -61,9 +61,8 @@ export function ControlBar({
           onClick={onReturnToLive}
           size="md"
           tone="neutral"
-          className="h-11 min-w-[4.75rem] shrink-0 px-3 sm:h-12 tall:h-14"
+          className="h-11 shrink-0 sm:h-12 tall:h-14"
           title="Jump back to live (F)"
-          ariaLabel="Jump back to live"
         >
           <span className="text-base">↓ Live</span>
         </Button>

@@ -153,6 +153,13 @@ jobs:
       - name: Two-lane provisional/refinement checks
         run: npm run e2e:live-two-lane -- http://localhost:3000 ./e2e-out
 
+      # One non-default language pair followed all the way down — picker,
+      # recogniser locale, on-device translator, the wire, the console — plus a
+      # pair that cannot work being refused before the microphone opens. It
+      # checks what ASAD asks its providers for, not what they deliver.
+      - name: Language-pair checks
+        run: npm run e2e:live-languages -- http://localhost:3000
+
       # The screenshots are the point when a check fails: they show what the
       # page actually looked like, which no assertion message can.
       - name: Upload screenshots

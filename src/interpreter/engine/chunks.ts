@@ -17,15 +17,6 @@ import type { Confidence, InterpretationChunk } from "@/types";
 
 export type ChunkDraft = Omit<InterpretationChunk, "id" | "state" | "at">;
 
-/** Provisional chunks belonging to any of `turnIds`, in stream order. */
-export const provisionalChunksFor = (
-  chunks: InterpretationChunk[],
-  turnIds: readonly number[],
-): InterpretationChunk[] =>
-  chunks.filter(
-    (c) => c.provisional === true && c.turnId !== undefined && turnIds.includes(c.turnId),
-  );
-
 let counter = 0;
 /** Monotonic id. Stable across a session; not intended to be global. */
 export const nextChunkId = (prefix = "c"): string => {
@@ -220,6 +211,15 @@ export function trimChunks(chunks: InterpretationChunk[]): InterpretationChunk[]
  * The only new question these helpers answer is: "may contextual English for
  * turn N still replace what the fast lane rendered for turn N?"
  * ------------------------------------------------------------------------ */
+
+/** Provisional chunks belonging to any of `turnIds`, in stream order. */
+export const provisionalChunksFor = (
+  chunks: InterpretationChunk[],
+  turnIds: readonly number[],
+): InterpretationChunk[] =>
+  chunks.filter(
+    (c) => c.provisional === true && c.turnId !== undefined && turnIds.includes(c.turnId),
+  );
 
 /**
  * - `refine`: every provisional chunk of those turns is still editable.

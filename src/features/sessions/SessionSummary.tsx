@@ -11,7 +11,6 @@ import { useMemo } from "react";
 import type { StoredSession } from "@/types";
 import { buildReview } from "./review";
 import { downloadSession } from "@/lib/export";
-import { canonicalPair, languageDisplayName, pairLabel, resolveLanguage } from "@/languages/registry";
 import { Button, Label } from "@/components/ui/primitives";
 
 const duration = (ms: number) => {
@@ -37,9 +36,6 @@ export function SessionSummary({
   onClose: () => void;
 }) {
   const review = useMemo(() => buildReview(session), [session]);
-  const pair = canonicalPair({ source: session.sourceLanguage, target: session.targetLanguage });
-  const source = resolveLanguage(pair.source);
-  const sourceIsKorean = (source?.base ?? "ko") === "ko";
 
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col gap-5 px-5 py-8">
@@ -50,9 +46,9 @@ export function SessionSummary({
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             {session.speaker ? `${session.speaker} · ` : ""}
-            {pairLabel(pair)} · {duration(review.durationMs)} · {review.segmentCount} segments ·{" "}
-            {review.chunkCount} {languageDisplayName(pair.target)} lines ·{" "}
-            {review.koreanCharacters.toLocaleString()} {languageDisplayName(pair.source)} characters
+            {duration(review.durationMs)} · {review.segmentCount} segments ·{" "}
+            {review.chunkCount} English lines · {review.koreanCharacters.toLocaleString()} Korean
+            characters
           </p>
         </div>
         <Button tone="quiet" onClick={onClose}>
@@ -174,21 +170,16 @@ export function SessionSummary({
       <Section title="Full transcript">
         <div className="scroll-y max-h-96 rounded-md border border-[var(--line)] bg-[var(--bg-raised)] p-3">
           {session.segments.map((segment) => (
-            <p
-              key={segment.id}
-              lang={pair.source}
-              dir={source?.direction ?? "ltr"}
-              className={`${sourceIsKorean ? "font-korean" : ""} source-text mb-2 text-sm text-[var(--fg-muted)]`}
-            >
+            <p key={segment.id} className="font-korean mb-2 text-sm text-[var(--fg-muted)]">
               {segment.text}
             </p>
           ))}
         </div>
       </Section>
 
-      <Section title={`Reconstructed ${languageDisplayName(pair.target)}`}>
+      <Section title="Reconstructed English">
         <div className="scroll-y max-h-96 rounded-md border border-[var(--line)] bg-[var(--bg-raised)] p-3">
-          <p lang={pair.target} className="text-sm leading-relaxed text-[var(--fg)]">
+          <p className="text-sm leading-relaxed text-[var(--fg)]">
             {session.chunks.map((chunk) => chunk.text).join(" ")}
           </p>
         </div>

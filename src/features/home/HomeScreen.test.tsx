@@ -17,10 +17,9 @@ describe("HomeScreen default language", () => {
     fireEvent.change(picker, { target: { value: "fr-FR" } });
 
     expect(picker.value).toBe("fr-FR");
-    expect(screen.getByText(/현재 프랑스어로 설정됨/)).toBeTruthy();
-    // Live is no longer pinned to one pair; the home screen must not say so.
-    expect(screen.queryByText(/한국어 → 영어 고정/)).toBeNull();
-    expect(screen.getByText("설교 · 강연 · 회의 · 언어 쌍 선택")).toBeTruthy();
+    expect(
+      screen.getByText("현재 프랑스어로 설정됨 · 라이브 통역은 현재 한국어 → 영어 고정"),
+    ).toBeTruthy();
 
     expect(JSON.parse(window.localStorage.getItem(COUNTER_PREFERENCES_STORAGE_KEY) ?? "{}"))
       .toMatchObject({ hostLang: "fr-FR" });

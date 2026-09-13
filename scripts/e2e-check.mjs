@@ -13,6 +13,7 @@ import { chromium } from "playwright";
 import { chromiumLaunchOptions } from "./browser.mjs";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { chooseLocalOnly, chooseRecogniser, start } from "./launcher.mjs";
 
 const base = process.argv[2] ?? "http://localhost:3000";
 const outDir = process.argv[3] ?? "./e2e-out";
@@ -64,13 +65,11 @@ await page.screenshot({ path: join(outDir, "home.png") });
 
 // --- Live session ---------------------------------------------------------
 await page.goto(`${base}/live`, { waitUntil: "networkidle" });
-const privacyDialog = page.getByRole("dialog", { name: /This setup sends what is said/ });
-if (await privacyDialog.isVisible().catch(() => false)) {
-  await privacyDialog.getByRole("button", { name: "Use local-only mode" }).click();
+if (await chooseLocalOnly(page)) {
   check("live privacy gate offers a working local-only path", true);
 }
-await page.getByRole("radio", { name: /^데모/ }).click();
-await page.getByRole("button", { name: "데모 실행" }).click();
+await chooseRecogniser(page, "demo");
+await start(page);
 await page.waitForTimeout(3000);
 
 await page.getByLabel("Session settings").click();

@@ -3,42 +3,37 @@
 /**
  * The interpreter console.
  *
- * Layout is a grid pinned to the viewport, with the translation stream taking
- * everything left over. That ordering is the product: translation dominant,
- * source available, context reachable, one control at the thumb.
+ * Layout is a grid pinned to the viewport, with the English stream taking
+ * everything left over. That ordering is the product: English dominant, Korean
+ * available, context reachable, one control at the thumb.
  *
- *   ┌──────────────────────────────────────────┐  44px   status · pair · mic
+ *   ┌──────────────────────────────────────────┐  44px   status
  *   │                                          │
- *   │           TRANSLATION  (1fr)             │         the thing you say
+ *   │            ENGLISH  (1fr)                │         the thing you say
  *   │                                          │
- *   ├──────────────────────────────────────────┤  ≤22%   source, checkable
+ *   ├──────────────────────────────────────────┤  ≤22%   Korean, checkable
  *   ├──────────────────────────────────────────┤  auto   context rail, when
  *   │                                          │         it has a cue
  *   └──────────────────────────────────────────┘  auto   FREEZE
  *
- * Every row except the translation earns its height or is not rendered: the
+ * Every row except the English earns its height or is not rendered: the
  * context rail is absent until there is something to put in it, and the
- * notice row above the translation exists only during a demo or while the
+ * notice row above the English exists only during a demo or while the
  * on-device backup is still coming up.
  *
  * On an iPhone in landscape the whole thing is about 390px tall, which is why
- * the source row is capped as a percentage, the context rail scrolls
+ * the Korean row is capped as a percentage, the context rail scrolls
  * horizontally rather than wrapping, and the chrome sheds padding below 480px.
- *
- * There is no mode. The pair label in the strip says what is being
- * interpreted into what; the context chip, when the Context Engine has an
- * answer worth showing, says what kind of room it thinks this is.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ContextDomain, PrepSheet, SessionSettings, StoredSession } from "@/types";
-import { layerForDomain } from "@/types";
+import type { SessionSettings, StoredSession } from "@/types";
+import { isWorshipContext } from "@/interpreter/context/context-mode";
 import { activeChunk } from "@/interpreter/engine/chunks";
 import type { EngineSnapshot } from "@/interpreter/engine/session";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import type { SttProviderId } from "@/providers/stt";
-import { languageBase, pairLabel } from "@/languages/registry";
 import { saveSession } from "@/lib/storage";
 import { downloadSession } from "@/lib/export";
 import { Button } from "@/components/ui/primitives";
@@ -52,9 +47,8 @@ import { SettingsSheet } from "./SettingsSheet";
 import { Teleprompter } from "./Teleprompter";
 import { DemoRibbon } from "./DemoRibbon";
 import { LiveRescueOverlay } from "./LiveRescueOverlay";
-import { CorrectionPopover } from "./CorrectionPopover";
 import { aiStateFrom } from "./AiStatus";
-import { contextLabel } from "./live-strings";
+import type { PrepSheet } from "@/types";
 
 const FONT_SCALE_RANGE = { min: 0.7, max: 1.9 } as const;
 
@@ -75,30 +69,27 @@ export function LiveConsole({
 }) {
   const [frozen, setFrozen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsFocusContext, setSettingsFocusContext] = useState(false);
-  /** The source text the interpreter long-pressed; null while the box is closed. */
-  const [correcting, setCorrecting] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
   const {
     snapshot,
     phase,
     error,
+    fault,
     demoBeat,
     startedAt,
     lastProvider,
     browserTranslatorStatus,
-    audio,
     start,
+    resume,
     stop,
     correct,
-    setContext,
   } = session;
 
   // NO DISCLOSURE FETCH HERE, deliberately.
   //
   // It used to live in this component, and by the time it resolved the session
-  // had already started — the microphone was open and the first sentence had
+  // had already started — the microphone was open and the first Korean had
   // reached a cloud provider before the interpreter was told it would. A
   // dialog that appears after the data has left is not consent.
   //
@@ -144,17 +135,16 @@ export function LiveConsole({
     [settings, onSettingsChange],
   );
 
-  const { languagePair, domain } = snapshot;
-  const sourceIsKorean = languageBase(languagePair.source) === "ko";
-
   const buildStoredSession = useCallback(
     (sourceSnapshot: EngineSnapshot = snapshot): StoredSession => ({
       id: `session-${startedAt ?? Date.now()}`,
       startedAt: startedAt ?? Date.now(),
       endedAt: Date.now(),
-      sourceLanguage: languagePair.source,
-      targetLanguage: languagePair.target,
-      domain: domain.domain,
+      // What the session actually RAN as, not what was asked for. A stored
+      // session labelled "auto" would tell a later reader nothing.
+      context: sourceSnapshot.context.resolved,
+      sourceLanguage: settings.sourceLanguage,
+      targetLanguage: settings.targetLanguage,
       title: prep.title,
       speaker: prep.speaker,
       segments: sourceSnapshot.segments,
@@ -165,7 +155,7 @@ export function LiveConsole({
       entities: sourceSnapshot.entities,
       corrections: sourceSnapshot.corrections,
     }),
-    [snapshot, languagePair, domain.domain, prep, startedAt],
+    [snapshot, settings.sourceLanguage, settings.targetLanguage, prep, startedAt],
   );
 
   const handleEnd = useCallback(async () => {
@@ -175,27 +165,6 @@ export function LiveConsole({
     if (settings.saveHistory) saveSession(stored);
     onEnd(settings.saveHistory ? stored : null);
   }, [stop, buildStoredSession, settings.saveHistory, onEnd]);
-
-  /** Manual override: the engine hears it now, settings remember it. */
-  const changeContext = useCallback(
-    (context: ContextDomain) => {
-      setContext(context);
-      onSettingsChange({ ...settings, context });
-    },
-    [setContext, settings, onSettingsChange],
-  );
-
-  const openContextOverride = useCallback(() => {
-    setSettingsFocusContext(true);
-    setSettingsOpen(true);
-  }, []);
-
-  const closeSettings = useCallback(() => {
-    setSettingsOpen(false);
-    setSettingsFocusContext(false);
-  }, []);
-
-  const closeCorrection = useCallback(() => setCorrecting(null), []);
 
   useHotkeys(
     useMemo(
@@ -216,27 +185,20 @@ export function LiveConsole({
         "+": () => adjustFontScale(0.1),
         "=": () => adjustFontScale(0.1),
         "-": () => adjustFontScale(-0.1),
-        escape: closeSettings,
+        escape: () => setSettingsOpen(false),
       }),
-      [toggleFreeze, autoScroll, settings, onSettingsChange, adjustFontScale, closeSettings],
+      [toggleFreeze, autoScroll, settings, onSettingsChange, adjustFontScale],
     ),
-    // Off while any text box is open: a half-typed correction that the T key
-    // turns into a teleprompter is worse than no shortcut at all.
-    !settingsOpen && correcting === null,
+    !settingsOpen,
   );
 
   const teleprompter = settings.view === "teleprompter";
-  // Rescue is sermon intelligence. It follows the Context Engine's LAYER, not
-  // a mode the interpreter chose — there is none.
+  // Rescue is worship-shaped help — Scripture, theological register, the
+  // bridge back into a sermon. It follows the RESOLVED context rather than a
+  // mode chosen before anyone spoke, so it appears when it is relevant and
+  // stays out of the way when it is not.
   const rescueAvailable =
-    layerForDomain(domain.domain) === "sermon" && source !== "demo" && phase === "running";
-
-  // The chip is only worth a glance when the engine has actually decided
-  // something: the default and "generic" are the absence of a decision.
-  const contextChip =
-    domain.source !== "default" && domain.domain !== "generic"
-      ? contextLabel(domain.domain)
-      : undefined;
+    isWorshipContext(snapshot.context.resolved) && source !== "demo" && phase === "running";
 
   return (
     <div
@@ -260,11 +222,12 @@ export function LiveConsole({
           lastProvider,
           started: phase === "running",
         })}
+        fault={fault}
+        context={snapshot.context}
+        sourceLanguage={settings.sourceLanguage}
+        targetLanguage={settings.targetLanguage}
+        onContextChange={(context) => onSettingsChange({ ...settings, context })}
         scripted={source === "demo"}
-        pairLabel={pairLabel(languagePair)}
-        audio={audio}
-        context={contextChip}
-        onOpenContext={openContextOverride}
         onOpenSettings={() => setSettingsOpen(true)}
         onEnd={() => void handleEnd()}
       />
@@ -286,9 +249,9 @@ export function LiveConsole({
         <div />
       )}
 
-      {/* --- Translation: the dominant region ------------------------------ */}
+      {/* --- English: the dominant region ---------------------------------- */}
       {/* `min-w-0` on every row: a grid item defaults to `min-width: auto`,
-          which lets a long source segment push the row wider than the column
+          which lets a long Korean segment push the row wider than the column
           instead of wrapping — the text then runs off the right edge. */}
       <main className="relative min-h-0 min-w-0">
         {teleprompter ? (
@@ -296,31 +259,39 @@ export function LiveConsole({
             chunks={snapshot.chunks}
             segments={snapshot.segments}
             partial={snapshot.partial}
-            showSource={settings.showSource}
-            sourceLanguage={languagePair.source}
-            targetLanguage={languagePair.target}
+            showKorean={settings.showSource}
           />
         ) : (
           <TargetStream
             chunks={snapshot.chunks}
             activeId={active?.id}
+            language={settings.targetLanguage}
             containerRef={autoScroll.containerRef}
             activeRef={autoScroll.activeRef}
-            language={languagePair.target}
             // Short enough to take in without reading. The interpreter is
             // waiting for the speaker, not for an explanation of the product.
             emptyMessage={
               phase === "starting"
                 ? "Connecting…"
-                : phase === "idle" && source !== "demo"
-                  ? "Not listening."
-                  : "Waiting for the speaker."
+                : phase === "recovering"
+                  ? "Reconnecting…"
+                  : phase === "interrupted"
+                    ? "Paused."
+                    : phase === "idle" && source !== "demo"
+                      ? "Not listening."
+                      : "Waiting for the speaker."
             }
           />
         )}
 
-        {rescueAvailable && !settingsOpen && correcting === null && (
-          <LiveRescueOverlay snapshot={snapshot} prep={prep} startedAt={startedAt} />
+        {rescueAvailable && !settingsOpen && (
+          <LiveRescueOverlay
+            snapshot={snapshot}
+            prep={prep}
+            startedAt={startedAt}
+            sourceLanguage={settings.sourceLanguage}
+            targetLanguage={settings.targetLanguage}
+          />
         )}
 
         {frozen && (
@@ -334,9 +305,25 @@ export function LiveConsole({
           </div>
         )}
 
-        {error && (
-          <div className="absolute inset-x-3 bottom-3 z-20 flex flex-wrap items-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_50%,transparent)] bg-[var(--bg-overlay)] px-3 py-2 shadow-lg">
-            <p className="min-w-48 flex-1 text-xs leading-relaxed text-[var(--danger)]">{error}</p>
+        {/* One bar, three different situations, and the difference is the
+            whole point: a dropped socket recovers itself and says so, a denied
+            microphone waits for the person who can grant it, and a failure
+            before anything was heard sends you back to Start. In none of them
+            is what is already on screen thrown away. */}
+        {(error || fault) && (
+          <div
+            role="status"
+            className="absolute inset-x-3 bottom-3 z-20 flex flex-wrap items-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_50%,transparent)] bg-[var(--bg-overlay)] px-3 py-2 shadow-lg"
+          >
+            <p className="min-w-48 flex-1 text-xs leading-relaxed text-[var(--danger)]">
+              {fault?.message ?? error}
+              {fault?.recovering && " Reconnecting — the transcript is kept."}
+            </p>
+            {phase === "interrupted" && (
+              <Button size="md" tone="primary" onClick={() => void resume()}>
+                Resume
+              </Button>
+            )}
             {phase === "idle" && (
               <Button
                 size="md"
@@ -349,7 +336,7 @@ export function LiveConsole({
                 Try again
               </Button>
             )}
-            {phase !== "idle" && (
+            {phase !== "idle" && phase !== "interrupted" && !fault?.recovering && (
               <Button size="md" tone="quiet" onClick={session.dismissError}>
                 Dismiss
               </Button>
@@ -358,34 +345,17 @@ export function LiveConsole({
         )}
       </main>
 
-      {/* --- Source: secondary, capped ------------------------------------- */}
+      {/* --- Korean: secondary, capped ------------------------------------- */}
       {settings.showSource && !teleprompter && (
         // Capped as a fraction of the viewport, and capped harder on a short
-        // one: on an iPhone in landscape the source must not eat the
-        // translation. `relative` so the correction box can anchor to its
-        // bottom edge and grow upward over the translation — never the other
-        // way round.
-        <section className="relative max-h-[17dvh] min-h-0 min-w-0 border-t border-[var(--line)] bg-[var(--bg)] tall:max-h-[22dvh]">
+        // one: on an iPhone in landscape the Korean must not eat the English.
+        <section className="max-h-[17dvh] min-h-0 min-w-0 border-t border-[var(--line)] bg-[var(--bg)] tall:max-h-[22dvh]">
           <SourceStream
             segments={snapshot.segments}
             partial={snapshot.partial}
+            language={settings.sourceLanguage}
             frozen={frozen}
-            language={languagePair.source}
-            onSelectText={(text) => setCorrecting(text)}
           />
-          <div className="absolute inset-x-0 bottom-0 z-20 px-1 sm:px-4">
-            <CorrectionPopover
-              open={correcting !== null}
-              heard={correcting ?? ""}
-              defaultRemember={settings.rememberCorrections}
-              sourceIsKorean={sourceIsKorean}
-              onCancel={closeCorrection}
-              onApply={({ from, to, english, remember }) => {
-                correct(from, to, { english, remember });
-                closeCorrection();
-              }}
-            />
-          </div>
         </section>
       )}
 
@@ -412,13 +382,9 @@ export function LiveConsole({
 
       <SettingsSheet
         open={settingsOpen}
-        onClose={closeSettings}
+        onClose={() => setSettingsOpen(false)}
         settings={settings}
         onSettingsChange={onSettingsChange}
-        domain={domain}
-        onContextChange={changeContext}
-        focusContext={settingsFocusContext}
-        sourceIsKorean={sourceIsKorean}
         corrections={snapshot.corrections}
         onCorrect={correct}
         onExport={() => downloadSession(buildStoredSession(), "markdown")}

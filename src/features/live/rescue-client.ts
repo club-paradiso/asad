@@ -1,4 +1,4 @@
-import type { InterpretationMode, PrepSheet } from "@/types";
+import type { PrepSheet, ResolvedContext } from "@/types";
 import type { EngineSnapshot } from "@/interpreter/engine/session";
 import { rescueKoreanText } from "@/interpreter/engine/rescue";
 import { buildRollingContext } from "@/interpreter/context/rolling";
@@ -21,7 +21,9 @@ export interface RescueClientResult {
 
 export interface BuildRescueRequestInput {
   snapshot: EngineSnapshot;
-  mode: InterpretationMode;
+  context: ResolvedContext;
+  source: string;
+  target: string;
   prep: PrepSheet;
   /** Milliseconds since the live session started. */
   elapsedMs: number;
@@ -49,13 +51,15 @@ export function buildRescueRequest(input: BuildRescueRequestInput): RescueReques
   };
 
   const candidate = {
-    mode: input.mode,
+    context: input.context,
+    source: input.source,
+    target: input.target,
     recentKorean,
-    context: buildRollingContext({
+    history: buildRollingContext({
       segments: input.snapshot.segments,
       chunks: input.snapshot.chunks,
       memory,
-      mode: input.mode,
+      context: input.context,
       prep: input.prep,
     }),
   };

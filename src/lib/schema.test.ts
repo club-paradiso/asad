@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { migrateSession, migrateSettings } from "./storage";
 import {
   extractJsonObject,
   interpretRequestSchema,
@@ -78,10 +79,10 @@ describe("interpreter output validation", () => {
 
 describe("interpret request validation", () => {
   const base = {
-    mode: "sermon",
+    context: "worship",
     lag: "balanced",
     pending: "우리가 오늘 함께 살펴볼 말씀은 베드로전서 2장 9절입니다.",
-    context: { recentKorean: [], recentEnglish: [], glossary: [], entities: [], scripture: [], corrections: [] },
+    history: { recentKorean: [], recentEnglish: [], glossary: [], entities: [], scripture: [], corrections: [] },
   };
 
   it("accepts a minimal request and applies defaults", () => {
@@ -104,13 +105,73 @@ describe("interpret request validation", () => {
     expect(interpretRequestSchema.safeParse({ ...base, pending: "" }).success).toBe(false);
   });
 
-  it("rejects an unknown mode", () => {
-    expect(interpretRequestSchema.safeParse({ ...base, mode: "courtroom" }).success).toBe(false);
+  it("rejects an unknown context", () => {
+    expect(interpretRequestSchema.safeParse({ ...base, context: "courtroom" }).success).toBe(false);
+    // `auto` is what the USER may ask for. It is resolved in the browser, so a
+    // request carrying it is a request that skipped the resolver.
+    expect(interpretRequestSchema.safeParse({ ...base, context: "auto" }).success).toBe(false);
+  });
+
+  it("rejects a malformed language tag before it reaches a provider", () => {
+    expect(interpretRequestSchema.safeParse({ ...base, source: "not a tag" }).success).toBe(false);
+    expect(interpretRequestSchema.safeParse({ ...base, target: "" }).success).toBe(false);
+    expect(interpretRequestSchema.safeParse({ ...base, source: "zh-TW" }).success).toBe(true);
+  });
+
+  it("defaults the pair to Korean → English", () => {
+    const result = interpretRequestSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.source).toBe("ko-KR");
+      expect(result.data.target).toBe("en-US");
+    }
   });
 
   it("bounds the pending buffer so one call cannot blow up", () => {
     expect(
       interpretRequestSchema.safeParse({ ...base, pending: "가".repeat(5000) }).success,
     ).toBe(false);
+  });
+});
+
+describe("stored state written before contexts and language pairs existed", () => {
+  it("reads an old Sermon setting forward as an explicit worship override", () => {
+    // Not `auto`: someone who deliberately chose Sermon gets a different
+    // product if that choice is quietly dropped on upgrade.
+    const migrated = migrateSettings({ mode: "sermon", lag: "safe", showKorean: false });
+    expect(migrated.context).toBe("worship");
+    expect(migrated.showSource).toBe(false);
+    expect(migrated.lag).toBe("safe");
+    expect(migrated.sourceLanguage).toBe("ko-KR");
+    expect(migrated.targetLanguage).toBe("en-US");
+    expect(migrated).not.toHaveProperty("mode");
+    expect(migrated).not.toHaveProperty("showKorean");
+  });
+
+  it("reads an old General setting forward as auto", () => {
+    // "General" meant "no domain steer", and the honest modern form of that is
+    // "stop asking" — which is what auto does.
+    expect(migrateSettings({ mode: "general" }).context).toBe("auto");
+  });
+
+  it("leaves already-migrated settings alone", () => {
+    const migrated = migrateSettings({ context: "meeting", showSource: false, fontScale: 1.4 });
+    expect(migrated.context).toBe("meeting");
+    expect(migrated.showSource).toBe(false);
+    expect(migrated.fontScale).toBe(1.4);
+  });
+
+  it("reads an old saved session forward rather than discarding it", () => {
+    const migrated = migrateSession({
+      id: "session-1",
+      startedAt: 1,
+      mode: "sermon",
+      segments: [],
+      chunks: [],
+    });
+    expect(migrated.context).toBe("worship");
+    expect(migrated.sourceLanguage).toBe("ko-KR");
+    expect(migrated.targetLanguage).toBe("en-US");
+    expect(migrated).not.toHaveProperty("mode");
   });
 });

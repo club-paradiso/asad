@@ -6,9 +6,9 @@ const session: StoredSession = {
   id: "s1",
   startedAt: Date.UTC(2026, 7, 24, 10, 0, 0),
   endedAt: Date.UTC(2026, 7, 24, 10, 45, 0),
+  context: "worship",
   sourceLanguage: "ko-KR",
   targetLanguage: "en-US",
-  domain: "sermon",
   title: "Our Identity in Christ",
   speaker: "류정길",
   segments: [
@@ -57,39 +57,6 @@ describe("plain text export", () => {
 
   it("reports the duration", () => {
     expect(text).toContain("Duration: 45:00");
-  });
-
-  it("names the languages and the context, never a mode", () => {
-    expect(text).toContain("Languages: KO → EN");
-    expect(text).toContain("Context: sermon");
-    expect(text).not.toMatch(/^Mode:/m);
-  });
-
-  it("titles the transcript sections by language", () => {
-    const chinese = toPlainText({ ...session, sourceLanguage: "zh-TW", targetLanguage: "ko-KR" });
-    expect(chinese).toContain("Languages: ZH-TW → KO");
-    expect(chinese).toContain("— CHINESE (TRADITIONAL) TRANSCRIPT —");
-    expect(chinese).toContain("— INTERPRETER KOREAN —");
-  });
-});
-
-describe("legacy sessions", () => {
-  const legacy: StoredSession = {
-    ...session,
-    sourceLanguage: undefined,
-    targetLanguage: undefined,
-    domain: undefined,
-    mode: "general",
-  };
-
-  it("keeps the Mode line only for a session saved before the unified console", () => {
-    const text = toPlainText(legacy);
-    expect(text).toContain("Mode: general");
-    expect(text).not.toContain("Languages:");
-    expect(text).not.toContain("Context:");
-    // Those sessions were all Korean → English.
-    expect(text).toContain("— KOREAN TRANSCRIPT —");
-    expect(toMarkdown(legacy)).toContain("## Korean transcript");
   });
 });
 

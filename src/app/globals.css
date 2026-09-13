@@ -566,31 +566,3 @@ select:focus-visible,
 .mark-resolve {
   animation: mark-resolve 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
-
-/* --- Source pane, any script ---------------------------------------------
-   The source transcript is no longer only Korean. Hangul keeps `keep-all`
-   from `.font-korean`; a spaceless script (Thai, Khmer, Chinese, Japanese,
-   Burmese) has no word boundary for the browser to break at, and a long
-   clause otherwise runs off the right edge of a 390px phone. `anywhere`
-   lets the line break where it must and only where it must. */
-.source-text {
-  overflow-wrap: anywhere;
-}
-
-.source-text-spaceless {
-  word-break: normal;
-  line-break: loose;
-  overflow-wrap: anywhere;
-}
-
-/* The audio glyph's "hearing speech" state. Slower and shallower than
-   `pulse-live`: it must register in peripheral vision as "alive" without
-   ever pulling a fixation off the line being read. */
-@keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-
-.pulse-soft {
-  animation: pulse-soft 1.6s ease-in-out infinite;
-}

@@ -13,13 +13,14 @@ import { promptGlossary, liveGlossary } from "@/interpreter/glossary/matcher";
 import type { InterpretRequest } from "@/lib/schema";
 
 const request = (over: Partial<InterpretRequest> = {}): InterpretRequest => ({
-  mode: "sermon",
+  context: "worship",
+  source: "ko-KR",
+  target: "en-US",
   lag: "balanced",
-  languagePair: { source: "ko-KR", target: "en-US" },
   pending: "우리가 살면서 겪는 모든 일을 우리는 다",
   continuesPrevious: false,
   allowAnticipation: true,
-  context: {
+  history: {
     recentKorean: [],
     recentEnglish: [],
     glossary: [],
@@ -68,12 +69,12 @@ describe("discourse markers", () => {
   const KOREAN = "결론적으로 말씀드리면 우리는 은혜로 구원을 받았습니다";
 
   it("reach the model", () => {
-    const matched = promptGlossary(KOREAN, "sermon");
+    const matched = promptGlossary(KOREAN, "worship");
     expect(matched.some((g) => g.korean === "결론적으로")).toBe(true);
   });
 
   it("stay off the interpreter's rail", () => {
-    const railed = liveGlossary(KOREAN, "sermon");
+    const railed = liveGlossary(KOREAN, "worship");
     expect(railed.some((g) => g.korean === "결론적으로")).toBe(false);
   });
 
@@ -84,10 +85,8 @@ describe("discourse markers", () => {
         boundary: "sentence",
         detected: {
           scripture: [],
-          glossary: promptGlossary(KOREAN, "sermon"),
+          glossary: promptGlossary(KOREAN, "worship"),
           culturalNotes: [],
-          hypotheses: [],
-          memory: [],
         },
       }),
     );

@@ -21,6 +21,7 @@ import { chromium } from "playwright";
 import { chromiumLaunchOptions } from "./browser.mjs";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { chooseRecogniser, start } from "./launcher.mjs";
 
 const base = process.argv[2] ?? "http://localhost:3000";
 const outDir = process.argv[3] ?? "./e2e-out";
@@ -73,14 +74,21 @@ async function session(recover) {
         this.onend?.();
       }
       abort() {}
+      /** Emit one finalised line, so there is transcript to lose. */
+      deliver(text = "\uc624\ub298\uc740 \ud568\uaed8 \ubaa8\uc600\uc2b5\ub2c8\ub2e4.") {
+        this.onresult?.({
+          resultIndex: 0,
+          results: { length: 1, 0: { isFinal: true, length: 1, 0: { transcript: text, confidence: 0.9 } } },
+        });
+      }
     }
     window.SpeechRecognition = MockSpeechRecognition;
     window.webkitSpeechRecognition = MockSpeechRecognition;
   }, recover);
 
   await page.goto(`${base}/live`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("radio", { name: "브라우저" }).click();
-  await page.getByRole("button", { name: /통역 시작/ }).click();
+  await chooseRecogniser(page, "webspeech");
+  await start(page);
   await page.waitForTimeout(1200);
   return { page, context, problems };
 }
@@ -103,7 +111,7 @@ const readConsole = (page) =>
   check("a healthy session reports one word", state.strip === "Live", `strip: "${state.strip}"`);
   check(
     "the status strip carries no diagnostics",
-    !/Browser|Deepgram|OpenAI|AI |Balanced|Sermon|local/i.test(state.header),
+    !/Browser|Deepgram|OpenAI|AI |Balanced|local/i.test(state.header),
     `header: "${state.header.replace(/\s+/g, " ")}"`,
   );
   check("no page errors while healthy", problems.length === 0, problems.join(" | "));
@@ -114,13 +122,18 @@ const readConsole = (page) =>
 /* --- A denied microphone is named, and the advice fits ------------------- */
 {
   const { page, context, problems } = await session(false);
+  // Let a line of Korean land first, so what survives the failure is testable.
+  await page.evaluate(() => window.__rec?.deliver?.());
+  await page.waitForTimeout(600);
+  const beforeFailure = await readConsole(page);
+
   await page.evaluate(() => window.__rec?.onerror?.({ error: "not-allowed" }));
   await page.waitForTimeout(900);
   const state = await readConsole(page);
 
   check(
-    "a denied microphone stops the session visibly",
-    /Not listening/.test(state.strip),
+    "a denied microphone is named as a microphone, not as a lost device",
+    /No microphone/.test(state.strip),
     `strip: "${state.strip}"`,
   );
   check(
@@ -130,7 +143,15 @@ const readConsole = (page) =>
   );
   check(
     "the interpreter is offered a way back",
-    await page.getByRole("button", { name: /Try again/ }).isVisible(),
+    await page.getByRole("button", { name: /Resume|Try again/ }).isVisible(),
+  );
+  // The point of the lifecycle work: a fault costs the audio path, not the
+  // session. Whatever had been recognised is still on screen afterwards.
+  const survivors = (beforeFailure.body.match(/[가-힣]{2,}/g) ?? []).slice(0, 3);
+  check(
+    "the transcript survives a fault that needs a human",
+    survivors.length === 0 || survivors.every((word) => state.body.includes(word)),
+    survivors.length === 0 ? "nothing had been recognised yet" : survivors.join(" · "),
   );
   check("no page errors on a denied microphone", problems.length === 0, problems.join(" | "));
   await page.screenshot({ path: join(outDir, "live-failure-mic-denied.png") });

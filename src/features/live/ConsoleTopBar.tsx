@@ -5,7 +5,7 @@
  *
  * An instrument panel, not a dashboard. When everything is working this reads
  *
- *     ● Live  KO → EN  🎙                           18:42   ⋯   End
+ *     ● Live      ko → en · Worship                  18:42   ⋯   End
  *
  * and nothing else, because an interpreter mid-sentence cannot act on the
  * provider's name, the lag profile they chose before they started, or whether a
@@ -20,12 +20,25 @@
  * Interactive controls still keep a 44px touch target; shaving eight pixels off
  * a button is not worth missed taps in the middle of a sentence.
  */
-import type { ConnectionState, SubsystemHealth } from "@/types";
+import type { ConnectionState, ContextMode, SubsystemHealth } from "@/types";
 import { Button, StatusDot } from "@/components/ui/primitives";
 import type { AiState } from "./AiStatus";
-import { AudioStatus } from "./AudioStatus";
-import type { AudioActivity } from "./useLiveSession";
 import { cn } from "@/lib/cn";
+import { findLanguage } from "@/lib/languages";
+import type { SessionFault } from "./transport-supervisor";
+import {
+  CONTEXT_LABEL_EN,
+  CONTEXT_MODES,
+  type ContextState,
+} from "@/interpreter/context/context-mode";
+
+/** `ko-KR` reads as `ko` in a strip an interpreter glances at for a second. */
+export function shortTag(language: string): string {
+  const definition = findLanguage(language);
+  if (!definition) return language;
+  // A script variant is exactly the case where the bare base subtag would lie.
+  return definition.scriptVariant ? definition.id : definition.base;
+}
 
 export function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -62,13 +75,25 @@ export function consoleStatus(input: {
   health: SubsystemHealth;
   ai: AiState;
   /**
+   * The session's own verdict on why it stopped listening, when it has one.
+   *
+   * It outranks `connection`, and it has to: a recogniser reports its terminal
+   * error and then, a beat later, reports that it closed. The close arrives
+   * last and reads as `idle`, so the strip used to settle on "Idle" — the one
+   * word that means "nothing is wrong" — while the microphone was refused and
+   * the session was over.
+   */
+  fault?: SessionFault | null;
+  /**
    * Demo mode. Its English is scripted, so "there is no model answering" is
    * the arrangement rather than a fault — and the demo ribbon already says so.
    * Warning about it would be the console crying wolf for a whole session.
    */
   scripted?: boolean;
 }): ConsoleStatus {
-  const { connection, health, ai, scripted = false } = input;
+  const { connection, health, ai, fault, scripted = false } = input;
+
+  if (fault) return statusForFault(fault);
 
   if (connection === "offline") {
     return {
@@ -126,7 +151,51 @@ export function consoleStatus(input: {
 
   if (connection === "live") return { state: "live", label: "Live", problem: false };
 
+  // A scripted run that reached its last beat is finished, not idle. "Idle" is
+  // the word for "waiting", and it left the demo looking like it had stalled.
+  if (scripted && connection === "idle") {
+    return { state: "idle", label: "Demo finished", problem: false };
+  }
+
   return { state: connection, label: "Idle", problem: false };
+}
+
+/**
+ * One line per reason a session stopped listening.
+ *
+ * Each answers the interpreter's two questions — can I keep going, and is
+ * there anything for me to do — in the same place and in plain language.
+ */
+function statusForFault(fault: SessionFault): ConsoleStatus {
+  if (fault.recovering) {
+    return {
+      state: "reconnecting",
+      label: "Reconnecting",
+      detail: "Audio is held while it retries. Nothing on screen is lost.",
+      problem: true,
+    };
+  }
+
+  const detail: Record<SessionFault["kind"], string> = {
+    permission: "Grant microphone access, then tap Resume. The transcript is kept.",
+    device: "Reconnect the input or pick another, then tap Resume. The transcript is kept.",
+    unsupported: "This browser or deployment cannot run the input you chose.",
+    transport: "The connection did not come back. Tap Resume to try again.",
+  };
+
+  const label: Record<SessionFault["kind"], string> = {
+    permission: "No microphone",
+    device: "Input lost",
+    unsupported: "Not available",
+    transport: "Not listening",
+  };
+
+  return {
+    state: "error",
+    label: label[fault.kind],
+    detail: detail[fault.kind],
+    problem: true,
+  };
 }
 
 export function ConsoleTopBar({
@@ -134,11 +203,12 @@ export function ConsoleTopBar({
   health,
   elapsedMs,
   aiState,
-  scripted,
-  pairLabel,
-  audio = "off",
+  fault,
   context,
-  onOpenContext,
+  sourceLanguage,
+  targetLanguage,
+  onContextChange,
+  scripted,
   onOpenSettings,
   onEnd,
 }: {
@@ -146,21 +216,22 @@ export function ConsoleTopBar({
   health: SubsystemHealth;
   elapsedMs: number;
   aiState: AiState;
+  /** Why the session stopped listening, when it has. Outranks `connection`. */
+  fault?: SessionFault | null;
+  /** What the session resolved the setting to, and how it got there. */
+  context?: ContextState;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+  onContextChange?: (mode: ContextMode) => void;
   scripted?: boolean;
-  /** Compact direction label, e.g. `KO → EN`. */
-  pairLabel?: string;
-  /** What the microphone path is doing right now. */
-  audio?: AudioActivity;
-  /**
-   * The Context Engine's current answer, when it has one worth showing — the
-   * console passes nothing while the domain is the default or generic.
-   */
-  context?: string;
-  onOpenContext?: () => void;
   onOpenSettings: () => void;
   onEnd: () => void;
 }) {
-  const status = consoleStatus({ connection, health, ai: aiState, scripted });
+  const status = consoleStatus({ connection, health, ai: aiState, fault, scripted });
+  const pair =
+    sourceLanguage && targetLanguage
+      ? `${shortTag(sourceLanguage)} → ${shortTag(targetLanguage)}`
+      : null;
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--bg-raised)] pl-3 pr-1 text-[0.7rem] sm:pl-4 tall:h-12 tall:text-[0.75rem]">
@@ -188,39 +259,55 @@ export function ConsoleTopBar({
         </span>
         {status.detail && (
           // Narrow screens get the label and the colour; the sentence needs
-          // room it does not have next to a 390px-wide translation column.
+          // room it does not have next to a 390px-wide English column.
           <span className="hidden min-w-0 truncate text-[var(--fg-dim)] sm:inline">
             {status.detail}
           </span>
         )}
       </p>
 
-      {pairLabel && (
-        <span
-          className="shrink-0 rounded-md border border-[var(--line)] px-1.5 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide text-[var(--fg-muted)] tall:text-[0.7rem]"
-          aria-label={`Languages ${pairLabel}`}
-          data-pair={pairLabel}
-        >
-          {pairLabel}
+      {/* The pair and the context, in the order an interpreter would ask:
+          what am I doing, and what has ASAD decided about it. The context is a
+          select rather than a label because overriding it must cost one tap —
+          it is the ONLY place the old mode choice still exists, and it is now
+          optional, revisable and mid-session. */}
+      {pair && (
+        <span className="ml-auto hidden shrink-0 tabular-nums text-[var(--fg-dim)] sm:inline">
+          {pair}
         </span>
       )}
 
-      {context && (
-        <button
-          type="button"
-          onClick={onOpenContext}
-          title="Context the interpreter is tuned for — tap to override"
-          className="hidden min-h-8 shrink-0 items-center rounded-md border border-[color-mix(in_srgb,var(--info)_34%,transparent)] bg-[var(--info-dim)] px-1.5 text-[0.65rem] font-medium text-[var(--info)] min-[400px]:inline-flex"
-          data-context={context}
+      {context && onContextChange && (
+        <select
+          aria-label="Interpretation context"
+          title={
+            context.mode === "auto"
+              ? `Detected automatically${context.warmingUp ? " — still listening" : ""}. Choose one to override.`
+              : "Manually set. Choose Auto to hand it back to ASAD."
+          }
+          value={context.mode}
+          onChange={(event) => onContextChange(event.target.value as ContextMode)}
+          className={cn(
+            "shrink-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[0.7rem] outline-none hover:border-[var(--line)] focus-visible:border-[var(--accent)] tall:text-[0.75rem]",
+            context.mode === "auto" ? "text-[var(--fg-dim)]" : "text-[var(--accent)]",
+            !pair && "ml-auto",
+          )}
         >
-          {context}
-        </button>
+          {CONTEXT_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode === "auto"
+                ? `Auto${context.warmingUp ? "" : ` · ${CONTEXT_LABEL_EN[context.resolved]}`}`
+                : CONTEXT_LABEL_EN[mode]}
+            </option>
+          ))}
+        </select>
       )}
 
-      <AudioStatus activity={audio} className="shrink-0" />
-
       <span
-        className="ml-auto shrink-0 tabular-nums text-[var(--fg-muted)]"
+        className={cn(
+          "shrink-0 tabular-nums text-[var(--fg-muted)]",
+          !pair && !context && "ml-auto",
+        )}
         aria-label="Elapsed time"
       >
         {formatElapsed(elapsedMs)}

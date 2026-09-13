@@ -1,17 +1,22 @@
 /**
  * Languages offered at the counter.
  *
- * A thin view over the canonical registry (`@/languages/registry`). The
- * Counter picker keeps its own shape — `code`, `endonym`, `speechSupported` —
- * because a dozen screens read it, but every fact comes from the registry.
- * Add a language there; it shows up here in the same order.
+ * THIS IS A VIEW, NOT A SOURCE. Every language fact now lives in
+ * `src/lib/languages.ts`, which is the single authoritative registry shared by
+ * Counter Mode, Live Interpretation, the recogniser layer and diagnostics.
+ *
+ * This module remains because Counter Mode's vocabulary is genuinely narrower
+ * than the registry's — it wants a tag, three display names, a direction flag
+ * and one boolean about the browser recogniser — and because keeping the
+ * counter-shaped view here means the counter screens did not all have to learn
+ * the registry's shape to gain a single source of truth.
  */
 import {
   LANGUAGES,
-  resolveLanguage,
-  suggestLanguageId,
+  PRIORITY_LANGUAGES as REGISTRY_PRIORITY_LANGUAGES,
+  findLanguage as findRegistryLanguage,
   type LanguageDefinition,
-} from "@/languages/registry";
+} from "@/lib/languages";
 
 export interface CounterLanguage {
   /** BCP-47 tag used for STT and passed to the model. */
@@ -29,27 +34,27 @@ export interface CounterLanguage {
 
 const toCounterLanguage = (language: LanguageDefinition): CounterLanguage => ({
   code: language.id,
-  endonym: language.name.native,
-  ko: language.name.ko,
-  en: language.name.en,
-  speechSupported: language.browserSpeechOffered,
+  endonym: language.endonym,
+  ko: language.ko,
+  en: language.en,
+  speechSupported: language.stt.webspeech !== null,
   ...(language.direction === "rtl" ? { rtl: true } : {}),
 });
 
-export const COUNTER_LANGUAGES: CounterLanguage[] = LANGUAGES.map(toCounterLanguage);
+export const COUNTER_LANGUAGES: CounterLanguage[] = LANGUAGES.filter(
+  (language) => language.capabilities.counter,
+).map(toCounterLanguage);
 
-/** Registry id → the one CounterLanguage instance for it, so lookups are referentially stable. */
 const BY_ID = new Map(COUNTER_LANGUAGES.map((language) => [language.code, language]));
 
 /**
- * Resolve any tag a browser, an OS or a person can produce. Case-insensitive;
- * script and region subtags are honoured before the base-language fallback,
- * so `zh-Hant-HK` lands on zh-TW and `uig` on ug-CN. The registry owns the
- * alias table.
+ * Resolve any input tag — alias, lowercase, script-subtagged or base-only — to
+ * the counter view of its registry entry. Resolution itself belongs to the
+ * registry; this only narrows the result.
  */
 export const findLanguage = (code: string): CounterLanguage | undefined => {
-  const language = resolveLanguage(code);
-  return language ? BY_ID.get(language.id) : undefined;
+  const resolved = findRegistryLanguage(code);
+  return resolved ? BY_ID.get(resolved.id) : undefined;
 };
 
 /** The registry tag for an arbitrary input tag, or the input when unknown. */
@@ -72,17 +77,12 @@ export function suggestLanguage(
   navigatorLanguages: readonly string[] | undefined,
   fallback = "en-US",
 ): string {
-  return suggestLanguageId(navigatorLanguages, fallback);
+  for (const candidate of navigatorLanguages ?? []) {
+    const match = findLanguage(candidate);
+    if (match) return match.code;
+  }
+  return fallback;
 }
 
 /** Languages the visitor picker shows first — the common ones at a Korean desk. */
-export const PRIORITY_LANGUAGES = [
-  "en-US",
-  "zh-CN",
-  "vi-VN",
-  "th-TH",
-  "ja-JP",
-  "ru-RU",
-  "uz-UZ",
-  "mn-MN",
-] as const;
+export const PRIORITY_LANGUAGES = REGISTRY_PRIORITY_LANGUAGES;

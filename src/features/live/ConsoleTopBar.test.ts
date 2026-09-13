@@ -1,10 +1,7 @@
-import { createElement } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ConnectionState, SubsystemHealth } from "@/types";
 import type { AiState } from "./AiStatus";
-import { audioStatusLabel } from "./AudioStatus";
-import { ConsoleTopBar, consoleStatus, formatElapsed } from "./ConsoleTopBar";
+import { consoleStatus, formatElapsed } from "./ConsoleTopBar";
 
 const healthy: SubsystemHealth = { stt: "ok", llm: "ok", bible: "ok" };
 
@@ -100,48 +97,51 @@ describe("formatElapsed", () => {
   });
 });
 
-describe("ConsoleTopBar", () => {
-  afterEach(cleanup);
+describe("a session that stopped listening", () => {
+  const base = {
+    connection: "idle" as const,
+    health: { stt: "ok", llm: "ok", bible: "ok" } as const,
+    ai: "live" as const,
+  };
 
-  const renderBar = (props: Partial<Parameters<typeof ConsoleTopBar>[0]> = {}) =>
-    render(
-      createElement(ConsoleTopBar, {
-        connection: "live",
-        health: healthy,
-        elapsedMs: 61_000,
-        aiState: "live",
-        pairLabel: "ZH-TW → KO",
-        audio: "speech",
-        onOpenSettings: () => {},
-        onEnd: () => {},
-        ...props,
-      }),
-    );
-
-  it("renders the language pair next to the status", () => {
-    renderBar();
-    expect(screen.getByText("ZH-TW → KO")).toBeTruthy();
-    expect(screen.getByText("Live")).toBeTruthy();
-    expect(screen.getByText("1:01")).toBeTruthy();
+  it("outranks a recogniser's late 'closed' event", () => {
+    // The recogniser reports its terminal error and then, a beat later,
+    // reports that it closed. The close arrives last and reads as `idle`, so
+    // the strip used to settle on the one word that means nothing is wrong.
+    const status = consoleStatus({
+      ...base,
+      fault: {
+        kind: "permission",
+        message: "Microphone access was refused.",
+        recovering: false,
+        attempts: 0,
+      },
+    });
+    expect(status.label).toBe("No microphone");
+    expect(status.problem).toBe(true);
+    expect(status.detail).toMatch(/Resume/);
   });
 
-  it("shows the audio glyph with an accessible name and no visualiser", () => {
-    const { container } = renderBar();
-    expect(screen.getByRole("img", { name: audioStatusLabel("speech") })).toBeTruthy();
-    expect(container.querySelector("canvas, meter, progress")).toBeNull();
+  it("says a dropped transport is coming back and nothing is lost", () => {
+    const status = consoleStatus({
+      ...base,
+      connection: "reconnecting",
+      fault: { kind: "transport", message: "socket closed", recovering: true, attempts: 1 },
+    });
+    expect(status.label).toBe("Reconnecting");
+    expect(status.detail).toMatch(/Nothing on screen is lost/);
   });
 
-  it("gives every icon-only control a name", () => {
-    renderBar();
-    expect(screen.getByRole("button", { name: "Session settings" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "End session" })).toBeTruthy();
+  it("names the input rather than the network when the device went", () => {
+    const status = consoleStatus({
+      ...base,
+      fault: { kind: "device", message: "gone", recovering: false, attempts: 0 },
+    });
+    expect(status.label).toBe("Input lost");
+    expect(status.detail).not.toMatch(/connection/i);
   });
 
-  it("only shows the context chip when the engine has decided something", () => {
-    renderBar({ context: undefined });
-    expect(screen.queryByText("예배")).toBeNull();
-    cleanup();
-    renderBar({ context: "예배" });
-    expect(screen.getByRole("button", { name: "예배" })).toBeTruthy();
+  it("stays quiet when there is no fault", () => {
+    expect(consoleStatus({ ...base, connection: "live", fault: null }).problem).toBe(false);
   });
 });

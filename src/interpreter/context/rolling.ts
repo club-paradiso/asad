@@ -14,12 +14,26 @@ import type {
   EntityResolution,
   GlossaryItem,
   InterpretationChunk,
-  InterpretationMode,
   PrepSheet,
+  ResolvedContext,
   TranscriptSegment,
 } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
 import type { SessionMemory } from "./memory";
+
+/**
+ * What to call the session in the compressed summary. A preacher is not "in a
+ * session" and a standup is not "in a sermon"; the resolved context already
+ * knows which, so the summary says it.
+ */
+const SETTING_NOUN: Record<ResolvedContext, string> = {
+  worship: "service",
+  lecture: "lecture",
+  meeting: "meeting",
+  conversation: "conversation",
+  event: "event",
+  generic: "session",
+};
 
 /** Character budgets for the rolling window. Tuned for latency, not recall. */
 export const CONTEXT_BUDGET = {
@@ -47,7 +61,7 @@ export interface RollingContext {
   entities: EntityResolution[];
   scripture: string[];
   corrections: Array<{ from: string; to: string; english?: string }>;
-  prep?: InterpretRequest["context"]["prep"];
+  prep?: InterpretRequest["history"]["prep"];
 }
 
 /** Take items from the end of a list until a character budget is spent. */
@@ -75,14 +89,14 @@ function takeTail<T>(items: T[], budget: number, maxCount: number, size: (item: 
 export function compressHistory(
   older: TranscriptSegment[],
   memory: SessionMemory,
-  mode: InterpretationMode,
+  context: ResolvedContext,
 ): string {
   if (older.length === 0) return "";
 
   const parts: string[] = [];
   const minutes = Math.max(1, Math.round((older[older.length - 1].at - older[0].at) / 60000));
   parts.push(
-    `Earlier in this ${mode === "sermon" ? "sermon" : "session"} (~${minutes} min, ${older.length} segments so far).`,
+    `Earlier in this ${SETTING_NOUN[context]} (~${minutes} min, ${older.length} segments so far).`,
   );
   if (memory.topic) parts.push(`Topic: ${memory.topic}.`);
   if (memory.scripture.length > 0) {
@@ -119,10 +133,10 @@ export function buildRollingContext(input: {
   segments: TranscriptSegment[];
   chunks: InterpretationChunk[];
   memory: SessionMemory;
-  mode: InterpretationMode;
+  context: ResolvedContext;
   prep: PrepSheet;
 }): RollingContext {
-  const { segments, chunks, memory, mode, prep } = input;
+  const { segments, chunks, memory, context, prep } = input;
 
   const recent = takeTail(
     segments,
@@ -141,7 +155,7 @@ export function buildRollingContext(input: {
   );
 
   return {
-    summary: compressHistory(older, memory, mode),
+    summary: compressHistory(older, memory, context),
     topic: memory.topic,
     recentKorean: recent.map((s) => s.text),
     recentEnglish: recentEnglish.map((c) => c.text),
@@ -155,7 +169,7 @@ export function buildRollingContext(input: {
   };
 }
 
-function prepContext(prep: PrepSheet): InterpretRequest["context"]["prep"] {
+function prepContext(prep: PrepSheet): InterpretRequest["history"]["prep"] {
   const has =
     prep.speaker || prep.title || prep.organisation || prep.scripture || prep.notes;
   if (!has) return undefined;

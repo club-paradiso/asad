@@ -21,7 +21,7 @@ describe("rolling context window", () => {
       segments: segments(400),
       chunks: chunks(400),
       memory: emptyMemory(),
-      mode: "sermon",
+      context: "worship",
       prep: emptyPrepSheet(),
     });
 
@@ -39,7 +39,7 @@ describe("rolling context window", () => {
       segments: list,
       chunks: [],
       memory: emptyMemory(),
-      mode: "sermon",
+      context: "worship",
       prep: emptyPrepSheet(),
     });
     expect(context.recentKorean[context.recentKorean.length - 1]).toBe("마지막 문장입니다.");
@@ -54,7 +54,7 @@ describe("rolling context window", () => {
       segments: [],
       chunks: withGuess,
       memory: emptyMemory(),
-      mode: "sermon",
+      context: "worship",
       prep: emptyPrepSheet(),
     });
     expect(context.recentEnglish).not.toContain("A prediction.");
@@ -72,7 +72,7 @@ describe("rolling context window", () => {
       segments: segments(60),
       chunks: [],
       memory,
-      mode: "sermon",
+      context: "worship",
       prep: emptyPrepSheet(),
     });
 
@@ -83,7 +83,7 @@ describe("rolling context window", () => {
   });
 
   it("has nothing to compress at the start of a session", () => {
-    expect(compressHistory([], emptyMemory(), "sermon")).toBe("");
+    expect(compressHistory([], emptyMemory(), "worship")).toBe("");
   });
 
   it("carries the prep sheet through", () => {
@@ -91,7 +91,7 @@ describe("rolling context window", () => {
       segments: [],
       chunks: [],
       memory: emptyMemory(),
-      mode: "sermon",
+      context: "worship",
       prep: { ...emptyPrepSheet(), speaker: "류정길", scripture: "1 Peter 2:9" },
     });
     expect(context.prep?.speaker).toBe("류정길");
@@ -103,7 +103,7 @@ describe("rolling context window", () => {
       segments: [],
       chunks: [],
       memory: emptyMemory(),
-      mode: "sermon",
+      context: "worship",
       prep: emptyPrepSheet(),
     });
     expect(context.prep).toBeUndefined();
@@ -114,7 +114,7 @@ describe("rolling context window", () => {
       segments: segments(500),
       chunks: chunks(500),
       memory: emptyMemory(),
-      mode: "sermon",
+      context: "worship",
       prep: emptyPrepSheet(),
     });
     // Bounded context is what keeps a long service affordable and fast.

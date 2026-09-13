@@ -17,17 +17,9 @@
  *     and does not pretend to be — it marks anything it cannot support as low
  *     confidence and never invents content.
  */
-import type { InterpreterOutput, LanguagePair } from "@/types";
+import type { InterpreterOutput, ResolvedContext } from "@/types";
 import type { DemoBeat, DemoScript } from "@/demo/types";
 import { DEMO_SCRIPTS } from "@/demo/sermon-script";
-import {
-  canonicalPair,
-  DEFAULT_LANGUAGE_PAIR,
-  LANGUAGES,
-  languageBase,
-  languageDisplayName,
-  type LanguagePairIds,
-} from "@/languages/registry";
 import { detectScriptureReferences } from "@/interpreter/scripture/detect";
 import { liveGlossary } from "@/interpreter/glossary/matcher";
 import { detectCultural } from "@/interpreter/cultural/detect";
@@ -83,30 +75,15 @@ export function mergeOutputs(outputs: InterpreterOutput[]): InterpreterOutput {
   return merged;
 }
 
-/**
- * Rule-based assistance for source text that is not in any script.
- *
- * Every detector here — Scripture normalisation, the glossary, cultural and
- * wordplay detection, rhetorical frames — was written for Korean. For any
- * other source they are not run, and the honest placeholder names the
- * language so nobody mistakes a Mandarin transcript for missing English.
- */
+/** Rule-based assistance for Korean that is not in any script. */
 export function deterministicOutput(
   pending: string,
-  mode: "sermon" | "general",
-  pair: Partial<LanguagePairIds> | undefined = DEFAULT_LANGUAGE_PAIR,
+  context: ResolvedContext,
 ): InterpreterOutput {
-  const canonical = canonicalPair(pair);
-  const sourceName = languageDisplayName(canonical.source);
-  const targetName = languageDisplayName(canonical.target);
-  const korean = languageBase(canonical.source) === "ko";
-
-  const scripture = korean
-    ? detectScriptureReferences(pending).map(({ index: _index, ...ref }) => ref)
-    : [];
-  const glossary = korean ? liveGlossary(pending, mode) : [];
-  const culturalNotes = korean ? detectCultural(pending) : [];
-  const frame = korean ? frameShortcut(pending) : null;
+  const scripture = detectScriptureReferences(pending).map(({ index: _index, ...ref }) => ref);
+  const glossary = liveGlossary(pending, context);
+  const culturalNotes = detectCultural(pending);
+  const frame = frameShortcut(pending);
 
   const safeChunks: InterpreterOutput["safeChunks"] = [];
 
@@ -131,11 +108,11 @@ export function deterministicOutput(
 
   if (safeChunks.length === 0) {
     // Nothing here can be rendered honestly without a translation model. Say so
-    // rather than emitting invented target-language text.
+    // rather than emitting invented English.
     safeChunks.push({
-      text: `[no interpretation model configured — ${sourceName} transcript only]`,
+      text: "[no interpretation model configured — Korean transcript only]",
       confidence: "low",
-      note: `Set LLM_PROVIDER to enable ${targetName} assistance`,
+      note: "Set LLM_PROVIDER to enable English assistance",
     });
   }
 
@@ -150,15 +127,13 @@ export function deterministicOutput(
 
 export interface MockInterpretInput {
   pending: string;
-  mode: "sermon" | "general";
+  context: ResolvedContext;
   /**
    * The demo script to match against. Omitting it disables scripted beats
    * entirely — that is what every live caller does, and it is load-bearing.
    */
   scriptId?: string;
   allowAnticipation?: boolean;
-  /** Session languages. Defaults to Korean → English, the pair the detectors were written for. */
-  pair?: LanguagePair | Partial<LanguagePairIds>;
 }
 
 /** The whole local interpreter, usable from the browser or the server. */
@@ -183,7 +158,7 @@ export function interpretLocally(input: MockInterpretInput): InterpreterOutput {
     }
   }
 
-  return deterministicOutput(input.pending, input.mode, input.pair);
+  return deterministicOutput(input.pending, input.context);
 }
 
 /**
@@ -200,11 +175,10 @@ export class LocalLlmProvider implements LlmProvider {
   async complete(request: LlmRequest): Promise<LlmResponse> {
     const started = Date.now();
     const pending = extractPending(request.user);
-    const mode = /^DOMAIN: .*SERMON/m.test(request.system) ? "sermon" : "general";
+    const context = contextFromSystemPrompt(request.system);
     const allowAnticipation = !/Do not return anticipatedChunks/.test(request.user);
-    const pair = extractPair(request.system);
     return {
-      text: JSON.stringify(interpretLocally({ pending, mode, allowAnticipation, pair })),
+      text: JSON.stringify(interpretLocally({ pending, context, allowAnticipation })),
       model: "deterministic",
       latencyMs: Date.now() - started,
     };
@@ -214,23 +188,30 @@ export class LocalLlmProvider implements LlmProvider {
 /** Phase 1 name, kept so existing imports and tests keep working. */
 export { LocalLlmProvider as MockLlmProvider };
 
-/** Recover the pending source text from the assembled user prompt, whatever the language heading. */
+/** Recover the source speech from the assembled user prompt. */
 export function extractPending(user: string): string {
-  const match = user.match(/^[^\n]+ TO INTERPRET NOW \(stabilised\):\n([\s\S]*?)(?:\n\n|$)/m);
+  const match = user.match(/SOURCE TO INTERPRET NOW \(stabilised\):\n([\s\S]*?)(?:\n\n|$)/);
   return match ? match[1].trim() : user.trim();
 }
 
-const ID_BY_DISPLAY_NAME = new Map(LANGUAGES.map((language) => [language.name.en, language.id]));
-
 /**
- * Recover the language pair from the system prompt's first line. Both the full
- * ("working Korean into English") and the compact ("working Korean → English")
- * contracts name it there; anything else is the default pair.
+ * Recover the resolved context from the system prompt the router was given.
+ *
+ * The local provider sits behind the same port as the vendors, so a prompt is
+ * all it receives. Each context delta opens with its own DOMAIN line, which is
+ * the one thing in the prompt that names the setting unambiguously.
  */
-export function extractPair(system: string): LanguagePairIds {
-  const match = system.match(/interpreter working (.+?) (?:into|→) (.+?)\./);
-  if (!match) return DEFAULT_LANGUAGE_PAIR;
-  const source = ID_BY_DISPLAY_NAME.get(match[1]);
-  const target = ID_BY_DISPLAY_NAME.get(match[2]);
-  return source && target ? { source, target } : DEFAULT_LANGUAGE_PAIR;
+const DOMAIN_LINES: Array<[RegExp, ResolvedContext]> = [
+  [/DOMAIN: KOREAN CHURCH SERMON/, "worship"],
+  [/DOMAIN: LECTURE/, "lecture"],
+  [/DOMAIN: MEETING/, "meeting"],
+  [/DOMAIN: CONVERSATION/, "conversation"],
+  [/DOMAIN: EVENT/, "event"],
+];
+
+export function contextFromSystemPrompt(system: string): ResolvedContext {
+  for (const [pattern, context] of DOMAIN_LINES) {
+    if (pattern.test(system)) return context;
+  }
+  return "generic";
 }

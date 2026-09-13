@@ -9,7 +9,7 @@ import {
 } from "./booth-audio-preference";
 
 /**
- * Shared physical-input selection for Sermon Mode launch and preflight.
+ * Shared physical-input selection for the launcher and the booth preflight.
  *
  * The hook never opens the microphone. It only enumerates browser-visible
  * inputs and remembers the operator's choice locally. Consumers still decide

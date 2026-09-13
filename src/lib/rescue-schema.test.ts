@@ -3,9 +3,9 @@ import { RESCUE_MAX_CHARS } from "@/interpreter/engine/rescue";
 import { rescueRequestSchema } from "./rescue-schema";
 
 const base = {
-  mode: "sermon" as const,
+  context: "worship" as const,
   recentKorean: "우리의 소망은 예수 그리스도 안에 있습니다.",
-  context: {
+  history: {
     recentKorean: [],
     recentEnglish: [],
     glossary: [],
