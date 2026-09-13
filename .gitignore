@@ -26,3 +26,8 @@ yarn-error.log*
 !.design-canvas/**/*.dc.html
 # Seeded canvases are written to the repo root before publishing.
 /asad-*.html
+
+# Output of the e2e scripts and `npm run shot`. CI writes these on every run
+# and uploads them as an artifact; they are a build product, not source.
+e2e-out/
+shot.png
