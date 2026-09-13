@@ -1,4 +1,4 @@
-# Sermon Mode: Rescue semantics
+# Rescue semantics
 
 ## Why Rescue exists
 
@@ -39,7 +39,7 @@ A Rescue turn must:
 - never produce `anticipatedChunks`;
 - return low-confidence empty `safeChunks` when there is no safe current bridge.
 
-Sermon Mode still preserves theological precision and Scripture-reference safety during Rescue.
+A worship context still preserves theological precision and Scripture-reference safety during Rescue.
 
 ## Server isolation
 

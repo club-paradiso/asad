@@ -26,6 +26,18 @@ const ANCHOR = 0.55;
 /** Distance from the anchor before a scroll is worth performing at all. */
 const DEAD_ZONE_PX = 24;
 
+/**
+ * `scroll-behavior: auto` in a reduced-motion media query does not reach
+ * `Element.scrollTo({ behavior: "smooth" })` — the option wins over the
+ * stylesheet. The console's stylesheet already honours the preference for
+ * every CSS animation, and this is the one place that was quietly ignoring it,
+ * about eleven times a minute.
+ */
+const prefersReducedMotion = (): boolean =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export function useAutoScroll<T extends HTMLElement>(options: {
   /** Changes whenever the active chunk changes — the only scroll trigger. */
   activeKey: string | number;
@@ -39,10 +51,11 @@ export function useAutoScroll<T extends HTMLElement>(options: {
   const programmatic = useRef(false);
   const [atLive, setAtLive] = useState(true);
 
-  const scrollToActive = useCallback((behavior: ScrollBehavior = "smooth") => {
+  const scrollToActive = useCallback((requested: ScrollBehavior = "smooth") => {
     const container = containerRef.current;
     const active = activeRef.current;
     if (!container || !active) return;
+    const behavior: ScrollBehavior = prefersReducedMotion() ? "auto" : requested;
 
     // Measured from rects rather than `offsetTop`: the chunks' offset parent is
     // the positioned <main>, not the scroll container, so offsetTop would be

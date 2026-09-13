@@ -20,6 +20,7 @@
     "e2e:live-failure": "node scripts/e2e-live-failure.mjs",
     "e2e:live-quota-bypass": "node scripts/e2e-live-quota-bypass.mjs",
     "e2e:live-two-lane": "node scripts/e2e-live-two-lane.mjs",
+    "e2e:live-languages": "node scripts/e2e-live-languages.mjs",
     "bench:llm": "tsx scripts/bench-llm.mjs",
     "bench:gemini": "tsx scripts/bench-llm.mjs --only gemini --stdout markdown --no-write",
     "smoke:llm": "tsx scripts/smoke-llm.mjs",
