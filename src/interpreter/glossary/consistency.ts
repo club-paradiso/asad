@@ -120,6 +120,18 @@ export function settledForms(input: {
   return forms.sort((a, b) => b.words - a.words || b.canonical.length - a.canonical.length);
 }
 
+/**
+ * Below this length a settled form carries too little signal to match its
+ * first letter loosely.
+ *
+ * 류 romanises as both "Ryu" and "Yu", so "Yu Jeong-gil" for a settled
+ * "Ryu Jeong-gil" is drift worth fixing — the eleven shared characters are the
+ * evidence. "Kim" and "Lim" are also one edit apart and are two different
+ * surnames, and three characters is not evidence of anything. So the initial
+ * may differ only when the rest of the name is long enough to carry the claim.
+ */
+const LOOSE_INITIAL_MIN_CHARS = 6;
+
 /** Whether `candidate` is a misspelling of `form` rather than a different word. */
 export function isVariantOf(candidate: string, form: SettledForm): boolean {
   const key = fold(candidate);
@@ -128,7 +140,7 @@ export function isVariantOf(candidate: string, form: SettledForm): boolean {
   // differently — "Ryu Jeonggil" for "Ryu Jeong-gil". That IS the drift this
   // exists to stop, and it is the safest possible case to act on.
   if (key === form.key) return candidate.trim() !== form.canonical;
-  if (key[0] !== form.key[0]) return false;
+  if (form.key.length < LOOSE_INITIAL_MIN_CHARS && key[0] !== form.key[0]) return false;
   if (Math.abs(key.length - form.key.length) > 2) return false;
   const budget = Math.max(1, Math.floor(form.key.length * 0.25));
   return editDistance(key, form.key) <= budget;

@@ -93,42 +93,56 @@ const zeroScores = (): Scores => ({
  */
 interface DiscoursePattern {
   context: ResolvedContext;
+  /** Global, because repeated evidence is stronger evidence — up to a cap. */
   pattern: RegExp;
   weight: number;
 }
 
+/**
+ * How many hits of one pattern can count.
+ *
+ * Uncapped, a speaker who says "안건" fifteen times would drown every other
+ * family; capped at one, a passing mention would weigh as much as a session
+ * built on the word. Three is the point where more repetition stops being
+ * informative.
+ */
+const MAX_PATTERN_HITS = 3;
+
+const hits = (text: string, pattern: RegExp): number =>
+  Math.min(MAX_PATTERN_HITS, (text.match(pattern) ?? []).length);
+
 const DISCOURSE: DiscoursePattern[] = [
   // Worship — address to a room that is expected to answer, and the speech
   // acts that only happen in a service.
-  { context: "worship", pattern: /아멘|할렐루야|주님|하나님|기도하겠습니다|찬양|축복|성도\s*여러분/u, weight: 3 },
-  { context: "worship", pattern: /\bamen\b|\bhallelujah\b|\blet us pray\b|\bthe lord\b|\bcongregation\b/iu, weight: 3 },
-  { context: "worship", pattern: /장\s*\d+\s*절|말씀|성경|복음서/u, weight: 2 },
+  { context: "worship", pattern: /아멘|할렐루야|주님|하나님|기도하겠습니다|찬양|축복|성도\s*여러분/ug, weight: 3 },
+  { context: "worship", pattern: /\bamen\b|\bhallelujah\b|\blet us pray\b|\bthe lord\b|\bcongregation\b/iug, weight: 3 },
+  { context: "worship", pattern: /장\s*\d+\s*절|말씀|성경|복음서/ug, weight: 2 },
 
   // Lecture — one speaker teaching a structured body of material.
-  { context: "lecture", pattern: /오늘\s*강의|이번\s*시간(에|에는)|다음\s*장|슬라이드|정리하자면|과제|수강생|학생\s*여러분/u, weight: 3 },
-  { context: "lecture", pattern: /\btoday'?s lecture\b|\bnext slide\b|\bin this (?:session|chapter)\b|\bthe syllabus\b|\byour assignment\b/iu, weight: 3 },
-  { context: "lecture", pattern: /첫째|둘째|셋째|요약하면/u, weight: 1 },
+  { context: "lecture", pattern: /오늘\s*강의|이번\s*시간(에|에는)|다음\s*장|슬라이드|정리하자면|과제|수강생|학생\s*여러분/ug, weight: 3 },
+  { context: "lecture", pattern: /\btoday'?s lecture\b|\bnext slide\b|\bin this (?:session|chapter)\b|\bthe syllabus\b|\byour assignment\b/iug, weight: 3 },
+  { context: "lecture", pattern: /첫째|둘째|셋째|요약하면/ug, weight: 1 },
 
   // Meeting — an agenda, decisions, and people being assigned things.
-  { context: "meeting", pattern: /안건|회의록|의결|다음\s*안건|액션\s*아이템|담당자|일정\s*조율|보고드리겠습니다|검토하겠습니다/u, weight: 3 },
-  { context: "meeting", pattern: /\bagenda\b|\baction items?\b|\bminutes\b|\bfollow[- ]?up\b|\bnext steps\b|\bwho(?:'s| is) taking\b|\bdeadline\b/iu, weight: 3 },
-  { context: "meeting", pattern: /분기|예산|일정표|승인/u, weight: 1 },
+  { context: "meeting", pattern: /안건|회의록|의결|다음\s*안건|액션\s*아이템|담당자|일정\s*조율|보고드리겠습니다|검토하겠습니다/ug, weight: 3 },
+  { context: "meeting", pattern: /\bagenda\b|\baction items?\b|\bminutes\b|\bfollow[- ]?up\b|\bnext steps\b|\bwho(?:'s| is) taking\b|\bdeadline\b/iug, weight: 3 },
+  { context: "meeting", pattern: /분기|예산|일정표|승인/ug, weight: 1 },
 
   // Conversation — two people, short turns, questions back and forth.
-  { context: "conversation", pattern: /그쪽|혹시\s*어떻게|여쭤볼게요|말씀해\s*주세요|성함이|어떻게\s*도와드릴까요/u, weight: 3 },
-  { context: "conversation", pattern: /\bhow can i help\b|\bcould you tell me\b|\bmay i ask\b|\byour name\b|\bone moment please\b/iu, weight: 3 },
+  { context: "conversation", pattern: /그쪽|혹시\s*어떻게|여쭤볼게요|말씀해\s*주세요|성함이|어떻게\s*도와드릴까요/ug, weight: 3 },
+  { context: "conversation", pattern: /\bhow can i help\b|\bcould you tell me\b|\bmay i ask\b|\byour name\b|\bone moment please\b/iug, weight: 3 },
 
   // Event — a programme being run from a stage.
-  { context: "event", pattern: /내빈|사회를\s*맡은|다음\s*순서|박수로\s*맞이|환영합니다|축사|개회|폐회/u, weight: 3 },
-  { context: "event", pattern: /\bwelcome everyone\b|\bour next (?:speaker|item)\b|\bplease join me in welcoming\b|\bopening remarks\b|\bthank you all for coming\b/iu, weight: 3 },
+  { context: "event", pattern: /내빈|사회를\s*맡은|다음\s*순서|박수로\s*맞이|환영합니다|축사|개회|폐회/ug, weight: 3 },
+  { context: "event", pattern: /\bwelcome everyone\b|\bour next (?:speaker|item)\b|\bplease join me in welcoming\b|\bopening remarks\b|\bthank you all for coming\b/iug, weight: 3 },
 ];
 
 /** Prep-sheet metadata evidence, available before a word is spoken. */
 const METADATA: DiscoursePattern[] = [
-  { context: "worship", pattern: /교회|성당|선교|목사|전도사|장로|예배|church|chapel|ministry|parish|pastor|worship/iu, weight: 4 },
-  { context: "lecture", pattern: /대학|학교|강의|세미나|아카데미|university|college|lecture|seminar|course|academy/iu, weight: 3 },
-  { context: "meeting", pattern: /회의|이사회|주주|워크숍|board|meeting|committee|standup|retrospective/iu, weight: 3 },
-  { context: "event", pattern: /컨퍼런스|포럼|시상식|개막|축제|conference|forum|ceremony|festival|summit|gala/iu, weight: 3 },
+  { context: "worship", pattern: /교회|성당|선교|목사|전도사|장로|예배|church|chapel|ministry|parish|pastor|worship/iug, weight: 4 },
+  { context: "lecture", pattern: /대학|학교|강의|세미나|아카데미|university|college|lecture|seminar|course|academy/iug, weight: 3 },
+  { context: "meeting", pattern: /회의|이사회|주주|워크숍|board|meeting|committee|standup|retrospective/iug, weight: 3 },
+  { context: "event", pattern: /컨퍼런스|포럼|시상식|개막|축제|conference|forum|ceremony|festival|summit|gala/iug, weight: 3 },
 ];
 
 /**
@@ -141,7 +155,7 @@ export function discourseScores(text: string): Scores {
   const scores = zeroScores();
   if (!text.trim()) return scores;
   for (const signal of DISCOURSE) {
-    if (signal.pattern.test(text)) scores[signal.context] += signal.weight;
+    scores[signal.context] += signal.weight * hits(text, signal.pattern);
   }
 
   // Language-independent shape. A high question density with short turns is
@@ -169,7 +183,7 @@ export function metadataScores(prep: PrepSheet | undefined): Scores {
   if (prep?.scripture?.trim()) scores.worship += 4;
   if (!corpus) return scores;
   for (const signal of METADATA) {
-    if (signal.pattern.test(corpus)) scores[signal.context] += signal.weight;
+    if (hits(corpus, signal.pattern) > 0) scores[signal.context] += signal.weight;
   }
   return scores;
 }
@@ -189,6 +203,8 @@ export const CONTEXT_MIN_CHARS = 140;
 export const CONTEXT_SWITCH_MARGIN = 3;
 /** Below this the top score is noise, whatever it is. */
 export const CONTEXT_MIN_SCORE = 4;
+/** Added to the floor while the session has barely started. */
+export const CONTEXT_WARMUP_MARGIN = 2;
 
 export interface ContextState {
   /** What the user asked for. */
@@ -234,6 +250,9 @@ export class ContextResolver {
   constructor(options: { mode?: ContextMode; prep?: PrepSheet } = {}) {
     this.mode = options.mode ?? "auto";
     this.prep = options.prep;
+    // A prep sheet is evidence before a word is spoken, so the first `state()`
+    // must already reflect it rather than waiting for the first utterance.
+    this.recompute();
   }
 
   /** The user's override, or `auto`. Changing it never discards evidence. */
@@ -243,6 +262,7 @@ export class ContextResolver {
 
   setPrep(prep: PrepSheet | undefined): void {
     this.prep = prep;
+    this.recompute();
   }
 
   /**
@@ -285,10 +305,11 @@ export class ContextResolver {
 
     // The model's read. Weighted highest of the textual families because it is
     // the only one that read the sentence rather than matched it — but it is
-    // still one vote among six, and it cannot on its own clear the switch
-    // margin against a settled incumbent.
+    // still one vote among six: two agreeing votes can specialise a session
+    // the text alone leaves ambiguous, and no number of them can clear the
+    // switch margin against an incumbent the other families are holding up.
     for (const [context, votes] of Object.entries(this.modelVotes)) {
-      if (isResolvedContext(context)) scores[context] += Math.min(8, (votes ?? 0) * 2);
+      if (isResolvedContext(context)) scores[context] += Math.min(9, (votes ?? 0) * 3);
     }
 
     const ranked = RESOLVED_CONTEXTS.filter((context) => context !== "generic")
@@ -298,23 +319,13 @@ export class ContextResolver {
     const leader = ranked[0];
     const runnerUp = ranked[1];
 
-    if (this.observed < CONTEXT_MIN_CHARS && Object.keys(this.modelVotes).length === 0) {
-      // Metadata alone may still specialise before anyone speaks — that is the
-      // prep sheet doing its job — but it has to be unambiguous about it.
-      const metadataLeader = RESOLVED_CONTEXTS.filter((c) => c !== "generic")
-        .map((context) => ({ context, score: metadata[context] }))
-        .sort((a, b) => b.score - a.score)[0];
-      if (metadataLeader.score >= CONTEXT_MIN_SCORE) {
-        this.inferred = metadataLeader.context;
-        this.confidenceValue = 0.4;
-      } else {
-        this.inferred = "generic";
-        this.confidenceValue = 0;
-      }
-      return;
-    }
+    // Before there is much speech, the bar is higher rather than different.
+    // Prep metadata and resolved Scripture references are both real evidence at
+    // second zero; a couple of matched words in one greeting are not.
+    const floor =
+      this.observed < CONTEXT_MIN_CHARS ? CONTEXT_MIN_SCORE + CONTEXT_WARMUP_MARGIN : CONTEXT_MIN_SCORE;
 
-    if (!leader || leader.score < CONTEXT_MIN_SCORE) {
+    if (!leader || leader.score < floor) {
       this.inferred = "generic";
       this.confidenceValue = 0;
       return;

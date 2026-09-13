@@ -67,6 +67,18 @@ describe("variant detection", () => {
     expect(isVariantOf("Ryan", form)).toBe(false);
   });
 
+  it("accepts a different initial only when the rest of the name carries it", () => {
+    // 류 romanises as both Ryu and Yu, and eleven shared characters are enough
+    // to be sure it is the same person.
+    expect(isVariantOf("Yu Jeong-gil", form)).toBe(true);
+
+    // Three characters are not. Kim and Lim are one edit apart and are two
+    // different surnames.
+    const short = forms({ entities: [{ korean: "김", english: "Kim", kind: "person" }] })[0];
+    expect(isVariantOf("Lim", short)).toBe(false);
+    expect(isVariantOf("Kin", short)).toBe(true);
+  });
+
   it("is not a variant of itself", () => {
     expect(isVariantOf("Ryu Jeong-gil", form)).toBe(false);
   });
@@ -101,6 +113,11 @@ describe("enforcement in produced text", () => {
   it("does not touch a different person with a similar name", () => {
     const result = enforceTerminology("Kim Jeong-gil sat at the back.", list);
     expect(result.text).toBe("Kim Jeong-gil sat at the back.");
+  });
+
+  it("catches a recogniser splitting a hyphenated name into two words", () => {
+    const result = enforceTerminology("Pastor Ryu Jeong Gil closed in prayer.", list);
+    expect(result.text).toBe("Pastor Ryu Jeong-gil closed in prayer.");
   });
 
   it("handles a multi-word organisation drifting one word", () => {

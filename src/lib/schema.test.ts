@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { migrateSession, migrateSettings } from "./storage";
 import {
   extractJsonObject,
   interpretRequestSchema,
@@ -130,5 +131,47 @@ describe("interpret request validation", () => {
     expect(
       interpretRequestSchema.safeParse({ ...base, pending: "가".repeat(5000) }).success,
     ).toBe(false);
+  });
+});
+
+describe("stored state written before contexts and language pairs existed", () => {
+  it("reads an old Sermon setting forward as an explicit worship override", () => {
+    // Not `auto`: someone who deliberately chose Sermon gets a different
+    // product if that choice is quietly dropped on upgrade.
+    const migrated = migrateSettings({ mode: "sermon", lag: "safe", showKorean: false });
+    expect(migrated.context).toBe("worship");
+    expect(migrated.showSource).toBe(false);
+    expect(migrated.lag).toBe("safe");
+    expect(migrated.sourceLanguage).toBe("ko-KR");
+    expect(migrated.targetLanguage).toBe("en-US");
+    expect(migrated).not.toHaveProperty("mode");
+    expect(migrated).not.toHaveProperty("showKorean");
+  });
+
+  it("reads an old General setting forward as auto", () => {
+    // "General" meant "no domain steer", and the honest modern form of that is
+    // "stop asking" — which is what auto does.
+    expect(migrateSettings({ mode: "general" }).context).toBe("auto");
+  });
+
+  it("leaves already-migrated settings alone", () => {
+    const migrated = migrateSettings({ context: "meeting", showSource: false, fontScale: 1.4 });
+    expect(migrated.context).toBe("meeting");
+    expect(migrated.showSource).toBe(false);
+    expect(migrated.fontScale).toBe(1.4);
+  });
+
+  it("reads an old saved session forward rather than discarding it", () => {
+    const migrated = migrateSession({
+      id: "session-1",
+      startedAt: 1,
+      mode: "sermon",
+      segments: [],
+      chunks: [],
+    });
+    expect(migrated.context).toBe("worship");
+    expect(migrated.sourceLanguage).toBe("ko-KR");
+    expect(migrated.targetLanguage).toBe("en-US");
+    expect(migrated).not.toHaveProperty("mode");
   });
 });
