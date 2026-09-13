@@ -3,7 +3,7 @@
 - Speaker: 류정길
 - Context: worship
 - Languages: ko-KR → en-US
-- Date: 2026-09-13T15:52:16.433Z
+- Date: 2026-09-13T16:02:07.477Z
 - Duration: 00:17
 
 ## Interpreter English

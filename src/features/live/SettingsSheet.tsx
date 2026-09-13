@@ -112,6 +112,8 @@ export function SettingsSheet({
         >
           <Segmented<ContextMode>
             label="Interpretation context"
+            wrap
+            size="sm"
             value={settings.context}
             onChange={(context) => patch({ context })}
             options={CONTEXT_MODES.map((mode) => ({

@@ -176,6 +176,7 @@ export function Segmented<T extends string>({
   size = "md",
   label,
   indicator = false,
+  wrap = false,
 }: {
   options: Array<{ value: T; label: string; title?: string }>;
   value: T;
@@ -183,12 +184,23 @@ export function Segmented<T extends string>({
   size?: "sm" | "md";
   label?: string;
   indicator?: boolean;
+  /**
+   * Let the row run onto a second line rather than off the edge.
+   *
+   * Six context options do not fit the settings sheet in one row, and a
+   * segmented control that overflows does not scroll — it simply hides its
+   * last option, which for this control was "Event".
+   */
+  wrap?: boolean;
 }) {
   return (
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex rounded-xl border border-[var(--line)] bg-[var(--bg-overlay)] p-1"
+      className={cn(
+        "rounded-xl border border-[var(--line)] bg-[var(--bg-overlay)] p-1",
+        wrap ? "flex flex-wrap gap-1" : "inline-flex",
+      )}
     >
       {options.map((option) => {
         const selected = option.value === value;
