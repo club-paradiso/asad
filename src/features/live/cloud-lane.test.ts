@@ -14,6 +14,7 @@ import { SESSION_QUOTA_BYPASS_MS, TEMPORARY_RATE_LIMIT_BYPASS_MS } from "./cloud
 const request: InterpretRequest = {
   mode: "sermon",
   lag: "fast",
+  languagePair: { source: "ko-KR", target: "en-US" },
   pending: "오늘 우리는 서로를 사랑해야 합니다.",
   context: { recentKorean: [], recentEnglish: [], glossary: [], entities: [], scripture: [], corrections: [] },
   continuesPrevious: false,

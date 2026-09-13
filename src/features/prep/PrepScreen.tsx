@@ -15,6 +15,8 @@
  */
 import { useCallback, useState } from "react";
 import type { GlossaryItem, PrepBrief, PrepSheet } from "@/types";
+import { layerForDomain } from "@/types";
+import { canonicalPair } from "@/languages/registry";
 import { loadSettings, prepStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { guardedFetch, useSessionToken } from "@/lib/session-client";
@@ -48,18 +50,27 @@ export function PrepScreen() {
     [prep, setPrep],
   );
 
-  const currentInput = useCallback(
-    () => ({
-      mode: loadSettings().mode,
+  const currentInput = useCallback(() => {
+    const settings = loadSettings();
+    const context = settings.context;
+    return {
+      // The request schema still keys its prompt modules by layer, so the
+      // layer is derived here — from the interpreter's override when there
+      // is one, otherwise from nothing, because no room has been heard yet.
+      mode: layerForDomain(context === "auto" ? "generic" : context),
+      languagePair: canonicalPair({
+        source: settings.sourceLanguage,
+        target: settings.targetLanguage,
+      }),
+      domain: context,
       speaker: prep.speaker,
       title: prep.title,
       organisation: prep.organisation,
       scripture: prep.scripture,
       notes: prep.notes,
       outline: prep.outline,
-    }),
-    [prep],
-  );
+    };
+  }, [prep]);
 
   const applyBrief = useCallback(
     (nextBrief: PrepBrief, reason?: string) => {

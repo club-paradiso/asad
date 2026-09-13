@@ -10,7 +10,7 @@ import { guardInferenceRoute } from "@/lib/guard";
 import { normaliseCode } from "@/counter/codes";
 import { counterStore } from "@/counter/store";
 import { isSensitiveCounterProfile } from "@/counter/profiles";
-import { findLanguage } from "@/counter/languages";
+import { resolveLanguage, sttLanguageFor } from "@/languages/registry";
 import { MAX_COUNTER_UTTERANCE_BYTES } from "@/providers/stt/audio";
 import {
   COUNTER_TOKEN_HEADER,
@@ -44,9 +44,11 @@ export async function POST(request: Request) {
   if (audio.byteLength > MAX_COUNTER_UTTERANCE_BYTES + 44) {
     return error(413, "Voice input is too long. Please use a shorter turn or type your message.");
   }
-  const language = typeof body.language === "string" && findLanguage(body.language)
-    ? body.language
-    : "en-US";
+  // The registry's Whisper code for the requested language; null for one the
+  // batch model must not be asked for. Unknown tags keep the English default.
+  const requestedLanguage =
+    (typeof body.language === "string" ? resolveLanguage(body.language)?.id : undefined) ?? "en-US";
+  const language = sttLanguageFor("hf", requestedLanguage) ?? undefined;
 
   // Do not trust a browser-supplied profile. Look up the transient session and
   // fail closed if it is unavailable: a generic provider must never receive a
@@ -101,7 +103,8 @@ export async function requestHfTranscription(input: {
   token: string;
   model: string;
   audio: Uint8Array;
-  language: string;
+  /** Whisper base code from the registry; omitted when no code should be sent. */
+  language?: string;
   fetcher?: typeof fetch;
 }): Promise<{ ok: true; text: string } | { ok: false; status: number; message: string; retryAfter?: string }> {
   const controller = new AbortController();

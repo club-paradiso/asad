@@ -5,7 +5,13 @@
  * zero-configuration live path and the graceful fallback when a cloud provider
  * is unreachable.
  */
-import { BaseSpeechProvider, type SttProviderId, type SttProviderOptions } from "./types";
+import { languageDisplayName } from "@/languages/registry";
+import {
+  BaseSpeechProvider,
+  type StableTranscriptMeta,
+  type SttProviderId,
+  type SttProviderOptions,
+} from "./types";
 import { webSpeechLanguage } from "./language";
 import { speechFailureMessage } from "./failure";
 import { joinBrowserResultParts, pickSpeechAlternative } from "./transcript";
@@ -59,8 +65,15 @@ function getConstructor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-function alternativesFor(result: SpeechRecognitionResultLike): string[] {
-  const alternatives: Array<{ transcript: string; confidence: number; index: number }> = [];
+interface RankedAlternative {
+  transcript: string;
+  /** Browser confidence, or undefined when the browser did not report a finite one. */
+  confidence: number | undefined;
+}
+
+/** A result's alternatives, best first: by confidence, then by browser order. */
+function rankAlternatives(result: SpeechRecognitionResultLike): RankedAlternative[] {
+  const alternatives: Array<RankedAlternative & { index: number }> = [];
   for (let i = 0; i < result.length; i += 1) {
     const alternative = result[i];
     if (!alternative?.transcript) continue;
@@ -69,15 +82,42 @@ function alternativesFor(result: SpeechRecognitionResultLike): string[] {
       confidence:
         typeof alternative.confidence === "number" && Number.isFinite(alternative.confidence)
           ? alternative.confidence
-          : -1,
+          : undefined,
       index: i,
     });
   }
   alternatives.sort((a, b) => {
-    const confidenceOrder = b.confidence - a.confidence;
+    const confidenceOrder = (b.confidence ?? -1) - (a.confidence ?? -1);
     return confidenceOrder !== 0 ? confidenceOrder : a.index - b.index;
   });
-  return alternatives.map((alternative) => alternative.transcript);
+  return alternatives.map(({ transcript, confidence }) => ({ transcript, confidence }));
+}
+
+/** The hypothesis chosen for a result, with what the browser said about it. */
+interface ChosenHypothesis {
+  text: string;
+  meta: StableTranscriptMeta | undefined;
+}
+
+function chooseHypothesis(
+  result: SpeechRecognitionResultLike,
+  language: string | undefined,
+): ChosenHypothesis | null {
+  const ranked = rankAlternatives(result);
+  const text = pickSpeechAlternative(
+    ranked.map((alternative) => alternative.transcript),
+    language,
+  );
+  if (!text) return null;
+  const chosen = ranked.find((alternative) => alternative.transcript.trim() === text);
+  const others = ranked
+    .filter((alternative) => alternative !== chosen)
+    .map((alternative) => alternative.transcript.trim())
+    .filter((candidate) => candidate && candidate !== text);
+  const meta: StableTranscriptMeta = {};
+  if (chosen?.confidence !== undefined) meta.confidence = chosen.confidence;
+  if (others.length) meta.alternatives = [...new Set(others)];
+  return { text, meta: Object.keys(meta).length ? meta : undefined };
 }
 
 function stableDelta(previous: string | undefined, next: string): string {
@@ -127,12 +167,23 @@ export class WebSpeechProvider extends BaseSpeechProvider {
     const Ctor = getConstructor();
     if (!Ctor) throw new Error("This browser has no built-in speech recognition.");
 
+    // The registry decides which tag the browser gets, and whether it gets one
+    // at all. A language with no browser tag (Uyghur) must not be sent as its
+    // nearest neighbour: the recogniser would return confident text in the
+    // wrong language, which is worse than an honest refusal here.
+    const lang = webSpeechLanguage(this.options.language);
+    if (!lang) {
+      throw new Error(
+        `Browser speech recognition cannot transcribe ${languageDisplayName(this.options.language ?? "")}.`,
+      );
+    }
+
     this.wantRunning = true;
     this.recoveryUsed = 0;
     this.emitStatus("connecting");
 
     const recognition = new Ctor();
-    recognition.lang = webSpeechLanguage(this.options.language);
+    recognition.lang = lang;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 3;
@@ -142,7 +193,7 @@ export class WebSpeechProvider extends BaseSpeechProvider {
       let connected = false;
       let settled = false;
       let hasResult = false;
-      const interimByIndex = new Map<number, string>();
+      const interimByIndex = new Map<number, ChosenHypothesis>();
       const committedByIndex = new Map<number, string>();
 
       const clearInterimCommit = () => {
@@ -150,12 +201,16 @@ export class WebSpeechProvider extends BaseSpeechProvider {
         this.interimCommitTimer = null;
       };
 
+      const commit = (index: number, hypothesis: ChosenHypothesis) => {
+        const delta = stableDelta(committedByIndex.get(index), hypothesis.text);
+        if (delta) this.emitStable(delta, hypothesis.meta);
+        committedByIndex.set(index, hypothesis.text.trim());
+      };
+
       const commitInterim = () => {
         clearInterimCommit();
-        for (const [index, text] of [...interimByIndex.entries()].sort((a, b) => a[0] - b[0])) {
-          const delta = stableDelta(committedByIndex.get(index), text);
-          if (delta) this.emitStable(delta);
-          committedByIndex.set(index, text.trim());
+        for (const [index, hypothesis] of [...interimByIndex.entries()].sort((a, b) => a[0] - b[0])) {
+          commit(index, hypothesis);
         }
       };
 
@@ -188,22 +243,20 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           //
           // The list only ever grows within a recognition session, so that made
           // the per-event cost proportional to how long the service had been
-          // running: `alternativesFor` + `pickSpeechAlternative` score every
-          // alternative character by character, on the same thread that renders
-          // the English the interpreter is reading. Forty minutes in, every
+          // running: ranking + `pickSpeechAlternative` score every alternative
+          // character by character, on the same thread that renders the
+          // English the interpreter is reading. Forty minutes in, every
           // recogniser event re-ranked forty minutes of settled transcript.
           if (result.isFinal && i < event.resultIndex) continue;
-          const text = pickSpeechAlternative(alternativesFor(result), this.options.language);
-          if (!text) continue;
+          const hypothesis = chooseHypothesis(result, this.options.language);
+          if (!hypothesis) continue;
           hasResult = true;
           if (result.isFinal) {
             interimByIndex.delete(i);
-            const delta = stableDelta(committedByIndex.get(i), text);
-            if (delta) this.emitStable(delta);
-            committedByIndex.set(i, text.trim());
+            commit(i, hypothesis);
           } else {
-            interimByIndex.set(i, text);
-            interim.push(text);
+            interimByIndex.set(i, hypothesis);
+            interim.push(hypothesis.text);
           }
         }
         const partial = joinBrowserResultParts(interim, this.options.language);

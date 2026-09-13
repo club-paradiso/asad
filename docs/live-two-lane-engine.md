@@ -1,5 +1,10 @@
 # ASAD Live two-lane interpretation engine
 
+> Superseded in part by [`live-interpretation-engine.md`](./live-interpretation-engine.md):
+> the two lanes remain, `setMode()` became `setContext()`, turns carry a
+> revision, a validated Translation Memory hit now answers a turn without the
+> cloud, and a stability gate suppresses stylistic refinements.
+
 Implemented on `feat/live-two-lane-engine` after the handoff in
 `docs/claude-live-two-lane-handoff.md`. This document is the architecture of
 record for the two lanes, the invariants tests enforce, and what remains

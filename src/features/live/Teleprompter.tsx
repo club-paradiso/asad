@@ -4,12 +4,12 @@
  * Focus view.
  *
  * The console minus its history. One line the interpreter is saying, whatever
- * is predicted after it, and — if they want it — one line of Korean to check
- * against. No scrollback, no context rail, nothing to scroll.
+ * is predicted after it, and — if they want it — one line of the source to
+ * check against. No scrollback, no context rail, nothing to scroll.
  *
  * That is a different job from the console, not a larger font: the console is
  * for a service you can follow, this is for the passage you cannot — fast
- * delivery, dense theology, a preacher who does not pause — where looking away
+ * delivery, dense theology, a speaker who does not pause — where looking away
  * from the current line costs you the next one.
  *
  * The CURRENT and NEXT captions are gone. Size, contrast and the ◦ marker
@@ -18,28 +18,39 @@
  * on screen that could not be spoken aloud.
  */
 import type { InterpretationChunk, PartialTranscript, TranscriptSegment } from "@/types";
+import { resolveLanguage } from "@/languages/registry";
 import { cn } from "@/lib/cn";
 
 export function Teleprompter({
   chunks,
   segments,
   partial,
-  showKorean,
+  showSource,
+  sourceLanguage = "ko-KR",
+  targetLanguage = "en-US",
 }: {
   chunks: InterpretationChunk[];
   segments: TranscriptSegment[];
   partial: PartialTranscript | null;
-  showKorean: boolean;
+  showSource: boolean;
+  sourceLanguage?: string;
+  targetLanguage?: string;
 }) {
   const spoken = chunks.filter((c) => c.state !== "anticipated");
   const current = spoken[spoken.length - 1];
   const previous = spoken[spoken.length - 2];
   const upcoming = chunks.filter((c) => c.state === "anticipated");
 
-  const lastKorean = segments[segments.length - 1]?.text;
+  const lastSource = segments[segments.length - 1]?.text;
+  const source = resolveLanguage(sourceLanguage);
+  const target = resolveLanguage(targetLanguage);
 
   return (
-    <div className="flex h-full flex-col justify-center gap-5 px-4 sm:px-10">
+    <div
+      className="flex h-full flex-col justify-center gap-5 px-4 sm:px-10"
+      lang={target?.id ?? targetLanguage}
+      dir={target?.direction ?? "ltr"}
+    >
       {previous && (
         <p className="chunk-committed type-english opacity-30 line-clamp-1">{previous.text}</p>
       )}
@@ -58,7 +69,7 @@ export function Teleprompter({
             <span
               aria-hidden
               className="mr-2 align-middle text-[0.4em] text-[var(--fg-dim)]"
-              title="Provisional on-device English — may still be refined"
+              title="Provisional on-device translation — may still be refined"
             >
               ≈
             </span>
@@ -103,9 +114,16 @@ export function Teleprompter({
         )}
       </div>
 
-      {showKorean && lastKorean && (
-        <p className="font-korean type-korean korean-partial line-clamp-1 border-t border-[var(--line)] pt-3">
-          {partial?.text ?? lastKorean}
+      {showSource && lastSource && (
+        <p
+          lang={source?.id ?? sourceLanguage}
+          dir={source?.direction ?? "ltr"}
+          className={cn(
+            "type-korean korean-partial source-text line-clamp-1 border-t border-[var(--line)] pt-3",
+            (source?.base ?? "ko") === "ko" ? "font-korean" : "font-sans",
+          )}
+        >
+          {partial?.text ?? lastSource}
         </p>
       )}
     </div>

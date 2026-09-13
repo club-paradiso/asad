@@ -3,10 +3,11 @@
  *
  * This is deliberately separate from /api/interpret. Rescue must never drain,
  * cancel, commit, or otherwise mutate the ordinary live interpretation queue.
- * The client supplies a bounded recent-Korean window; this route asks only for
- * the minimum safe bridge into the latest resolved idea.
+ * The client supplies a bounded recent source-text window; this route asks
+ * only for the minimum safe bridge into the latest resolved idea.
  */
 import { NextResponse } from "next/server";
+import { canonicalPair } from "@/languages/registry";
 import { rescueRequestSchema } from "@/lib/rescue-schema";
 import { parseInterpreterOutput } from "@/lib/schema";
 import { buildRescueUserPrompt } from "@/interpreter/prompts/rescue";
@@ -79,13 +80,16 @@ export async function POST(request: Request) {
     lag: "fast",
   });
   const context = applyProfile(input.context, profile.profile);
+  const pair = canonicalPair(input.languagePair);
   const system = systemPromptFor(input.mode, {
     schemaEnforced: caps.structuredOutput,
+    pair,
   });
   const user = buildRescueUserPrompt({
     mode: input.mode,
     recentKorean: input.recentKorean,
     context,
+    languagePair: pair,
   });
 
   if (!user) {
@@ -94,7 +98,7 @@ export async function POST(request: Request) {
       provider: "local",
       model: "none",
       degraded: true,
-      reason: "There is no recent stable Korean to rescue.",
+      reason: "There is no recent stable source text to rescue.",
     });
   }
 

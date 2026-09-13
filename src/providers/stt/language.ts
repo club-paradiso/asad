@@ -2,54 +2,42 @@
  * Provider-specific STT language tags.
  *
  * The product uses BCP-47 tags because the UI needs region/script distinctions,
- * but speech vendors do not accept the same set of tags. Keep that translation
- * at the provider boundary instead of throwing away region information globally.
+ * but speech vendors do not accept the same set of tags. The translation lives
+ * in the registry (`@/languages/registry`); these helpers only add the
+ * provider boundary's default: no language means Korean, as it did throughout
+ * the MVP.
  */
+import { sttLanguageFor, whisperPromptFor } from "@/languages/registry";
+
+const DEFAULT_LANGUAGE = "ko-KR";
 
 /**
- * Deepgram Nova-3 language codes currently used by Counter Mode.
- *
- * Preserve region/script variants where Deepgram has distinct models (notably
- * Simplified vs Traditional Chinese). Return null for languages Nova-3 does not
- * currently support so Counter Mode can fall back to browser speech immediately.
+ * Deepgram Nova-3 language code, or null for a language Nova-3 does not
+ * support so Counter Mode can fall back to browser speech immediately.
  */
-const DEEPGRAM_LANGUAGE: Record<string, string> = {
-  "ko-KR": "ko-KR",
-  "en-US": "en-US",
-  "zh-CN": "zh-CN",
-  "zh-TW": "zh-TW",
-  "ja-JP": "ja",
-  "vi-VN": "vi",
-  "th-TH": "th-TH",
-  "id-ID": "id",
-  "ru-RU": "ru",
-  "uk-UA": "uk",
-  "mn-MN": "mn",
-  "ne-NP": "ne",
-  "tl-PH": "tl",
-  "es-ES": "es",
-  "fr-FR": "fr",
-  "de-DE": "de",
-  "pt-BR": "pt-BR",
-  "ar-SA": "ar-SA",
-  "hi-IN": "hi",
-  "bn-BD": "bn",
-  "ur-PK": "ur",
-  "tr-TR": "tr-TR",
-};
-
 export function deepgramLanguage(language: string | undefined): string | null {
-  if (!language) return "ko-KR";
-  return DEEPGRAM_LANGUAGE[language] ?? null;
+  return sttLanguageFor("deepgram", language ?? DEFAULT_LANGUAGE);
 }
 
 /**
- * Browser SpeechRecognition wants BCP-47. Most app tags can pass through, but
- * Google's browser speech backend commonly exposes Filipino as fil-PH rather
- * than the older tl-PH tag used by the product/model layer.
+ * Browser SpeechRecognition tag (Google exposes Filipino as fil-PH, for one).
+ * `null` when the registry says the browser recogniser must not receive the
+ * language at all, or when the tag is not a registry language.
  */
-export function webSpeechLanguage(language: string | undefined): string {
-  if (!language) return "ko-KR";
-  if (language === "tl-PH") return "fil-PH";
-  return language;
+export function webSpeechLanguage(language: string | undefined): string | null {
+  return sttLanguageFor("webspeech", language ?? DEFAULT_LANGUAGE);
+}
+
+/** Whisper-family base code for OpenAI realtime transcription, or null. */
+export function openaiTranscriptionLanguage(language: string | undefined): string | null {
+  return sttLanguageFor("openai", language ?? DEFAULT_LANGUAGE);
+}
+
+/**
+ * Whisper cannot be told a script through its language code — `zh` alone lets
+ * the model pick Simplified or Traditional. The registry carries a prompt in
+ * the wanted script for the languages where that matters.
+ */
+export function whisperScriptPrompt(language: string | undefined): string | undefined {
+  return whisperPromptFor(language ?? DEFAULT_LANGUAGE);
 }

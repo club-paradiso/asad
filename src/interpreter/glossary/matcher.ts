@@ -7,8 +7,15 @@
  *
  * Matching is longest-first so 하나님 나라 wins over 하나님, and 택하신 족속
  * wins over 족속.
+ *
+ * LANGUAGES. The built-in lexicons are Korean, and Korean only: the Korean
+ * whole-word matcher knows Korean particles and nothing about Thai or
+ * Mandarin. For any other source language only the `extra` entries — the prep
+ * sheet's and the session's own — are matched, with a boundary rule that
+ * suits the script, and the Korean lexicon is never consulted.
  */
 import type { GlossaryItem, InterpretationMode } from "@/types";
+import { isSpacelessLanguage, languageBase } from "@/languages/registry";
 import { COMMUNITY_SERMON_GLOSSARY } from "./community-glossary";
 import { lexiconFor } from "./lexicon";
 import { findWholeWordOccurrences } from "./match-korean";
@@ -21,30 +28,63 @@ export interface GlossaryMatch extends GlossaryItem {
 /** Maximum entries shown on the live console at once. */
 export const LIVE_GLOSSARY_LIMIT = 6;
 
+/** The source language every matcher assumes when none is given. */
+export const DEFAULT_GLOSSARY_LANGUAGE = "ko-KR";
+
 const byLengthDesc = (a: GlossaryItem, b: GlossaryItem) =>
   b.korean.length - a.korean.length;
 
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
- * Find glossary terms present in a piece of Korean text.
+ * Every occurrence of `term` in `text`, with the boundary rule the language
+ * needs: Korean particles for Korean, plain substring for scripts that do not
+ * space words, Unicode word boundaries (case-insensitive) for the rest.
+ */
+export function findOccurrences(text: string, term: string, language: string): number[] {
+  if (!term) return [];
+  if (languageBase(language) === "ko") return findWholeWordOccurrences(text, term);
+
+  const out: number[] = [];
+  if (isSpacelessLanguage(language)) {
+    const haystack = text.toLowerCase();
+    const needle = term.toLowerCase();
+    for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, at + 1)) out.push(at);
+    return out;
+  }
+
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(term)}(?![\\p{L}\\p{N}])`, "giu");
+  for (let match = re.exec(text); match !== null; match = re.exec(text)) {
+    out.push(match.index);
+    if (match[0].length === 0) re.lastIndex += 1;
+  }
+  return out;
+}
+
+/**
+ * Find glossary terms present in a piece of source text.
  *
  * `extra` carries prep-sheet and model-supplied entries, which outrank the
- * built-in lexicon when both match the same Korean string.
+ * built-in lexicon when both match the same source string.
  *
- * In sermon mode the volunteer-maintained community glossary extends coverage
- * after the hand-curated lexicon. This ordering is intentional: broad coverage
- * must never silently replace a context-aware decision such as 대속 → atonement.
+ * In the sermon layer the volunteer-maintained community glossary extends
+ * coverage after the hand-curated lexicon. This ordering is intentional: broad
+ * coverage must never silently replace a context-aware decision such as
+ * 대속 → atonement.
  */
 export function matchGlossary(
   text: string,
   mode: InterpretationMode,
   extra: GlossaryItem[] = [],
+  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): GlossaryMatch[] {
   if (!text.trim()) return [];
 
-  const community = mode === "sermon" ? COMMUNITY_SERMON_GLOSSARY : [];
+  const korean = languageBase(language) === "ko";
+  const community = korean && mode === "sermon" ? COMMUNITY_SERMON_GLOSSARY : [];
   const entries = dedupeByKorean([
     ...extra,
-    ...lexiconFor(mode),
+    ...(korean ? lexiconFor(mode) : []),
     ...community,
   ]).sort(byLengthDesc);
 
@@ -56,7 +96,7 @@ export function matchGlossary(
   for (const entry of entries) {
     // Whole-word only. Korean agglutinates, so substring search would report
     // 감사 ("thanksgiving") inside 감사합니다 ("thank you").
-    for (const index of findWholeWordOccurrences(text, entry.korean)) {
+    for (const index of findOccurrences(text, entry.korean, language)) {
       const end = index + entry.korean.length;
       let overlaps = false;
       for (let i = index; i < end; i += 1) {
@@ -91,9 +131,10 @@ export function liveGlossary(
   mode: InterpretationMode,
   extra: GlossaryItem[] = [],
   limit = LIVE_GLOSSARY_LIMIT,
+  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): GlossaryItem[] {
   return (
-    matchGlossary(recentText, mode, extra)
+    matchGlossary(recentText, mode, extra, language)
       .filter((item) => !item.register)
       .slice(0, limit)
       .map(({ index: _index, ...item }) => item)
@@ -116,8 +157,9 @@ export function promptGlossary(
   mode: InterpretationMode,
   extra: GlossaryItem[] = [],
   limit = PROMPT_GLOSSARY_LIMIT,
+  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): GlossaryItem[] {
-  return matchGlossary(recentText, mode, extra)
+  return matchGlossary(recentText, mode, extra, language)
     .slice(0, limit)
     .map(({ index: _index, ...item }) => item);
 }

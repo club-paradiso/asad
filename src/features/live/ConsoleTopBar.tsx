@@ -5,7 +5,7 @@
  *
  * An instrument panel, not a dashboard. When everything is working this reads
  *
- *     ● Live                                        18:42   ⋯   End
+ *     ● Live  KO → EN  🎙                           18:42   ⋯   End
  *
  * and nothing else, because an interpreter mid-sentence cannot act on the
  * provider's name, the lag profile they chose before they started, or whether a
@@ -23,6 +23,8 @@
 import type { ConnectionState, SubsystemHealth } from "@/types";
 import { Button, StatusDot } from "@/components/ui/primitives";
 import type { AiState } from "./AiStatus";
+import { AudioStatus } from "./AudioStatus";
+import type { AudioActivity } from "./useLiveSession";
 import { cn } from "@/lib/cn";
 
 export function formatElapsed(ms: number): string {
@@ -133,6 +135,10 @@ export function ConsoleTopBar({
   elapsedMs,
   aiState,
   scripted,
+  pairLabel,
+  audio = "off",
+  context,
+  onOpenContext,
   onOpenSettings,
   onEnd,
 }: {
@@ -141,6 +147,16 @@ export function ConsoleTopBar({
   elapsedMs: number;
   aiState: AiState;
   scripted?: boolean;
+  /** Compact direction label, e.g. `KO → EN`. */
+  pairLabel?: string;
+  /** What the microphone path is doing right now. */
+  audio?: AudioActivity;
+  /**
+   * The Context Engine's current answer, when it has one worth showing — the
+   * console passes nothing while the domain is the default or generic.
+   */
+  context?: string;
+  onOpenContext?: () => void;
   onOpenSettings: () => void;
   onEnd: () => void;
 }) {
@@ -172,12 +188,36 @@ export function ConsoleTopBar({
         </span>
         {status.detail && (
           // Narrow screens get the label and the colour; the sentence needs
-          // room it does not have next to a 390px-wide English column.
+          // room it does not have next to a 390px-wide translation column.
           <span className="hidden min-w-0 truncate text-[var(--fg-dim)] sm:inline">
             {status.detail}
           </span>
         )}
       </p>
+
+      {pairLabel && (
+        <span
+          className="shrink-0 rounded-md border border-[var(--line)] px-1.5 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide text-[var(--fg-muted)] tall:text-[0.7rem]"
+          aria-label={`Languages ${pairLabel}`}
+          data-pair={pairLabel}
+        >
+          {pairLabel}
+        </span>
+      )}
+
+      {context && (
+        <button
+          type="button"
+          onClick={onOpenContext}
+          title="Context the interpreter is tuned for — tap to override"
+          className="hidden min-h-8 shrink-0 items-center rounded-md border border-[color-mix(in_srgb,var(--info)_34%,transparent)] bg-[var(--info-dim)] px-1.5 text-[0.65rem] font-medium text-[var(--info)] min-[400px]:inline-flex"
+          data-context={context}
+        >
+          {context}
+        </button>
+      )}
+
+      <AudioStatus activity={audio} className="shrink-0" />
 
       <span
         className="ml-auto shrink-0 tabular-nums text-[var(--fg-muted)]"

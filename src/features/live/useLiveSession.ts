@@ -4,16 +4,19 @@
  * React binding for the interpretation engine.
  *
  * Owns the things the engine deliberately does not: the speech provider, the
- * microphone, the clock interval, and the network calls. The engine itself
- * stays a pure state machine so it can be tested without a browser.
+ * microphone, the clock interval, the network calls, the audio-activity
+ * signal and persistent memory. The engine itself stays a pure state machine
+ * so it can be tested without a browser.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   BibleReference,
   ConnectionState,
-  InterpretationMode,
+  ContextDomain,
   LagProfile,
+  LanguagePair,
   PrepSheet,
+  StableTranscriptMeta,
 } from "@/types";
 import { emptyPrepSheet } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
@@ -45,6 +48,14 @@ import {
 } from "@/providers/stt";
 import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
+import { canonicalPair, isKoreanToEnglish, languageDisplayName } from "@/languages/registry";
+import {
+  loadPersistentMemory,
+  persistLearnings,
+  savePersistentMemory,
+  seedFromPersistent,
+} from "@/interpreter/memory/persistent";
+import { layerForDomain } from "@/types";
 import { guardedFetch } from "@/lib/session-client";
 import { ClientLatencyQueue } from "./client-latency";
 import {
@@ -64,6 +75,11 @@ const FINAL_INFLIGHT_WAIT_MS = 2200;
 const FINAL_FLUSH_WAIT_MS = 2800;
 /** Provisional render times kept for turns whose contextual result is still out. */
 const MAX_PROVISIONAL_RENDER_MARKS = 64;
+/** No partial for this long after the last one means the speaker paused. */
+const SPEECH_SILENCE_MS = 1_400;
+/** Raw-audio RMS above this is speech; below it for a while is silence. */
+const SPEECH_RMS_THRESHOLD = 0.012;
+const SPEECH_ONSET_QUIET_MS = 600;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -78,8 +94,18 @@ interface RenderMarker {
 
 export type SessionPhase = "idle" | "starting" | "running" | "ended";
 
+/**
+ * What the microphone is doing, as far as the console should say. Derived
+ * from the recogniser's status and from speech activity — a raw-audio level
+ * where the browser hands us frames, otherwise interim-result cadence.
+ */
+export type AudioActivity = "off" | "mic-active" | "speech" | "silence" | "reconnecting" | "unavailable";
+
 export interface LiveSessionOptions {
-  mode: InterpretationMode;
+  /** Canonical registry ids. */
+  languagePair: LanguagePair;
+  /** `auto` unless the interpreter overrode it. */
+  context: ContextDomain;
   lag: LagProfile;
   prep?: PrepSheet;
   /** `demo` needs no key and no microphone. */
@@ -90,9 +116,17 @@ export interface LiveSessionOptions {
   demoSpeed?: number;
   /** Look up Scripture text. Skipped entirely in demo mode. */
   resolveScripture?: boolean;
+  /** Keep user-confirmed corrections and bindings for future sessions. */
+  rememberCorrections?: boolean;
 }
 
-const emptySnapshot = (): EngineSnapshot => ({
+export interface CorrectionOptions {
+  english?: string;
+  remember?: boolean;
+  scope?: "source" | "target" | "entity";
+}
+
+const emptySnapshot = (pair: LanguagePair): EngineSnapshot => ({
   segments: [],
   partial: null,
   chunks: [],
@@ -104,14 +138,30 @@ const emptySnapshot = (): EngineSnapshot => ({
   connection: "idle",
   health: { stt: "ok", llm: "ok", bible: "ok" },
   thinking: false,
+  languagePair: pair,
+  domain: { domain: "generic", confidence: 0, source: "default", signals: [] },
 });
 
+/** Root-mean-square of a PCM16 frame. Cheap enough to run on every 50 ms frame. */
+function frameRms(frame: ArrayBuffer): number {
+  const samples = new Int16Array(frame);
+  if (samples.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = samples[i] / 32768;
+    sum += value * value;
+  }
+  return Math.sqrt(sum / samples.length);
+}
+
 export function useLiveSession(options: LiveSessionOptions) {
-  const [snapshot, setSnapshot] = useState<EngineSnapshot>(emptySnapshot);
+  const pair = useMemo(() => canonicalPair(options.languagePair), [options.languagePair]);
+  const [snapshot, setSnapshot] = useState<EngineSnapshot>(() => emptySnapshot(pair));
   const [phase, setPhase] = useState<SessionPhase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [demoBeat, setDemoBeat] = useState<DemoBeat | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [audio, setAudio] = useState<AudioActivity>("off");
   /**
    * Which provider answered the most recent turn. The console shows this only
    * when it is the deterministic local interpreter, because that is the case
@@ -129,6 +179,7 @@ export function useLiveSession(options: LiveSessionOptions) {
   const browserTranslatorPreparationRef = useRef<Promise<BrowserTranslatorSession | null> | null>(
     null,
   );
+  const browserTranslatorPairRef = useRef<string>("");
   const mountedRef = useRef(true);
   /** The last message the speech provider itself reported, if any. */
   const providerErrorRef = useRef<string | null>(null);
@@ -136,8 +187,21 @@ export function useLiveSession(options: LiveSessionOptions) {
   const pendingRenderLatencyRef = useRef<RenderMarker[]>([]);
   /** When each turn's provisional English reached the screen, by turn id. */
   const provisionalRenderedAtRef = useRef(new Map<number, number>());
+  /** Speech-activity clocks for T0/T1/T2. Times only. */
+  const speechRef = useRef<{
+    onsetAt: number | null;
+    firstPartialAt: number | null;
+    lastPartialAt: number;
+    quietSince: number;
+    silenceTimer: ReturnType<typeof setTimeout> | null;
+    status: SttStatus;
+  }>({ onsetAt: null, firstPartialAt: null, lastPartialAt: 0, quietSince: 0, silenceTimer: null, status: "idle" });
 
-  const script: DemoScript = useMemo(() => demoScriptFor(options.mode), [options.mode]);
+  const demoAvailable = isKoreanToEnglish(pair);
+  const script: DemoScript = useMemo(
+    () => demoScriptFor(layerForDomain(options.context === "auto" ? "sermon" : options.context)),
+    [options.context],
+  );
 
   // Live-updating ref so the engine's callbacks always see current settings
   // without tearing down the session when a toggle changes. Seeded at mount so
@@ -181,31 +245,35 @@ export function useLiveSession(options: LiveSessionOptions) {
   }, []);
 
   /**
-   * Begin Chrome's local ko→en translator while the Start click still carries
-   * user activation. If a model pack has to download, the console exposes that
-   * state; interpretation never waits on the download mid-sentence.
+   * Begin the browser's on-device translator for this pair while the Start
+   * click still carries user activation. If a model pack has to download, the
+   * console exposes that state; interpretation never waits on the download
+   * mid-sentence. A pair change discards a translator built for another pair.
    */
-  const prepareBrowserTranslator = useCallback(() => {
-    if (browserTranslatorRef.current) {
+  const prepareBrowserTranslator = useCallback((currentPair: LanguagePair) => {
+    const key = `${currentPair.source}>${currentPair.target}`;
+    if (browserTranslatorRef.current && browserTranslatorPairRef.current === key) {
       setBrowserTranslatorStatus("ready");
       return;
     }
+    if (browserTranslatorRef.current) {
+      browserTranslatorRef.current.destroy();
+      browserTranslatorRef.current = null;
+    }
     if (browserTranslatorPreparationRef.current) return;
 
-    // No download-progress callback: the console does not render a
-    // percentage, and interpretation never waits on the pack, so observing it
-    // only re-rendered the live surface while a background download ticked.
-    const preparation = beginBrowserTranslatorPreparation();
+    const preparation = beginBrowserTranslatorPreparation({ pair: currentPair });
     if (!preparation.supported) {
       setBrowserTranslatorStatus("unsupported");
       return;
     }
 
     setBrowserTranslatorStatus("preparing");
+    browserTranslatorPairRef.current = key;
     browserTranslatorPreparationRef.current = preparation.session;
     void preparation.session
       .then((translator) => {
-        if (!mountedRef.current) {
+        if (!mountedRef.current || browserTranslatorPairRef.current !== key) {
           translator?.destroy();
           return;
         }
@@ -237,6 +305,7 @@ export function useLiveSession(options: LiveSessionOptions) {
           pending: request.pending,
           mode: request.mode,
           allowAnticipation: request.allowAnticipation,
+          pair: request.languagePair,
         }),
       telemetry: clientLatencyRef.current,
       onProvider: (provider) => setLastProvider(provider),
@@ -261,6 +330,7 @@ export function useLiveSession(options: LiveSessionOptions) {
             mode: request.mode,
             scriptId: script.id,
             allowAnticipation: request.allowAnticipation,
+            pair: request.languagePair,
           }),
           provider: "local",
           model: "deterministic",
@@ -272,10 +342,11 @@ export function useLiveSession(options: LiveSessionOptions) {
   );
 
   /**
-   * The provisional lane: Chrome's on-device translator, and only when it is
-   * genuinely ready. `isReady` is answered from the ref synchronously, so a
-   * language pack that is still downloading simply means cloud-first for that
-   * turn. Demo mode has no fast lane; its scripted English is already instant.
+   * The provisional lane: the browser's on-device translator, and only when
+   * it is genuinely ready. `isReady` is answered from the ref synchronously,
+   * so a language pack that is still downloading simply means cloud-first for
+   * that turn. Demo mode has no fast lane; its scripted English is already
+   * instant.
    */
   const provisionalLane = useMemo<ProvisionalLane>(
     () => ({
@@ -298,14 +369,22 @@ export function useLiveSession(options: LiveSessionOptions) {
    * FINAL English reached state / screen. When the contextual lane leaves the
    * provisional line standing, that final English was the provisional one, so
    * the sample points at the provisional clock rather than at the moment the
-   * cloud got round to agreeing.
+   * cloud got round to agreeing. `stable_to_first_useful` is the interpreter's
+   * number: the first target-language content for the turn, whichever path.
    */
   const recordTurnTiming = useCallback((timing: TurnTiming) => {
     const queue = clientLatencyRef.current;
     const { stableAt, provider, model, turnId } = timing;
 
+    if (timing.firstUseful) {
+      queue.add("stable_to_first_useful", timing.safeAt - stableAt, provider, model);
+    }
+
     if (timing.lane === "provisional") {
       if (!timing.hasSafe) return;
+      if (provider === "translation-memory") {
+        queue.add("stable_to_memory_hit", timing.safeAt - stableAt, provider, model);
+      }
       queue.add("stable_to_provisional", timing.safeAt - stableAt, provider, model);
       pendingRenderLatencyRef.current.push({ stage: "stable_to_provisional_render", stableAt, turnId, provider, model });
       return;
@@ -313,6 +392,9 @@ export function useLiveSession(options: LiveSessionOptions) {
 
     if (timing.clientDispatchedAt !== undefined) {
       queue.add("stable_to_client_dispatch", timing.clientDispatchedAt - stableAt, provider, model);
+    }
+    if (timing.qualityStartAt !== undefined) {
+      queue.add("quality_repair_start", timing.qualityStartAt - stableAt, provider, model);
     }
 
     switch (timing.outcome) {
@@ -325,6 +407,7 @@ export function useLiveSession(options: LiveSessionOptions) {
       case "refined":
         queue.add("stable_to_safe", timing.safeAt - stableAt, provider, model);
         pendingRenderLatencyRef.current.push({ stage: "stable_to_render", stableAt, turnId, provider, model });
+        pendingRenderLatencyRef.current.push({ stage: "quality_repair_rendered", stableAt, turnId, provider, model });
         if (timing.provisionalAppliedAt !== undefined) {
           queue.add("provisional_to_refinement", timing.safeAt - timing.provisionalAppliedAt, provider, model);
         }
@@ -364,9 +447,77 @@ export function useLiveSession(options: LiveSessionOptions) {
     return data.reference ?? reference;
   }, []);
 
+  /* --- Audio activity --------------------------------------------------- */
+
+  const clearSilenceTimer = () => {
+    const speech = speechRef.current;
+    if (speech.silenceTimer) clearTimeout(speech.silenceTimer);
+    speech.silenceTimer = null;
+  };
+
+  /** Interim text arrived: the speaker is talking. T1 when it is the first since a pause. */
+  const notePartial = useCallback(() => {
+    const speech = speechRef.current;
+    const now = Date.now();
+    if (speech.firstPartialAt === null) {
+      speech.firstPartialAt = now;
+      if (speech.onsetAt !== null && optionsRef.current.source !== "demo") {
+        clientLatencyRef.current.add("speech_to_first_partial", now - speech.onsetAt);
+      }
+    }
+    speech.lastPartialAt = now;
+    if (speech.status === "listening") setAudio("speech");
+    clearSilenceTimer();
+    speech.silenceTimer = setTimeout(() => {
+      speech.silenceTimer = null;
+      speech.firstPartialAt = null;
+      speech.onsetAt = null;
+      if (speechRef.current.status === "listening") setAudio("silence");
+    }, SPEECH_SILENCE_MS);
+  }, []);
+
+  /** Final text arrived: T2. */
+  const noteStable = useCallback(() => {
+    const speech = speechRef.current;
+    if (speech.firstPartialAt !== null && optionsRef.current.source !== "demo") {
+      clientLatencyRef.current.add("partial_to_stable", Date.now() - speech.firstPartialAt);
+    }
+    speech.firstPartialAt = null;
+    speech.onsetAt = null;
+  }, []);
+
+  /** Raw audio frame (providers that take PCM): T0 is the onset after quiet. */
+  const noteFrame = useCallback((frame: ArrayBuffer) => {
+    const speech = speechRef.current;
+    const now = Date.now();
+    const rms = frameRms(frame);
+    if (rms >= SPEECH_RMS_THRESHOLD) {
+      if (speech.onsetAt === null && now - speech.quietSince >= SPEECH_ONSET_QUIET_MS) {
+        speech.onsetAt = now;
+        if (speech.status === "listening") setAudio("speech");
+      }
+      speech.quietSince = now;
+    }
+  }, []);
+
+  const mapAudio = (status: SttStatus): AudioActivity => {
+    switch (status) {
+      case "listening":
+        return "mic-active";
+      case "reconnecting":
+      case "connecting":
+        return "reconnecting";
+      case "error":
+        return "unavailable";
+      default:
+        return "off";
+    }
+  };
+
   const teardown = useCallback(async () => {
     if (tickRef.current) clearInterval(tickRef.current);
     tickRef.current = null;
+    clearSilenceTimer();
     // Invalidate ownership before the first await. A track-ended callback can
     // race with AudioWorklet startup; the startup tail uses the ref identity
     // as its cancellation check and must see teardown synchronously.
@@ -376,6 +527,31 @@ export function useLiveSession(options: LiveSessionOptions) {
     providerRef.current = null;
     await mic?.stop().catch(() => {});
     await provider?.disconnect().catch(() => {});
+    setAudio("off");
+  }, []);
+
+  /** Keep what the session learned, under the user's setting. Never transcripts. */
+  const persist = useCallback((engine: InterpretationEngine) => {
+    if (optionsRef.current.rememberCorrections === false) return;
+    if (optionsRef.current.source === "demo") return;
+    try {
+      const learnings = engine.learnings();
+      if (
+        learnings.corrections.length === 0 &&
+        learnings.entities.length === 0 &&
+        learnings.memory.length === 0
+      ) {
+        return;
+      }
+      const next = persistLearnings(loadPersistentMemory(), {
+        ...learnings,
+        pair: engine.snapshot().languagePair,
+        now: Date.now(),
+      });
+      savePersistentMemory(next);
+    } catch {
+      // Persistence is a convenience; a full or private store is not an error.
+    }
   }, []);
 
   const stop = useCallback(async (): Promise<EngineSnapshot> => {
@@ -386,7 +562,7 @@ export function useLiveSession(options: LiveSessionOptions) {
     // first used to throw that final sentence away.
     await teardown();
     if (!engine) {
-      const finalSnapshot = emptySnapshot();
+      const finalSnapshot = emptySnapshot(pair);
       setSnapshot(finalSnapshot);
       setPhase("ended");
       flushClientTelemetry();
@@ -407,35 +583,46 @@ export function useLiveSession(options: LiveSessionOptions) {
     }
 
     engine.stop();
+    persist(engine);
     const finalSnapshot = engine.snapshot();
     setSnapshot(finalSnapshot);
     setPhase("ended");
     flushClientTelemetry();
     return finalSnapshot;
-  }, [flushClientTelemetry, teardown]);
+  }, [flushClientTelemetry, pair, persist, teardown]);
 
   const start = useCallback(async () => {
     if (phase === "running" || phase === "starting") return;
 
     const current = optionsRef.current;
+    const currentPair = canonicalPair(current.languagePair);
     // This function is called synchronously from the launcher's Start click.
-    // Kick off Translator.create() before the first await so Chrome can use the
-    // user's activation to download/instantiate the local language pack.
-    if (current.source !== "demo") prepareBrowserTranslator();
+    // Kick off Translator.create() before the first await so the browser can
+    // use the user's activation to download/instantiate the language pack.
+    if (current.source !== "demo") prepareBrowserTranslator(currentPair);
 
     setError(null);
     providerErrorRef.current = null;
     setPhase("starting");
     setDemoBeat(null);
     setLastProvider(undefined);
-    setSnapshot(emptySnapshot());
+    setSnapshot(emptySnapshot(currentPair));
     pendingRenderLatencyRef.current = [];
     provisionalRenderedAtRef.current.clear();
+    speechRef.current = { onsetAt: null, firstPartialAt: null, lastPartialAt: 0, quietSince: Date.now(), silenceTimer: null, status: "idle" };
+
+    // Earlier sessions' confirmed corrections and bindings, when allowed.
+    const persisted =
+      current.rememberCorrections === false || current.source === "demo"
+        ? undefined
+        : seedFromPersistent(loadPersistentMemory(), currentPair);
 
     const engine = new InterpretationEngine({
-      mode: current.mode,
+      languagePair: currentPair,
+      context: current.context,
       lag: current.lag,
       prep: current.prep ?? emptyPrepSheet(),
+      persisted,
       interpret,
       provisional: provisionalLane,
       resolveBible:
@@ -468,19 +655,27 @@ export function useLiveSession(options: LiveSessionOptions) {
         if (engineRef.current !== engine) return;
         engine.setConnection("error");
         engine.setHealth("stt", "down", message);
+        setAudio("unavailable");
         setPhase("idle");
       });
     };
 
     try {
-      // The recogniser gets only the highest-value terms. In sermon mode this
-      // includes community-glossary terms that actually occur in today's prep.
-      const hints = buildSttHints(current.mode, current.prep);
+      if (current.source === "demo" && !isKoreanToEnglish(currentPair)) {
+        throw new Error(
+          `The scripted demo is Korean → English. Choose Browser input for ${languageDisplayName(currentPair.source)}.`,
+        );
+      }
+
+      // The recogniser gets only the highest-value terms. In the worship layer
+      // this includes community-glossary terms that actually occur in today's prep.
+      const layer = layerForDomain(current.context === "auto" ? "generic" : current.context);
+      const hints = buildSttHints(layer, current.prep, undefined, currentPair.source);
 
       const credentials =
         current.source === "demo" || current.source === "webspeech"
           ? undefined
-          : ((await fetchSttCredentials("ko-KR", undefined, "live")) ?? undefined);
+          : ((await fetchSttCredentials(currentPair.source, undefined, "live")) ?? undefined);
 
       // Never silently replace a real microphone with the scripted demo. That
       // looked like a successful session while listening to nothing the speaker
@@ -504,7 +699,7 @@ export function useLiveSession(options: LiveSessionOptions) {
 
       const provider = createSpeechProvider({
         provider: effectiveSource,
-        language: "ko-KR",
+        language: currentPair.source,
         hints,
         credentials,
         demo: {
@@ -518,13 +713,21 @@ export function useLiveSession(options: LiveSessionOptions) {
       });
       providerRef.current = provider;
 
-      provider.onPartial((text) => engineRef.current?.handlePartial(text));
-      provider.onStable((text) => engineRef.current?.handleStable(text));
+      provider.onPartial((text) => {
+        notePartial();
+        engineRef.current?.handlePartial(text);
+      });
+      provider.onStable((text: string, meta?: StableTranscriptMeta) => {
+        noteStable();
+        engineRef.current?.handleStable(text, meta);
+      });
       provider.onError((err) => {
         providerErrorRef.current = err.message;
         setError(err.message);
       });
       provider.onStatus((status) => {
+        speechRef.current.status = status;
+        setAudio(mapAudio(status));
         engineRef.current?.setConnection(mapStatus(status));
         engineRef.current?.setHealth(
           "stt",
@@ -549,7 +752,10 @@ export function useLiveSession(options: LiveSessionOptions) {
         }
         const mic = new MicrophoneCapture({
           deviceId: current.audioDeviceId || undefined,
-          onFrame: (frame) => provider.sendAudio(frame),
+          onFrame: (frame) => {
+            noteFrame(frame);
+            provider.sendAudio(frame);
+          },
           onError: (err) => setError(err.message),
           onEnded: () => {
             failTerminally(
@@ -584,15 +790,16 @@ export function useLiveSession(options: LiveSessionOptions) {
       if (engineRef.current === engine) {
         engine.setConnection("error");
         engine.setHealth("stt", "down", message);
+        setAudio(err instanceof Error && err.name === "NotAllowedError" ? "unavailable" : "off");
         setPhase("idle");
       }
     }
-  }, [phase, interpret, prepareBrowserTranslator, provisionalLane, recordTurnTiming, resolveBible, script, teardown]);
+  }, [phase, interpret, noteFrame, notePartial, noteStable, prepareBrowserTranslator, provisionalLane, recordTurnTiming, resolveBible, script, teardown]);
 
   // Push setting changes into the running engine rather than restarting it.
   useEffect(() => {
-    engineRef.current?.setMode(options.mode);
-  }, [options.mode]);
+    engineRef.current?.setContext(options.context);
+  }, [options.context]);
 
   useEffect(() => {
     engineRef.current?.setLag(options.lag);
@@ -613,8 +820,15 @@ export function useLiveSession(options: LiveSessionOptions) {
     [flushClientTelemetry, teardown],
   );
 
-  const correct = useCallback((from: string, to: string, english?: string) => {
-    engineRef.current?.correct(from, to, english);
+  const correct = useCallback((from: string, to: string, correction?: CorrectionOptions) => {
+    engineRef.current?.correct(from, to, {
+      ...correction,
+      remember: correction?.remember ?? optionsRef.current.rememberCorrections !== false,
+    });
+  }, []);
+
+  const setContext = useCallback((context: ContextDomain) => {
+    engineRef.current?.setContext(context);
   }, []);
 
   return {
@@ -626,9 +840,12 @@ export function useLiveSession(options: LiveSessionOptions) {
     browserTranslatorStatus,
     startedAt,
     script,
+    demoAvailable,
+    audio,
     start,
     stop,
     correct,
+    setContext,
     dismissError: useCallback(() => {
       providerErrorRef.current = null;
       setError(null);

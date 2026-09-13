@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AppConfig } from "@/app/api/config/route";
-import { readinessRows } from "./StartScreen";
+import { boothPreflightApplies, readinessRows } from "./StartScreen";
+
+// The rows are pure. The launcher module also binds the live-session hook,
+// which drags in the recogniser and engine graph; none of it is exercised here.
+vi.mock("./useLiveSession", () => ({ useLiveSession: () => ({}) }));
 
 const configWithDisclosure = {
   stt: { configured: "webspeech", cloudAvailable: false },
@@ -25,11 +29,38 @@ const configWithDisclosure = {
   },
 } satisfies AppConfig;
 
+describe("when the booth sound check applies", () => {
+  it("applies when the interpreter says the room is a service", () => {
+    expect(boothPreflightApplies({ context: "sermon", source: "deepgram" })).toBe(true);
+    expect(boothPreflightApplies({ context: "worship", source: "webspeech" })).toBe(true);
+  });
+
+  it("applies when a cloud recogniser is fed from a chosen physical input", () => {
+    expect(
+      boothPreflightApplies({ context: "auto", source: "deepgram", audioDeviceSelected: true }),
+    ).toBe(true);
+    expect(
+      boothPreflightApplies({ context: "meeting", source: "openai", audioDeviceSelected: true }),
+    ).toBe(true);
+  });
+
+  it("does not apply to a default microphone in an ordinary room", () => {
+    expect(boothPreflightApplies({ context: "auto", source: "deepgram" })).toBe(false);
+    expect(
+      boothPreflightApplies({ context: "meeting", source: "deepgram", audioDeviceSelected: false }),
+    ).toBe(false);
+    // Browser recognition picks its own input; there is nothing to preflight.
+    expect(
+      boothPreflightApplies({ context: "auto", source: "webspeech", audioDeviceSelected: true }),
+    ).toBe(false);
+  });
+});
+
 describe("launcher booth preflight readiness", () => {
-  it("marks an unverified raw Sermon input as limited without blocking it", () => {
+  it("marks an unverified raw input in a service as limited without blocking it", () => {
     const [input] = readinessRows({
       config: null,
-      mode: "sermon",
+      context: "sermon",
       source: "deepgram",
       audioInputLabel: "USB Mixer",
       audioInputSupported: true,
@@ -44,10 +75,24 @@ describe("launcher booth preflight readiness", () => {
     expect(input.detail).toMatch(/그대로 시작해도 됩니다/);
   });
 
-  it("returns the same Sermon input to ready after a matching fresh preflight", () => {
+  it("asks for the same check when a booth input is chosen under auto context", () => {
     const [input] = readinessRows({
       config: null,
-      mode: "sermon",
+      context: "auto",
+      source: "deepgram",
+      audioInputLabel: "USB Mixer",
+      audioInputSupported: true,
+      audioDeviceSelected: true,
+      boothPreflightVerified: false,
+    });
+
+    expect(input).toMatchObject({ level: "limited", value: "USB Mixer · 사전 점검 안 됨" });
+  });
+
+  it("returns the same input to ready after a matching fresh preflight", () => {
+    const [input] = readinessRows({
+      config: null,
+      context: "sermon",
       source: "deepgram",
       audioInputLabel: "USB Mixer",
       audioInputSupported: true,
@@ -61,12 +106,12 @@ describe("launcher booth preflight readiness", () => {
     });
   });
 
-  it("does not require church booth preflight in General mode", () => {
+  it("does not require a booth preflight for a default input in auto context", () => {
     const [input] = readinessRows({
       config: null,
-      mode: "general",
+      context: "auto",
       source: "deepgram",
-      audioInputLabel: "USB Mixer",
+      audioInputLabel: "시스템 기본값",
       audioInputSupported: true,
       boothPreflightVerified: false,
     });
@@ -74,10 +119,18 @@ describe("launcher booth preflight readiness", () => {
     expect(input.level).toBe("ready");
   });
 
+  it("never takes a mode", () => {
+    // The unified console has no Sermon/General switch; the rows must not
+    // quietly grow one back.
+    const rows = readinessRows({ config: null, source: "demo" });
+    expect(rows.map((row) => row.label)).toEqual(["입력", "인식", "AI", "개인정보"]);
+    expect(JSON.stringify(rows)).not.toMatch(/설교 모드|일반 모드/);
+  });
+
   it("blocks a remembered input after that physical device disappears", () => {
     const [input] = readinessRows({
       config: null,
-      mode: "sermon",
+      context: "sermon",
       source: "deepgram",
       audioInputLabel: "선택한 입력을 찾을 수 없음",
       audioInputSupported: true,

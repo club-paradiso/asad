@@ -3,36 +3,42 @@
 /**
  * The interpreter console.
  *
- * Layout is a grid pinned to the viewport, with the English stream taking
- * everything left over. That ordering is the product: English dominant, Korean
- * available, context reachable, one control at the thumb.
+ * Layout is a grid pinned to the viewport, with the translation stream taking
+ * everything left over. That ordering is the product: translation dominant,
+ * source available, context reachable, one control at the thumb.
  *
- *   ┌──────────────────────────────────────────┐  44px   status
+ *   ┌──────────────────────────────────────────┐  44px   status · pair · mic
  *   │                                          │
- *   │            ENGLISH  (1fr)                │         the thing you say
+ *   │           TRANSLATION  (1fr)             │         the thing you say
  *   │                                          │
- *   ├──────────────────────────────────────────┤  ≤22%   Korean, checkable
+ *   ├──────────────────────────────────────────┤  ≤22%   source, checkable
  *   ├──────────────────────────────────────────┤  auto   context rail, when
  *   │                                          │         it has a cue
  *   └──────────────────────────────────────────┘  auto   FREEZE
  *
- * Every row except the English earns its height or is not rendered: the
+ * Every row except the translation earns its height or is not rendered: the
  * context rail is absent until there is something to put in it, and the
- * notice row above the English exists only during a demo or while the
+ * notice row above the translation exists only during a demo or while the
  * on-device backup is still coming up.
  *
  * On an iPhone in landscape the whole thing is about 390px tall, which is why
- * the Korean row is capped as a percentage, the context rail scrolls
+ * the source row is capped as a percentage, the context rail scrolls
  * horizontally rather than wrapping, and the chrome sheds padding below 480px.
+ *
+ * There is no mode. The pair label in the strip says what is being
+ * interpreted into what; the context chip, when the Context Engine has an
+ * answer worth showing, says what kind of room it thinks this is.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { SessionSettings, StoredSession } from "@/types";
+import type { ContextDomain, PrepSheet, SessionSettings, StoredSession } from "@/types";
+import { layerForDomain } from "@/types";
 import { activeChunk } from "@/interpreter/engine/chunks";
 import type { EngineSnapshot } from "@/interpreter/engine/session";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import type { SttProviderId } from "@/providers/stt";
+import { languageBase, pairLabel } from "@/languages/registry";
 import { saveSession } from "@/lib/storage";
 import { downloadSession } from "@/lib/export";
 import { Button } from "@/components/ui/primitives";
@@ -40,14 +46,15 @@ import type { LiveSession } from "./useLiveSession";
 import { ConsoleTopBar } from "./ConsoleTopBar";
 import { ControlBar } from "./ControlBar";
 import { ContextRail } from "./ContextRail";
-import { EnglishStream } from "./EnglishStream";
-import { KoreanStream } from "./KoreanStream";
+import { TargetStream } from "./TargetStream";
+import { SourceStream } from "./SourceStream";
 import { SettingsSheet } from "./SettingsSheet";
 import { Teleprompter } from "./Teleprompter";
 import { DemoRibbon } from "./DemoRibbon";
 import { LiveRescueOverlay } from "./LiveRescueOverlay";
+import { CorrectionPopover } from "./CorrectionPopover";
 import { aiStateFrom } from "./AiStatus";
-import type { PrepSheet } from "@/types";
+import { contextLabel } from "./live-strings";
 
 const FONT_SCALE_RANGE = { min: 0.7, max: 1.9 } as const;
 
@@ -68,6 +75,9 @@ export function LiveConsole({
 }) {
   const [frozen, setFrozen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsFocusContext, setSettingsFocusContext] = useState(false);
+  /** The source text the interpreter long-pressed; null while the box is closed. */
+  const [correcting, setCorrecting] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
   const {
@@ -78,15 +88,17 @@ export function LiveConsole({
     startedAt,
     lastProvider,
     browserTranslatorStatus,
+    audio,
     start,
     stop,
     correct,
+    setContext,
   } = session;
 
   // NO DISCLOSURE FETCH HERE, deliberately.
   //
   // It used to live in this component, and by the time it resolved the session
-  // had already started — the microphone was open and the first Korean had
+  // had already started — the microphone was open and the first sentence had
   // reached a cloud provider before the interpreter was told it would. A
   // dialog that appears after the data has left is not consent.
   //
@@ -132,12 +144,17 @@ export function LiveConsole({
     [settings, onSettingsChange],
   );
 
+  const { languagePair, domain } = snapshot;
+  const sourceIsKorean = languageBase(languagePair.source) === "ko";
+
   const buildStoredSession = useCallback(
     (sourceSnapshot: EngineSnapshot = snapshot): StoredSession => ({
       id: `session-${startedAt ?? Date.now()}`,
       startedAt: startedAt ?? Date.now(),
       endedAt: Date.now(),
-      mode: settings.mode,
+      sourceLanguage: languagePair.source,
+      targetLanguage: languagePair.target,
+      domain: domain.domain,
       title: prep.title,
       speaker: prep.speaker,
       segments: sourceSnapshot.segments,
@@ -148,7 +165,7 @@ export function LiveConsole({
       entities: sourceSnapshot.entities,
       corrections: sourceSnapshot.corrections,
     }),
-    [snapshot, settings.mode, prep, startedAt],
+    [snapshot, languagePair, domain.domain, prep, startedAt],
   );
 
   const handleEnd = useCallback(async () => {
@@ -158,6 +175,27 @@ export function LiveConsole({
     if (settings.saveHistory) saveSession(stored);
     onEnd(settings.saveHistory ? stored : null);
   }, [stop, buildStoredSession, settings.saveHistory, onEnd]);
+
+  /** Manual override: the engine hears it now, settings remember it. */
+  const changeContext = useCallback(
+    (context: ContextDomain) => {
+      setContext(context);
+      onSettingsChange({ ...settings, context });
+    },
+    [setContext, settings, onSettingsChange],
+  );
+
+  const openContextOverride = useCallback(() => {
+    setSettingsFocusContext(true);
+    setSettingsOpen(true);
+  }, []);
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    setSettingsFocusContext(false);
+  }, []);
+
+  const closeCorrection = useCallback(() => setCorrecting(null), []);
 
   useHotkeys(
     useMemo(
@@ -172,22 +210,33 @@ export function LiveConsole({
             ...settings,
             view: settings.view === "teleprompter" ? "console" : "teleprompter",
           }),
-        k: () => onSettingsChange({ ...settings, showKorean: !settings.showKorean }),
+        k: () => onSettingsChange({ ...settings, showSource: !settings.showSource }),
         g: () => onSettingsChange({ ...settings, showGlossary: !settings.showGlossary }),
         b: () => onSettingsChange({ ...settings, showScripture: !settings.showScripture }),
         "+": () => adjustFontScale(0.1),
         "=": () => adjustFontScale(0.1),
         "-": () => adjustFontScale(-0.1),
-        escape: () => setSettingsOpen(false),
+        escape: closeSettings,
       }),
-      [toggleFreeze, autoScroll, settings, onSettingsChange, adjustFontScale],
+      [toggleFreeze, autoScroll, settings, onSettingsChange, adjustFontScale, closeSettings],
     ),
-    !settingsOpen,
+    // Off while any text box is open: a half-typed correction that the T key
+    // turns into a teleprompter is worse than no shortcut at all.
+    !settingsOpen && correcting === null,
   );
 
   const teleprompter = settings.view === "teleprompter";
+  // Rescue is sermon intelligence. It follows the Context Engine's LAYER, not
+  // a mode the interpreter chose — there is none.
   const rescueAvailable =
-    settings.mode === "sermon" && source !== "demo" && phase === "running";
+    layerForDomain(domain.domain) === "sermon" && source !== "demo" && phase === "running";
+
+  // The chip is only worth a glance when the engine has actually decided
+  // something: the default and "generic" are the absence of a decision.
+  const contextChip =
+    domain.source !== "default" && domain.domain !== "generic"
+      ? contextLabel(domain.domain)
+      : undefined;
 
   return (
     <div
@@ -212,6 +261,10 @@ export function LiveConsole({
           started: phase === "running",
         })}
         scripted={source === "demo"}
+        pairLabel={pairLabel(languagePair)}
+        audio={audio}
+        context={contextChip}
+        onOpenContext={openContextOverride}
         onOpenSettings={() => setSettingsOpen(true)}
         onEnd={() => void handleEnd()}
       />
@@ -233,9 +286,9 @@ export function LiveConsole({
         <div />
       )}
 
-      {/* --- English: the dominant region ---------------------------------- */}
+      {/* --- Translation: the dominant region ------------------------------ */}
       {/* `min-w-0` on every row: a grid item defaults to `min-width: auto`,
-          which lets a long Korean segment push the row wider than the column
+          which lets a long source segment push the row wider than the column
           instead of wrapping — the text then runs off the right edge. */}
       <main className="relative min-h-0 min-w-0">
         {teleprompter ? (
@@ -243,14 +296,17 @@ export function LiveConsole({
             chunks={snapshot.chunks}
             segments={snapshot.segments}
             partial={snapshot.partial}
-            showKorean={settings.showKorean}
+            showSource={settings.showSource}
+            sourceLanguage={languagePair.source}
+            targetLanguage={languagePair.target}
           />
         ) : (
-          <EnglishStream
+          <TargetStream
             chunks={snapshot.chunks}
             activeId={active?.id}
             containerRef={autoScroll.containerRef}
             activeRef={autoScroll.activeRef}
+            language={languagePair.target}
             // Short enough to take in without reading. The interpreter is
             // waiting for the speaker, not for an explanation of the product.
             emptyMessage={
@@ -263,7 +319,7 @@ export function LiveConsole({
           />
         )}
 
-        {rescueAvailable && !settingsOpen && (
+        {rescueAvailable && !settingsOpen && correcting === null && (
           <LiveRescueOverlay snapshot={snapshot} prep={prep} startedAt={startedAt} />
         )}
 
@@ -302,16 +358,34 @@ export function LiveConsole({
         )}
       </main>
 
-      {/* --- Korean: secondary, capped ------------------------------------- */}
-      {settings.showKorean && !teleprompter && (
+      {/* --- Source: secondary, capped ------------------------------------- */}
+      {settings.showSource && !teleprompter && (
         // Capped as a fraction of the viewport, and capped harder on a short
-        // one: on an iPhone in landscape the Korean must not eat the English.
-        <section className="max-h-[17dvh] min-h-0 min-w-0 border-t border-[var(--line)] bg-[var(--bg)] tall:max-h-[22dvh]">
-          <KoreanStream
+        // one: on an iPhone in landscape the source must not eat the
+        // translation. `relative` so the correction box can anchor to its
+        // bottom edge and grow upward over the translation — never the other
+        // way round.
+        <section className="relative max-h-[17dvh] min-h-0 min-w-0 border-t border-[var(--line)] bg-[var(--bg)] tall:max-h-[22dvh]">
+          <SourceStream
             segments={snapshot.segments}
             partial={snapshot.partial}
             frozen={frozen}
+            language={languagePair.source}
+            onSelectText={(text) => setCorrecting(text)}
           />
+          <div className="absolute inset-x-0 bottom-0 z-20 px-1 sm:px-4">
+            <CorrectionPopover
+              open={correcting !== null}
+              heard={correcting ?? ""}
+              defaultRemember={settings.rememberCorrections}
+              sourceIsKorean={sourceIsKorean}
+              onCancel={closeCorrection}
+              onApply={({ from, to, english, remember }) => {
+                correct(from, to, { english, remember });
+                closeCorrection();
+              }}
+            />
+          </div>
         </section>
       )}
 
@@ -338,9 +412,13 @@ export function LiveConsole({
 
       <SettingsSheet
         open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+        onClose={closeSettings}
         settings={settings}
         onSettingsChange={onSettingsChange}
+        domain={domain}
+        onContextChange={changeContext}
+        focusContext={settingsFocusContext}
+        sourceIsKorean={sourceIsKorean}
         corrections={snapshot.corrections}
         onCorrect={correct}
         onExport={() => downloadSession(buildStoredSession(), "markdown")}

@@ -9,15 +9,16 @@
  *
  * That is a genuinely useful sheet to walk into a service holding.
  */
-import type { z } from "zod";
-import type { prepRequestSchema } from "@/lib/schema";
 import type { PrepBrief } from "@/types";
+import { DEFAULT_LANGUAGE_PAIR } from "@/languages/registry";
 import { parseEnglishReference, detectScriptureReferences } from "../scripture/detect";
 import { matchGlossary } from "../glossary/matcher";
 import { detectCultural } from "../cultural/detect";
+import { prepLayer, type PrepPromptInput } from "../prompts/prep";
+import { pairNames } from "../prompts/shared";
 import { romaniseName } from "@/lib/romanise";
 
-type PrepInput = z.infer<typeof prepRequestSchema>;
+type PrepInput = PrepPromptInput;
 
 const SERMON_DIFFICULTIES = [
   "Korean holds the predicate to the end — lead with a topic frame ('What I want to say is…') so you can start speaking.",
@@ -44,6 +45,19 @@ const SERMON_PHRASES: Array<{ korean: string; english: string }> = [
   { korean: "말씀을 봉독하겠습니다.", english: "Let's read the passage together." },
 ];
 
+/** True of any spoken source; nothing here presumes Korean. */
+const GENERIC_DIFFICULTIES = [
+  "Numbers, dates and amounts are the highest-risk items. Ask for a repeat rather than guessing.",
+  "Names: settle one rendering before the session and reuse it exactly.",
+  "Deliberate repetition is usually rhetoric. Preserve a refrain even when it feels redundant.",
+];
+
+const GENERIC_SERMON_DIFFICULTIES = [
+  "Scripture references: say the lead-in first, then the reference on its own. Never recite verse wording that was not read out.",
+  "Technical theology must stay technical; relational language should go dynamic.",
+  "Congregation prompts (Amen?) are addressed to the room. Decide in advance whether you will render or drop them.",
+];
+
 const GENERAL_PHRASES: Array<{ korean: string; english: string }> = [
   { korean: "제가 먼저 말씀드리고 싶은 것은…", english: "The first thing I want to say is…" },
   { korean: "결론적으로 말씀드리면…", english: "To sum up…" },
@@ -56,12 +70,18 @@ export function localPrepBrief(
   options: { localOnly?: boolean } = {},
 ): PrepBrief {
   const corpus = [input.title, input.notes, input.outline].filter(Boolean).join("\n");
-  const sermon = input.mode === "sermon";
+  // The domain's layer when the Context Engine supplied one; the wire mode otherwise.
+  const mode = prepLayer(input);
+  const sermon = mode === "sermon";
+  const names = pairNames(input.languagePair ?? DEFAULT_LANGUAGE_PAIR);
+  // The detectors, phrases and difficulty notes below are Korean-specific.
+  const korean = names.koreanSource;
+  const language = names.pair.source;
 
   // Scripture: the typed main passage plus anything found in the outline.
   const scripture = [
     ...(input.scripture ? [parseEnglishReference(input.scripture)].filter(Boolean) : []),
-    ...detectScriptureReferences(corpus).map(({ index: _index, ...ref }) => ref),
+    ...(korean ? detectScriptureReferences(corpus).map(({ index: _index, ...ref }) => ref) : []),
   ].filter((ref): ref is NonNullable<typeof ref> => ref !== null);
 
   const seenRefs = new Set<string>();
@@ -71,7 +91,7 @@ export function localPrepBrief(
     return true;
   });
 
-  const keyTerms = matchGlossary(corpus, input.mode)
+  const keyTerms = matchGlossary(corpus, mode, [], language)
     .slice(0, 20)
     .map(({ index: _index, ...item }) => item);
 
@@ -79,7 +99,8 @@ export function localPrepBrief(
     ...(input.speaker
       ? [{
           korean: input.speaker,
-          english: romaniseName(input.speaker),
+          // Revised Romanisation is a Korean → Latin-script rule and nothing else.
+          english: korean && names.latinTarget ? romaniseName(input.speaker) : input.speaker,
           kind: "person" as const,
           note: "Speaker",
         }]
@@ -93,11 +114,11 @@ export function localPrepBrief(
       : []),
   ];
 
-  const cultural = detectCultural(corpus, properNouns);
+  const cultural = korean ? detectCultural(corpus, properNouns) : [];
 
   const overviewParts = [
     input.title ? `"${input.title}"` : sermon ? "Sermon" : "Session",
-    input.speaker ? `by ${romaniseName(input.speaker)}` : null,
+    input.speaker ? `by ${properNouns[0]?.english ?? input.speaker}` : null,
     input.organisation ? `at ${input.organisation}` : null,
     uniqueScripture[0] ? `on ${uniqueScripture[0].display}` : null,
   ].filter(Boolean);
@@ -135,10 +156,15 @@ export function localPrepBrief(
     scripture: uniqueScripture,
     properNouns,
     difficultPoints: [
-      ...(sermon ? SERMON_DIFFICULTIES : GENERAL_DIFFICULTIES),
+      ...(korean
+        ? sermon ? SERMON_DIFFICULTIES : GENERAL_DIFFICULTIES
+        : sermon ? [...GENERIC_SERMON_DIFFICULTIES, ...GENERIC_DIFFICULTIES] : GENERIC_DIFFICULTIES),
       ...cultural.map((c) => `${c.korean}: ${c.note}`),
     ].slice(0, 12),
-    anticipatedPhrases: sermon ? SERMON_PHRASES : GENERAL_PHRASES,
+    // The phrase patterns are Korean sentence shapes; inventing ones for a
+    // language nobody here has checked would be exactly the filler this brief
+    // exists to avoid.
+    anticipatedPhrases: korean ? (sermon ? SERMON_PHRASES : GENERAL_PHRASES) : [],
     pronunciation: properNouns
       .filter((p) => p.kind === "person")
       .map((p) => ({ korean: p.korean, english: p.english })),

@@ -12,40 +12,20 @@
  * worse than offering no microphone: the visitor speaks, nothing happens, and
  * they have no way to tell whether they were heard.
  *
- * So capability is declared, not discovered:
+ * So capability is declared, not discovered — in the language registry, where
+ * every provider slot is either an identifier or an explicit `null`:
  *
  *   native        the vendor lists this language and it is in ordinary use
  *   experimental  the vendor accepts the tag but quality is not established
  *   fallback-only reachable only through a slower batch path
  *   unsupported   do not send this language to this provider at all
  */
-import { findLanguage } from "@/counter/languages";
-import { deepgramLanguage } from "./language";
+import { resolveLanguage, sttLanguageFor } from "@/languages/registry";
 
 export type SttLanguageSupport = "native" | "experimental" | "fallback-only" | "unsupported";
 
 /** Recognisers Counter Mode can reach, in the order it prefers them. */
 export type CounterSttProvider = "deepgram" | "openai" | "webspeech" | "hf";
-
-/**
- * Base languages the Whisper family transcribes.
- *
- * Both the OpenAI realtime transcription models and the default Hugging Face
- * fallback (`openai/whisper-large-v3-turbo`) descend from this list, so they
- * share it. Uyghur is deliberately absent: Whisper does not train on it, and
- * passing `ug` anyway does not produce Uyghur — it produces confident text in
- * whichever neighbouring language the model decides it heard.
- */
-const WHISPER_LANGUAGES = new Set([
-  "af", "am", "ar", "as", "az", "ba", "be", "bg", "bn", "bo", "br", "bs", "ca",
-  "cs", "cy", "da", "de", "el", "en", "es", "et", "eu", "fa", "fi", "fo", "fr",
-  "gl", "gu", "ha", "haw", "he", "hi", "hr", "ht", "hu", "hy", "id", "is", "it",
-  "ja", "jw", "ka", "kk", "km", "kn", "ko", "la", "lb", "ln", "lo", "lt", "lv",
-  "mg", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my", "ne", "nl", "nn", "no",
-  "oc", "pa", "pl", "ps", "pt", "ro", "ru", "sa", "sd", "si", "sk", "sl", "sn",
-  "so", "sq", "sr", "su", "sv", "sw", "ta", "te", "tg", "th", "tk", "tl", "tr",
-  "tt", "uk", "ur", "uz", "vi", "yi", "yo", "yue", "zh",
-]);
 
 /**
  * Whisper languages where the training data is thin enough that Counter Mode
@@ -54,28 +34,30 @@ const WHISPER_LANGUAGES = new Set([
  */
 const WHISPER_LOW_RESOURCE = new Set(["km", "my", "mn", "ne", "si", "lo", "ps", "tg", "sd"]);
 
-const baseTag = (language: string | undefined): string =>
-  (language ?? "").trim().toLowerCase().split("-")[0];
-
 export function sttLanguageSupport(
   provider: CounterSttProvider,
   language: string | undefined,
 ): SttLanguageSupport {
-  const base = baseTag(language);
-  if (!base) return "unsupported";
+  const known = resolveLanguage(language);
+  if (!known) return "unsupported";
 
   switch (provider) {
     case "deepgram":
-      return deepgramLanguage(language) ? "native" : "unsupported";
-    case "openai":
-      if (!WHISPER_LANGUAGES.has(base)) return "unsupported";
-      return WHISPER_LOW_RESOURCE.has(base) ? "experimental" : "native";
+      return sttLanguageFor("deepgram", known.id) ? "native" : "unsupported";
+    case "openai": {
+      const code = sttLanguageFor("openai", known.id);
+      if (!code) return "unsupported";
+      return WHISPER_LOW_RESOURCE.has(code) ? "experimental" : "native";
+    }
     case "webspeech":
       // The registry flag is the product's own record of which languages the
-      // browser recogniser handles well enough to offer.
-      return findLanguage(language ?? "")?.speechSupported ? "native" : "unsupported";
+      // browser recogniser handles well enough to offer; a language the
+      // browser must never receive has no tag at all.
+      return known.browserSpeechOffered && sttLanguageFor("webspeech", known.id)
+        ? "native"
+        : "unsupported";
     case "hf":
-      if (!WHISPER_LANGUAGES.has(base)) return "unsupported";
+      if (!sttLanguageFor("hf", known.id)) return "unsupported";
       // Batch-only by construction: one utterance is uploaded after it ends,
       // so there are no interim results however good the model is.
       return "fallback-only";

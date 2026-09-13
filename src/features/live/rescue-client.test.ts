@@ -15,6 +15,8 @@ const snapshot = (overrides: Partial<EngineSnapshot> = {}): EngineSnapshot => ({
   connection: "live",
   health: { stt: "ok", llm: "ok", bible: "ok" },
   thinking: false,
+  languagePair: { source: "ko-KR", target: "en-US" },
+  domain: { domain: "sermon", confidence: 0.8, source: "inferred", signals: [] },
   ...overrides,
 });
 

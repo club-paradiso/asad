@@ -327,7 +327,7 @@ export async function runLiveBenchmark(options: LiveBenchOptions): Promise<LiveB
   };
 
   const engine = new InterpretationEngine({
-    mode: "sermon",
+    context: "sermon",
     lag,
     prep: emptyPrepSheet(),
     now: clock,

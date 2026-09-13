@@ -124,7 +124,7 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
           return {
             output,
             degraded: true,
-            reason: `${reason} Chrome on-device Korean→English backup was used.`,
+            reason: `${reason} The browser's on-device translation backup was used.`,
             clientDispatchedAt: firstClientDispatchedAt,
             provider: BROWSER_TRANSLATOR_PROVIDER,
             model: BROWSER_TRANSLATOR_MODEL,

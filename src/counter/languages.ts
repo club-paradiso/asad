@@ -1,11 +1,18 @@
 /**
  * Languages offered at the counter.
  *
- * Chosen for who actually turns up at a Korean public-service, clinic or
- * reception desk, not for coverage-count marketing. Each carries its own
- * endonym, because a visitor scanning a QR code needs to find their language in
- * a list written in *their* script, not in Korean or English.
+ * A thin view over the canonical registry (`@/languages/registry`). The
+ * Counter picker keeps its own shape — `code`, `endonym`, `speechSupported` —
+ * because a dozen screens read it, but every fact comes from the registry.
+ * Add a language there; it shows up here in the same order.
  */
+import {
+  LANGUAGES,
+  resolveLanguage,
+  suggestLanguageId,
+  type LanguageDefinition,
+} from "@/languages/registry";
+
 export interface CounterLanguage {
   /** BCP-47 tag used for STT and passed to the model. */
   code: string;
@@ -20,103 +27,29 @@ export interface CounterLanguage {
   rtl?: boolean;
 }
 
-export const COUNTER_LANGUAGES: CounterLanguage[] = [
-  { code: "ko-KR", endonym: "한국어", ko: "한국어", en: "Korean", speechSupported: true },
-  { code: "en-US", endonym: "English", ko: "영어", en: "English", speechSupported: true },
-  { code: "zh-CN", endonym: "中文（简体）", ko: "중국어(간체)", en: "Chinese (Simplified)", speechSupported: true },
-  { code: "zh-TW", endonym: "中文（繁體）", ko: "중국어(번체)", en: "Chinese (Traditional)", speechSupported: true },
-  { code: "ja-JP", endonym: "日本語", ko: "일본어", en: "Japanese", speechSupported: true },
-  { code: "vi-VN", endonym: "Tiếng Việt", ko: "베트남어", en: "Vietnamese", speechSupported: true },
-  { code: "th-TH", endonym: "ไทย", ko: "태국어", en: "Thai", speechSupported: true },
-  { code: "id-ID", endonym: "Bahasa Indonesia", ko: "인도네시아어", en: "Indonesian", speechSupported: true },
-  { code: "ru-RU", endonym: "Русский", ko: "러시아어", en: "Russian", speechSupported: true },
-  { code: "uk-UA", endonym: "Українська", ko: "우크라이나어", en: "Ukrainian", speechSupported: true },
-  { code: "uz-UZ", endonym: "Oʻzbekcha", ko: "우즈베크어", en: "Uzbek", speechSupported: false },
-  { code: "mn-MN", endonym: "Монгол", ko: "몽골어", en: "Mongolian", speechSupported: false },
-  { code: "ne-NP", endonym: "नेपाली", ko: "네팔어", en: "Nepali", speechSupported: false },
-  { code: "km-KH", endonym: "ភាសាខ្មែរ", ko: "크메르어", en: "Khmer", speechSupported: false },
-  { code: "my-MM", endonym: "မြန်မာ", ko: "미얀마어", en: "Burmese", speechSupported: false },
-  { code: "tl-PH", endonym: "Tagalog", ko: "타갈로그어", en: "Tagalog", speechSupported: true },
-  { code: "es-ES", endonym: "Español", ko: "스페인어", en: "Spanish", speechSupported: true },
-  { code: "fr-FR", endonym: "Français", ko: "프랑스어", en: "French", speechSupported: true },
-  { code: "de-DE", endonym: "Deutsch", ko: "독일어", en: "German", speechSupported: true },
-  { code: "pt-BR", endonym: "Português", ko: "포르투갈어", en: "Portuguese", speechSupported: true },
-  { code: "ar-SA", endonym: "العربية", ko: "아랍어", en: "Arabic", speechSupported: true, rtl: true },
-  { code: "hi-IN", endonym: "हिन्दी", ko: "힌디어", en: "Hindi", speechSupported: true },
-  { code: "bn-BD", endonym: "বাংলা", ko: "벵골어", en: "Bengali", speechSupported: true },
-  { code: "ur-PK", endonym: "اردو", ko: "우르두어", en: "Urdu", speechSupported: true, rtl: true },
-  { code: "tr-TR", endonym: "Türkçe", ko: "터키어", en: "Turkish", speechSupported: true },
-  // Uyghur is written in the Perso-Arabic script but is a Turkic language and
-  // is NOT Arabic, Uzbek, or Turkish. It is listed with its own tag so nothing
-  // downstream can quietly reroute it to `ar`, `uz`, or `tr` — a mistake that
-  // produces confident, fluent, completely wrong administrative text.
-  { code: "ug-CN", endonym: "ئۇيغۇرچە", ko: "위구르어", en: "Uyghur", speechSupported: false, rtl: true },
-];
+const toCounterLanguage = (language: LanguageDefinition): CounterLanguage => ({
+  code: language.id,
+  endonym: language.name.native,
+  ko: language.name.ko,
+  en: language.name.en,
+  speechSupported: language.browserSpeechOffered,
+  ...(language.direction === "rtl" ? { rtl: true } : {}),
+});
 
-const tagKey = (code: string): string => code.trim().toLowerCase().replace(/_/g, "-");
-const BY_CODE = new Map(COUNTER_LANGUAGES.map((language) => [tagKey(language.code), language]));
-const BY_BASE = new Map<string, CounterLanguage>();
-for (const language of COUNTER_LANGUAGES) {
-  const base = tagKey(language.code).split("-")[0];
-  if (!BY_BASE.has(base)) BY_BASE.set(base, language);
-}
+export const COUNTER_LANGUAGES: CounterLanguage[] = LANGUAGES.map(toCounterLanguage);
+
+/** Registry id → the one CounterLanguage instance for it, so lookups are referentially stable. */
+const BY_ID = new Map(COUNTER_LANGUAGES.map((language) => [language.code, language]));
 
 /**
- * Tags that a browser, an OS, or a hand-typed configuration really emits, and
- * which the base-language fallback alone resolves to the wrong entry.
- *
- * Two families matter at a Korean counter:
- *
- *  - Chinese script subtags. `zh-Hant-TW` and `zh-HK` used to fall through to
- *    the first `zh` entry, so a Traditional-script visitor was handed
- *    Simplified Chinese without ever being asked.
- *  - Uyghur. It has ISO 639-2/3 aliases (`uig`) and is routinely written with
- *    an explicit script subtag. It must never resolve to Arabic or Uzbek
- *    merely because it shares a script with one and a language family with
- *    the other.
- */
-const TAG_ALIASES: Record<string, string> = {
-  "zh-hant": "zh-TW",
-  "zh-hant-tw": "zh-TW",
-  "zh-hant-hk": "zh-TW",
-  "zh-hant-mo": "zh-TW",
-  "zh-hk": "zh-TW",
-  "zh-mo": "zh-TW",
-  "zh-hans": "zh-CN",
-  "zh-hans-cn": "zh-CN",
-  "zh-hans-sg": "zh-CN",
-  "zh-sg": "zh-CN",
-  cmn: "zh-CN",
-  "fil-ph": "tl-PH",
-  fil: "tl-PH",
-  uig: "ug-CN",
-  "ug-arab": "ug-CN",
-  "ug-arab-cn": "ug-CN",
-  "ug-latn": "ug-CN",
-  "ug-cyrl": "ug-CN",
-};
-
-/**
- * BCP-47 tags are case-insensitive. Resolve an exact language+region/script
- * match before falling back to the base language. Without that ordering,
- * lowercase `zh-tw` fell through to the first `zh` entry (`zh-CN`) and silently
- * changed Traditional Chinese into Simplified Chinese.
+ * Resolve any tag a browser, an OS or a person can produce. Case-insensitive;
+ * script and region subtags are honoured before the base-language fallback,
+ * so `zh-Hant-HK` lands on zh-TW and `uig` on ug-CN. The registry owns the
+ * alias table.
  */
 export const findLanguage = (code: string): CounterLanguage | undefined => {
-  const key = tagKey(code);
-  const alias = TAG_ALIASES[key];
-  if (alias) return BY_CODE.get(tagKey(alias));
-  const direct = BY_CODE.get(key);
-  if (direct) return direct;
-
-  // Strip a script subtag before the base fallback so `xx-Scpt-RR` resolves the
-  // same way `xx-RR` does, instead of only ever reaching the base entry.
-  const parts = key.split("-");
-  if (parts.length >= 3) {
-    const withoutScript = BY_CODE.get(`${parts[0]}-${parts.slice(2).join("-")}`);
-    if (withoutScript) return withoutScript;
-  }
-  return BY_BASE.get(parts[0]);
+  const language = resolveLanguage(code);
+  return language ? BY_ID.get(language.id) : undefined;
 };
 
 /** The registry tag for an arbitrary input tag, or the input when unknown. */
@@ -139,11 +72,7 @@ export function suggestLanguage(
   navigatorLanguages: readonly string[] | undefined,
   fallback = "en-US",
 ): string {
-  for (const candidate of navigatorLanguages ?? []) {
-    const match = findLanguage(candidate);
-    if (match) return match.code;
-  }
-  return fallback;
+  return suggestLanguageId(navigatorLanguages, fallback);
 }
 
 /** Languages the visitor picker shows first — the common ones at a Korean desk. */
