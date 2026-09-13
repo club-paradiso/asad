@@ -6,6 +6,10 @@
  * callbacks — unstable partials and finalised text. Swapping provider is a
  * config change, not a rewrite.
  */
+import type { StableTranscriptMeta } from "@/types";
+
+export type { StableTranscriptMeta };
+
 export type SttProviderId = "demo" | "webspeech" | "deepgram" | "openai";
 
 export type SttStatus =
@@ -16,9 +20,16 @@ export type SttStatus =
   | "closed"
   | "error";
 
+/**
+ * A stable result plus whatever the recogniser knew about it. `meta` is
+ * optional on both sides: providers that have nothing to add omit it, and a
+ * caller that only wants the text can keep taking one argument.
+ */
+export type StableTranscriptHandler = (text: string, meta?: StableTranscriptMeta) => void;
+
 export interface SttEventHandlers {
   onPartial?: (text: string) => void;
-  onStable?: (text: string) => void;
+  onStable?: StableTranscriptHandler;
   onStatus?: (status: SttStatus, detail?: string) => void;
   onError?: (error: Error) => void;
 }
@@ -31,13 +42,13 @@ export interface SpeechProvider {
   sendAudio(chunk: ArrayBuffer): void;
   disconnect(): Promise<void>;
   onPartial(callback: (text: string) => void): void;
-  onStable(callback: (text: string) => void): void;
+  onStable(callback: StableTranscriptHandler): void;
   onStatus(callback: (status: SttStatus, detail?: string) => void): void;
   onError(callback: (error: Error) => void): void;
 }
 
 export interface SttProviderOptions {
-  /** BCP-47 language tag; Korean throughout the MVP. */
+  /** BCP-47 language tag; any registry language. Korean when omitted. */
   language?: string;
   /**
    * Stop after one natural utterance instead of continuously restarting.
@@ -72,7 +83,7 @@ export abstract class BaseSpeechProvider implements SpeechProvider {
   onPartial(callback: (text: string) => void) {
     this.handlers.onPartial = callback;
   }
-  onStable(callback: (text: string) => void) {
+  onStable(callback: StableTranscriptHandler) {
     this.handlers.onStable = callback;
   }
   onStatus(callback: (status: SttStatus, detail?: string) => void) {
@@ -85,8 +96,10 @@ export abstract class BaseSpeechProvider implements SpeechProvider {
   protected emitPartial(text: string) {
     if (text.trim()) this.handlers.onPartial?.(text);
   }
-  protected emitStable(text: string) {
-    if (text.trim()) this.handlers.onStable?.(text);
+  protected emitStable(text: string, meta?: StableTranscriptMeta) {
+    if (!text.trim()) return;
+    if (meta) this.handlers.onStable?.(text, meta);
+    else this.handlers.onStable?.(text);
   }
   protected emitStatus(status: SttStatus, detail?: string) {
     this.handlers.onStatus?.(status, detail);

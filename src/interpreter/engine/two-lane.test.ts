@@ -82,7 +82,7 @@ function harness(options: { laneReady?: boolean; lane?: boolean; lag?: LagProfil
   const timings: TurnTiming[] = [];
 
   const engine = new InterpretationEngine({
-    mode: "sermon",
+    context: "sermon",
     lag: options.lag ?? "balanced",
     prep: emptyPrepSheet(),
     now: () => now,
@@ -366,7 +366,7 @@ describe("invalidation", () => {
     h.say(A);
     const lane = h.lastLane();
     const request = h.lastCloud();
-    h.engine.setMode("general");
+    h.engine.setContext("generic");
     expect(lane.signal.aborted).toBe(true);
     expect(request.signal.aborted).toBe(true);
 

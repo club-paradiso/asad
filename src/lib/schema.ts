@@ -11,16 +11,63 @@ import { COUNTER_PROFILE_IDS } from "@/counter/profiles";
 
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 
+/**
+ * The prompt/lexicon layer, derived by the Context Engine. Kept on the wire
+ * so a server that never saw the transcript can still pick the right prompt
+ * modules; it is never a user-facing mode.
+ */
 export const modeSchema = z.enum(["sermon", "general"]);
+
+export const resolvedDomainSchema = z.enum([
+  "worship",
+  "sermon",
+  "lecture",
+  "meeting",
+  "conversation",
+  "presentation",
+  "event",
+  "generic",
+]);
 
 export const lagSchema = z.enum(["fast", "balanced", "safe"]);
 
-/** Browser-measured live latency. Never contains transcript content. */
+/** How hard the client judged this turn, so the server can spend accordingly. */
+export const routeTierSchema = z.enum(["fast", "contextual", "deep"]);
+
+const languageTag = z
+  .string()
+  .trim()
+  .min(2)
+  .max(12)
+  .regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, "expected a BCP-47 language tag");
+
+export const languagePairSchema = z.object({
+  source: languageTag,
+  target: languageTag,
+});
+
+/**
+ * Browser-measured live latency. Never contains transcript content.
+ *
+ * The T0–T7 timeline of one turn, as far as a browser can observe it:
+ *   speech_to_first_partial  T0→T1  speech activity → first interim text
+ *   partial_to_stable        T1→T2  first interim text → finalised text
+ *   stable_to_client_dispatch T2→T3 finalised → first network dispatch
+ *   stable_to_first_useful   T2→T4  finalised → first target-language content in state
+ *   stable_to_render         T2→T5  finalised → React committed the final English
+ *   quality_repair_start     T2→T6  finalised → the quality path began evaluating
+ *   quality_repair_rendered  T2→T7  finalised → a quality repair reached the screen
+ */
 export const clientLatencyStageSchema = z.enum([
+  "speech_to_first_partial",
+  "partial_to_stable",
   "stable_to_client_dispatch",
+  "stable_to_first_useful",
   "stable_to_safe",
   "stable_to_anticipated",
   "stable_to_render",
+  "quality_repair_start",
+  "quality_repair_rendered",
   // Two-lane stages. Durations and counts only; a stage name is not content.
   "stable_to_provisional",
   "stable_to_provisional_render",
@@ -28,6 +75,8 @@ export const clientLatencyStageSchema = z.enum([
   "refinement_discarded_committed",
   "contextual_result_stale",
   "provisional_failed",
+  // Deterministic memory answered the turn without a model.
+  "stable_to_memory_hit",
 ]);
 
 export const clientLatencySampleSchema = z.object({
@@ -103,11 +152,30 @@ export const interpreterOutputSchema = z.object({
 
 export type ParsedInterpreterOutput = z.infer<typeof interpreterOutputSchema>;
 
+/**
+ * A source-side hypothesis the Repair Engine could not settle deterministically.
+ * The model may prefer `candidate` over the heard form only when the context
+ * supports it; it must never invent a third reading.
+ */
+export const repairHypothesisSchema = z.object({
+  heard: z.string().min(1).max(80),
+  candidate: z.string().min(1).max(80),
+  /** Why the candidate is plausible — an evidence label, never a transcript. */
+  reason: z.string().min(1).max(120),
+});
+
 /** Request body accepted by `POST /api/interpret`. */
 export const interpretRequestSchema = z.object({
   mode: modeSchema,
   lag: lagSchema,
-  /** Newly stabilised Korean awaiting interpretation. */
+  /** Languages of the session. Defaults preserve the original ko→en contract. */
+  languagePair: languagePairSchema.default({ source: "ko-KR", target: "en-US" }),
+  /** The Context Engine's current domain and how sure it is. */
+  domain: resolvedDomainSchema.optional(),
+  domainConfidence: z.number().min(0).max(1).optional(),
+  /** Difficulty the client judged; the server picks the context profile from it. */
+  routeTier: routeTierSchema.optional(),
+  /** Newly stabilised source text awaiting interpretation. */
   pending: z.string().min(1).max(4000),
   /** Unstable tail, used only for anticipation. */
   partial: z.string().max(1000).optional(),
@@ -152,6 +220,13 @@ export const interpretRequestSchema = z.object({
       scripture: z.array(bibleReferenceSchema).max(4).default([]),
       glossary: z.array(glossaryItemSchema).max(8).default([]),
       culturalNotes: z.array(culturalNoteSchema).max(4).default([]),
+      /** Suspicious recognition the client could not repair on its own. */
+      hypotheses: z.array(repairHypothesisSchema).max(4).default([]),
+      /** Translation Memory renderings for phrases inside this unit. */
+      memory: z
+        .array(z.object({ source: z.string().min(1).max(400), target: z.string().min(1).max(400) }))
+        .max(6)
+        .default([]),
     })
     .optional(),
   /** Completed client timings from earlier turns, piggybacked without another request. */
@@ -260,13 +335,6 @@ export function parseCounterOutput(raw: string): CounterOutput | null {
   const result = counterOutputSchema.safeParse(value);
   return result.success ? result.data : null;
 }
-
-const languageTag = z
-  .string()
-  .trim()
-  .min(2)
-  .max(12)
-  .regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, "expected a BCP-47 language tag");
 
 export const createCounterSessionSchema = z.object({
   hostLang: languageTag,

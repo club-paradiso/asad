@@ -29,7 +29,7 @@ function harness(options: { lag?: "fast" | "balanced" | "safe" } = {}) {
   const requests: InterpretRequest[] = [];
 
   const engine = new InterpretationEngine({
-    mode: "sermon",
+    context: "sermon",
     lag: options.lag ?? "balanced",
     prep: {
       ...emptyPrepSheet(),
@@ -267,7 +267,7 @@ describe("subsystem failure never ends the session", () => {
     let snapshot: EngineSnapshot | null = null;
 
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "sermon",
       lag: "balanced",
       now: () => now,
       onChange: (next) => {

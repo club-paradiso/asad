@@ -27,7 +27,9 @@
     "soak": "tsx scripts/soak.mjs",
     "soak:two-lane": "tsx scripts/soak-two-lane.mjs",
     "health:openrouter": "tsx scripts/health-openrouter.mjs",
-    "measure:prompt": "tsx scripts/measure-prompt.mjs"
+    "measure:prompt": "tsx scripts/measure-prompt.mjs",
+    "bench:quality": "tsx scripts/bench-quality.mjs",
+    "e2e:live-unified": "node scripts/e2e-live-unified.mjs"
   },
   "dependencies": {
     "next": "^16.3.4",

@@ -15,6 +15,7 @@ import type { InterpretRequest } from "@/lib/schema";
 const request = (over: Partial<InterpretRequest> = {}): InterpretRequest => ({
   mode: "sermon",
   lag: "balanced",
+  languagePair: { source: "ko-KR", target: "en-US" },
   pending: "우리가 살면서 겪는 모든 일을 우리는 다",
   continuesPrevious: false,
   allowAnticipation: true,
@@ -85,6 +86,8 @@ describe("discourse markers", () => {
           scripture: [],
           glossary: promptGlossary(KOREAN, "sermon"),
           culturalNotes: [],
+          hypotheses: [],
+          memory: [],
         },
       }),
     );

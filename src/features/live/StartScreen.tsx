@@ -3,10 +3,16 @@
 /**
  * The launcher.
  *
- * Requirement: live interpretation in three interactions or fewer, and an
- * honest answer to four questions before any of them —
+ * Requirement: live interpretation in three interactions or fewer — pick the
+ * languages, press Start, speak — and an honest answer to four questions
+ * before any of them:
  *
- *   Am I ready?   What am I interpreting?   Which input?   Can I start?
+ *   Am I ready?   Which languages?   Which input?   Can I start?
+ *
+ * There is no Mode. Sermon intelligence is something the Context Engine
+ * switches on when the room turns out to be a service; the interpreter is
+ * never asked to declare it. "맥락" exists as a secondary control for the
+ * case where they want to override that judgement, and it defaults to 자동.
  *
  * TWO CONSTRAINTS MEET HERE, and they look like they conflict:
  *
@@ -18,18 +24,19 @@
  *
  *  2. Nothing may reach a cloud provider before the privacy disclosure has
  *     been acknowledged. The console used to fetch that disclosure after
- *     starting, so the microphone opened and the first Korean of the sermon
- *     was sent before the interpreter was told it would be.
+ *     starting, so the microphone opened and the first sentence was sent
+ *     before the interpreter was told it would be.
  *
  * They reconcile by resolving consent BEFORE the tap rather than after it.
  * The disclosure is settled here, on the launcher, while the interpreter is
- * still choosing a mode — and when it is outstanding, the interpreter's
+ * still choosing languages — and when it is outstanding, the interpreter's
  * "I understand" IS the user gesture that starts the session. Both constraints
  * hold, and neither is traded away.
  */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { InterpretationMode, LagProfile, StoredSession } from "@/types";
+import type { ContextDomain, StoredSession } from "@/types";
+import { CONTEXT_DOMAINS } from "@/types";
 import { prepStore, settingsStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { useCapability } from "@/hooks/useCapability";
@@ -38,11 +45,13 @@ import {
   WebSpeechProvider,
   type SttProviderId,
 } from "@/providers/stt";
+import { canonicalPair, isKoreanToEnglish, type LanguagePairIds } from "@/languages/registry";
 import { Button, Segmented } from "@/components/ui/primitives";
 import { openSession, readSessionState } from "@/lib/session-client";
 import type { AppConfig } from "@/app/api/config/route";
 import { BRAND } from "@/lib/brand";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { cn } from "@/lib/cn";
 import { LiveConsole } from "./LiveConsole";
 import { useLiveSession } from "./useLiveSession";
 import { useBoothAudioInput } from "./useBoothAudioInput";
@@ -51,50 +60,37 @@ import { preferredSttSource } from "./sourcePreference";
 import { sttDisclosureFor, useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
 import { Readiness, type ReadinessRow } from "./Readiness";
+import { LanguagePairPicker } from "./LanguagePairPicker";
+import {
+  CONTEXT_LABEL_KO,
+  LAG_DETAIL_KO,
+  LAG_LABEL_KO,
+  SOURCE_DETAIL_KO,
+  SOURCE_LABEL_KO,
+} from "./live-strings";
 import { SessionSummary } from "@/features/sessions/SessionSummary";
 
 type Screen = "start" | "live" | "review";
 
+const CLOUD_SOURCES: readonly SttProviderId[] = ["deepgram", "openai"];
+
 /**
- * Korean labels for the launcher.
+ * Whether the booth sound check is worth insisting on.
  *
- * They live here rather than in `lag.ts` / `providers/stt` on purpose: those
- * modules are shared with the live console, which stays English because its
- * CONTENT is English. The interpreter reading the console is looking for the
- * next line they have to say; a Korean word in that chrome is a word in the
- * wrong language sitting next to the one thing they are reading at speed.
- *
- * The launcher is the opposite — nothing is being read aloud yet, the reader
- * is Korean, and the old screen mixed the two in a way that belonged to
- * neither. So: chrome follows the reader, content follows the work.
- *
- * Provider names stay Latin. "Deepgram" is a proper noun and transliterating
- * it helps nobody.
+ * Simple on purpose: a service (the interpreter said so), or a cloud
+ * recogniser fed from a physical input someone chose — which is what a booth
+ * looks like from here. A laptop microphone in a meeting is not asked to
+ * check a mix-minus it does not have.
  */
-const LAG_LABEL_KO: Record<LagProfile, string> = {
-  fast: "빠르게",
-  balanced: "기본",
-  safe: "안전하게",
-};
-
-const LAG_DETAIL_KO: Record<LagProfile, string> = {
-  fast: "약 1초 뒤따라갑니다 — 예측이 가장 많고, 고칠 일도 가장 많습니다",
-  balanced: "약 2–3초 뒤따라갑니다 — 평소 작업용 기본값",
-  safe: "약 4–6초 뒤따라갑니다 — 문장이 끝나길 기다리고, 예측하지 않습니다",
-};
-
-const SOURCE_LABEL_KO: Partial<Record<SttProviderId, string>> = {
-  demo: "데모",
-  webspeech: "브라우저",
-};
-
-const SOURCE_DETAIL_KO: Partial<Record<SttProviderId, string>> = {
-  demo: "미리 녹음된 설교 — 마이크도 키도 필요 없고, 오프라인에서도 됩니다",
-  webspeech:
-    "브라우저가 인식을 관리합니다 — 브라우저 제공자의 서버로 음성이 전송될 수 있습니다",
-  deepgram: "한국어 스트리밍 — 중간 결과와 용어 힌트를 지원합니다",
-  openai: "웹소켓 기반 실시간 인식",
-};
+export function boothPreflightApplies(input: {
+  context: ContextDomain;
+  source: SttProviderId;
+  audioDeviceSelected?: boolean;
+}): boolean {
+  const worship = input.context === "worship" || input.context === "sermon";
+  const boothInput = CLOUD_SOURCES.includes(input.source) && input.audioDeviceSelected === true;
+  return worship || boothInput;
+}
 
 export function StartScreen() {
   const [screen, setScreen] = useState<Screen>("start");
@@ -105,7 +101,6 @@ export function StartScreen() {
   );
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
-  const [advanced, setAdvanced] = useState(false);
   const [boothPreflightVerified, setBoothPreflightVerified] = useState(false);
 
   /** Private-deployment gate, when one is configured. */
@@ -139,6 +134,13 @@ export function StartScreen() {
     };
   }, []);
 
+  const languagePair = useMemo<LanguagePairIds>(
+    () => canonicalPair({ source: settings.sourceLanguage, target: settings.targetLanguage }),
+    [settings.sourceLanguage, settings.targetLanguage],
+  );
+  // The scripted demo is a Korean sermon. Any other pair has no demo.
+  const demoAvailable = isKoreanToEnglish(languagePair);
+
   const configuredSource = useMemo<SttProviderId>(
     () =>
       preferredSttSource({
@@ -149,16 +151,34 @@ export function StartScreen() {
     [browserSttAvailable, config],
   );
 
-  const source = sourceOverride ?? configuredSource;
+  const chosenSource = sourceOverride ?? configuredSource;
+  // A pair with no demo silently prefers the browser recogniser; failing
+  // that, whatever cloud recogniser the deployment has. Only when there is
+  // nothing else does it stay on demo — and then Start says why it is off.
+  const source: SttProviderId =
+    chosenSource === "demo" && !demoAvailable
+      ? browserSttAvailable
+        ? "webspeech"
+        : config?.stt.cloudAvailable
+          ? (config.stt.configured as SttProviderId)
+          : "demo"
+      : chosenSource;
+  const demoMismatch = source === "demo" && !demoAvailable;
+
   const canChooseAudioInput = source !== "demo" && source !== "webspeech";
   const audioInputs = useBoothAudioInput(canChooseAudioInput);
   const audioDeviceId = audioInputs.deviceId;
   const selectedAudioLabel = audioInputs.selectedLabel;
+  const boothPreflightExpected = boothPreflightApplies({
+    context: settings.context,
+    source,
+    audioDeviceSelected: !!audioDeviceId,
+  });
 
   useEffect(() => {
     const refresh = () =>
       setBoothPreflightVerified(
-        settings.mode === "sermon" &&
+        boothPreflightExpected &&
           canChooseAudioInput &&
           audioInputs.selectionAvailable &&
           isBoothPreflightAcknowledged(audioDeviceId || undefined),
@@ -170,47 +190,52 @@ export function StartScreen() {
     // forever just because nobody navigated away.
     const timer = window.setInterval(refresh, 60_000);
     return () => window.clearInterval(timer);
-  }, [settings.mode, canChooseAudioInput, audioDeviceId, audioInputs.selectionAvailable]);
+  }, [boothPreflightExpected, canChooseAudioInput, audioDeviceId, audioInputs.selectionAvailable]);
 
   const session = useLiveSession({
-    mode: settings.mode,
+    languagePair,
+    context: settings.context,
     lag: settings.lag,
     prep,
     source,
     audioDeviceId: canChooseAudioInput ? audioDeviceId || undefined : undefined,
+    rememberCorrections: settings.rememberCorrections,
   });
 
   // Resolved here, before the tap, so pressing Start can never outrun it.
   const consent = useCloudConsent(source);
 
   const sources = useMemo(() => {
-    const list: SttProviderId[] = ["demo"];
+    const list: SttProviderId[] = demoAvailable ? ["demo"] : [];
     if (browserSttAvailable) list.push("webspeech");
     if (config?.stt.cloudAvailable)
       list.push(config.stt.configured as SttProviderId);
+    if (list.length === 0) list.push("demo");
     return [...new Set(list)];
-  }, [browserSttAvailable, config]);
+  }, [browserSttAvailable, config, demoAvailable]);
 
   const rows = useMemo(
     () =>
       readinessRows({
         config,
-        mode: settings.mode,
+        context: settings.context,
         source,
         consent: consent.phase,
         audioInputLabel: selectedAudioLabel,
         audioInputSupported: audioInputs.supported,
         audioInputAvailable: audioInputs.selectionAvailable,
+        audioDeviceSelected: !!audioDeviceId,
         boothPreflightVerified,
       }),
     [
       config,
-      settings.mode,
+      settings.context,
       source,
       consent.phase,
       selectedAudioLabel,
       audioInputs.supported,
       audioInputs.selectionAvailable,
+      audioDeviceId,
       boothPreflightVerified,
     ],
   );
@@ -285,6 +310,11 @@ export function StartScreen() {
     );
   }
 
+  const startBlocked =
+    !consent.mayStart ||
+    demoMismatch ||
+    (canChooseAudioInput && !audioInputs.selectionAvailable);
+
   /**
    * Start the session.
    *
@@ -295,20 +325,34 @@ export function StartScreen() {
   const beginSession = () => {
     // Belt and braces around the invariant: nothing starts while consent is
     // unresolved or outstanding, whatever the button happens to be doing.
-    if (!consent.mayStart || (canChooseAudioInput && !audioInputs.selectionAvailable)) return;
+    if (startBlocked) return;
     setScreen("live");
     void session.start();
   };
 
+  const prepReady = !!(prep.speaker || prep.title || prep.glossary.length > 0);
+  const audioSummary = [
+    SOURCE_LABEL_KO[source] ?? STT_PROVIDER_INFO[source].label,
+    canChooseAudioInput ? selectedAudioLabel : null,
+    LAG_LABEL_KO[settings.lag],
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
+      <div
+        className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 sm:px-8 lg:px-10"
+        style={{
+          paddingTop: "calc(1.5rem + var(--safe-top))",
+          paddingBottom: "calc(1.5rem + var(--safe-bottom))",
+        }}
+      >
         <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)] pb-6">
           <div className="min-w-0">
-            <h1 className="max-w-3xl break-all text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
+            <h1 className="flex max-w-3xl flex-wrap items-baseline gap-x-2 text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
               <Wordmark variant="compact" />
-              <span className="text-[var(--line-strong)]">/</span>
-              <span>라이브 통역</span>
+              <span className="type-display">Live</span>
             </h1>
             <p className="mt-1 text-sm text-[var(--fg-muted)]">
               {BRAND.liveTagline}
@@ -327,7 +371,7 @@ export function StartScreen() {
                 strokeLinejoin="round"
               />
             </svg>
-            모드 선택
+            홈
           </Link>
           <Link
             href="/diagnostics"
@@ -348,121 +392,28 @@ export function StartScreen() {
 
         <main className="grid flex-1 gap-8 py-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(22rem,1fr)] lg:gap-10 lg:py-0">
           <div className="flex min-w-0 flex-col gap-5 lg:py-8">
-            {/* --- Session configuration ----------------------------------------
-              Segmented rows rather than description cards: the descriptions were
-              prep-time reading occupying launch-time space, and they were what
-              pushed Start below the fold on a phone. */}
-            <section className="flex flex-col gap-4">
-              <ControlRow label="모드">
-                <Segmented
-                  label="통역 모드"
-                  indicator
-                  value={settings.mode}
-                  onChange={(mode) => updateSettings({ ...settings, mode })}
-                  options={(["sermon", "general"] as InterpretationMode[]).map(
-                    (mode) => ({
-                      value: mode,
-                      label: mode === "sermon" ? "설교" : "일반",
-                      title:
-                        mode === "sermon"
-                          ? "교회 통역 부스에서 일하는 통역사를 위한 모드입니다."
-                          : "회의 · 강연 · 인터뷰. 신학적 전제 없이 옮깁니다.",
-                    }),
-                  )}
-                />
-              </ControlRow>
-
-              <ControlRow label="입력">
-                {source === "demo" ? (
-                  <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
-                    녹음된 한국어 설교
-                  </p>
-                ) : source === "webspeech" ? (
-                  <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
-                    시스템 기본값 · 마이크는 브라우저 인식이 제어합니다
-                  </p>
-                ) : (
-                  <select
-                    aria-label="오디오 입력 장치"
-                    value={audioDeviceId}
-                    onChange={(event) => audioInputs.setDeviceId(event.target.value)}
-                    className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)]"
-                  >
-                    {audioDeviceId && !audioInputs.selectionAvailable ? (
-                      <option value={audioDeviceId} disabled>
-                        이전에 선택한 입력 · 연결 끊김
-                      </option>
-                    ) : null}
-                    <option value="">시스템 기본값</option>
-                    {audioInputs.devices
-                      .filter((device) => device.deviceId !== "default")
-                      .map((device) => (
-                        <option key={device.deviceId} value={device.deviceId}>
-                          {device.label}
-                        </option>
-                      ))}
-                  </select>
-                )}
-              </ControlRow>
-
-              <ControlRow label="인식">
-                <Segmented
-                  label="음성 인식"
-                  indicator
-                  value={source}
-                  onChange={setSourceOverride}
-                  options={sources.map((id) => ({
-                    value: id,
-                    label: SOURCE_LABEL_KO[id] ?? STT_PROVIDER_INFO[id].label,
-                    title: SOURCE_DETAIL_KO[id] ?? STT_PROVIDER_INFO[id].detail,
-                  }))}
-                />
-              </ControlRow>
-
-              <ControlRow label="지연">
-                <Segmented
-                  label="통역 지연"
-                  indicator
-                  value={settings.lag}
-                  onChange={(lag) => updateSettings({ ...settings, lag })}
-                  options={(["fast", "balanced", "safe"] as const).map(
-                    (lag) => ({
-                      value: lag,
-                      label: LAG_LABEL_KO[lag],
-                      title: LAG_DETAIL_KO[lag],
-                    }),
-                  )}
-                />
-              </ControlRow>
-              <p className="text-sm text-[var(--fg-muted)] sm:pl-28">
-                {LAG_DETAIL_KO[settings.lag]}
-              </p>
+            {/* --- 1. Languages ------------------------------------------- */}
+            <section aria-label="언어" className="flex flex-col gap-2">
+              <LanguagePairPicker
+                value={languagePair}
+                onChange={(pair) =>
+                  updateSettings({
+                    ...settings,
+                    sourceLanguage: pair.source,
+                    targetLanguage: pair.target,
+                  })
+                }
+              />
             </section>
 
-            {settings.mode === "sermon" && (
-              <div className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] px-4 py-3 text-sm leading-relaxed text-[var(--fg-muted)]">
-                <strong className="font-semibold text-[var(--fg)]">
-                  부스 모드.
-                </strong>{" "}
-                통역사와 교회의 동시통역 음향 설비가 이미 있다는 전제로 동작합니다. 통역사를 보조할 뿐, 번역을 회중에게 직접 송출하지는 않습니다.
-              </div>
-            )}
-
-            {/* On a phone the readiness answers must be read before the action
-                they qualify. The desktop copy stays in the sticky side rail. */}
-            <div className="lg:hidden">
-              <Readiness rows={rows} demo={source === "demo"} />
-            </div>
-
+            {/* --- 2. Start ---------------------------------------------- */}
             <Button
               tone="primary"
               size="lg"
-              // Disabled only while we genuinely do not yet know what starting would
-              // send. That window is short and it is the one the old race lived in.
-              disabled={
-                !consent.mayStart ||
-                (canChooseAudioInput && !audioInputs.selectionAvailable)
-              }
+              // Disabled only while we genuinely do not yet know what starting
+              // would send. That window is short and it is the one the old
+              // race lived in.
+              disabled={startBlocked}
               onClick={beginSession}
               className="w-full"
             >
@@ -474,75 +425,163 @@ export function StartScreen() {
                     ? "데모 실행"
                     : "통역 시작"}
             </Button>
+            {demoMismatch && (
+              <p className="text-sm text-[var(--warn)]" role="status">
+                이 언어 쌍에는 데모가 없고, 이 브라우저에는 쓸 수 있는 음성 인식이 없습니다. Chrome에서
+                열거나 한국어 → 영어로 바꿔 데모를 실행하세요.
+              </p>
+            )}
 
-            {/* --- Everything optional ------------------------------------------ */}
-            <details
-              open={advanced}
-              onToggle={(event) =>
-                setAdvanced((event.target as HTMLDetailsElement).open)
-              }
-              className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)]"
-            >
-              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium marker:content-none">
-                <span>
-                  <span className="font-semibold text-[var(--accent)]">
-                    시작 전에 챙길 것
-                  </span>
-                  <span className="ml-2 text-sm text-[var(--fg-muted)]">
-                    준비 시트 · 지난 세션
-                  </span>
-                </span>
-                <svg
-                  aria-hidden
-                  viewBox="0 0 20 20"
-                  className="size-4 shrink-0 text-[var(--accent)]"
-                  fill="none"
+            {/* --- 3. Everything secondary -------------------------------- */}
+            <div className="flex flex-wrap items-start gap-2">
+              <details className="group min-w-0 open:basis-full">
+                <summary className={quietSummary}>
+                  <span className="text-[var(--fg-dim)]">맥락:</span>{" "}
+                  {CONTEXT_LABEL_KO[settings.context]}
+                  <Chevron />
+                </summary>
+                <div
+                  role="radiogroup"
+                  aria-label="통역 맥락"
+                  className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-[var(--line)] bg-[var(--bg-raised)] p-1 sm:grid-cols-5"
                 >
-                  <path
-                    d="m7.5 4.5 5.5 5.5-5.5 5.5"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </summary>
-              <div className="flex flex-col gap-3 border-t border-[var(--line)] px-4 py-3.5">
-                <Link
-                  href="/prep"
-                  className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
-                >
-                  준비 시트 작성
-                  {prep.speaker || prep.title ? (
-                    <span className="ml-1.5 text-[var(--accent)]">· ready</span>
-                  ) : null}
-                </Link>
-                <Link
-                  href="/sessions"
-                  className="text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
-                >
-                  지난 세션 보기
-                </Link>
-                {/* Counter Mode is no longer buried here. It is a different job
-                  on the same footing, and it now has its own entry alongside
-                  this one on the home screen — which is what the comment that
-                  used to sit above this link already claimed. */}
-              </div>
-            </details>
+                  {CONTEXT_DOMAINS.map((option) => {
+                    const selected = settings.context === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => updateSettings({ ...settings, context: option })}
+                        className={cn(
+                          "min-h-11 rounded-lg px-2 text-sm transition-[color,background-color]",
+                          selected
+                            ? "bg-[var(--accent)] font-semibold text-[var(--accent-contrast)] shadow-sm"
+                            : "text-[var(--fg-muted)] hover:bg-[var(--accent-dim)] hover:text-[var(--fg)]",
+                        )}
+                      >
+                        {CONTEXT_LABEL_KO[option]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 px-1 text-xs leading-relaxed text-[var(--fg-dim)]">
+                  자동이면 준비 시트와 들리는 내용으로 예배·회의·강의를 스스로 알아차립니다. 직접
+                  고르면 그 판단을 덮어씁니다.
+                </p>
+              </details>
 
-            <p className="mt-auto border-t border-[var(--line)] pt-5 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
-              통역 중 단축키 ·{" "}
-              <strong className="font-semibold text-[var(--fg)]">Space</strong>{" "}
-              멈춤 ·{" "}
-              <strong className="font-semibold text-[var(--fg)]">T</strong>{" "}
-              프롬프터 ·{" "}
-              <strong className="font-semibold text-[var(--fg)]">K</strong>{" "}
-              한국어 ·{" "}
-              <strong className="font-semibold text-[var(--fg)]">G</strong>{" "}
-              용어 ·{" "}
-              <strong className="font-semibold text-[var(--fg)]">+/−</strong>{" "}
-              글자 크기
-            </p>
+              <Link href="/prep" className={quietSummary}>
+                용어집
+                {prepReady ? (
+                  <span className="ml-1.5 text-[var(--accent)]">· ready</span>
+                ) : null}
+              </Link>
+
+              <details className="group min-w-0 open:basis-full">
+                <summary className={quietSummary}>
+                  <span className="text-[var(--fg-dim)]">오디오 입력:</span> {audioSummary}
+                  <Chevron />
+                </summary>
+                <div className="mt-2 flex flex-col gap-4 rounded-xl border border-[var(--line)] bg-[var(--bg-raised)] p-4">
+                  <ControlRow label="입력">
+                    {source === "demo" ? (
+                      <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
+                        녹음된 한국어 설교
+                      </p>
+                    ) : source === "webspeech" ? (
+                      <p className="min-h-11 py-2.5 text-sm text-[var(--fg-muted)]">
+                        시스템 기본값 · 마이크는 브라우저 인식이 제어합니다
+                      </p>
+                    ) : (
+                      <select
+                        aria-label="오디오 입력 장치"
+                        value={audioDeviceId}
+                        onChange={(event) => audioInputs.setDeviceId(event.target.value)}
+                        className="min-h-11 w-full rounded-md border border-[var(--line-strong)] bg-[var(--bg-overlay)] px-3 text-sm text-[var(--fg)] outline-none focus-visible:border-[var(--accent)]"
+                      >
+                        {audioDeviceId && !audioInputs.selectionAvailable ? (
+                          <option value={audioDeviceId} disabled>
+                            이전에 선택한 입력 · 연결 끊김
+                          </option>
+                        ) : null}
+                        <option value="">시스템 기본값</option>
+                        {audioInputs.devices
+                          .filter((device) => device.deviceId !== "default")
+                          .map((device) => (
+                            <option key={device.deviceId} value={device.deviceId}>
+                              {device.label}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </ControlRow>
+
+                  <ControlRow label="인식">
+                    <Segmented
+                      label="음성 인식"
+                      indicator
+                      value={source}
+                      onChange={setSourceOverride}
+                      options={sources.map((id) => ({
+                        value: id,
+                        label: SOURCE_LABEL_KO[id] ?? STT_PROVIDER_INFO[id].label,
+                        title: SOURCE_DETAIL_KO[id] ?? STT_PROVIDER_INFO[id].detail,
+                      }))}
+                    />
+                  </ControlRow>
+
+                  <ControlRow label="지연">
+                    <Segmented
+                      label="통역 지연"
+                      indicator
+                      value={settings.lag}
+                      onChange={(lag) => updateSettings({ ...settings, lag })}
+                      options={(["fast", "balanced", "safe"] as const).map(
+                        (lag) => ({
+                          value: lag,
+                          label: LAG_LABEL_KO[lag],
+                          title: LAG_DETAIL_KO[lag],
+                        }),
+                      )}
+                    />
+                  </ControlRow>
+                  <p className="text-sm text-[var(--fg-muted)] sm:pl-28">
+                    {LAG_DETAIL_KO[settings.lag]}
+                  </p>
+
+                  {/* On a phone the readiness answers live here, next to the
+                      controls that change them. The desktop copy stays in the
+                      sticky side rail. */}
+                  <div className="lg:hidden">
+                    <Readiness rows={rows} demo={source === "demo"} />
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <div className="mt-auto flex flex-col gap-3 border-t border-[var(--line)] pt-5 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
+              <p>
+                통역 중 단축키 ·{" "}
+                <strong className="font-semibold text-[var(--fg)]">Space</strong>{" "}
+                멈춤 ·{" "}
+                <strong className="font-semibold text-[var(--fg)]">T</strong>{" "}
+                프롬프터 ·{" "}
+                <strong className="font-semibold text-[var(--fg)]">K</strong>{" "}
+                원문 ·{" "}
+                <strong className="font-semibold text-[var(--fg)]">G</strong>{" "}
+                용어 ·{" "}
+                <strong className="font-semibold text-[var(--fg)]">+/−</strong>{" "}
+                글자 크기 · 원문을 길게 누르면 이름·용어를 고칠 수 있습니다
+              </p>
+              <Link
+                href="/sessions"
+                className="self-start underline-offset-4 hover:text-[var(--fg)] hover:underline"
+              >
+                지난 세션 보기
+              </Link>
+            </div>
           </div>
 
           <aside className="hidden min-w-0 lg:block lg:py-8">
@@ -575,6 +614,29 @@ export function StartScreen() {
   );
 }
 
+/** The three quiet controls under Start share one look: a chip, not a button. */
+const quietSummary =
+  "inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-xl border border-[var(--line)] bg-[var(--bg-raised)] px-3.5 text-sm text-[var(--fg)] shadow-sm transition-[background-color,border-color] hover:border-[var(--line-strong)] hover:bg-[var(--accent-dim)] marker:content-none [&::-webkit-details-marker]:hidden";
+
+function Chevron() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 20 20"
+      className="ml-0.5 size-3.5 shrink-0 text-[var(--fg-dim)] transition-transform group-open:rotate-180"
+      fill="none"
+    >
+      <path
+        d="m6.5 8 3.5 3.5L13.5 8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ControlRow({
   label,
   children,
@@ -597,21 +659,29 @@ function ControlRow({
  *
  * Exported for tests: "the launcher never tells an interpreter to set an
  * environment variable" is a product rule worth asserting rather than
- * remembering.
+ * remembering. So is "no Mode": the rows take a context, never a mode.
  */
 export function readinessRows(input: {
   config: AppConfig | null;
-  mode?: InterpretationMode;
+  /** The interpreter's context override; `auto` normally. */
+  context?: ContextDomain;
   source: SttProviderId;
   consent?: string;
   audioInputLabel?: string;
   audioInputSupported?: boolean;
   audioInputAvailable?: boolean;
+  /** True when a specific physical input (not the system default) is chosen. */
+  audioDeviceSelected?: boolean;
   boothPreflightVerified?: boolean;
 }): ReadinessRow[] {
   const { config, source } = input;
   const demo = source === "demo";
   const info = STT_PROVIDER_INFO[source];
+  const preflightExpected = boothPreflightApplies({
+    context: input.context ?? "auto",
+    source,
+    audioDeviceSelected: input.audioDeviceSelected,
+  });
 
   const audio: ReadinessRow = demo
     ? {
@@ -625,7 +695,7 @@ export function readinessRows(input: {
           value: "시스템 기본 마이크",
           level: "limited",
           detail:
-            "입력 장치는 브라우저 음성 인식이 고릅니다. 교회 믹서를 써야 한다면 예배 전에 시스템 입력을 먼저 지정해 두세요.",
+            "입력 장치는 브라우저 음성 인식이 고릅니다. 믹서를 써야 한다면 시작 전에 시스템 입력을 먼저 지정해 두세요.",
         }
       : input.audioInputSupported === false
         ? {
@@ -640,20 +710,20 @@ export function readinessRows(input: {
               level: "blocked",
               detail: "입력을 다시 연결하거나 시스템 기본값 또는 다른 입력을 선택하세요.",
             }
-        : input.mode === "sermon" && input.boothPreflightVerified !== true
+        : preflightExpected && input.boothPreflightVerified !== true
           ? {
               label: "입력",
               value: `${input.audioInputLabel ?? "시스템 기본값"} · 사전 점검 안 됨`,
               level: "limited",
               detail:
-                "부스 사전 점검으로 한국어 프로그램 피드와 mix-minus가 쓸 만한지 확인하세요. 지금 바로 부스를 돌려야 한다면 그대로 시작해도 됩니다.",
+                "부스 사전 점검으로 프로그램 피드와 mix-minus가 쓸 만한지 확인하세요. 지금 바로 부스를 돌려야 한다면 그대로 시작해도 됩니다.",
             }
           : {
               label: "입력",
               value: input.audioInputLabel ?? "시스템 기본값",
               level: "ready",
               detail:
-                "부스에서는 실내 마이크보다 교회 믹서나 USB 오디오 인터페이스 피드를 쓰는 편이 낫습니다.",
+                "부스에서는 실내 마이크보다 믹서나 USB 오디오 인터페이스 피드를 쓰는 편이 낫습니다.",
             };
 
   const recognition: ReadinessRow = demo
@@ -688,7 +758,7 @@ export function readinessRows(input: {
           value: "규칙 기반만 사용",
           level: "limited",
           detail:
-            "성경 구절 · 용어 · 말놀이는 그대로 짚어줍니다. 다만 영어 문장은 번역이 아니라 규칙으로 만들어집니다.",
+            "성경 구절 · 용어 · 말놀이는 그대로 짚어줍니다. 다만 번역문은 번역이 아니라 규칙으로 만들어집니다.",
         }
       : !config.llm.sustainsLiveSermon
         ? {
@@ -696,7 +766,7 @@ export function readinessRows(input: {
             value: `${config.llm.configured} — 용량 제한`,
             level: "limited",
             detail:
-              `${config.llm.capacityNote ?? ""} 지원되는 데스크톱 Chrome에서는 기기 내 한국어→영어 번역으로 전환되며, 그 외 브라우저에서는 규칙 기반 보조만 남습니다.`.trim(),
+              `${config.llm.capacityNote ?? ""} 지원되는 데스크톱 Chrome에서는 기기 내 번역으로 전환되며, 그 외 브라우저에서는 규칙 기반 보조만 남습니다.`.trim(),
           }
         : { label: "AI", value: config.llm.configured, level: "ready" };
 

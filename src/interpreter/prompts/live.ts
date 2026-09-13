@@ -1,35 +1,50 @@
 /**
  * Assembly of the per-turn live interpretation prompt.
  *
- * The system prompt is mode-dependent and constant across a session, so it
- * caches well. Only this user turn changes, and it is kept deliberately small
- * — the rolling context has already been compressed before it gets here.
+ * The system prompt depends on the layer and the language pair, both constant
+ * across a session, so it caches well. Only this user turn changes, and it is
+ * kept deliberately small — the rolling context has already been compressed
+ * before it gets here.
  */
 import type { InterpretRequest } from "@/lib/schema";
+import type { ResolvedDomain } from "@/types";
+import { DEFAULT_LANGUAGE_PAIR, type LanguagePairIds } from "@/languages/registry";
 import { compactSystemPrompt } from "./compact";
 import { generalSystemPrompt } from "./general";
 import { sermonSystemPrompt } from "./sermon";
-import { contextBlock } from "./shared";
+import { contextBlock, pairNames } from "./shared";
 
-/**
- * The system prompt for a live turn.
- *
- * `schemaEnforced` drops the prose restatement of the JSON shape when the
- * provider validates against `INTERPRETER_JSON_SCHEMA` itself.
- *
- * `ultraCompact` is deliberately explicit rather than inferred here. Context
- * budgeting belongs to the router; prompt assembly only renders the contract
- * it was asked for. This keeps rescue/full-context flows unchanged.
- */
+export interface SystemPromptOptions {
+  /** Drop the prose restatement of the JSON shape when the provider validates against `INTERPRETER_JSON_SCHEMA` itself. */
+  schemaEnforced?: boolean;
+  /**
+   * Deliberately explicit rather than inferred here. Context budgeting belongs
+   * to the router; prompt assembly only renders the contract it was asked for.
+   */
+  ultraCompact?: boolean;
+  /** Session languages. Defaults to Korean → English, the pair the contract was measured on. */
+  pair?: Partial<LanguagePairIds>;
+  /**
+   * The Context Engine's domain. Accepted so a caller can hand the same options
+   * to the system and user prompts, but NEVER rendered into the system prompt:
+   * the domain drifts during a session and the system prompt must not, or the
+   * provider's prompt cache misses on every drift. The user turn carries it —
+   * see `buildLiveUserPrompt`.
+   */
+  domain?: ResolvedDomain;
+}
+
+/** The system prompt for a live turn. Constant for a given layer, pair and profile. */
 export const systemPromptFor = (
   mode: "sermon" | "general",
-  options: { schemaEnforced?: boolean; ultraCompact?: boolean } = {},
+  options: SystemPromptOptions = {},
 ): string => {
   const schemaEnforced = options.schemaEnforced ?? false;
-  if (options.ultraCompact) return compactSystemPrompt(mode, schemaEnforced);
+  const pair = options.pair ?? DEFAULT_LANGUAGE_PAIR;
+  if (options.ultraCompact) return compactSystemPrompt(mode, schemaEnforced, pair);
   return mode === "sermon"
-    ? sermonSystemPrompt(schemaEnforced)
-    : generalSystemPrompt(schemaEnforced);
+    ? sermonSystemPrompt(schemaEnforced, pair)
+    : generalSystemPrompt(schemaEnforced, pair);
 };
 
 /** Per-lag steer, appended to the user turn. */
@@ -71,10 +86,22 @@ function boundarySteer(request: InterpretRequest): string | null {
   return lines.length ? lines.join("\n") : null;
 }
 
+/** The heading the pending source text sits under. `mock.ts` reads it back. */
+export const pendingHeading = (pair: Partial<LanguagePairIds> | undefined): string =>
+  `${pairNames(pair).SOURCE} TO INTERPRET NOW (stabilised):`;
+
 export function buildLiveUserPrompt(request: InterpretRequest): string {
   const sections: string[] = [];
+  const pair = request.languagePair ?? DEFAULT_LANGUAGE_PAIR;
 
-  const context = contextBlock(request.context);
+  // One line, in the user turn rather than the system prompt, so a domain
+  // drift mid-session costs nothing in cache. `generic` says nothing: the
+  // layer already assumes nothing.
+  if (request.domain && request.domain !== "generic") {
+    sections.push(`SETTING: ${request.domain}`);
+  }
+
+  const context = contextBlock(request.context, pair);
   if (context) sections.push(context);
 
   const detected = request.detected;
@@ -121,10 +148,29 @@ export function buildLiveUserPrompt(request: InterpretRequest): string {
           .join("\n")}`,
       );
     }
+    // The Repair Engine's unsettled doubts. The model is the last reader with
+    // enough context to choose; it is still not allowed to invent a reading
+    // that neither the recogniser nor the evidence produced.
+    if (detected.hypotheses?.length) {
+      hints.push(
+        `RECOGNITION HYPOTHESES (the recogniser may have misheard; prefer the candidate ONLY if the context supports it, never invent a third reading):\n${detected.hypotheses
+          .map((h) => `  ${h.heard} → ${h.candidate} (${h.reason})`)
+          .join("\n")}`,
+      );
+    }
+    // Translation Memory. These were validated — by the interpreter, the prep
+    // sheet or repeated agreement — so the model reuses rather than re-decides.
+    if (detected.memory?.length) {
+      hints.push(
+        `REMEMBERED RENDERINGS (validated earlier; reuse exactly when the same phrase recurs):\n${detected.memory
+          .map((m) => `  ${m.source} → ${m.target}`)
+          .join("\n")}`,
+      );
+    }
     if (hints.length) sections.push(`LOCAL DETECTION\n${hints.join("\n\n")}`);
   }
 
-  sections.push(`KOREAN TO INTERPRET NOW (stabilised):\n${request.pending}`);
+  sections.push(`${pendingHeading(pair)}\n${request.pending}`);
 
   if (request.partial?.trim()) {
     sections.push(

@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import type { ConnectionState, SubsystemHealth } from "@/types";
 import type { AiState } from "./AiStatus";
-import { consoleStatus, formatElapsed } from "./ConsoleTopBar";
+import { audioStatusLabel } from "./AudioStatus";
+import { ConsoleTopBar, consoleStatus, formatElapsed } from "./ConsoleTopBar";
 
 const healthy: SubsystemHealth = { stt: "ok", llm: "ok", bible: "ok" };
 
@@ -94,5 +97,51 @@ describe("formatElapsed", () => {
 
   it("never renders a negative clock", () => {
     expect(formatElapsed(-5_000)).toBe("0:00");
+  });
+});
+
+describe("ConsoleTopBar", () => {
+  afterEach(cleanup);
+
+  const renderBar = (props: Partial<Parameters<typeof ConsoleTopBar>[0]> = {}) =>
+    render(
+      createElement(ConsoleTopBar, {
+        connection: "live",
+        health: healthy,
+        elapsedMs: 61_000,
+        aiState: "live",
+        pairLabel: "ZH-TW → KO",
+        audio: "speech",
+        onOpenSettings: () => {},
+        onEnd: () => {},
+        ...props,
+      }),
+    );
+
+  it("renders the language pair next to the status", () => {
+    renderBar();
+    expect(screen.getByText("ZH-TW → KO")).toBeTruthy();
+    expect(screen.getByText("Live")).toBeTruthy();
+    expect(screen.getByText("1:01")).toBeTruthy();
+  });
+
+  it("shows the audio glyph with an accessible name and no visualiser", () => {
+    const { container } = renderBar();
+    expect(screen.getByRole("img", { name: audioStatusLabel("speech") })).toBeTruthy();
+    expect(container.querySelector("canvas, meter, progress")).toBeNull();
+  });
+
+  it("gives every icon-only control a name", () => {
+    renderBar();
+    expect(screen.getByRole("button", { name: "Session settings" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "End session" })).toBeTruthy();
+  });
+
+  it("only shows the context chip when the engine has decided something", () => {
+    renderBar({ context: undefined });
+    expect(screen.queryByText("예배")).toBeNull();
+    cleanup();
+    renderBar({ context: "예배" });
+    expect(screen.getByRole("button", { name: "예배" })).toBeTruthy();
   });
 });

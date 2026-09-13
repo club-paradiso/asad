@@ -116,6 +116,8 @@ export function requestFor(benchCase: BenchCase): InterpretRequest {
   return {
     mode: benchCase.mode,
     lag: "balanced",
+    // The dataset is Korean → English; say so, as the live route's client does.
+    languagePair: { source: "ko-KR", target: "en-US" },
     pending: benchCase.korean,
     // Bench cases are whole utterances, and the `incomplete` category is the
     // one that deliberately is not: score it as the clock-cut unit it is, or
@@ -184,6 +186,7 @@ export function livePromptFor(
     system: systemPromptFor(benchCase.mode, {
       schemaEnforced: caps.structuredOutput,
       ultraCompact: decision.profile === "ultra-compact",
+      pair: request.languagePair,
     }),
     user: buildLiveUserPrompt({
       ...request,

@@ -1,6 +1,7 @@
 import type { InterpretationMode, PrepSheet } from "@/types";
+import { languageBase } from "@/languages/registry";
 import { THEOLOGICAL_LEXICON } from "./lexicon";
-import { matchGlossary } from "./matcher";
+import { DEFAULT_GLOSSARY_LANGUAGE, matchGlossary } from "./matcher";
 
 /** Deepgram currently receives at most this many `keyterm` hints. */
 export const STT_HINT_LIMIT = 50;
@@ -51,12 +52,18 @@ const SERMON_BASELINE = [
  *
  * This is intentionally not "send all 447 terms". Recognition hints bias the
  * acoustic model; irrelevant hints can make recognition worse, not better.
+ *
+ * `language` is the SOURCE language. The sermon baseline and the lexicons are
+ * Korean, so for any other language only the prep sheet's own terms are sent
+ * — a Mandarin recogniser fed Hangul keyterms is not being helped.
  */
 export function buildSttHints(
   mode: InterpretationMode,
   prep: PrepSheet | undefined,
   limit = STT_HINT_LIMIT,
+  language: string = DEFAULT_GLOSSARY_LANGUAGE,
 ): string[] {
+  const korean = languageBase(language) === "ko";
   const out: string[] = [];
   const seen = new Set<string>();
 
@@ -84,12 +91,12 @@ export function buildSttHints(
   if (prepCorpus) {
     // matchGlossary includes the 447-entry volunteer glossary in sermon mode,
     // but only terms present in today's prep material earn recogniser budget.
-    for (const match of matchGlossary(prepCorpus, mode, prep?.glossary ?? [])) {
+    for (const match of matchGlossary(prepCorpus, mode, prep?.glossary ?? [], language)) {
       add(match.korean);
     }
   }
 
-  if (mode === "sermon") {
+  if (korean && mode === "sermon") {
     const curated = new Set(THEOLOGICAL_LEXICON.map((item) => item.korean));
     for (const term of SERMON_BASELINE) {
       if (curated.has(term)) add(term);

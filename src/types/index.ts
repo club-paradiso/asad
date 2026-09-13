@@ -11,10 +11,77 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Domain specialisation. The interpretation engine itself is domain-agnostic;
- * the mode selects prompt modules, glossaries and resolvers layered on top.
+ * What kind of speech the session is carrying.
+ *
+ * `auto` is the default and the normal case: the Context Engine infers the
+ * domain from evidence (prep sheet, Scripture references, terminology,
+ * discourse patterns, the model's own topic label) and adapts as the session
+ * goes. The others are manual overrides behind a secondary control. None of
+ * them is a product mode the user must choose before starting.
+ */
+export type ContextDomain =
+  | "auto"
+  | "worship"
+  | "sermon"
+  | "lecture"
+  | "meeting"
+  | "conversation"
+  | "presentation"
+  | "event"
+  | "generic";
+
+export const CONTEXT_DOMAINS: readonly ContextDomain[] = [
+  "auto",
+  "worship",
+  "sermon",
+  "lecture",
+  "meeting",
+  "conversation",
+  "presentation",
+  "event",
+  "generic",
+];
+
+/** A domain the Context Engine has settled on. Never `auto`. */
+export type ResolvedDomain = Exclude<ContextDomain, "auto">;
+
+export const RESOLVED_DOMAINS: readonly ResolvedDomain[] = CONTEXT_DOMAINS.filter(
+  (domain): domain is ResolvedDomain => domain !== "auto",
+);
+
+/**
+ * INTERNAL prompt/lexicon layer, derived from the resolved domain.
+ *
+ * This is not a user choice and no screen offers it. The worship/sermon
+ * intelligence — Scripture handling, theological register, Korean church
+ * vocabulary — is a layer the Context Engine switches on when the evidence
+ * says the room is a service, and leaves off otherwise. The name survives
+ * from when it was a top-level mode because the prompt modules, lexicons and
+ * demo script are keyed by it.
  */
 export type InterpretationMode = "sermon" | "general";
+
+/** Which prompt/lexicon layer a resolved domain activates. */
+export const layerForDomain = (domain: ResolvedDomain): InterpretationMode =>
+  domain === "worship" || domain === "sermon" ? "sermon" : "general";
+
+/** How the Context Engine arrived at the domain it is using. */
+export type DomainSource = "manual" | "prep" | "inferred" | "default";
+
+export interface DomainInference {
+  domain: ResolvedDomain;
+  /** 0–1. Combined evidence, never a model's self-report. */
+  confidence: number;
+  source: DomainSource;
+  /** Short evidence labels for diagnostics and the console's context control. Never transcript. */
+  signals: string[];
+}
+
+/** The languages a Live session listens to and speaks. Canonical registry ids. */
+export interface LanguagePair {
+  source: string;
+  target: string;
+}
 
 /**
  * How far behind the speaker the interpreter is choosing to run. This is the
@@ -44,7 +111,7 @@ export type ConnectionState =
 // Korean side
 // ---------------------------------------------------------------------------
 
-/** A finalised piece of recognised Korean speech. */
+/** A finalised piece of recognised source-language speech. */
 export interface TranscriptSegment {
   id: string;
   text: string;
@@ -54,6 +121,24 @@ export interface TranscriptSegment {
   corrected?: boolean;
   /** The text this segment replaced, when `corrected`. */
   originalText?: string;
+  /**
+   * What the recogniser actually emitted, before normalisation or any
+   * evidence-based repair. Source evidence is never overwritten.
+   */
+  rawText?: string;
+  /** Recogniser confidence for this segment, 0–1, when the provider reports one. */
+  confidence?: number;
+  /** Alternative hypotheses the recogniser offered, best first, when available. */
+  alternatives?: string[];
+  /** True when the Repair Engine changed `text` from `rawText` on evidence. */
+  repaired?: boolean;
+}
+
+/** Recogniser metadata that may accompany a stable result. All optional. */
+export interface StableTranscriptMeta {
+  confidence?: number;
+  /** N-best alternatives, best first, excluding the chosen text. */
+  alternatives?: string[];
 }
 
 /** Live, still-unstable recognition output. */
@@ -108,7 +193,41 @@ export interface InterpretationChunk {
    * any other.
    */
   provisional?: boolean;
+  /**
+   * Revision of the turn this chunk renders. Bumped when the turn's source is
+   * corrected or repaired while a result is in flight, so a result built on
+   * an older revision can never overwrite a newer one.
+   */
+  revision?: number;
+  /** Set when the Repair Engine changed or flagged this chunk. Labels only. */
+  repairs?: RepairKind[];
+  /** Where the text came from: a validated memory hit needs no model. */
+  origin?: "tm" | "provisional" | "contextual" | "local";
 }
+
+/**
+ * Output lifecycle as the interpreter sees it.
+ *
+ *   interim      unstable recognition, still changing
+ *   provisional  first useful translation, may be refined
+ *   stable       locked; only a genuine semantic correction may follow it
+ */
+export type OutputLifecycle = "interim" | "provisional" | "stable";
+
+export const chunkLifecycle = (chunk: InterpretationChunk): OutputLifecycle =>
+  chunk.state === "committed" ? "stable" : chunk.state === "anticipated" ? "interim" : "provisional";
+
+/** Problem classes the Repair Engine can detect. */
+export type RepairKind =
+  | "stt-corruption"
+  | "entity"
+  | "terminology"
+  | "number"
+  | "date"
+  | "negation"
+  | "script"
+  | "implausible"
+  | "empty";
 
 // ---------------------------------------------------------------------------
 // Context support
@@ -227,26 +346,41 @@ export interface PrepBrief {
 }
 
 export interface SessionSettings {
-  mode: InterpretationMode;
+  /** Canonical registry id of the language being spoken. */
+  sourceLanguage: string;
+  /** Canonical registry id of the language being interpreted into. */
+  targetLanguage: string;
+  /** `auto` unless the interpreter overrode it. */
+  context: ContextDomain;
   lag: LagProfile;
   view: ConsoleView;
-  showKorean: boolean;
+  /** Show the source-language transcript under the translation. */
+  showSource: boolean;
   showGlossary: boolean;
   showScripture: boolean;
   fontScale: number;
   /** Session transcripts are only ever stored when the user opts in. */
   saveHistory: boolean;
+  /**
+   * Keep user-confirmed corrections and entity bindings for future sessions
+   * in this browser. Never transcripts, never audio, never unconfirmed model
+   * output.
+   */
+  rememberCorrections: boolean;
 }
 
 export const defaultSettings = (): SessionSettings => ({
-  mode: "sermon",
+  sourceLanguage: "ko-KR",
+  targetLanguage: "en-US",
+  context: "auto",
   lag: "balanced",
   view: "console",
-  showKorean: true,
+  showSource: true,
   showGlossary: true,
   showScripture: true,
   fontScale: 1,
   saveHistory: false,
+  rememberCorrections: true,
 });
 
 /** A user-issued correction, remembered for the rest of the session. */
@@ -256,6 +390,10 @@ export interface CorrectionRecord {
   at: number;
   /** Preferred English rendering / romanisation, when supplied. */
   english?: string;
+  /** What the correction targets. Defaults to the source transcript. */
+  scope?: "source" | "target" | "entity";
+  /** Whether the user asked for this correction to outlive the session. */
+  remember?: boolean;
 }
 
 /** The complete state of a live or finished session. */
@@ -277,6 +415,8 @@ export interface SessionState {
   connection: ConnectionState;
   /** Subsystem-level health, so one failure never blanks the console. */
   health: SubsystemHealth;
+  languagePair: LanguagePair;
+  domain: DomainInference;
 }
 
 export interface SubsystemHealth {
@@ -290,7 +430,12 @@ export interface StoredSession {
   id: string;
   startedAt: number;
   endedAt?: number;
-  mode: InterpretationMode;
+  /** Legacy field from sessions saved before the unified Live console. */
+  mode?: InterpretationMode;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+  /** The domain the Context Engine ended the session on. */
+  domain?: ResolvedDomain;
   title?: string;
   speaker?: string;
   segments: TranscriptSegment[];

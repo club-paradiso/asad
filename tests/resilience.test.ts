@@ -58,7 +58,7 @@ describe("scenario C · primary free provider returns 429 mid-sermon", () => {
     let now = 0;
     let snapshot: EngineSnapshot | null = null;
     const engine = new InterpretationEngine({
-      mode: "sermon",
+      context: "sermon",
       lag: "balanced",
       now: () => now,
       onChange: (next) => {

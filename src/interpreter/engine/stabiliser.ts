@@ -13,23 +13,22 @@
  * (3) is what keeps a preacher who never pauses from starving the pipeline.
  */
 import type { LagConfig } from "./lag";
+import {
+  boundaryRulesFor,
+  endsClause,
+  endsSentence,
+  joinTranscript,
+  splitThoughtUnits as splitByLanguage,
+  transcriptLength,
+} from "@/languages/segmentation";
 
 /**
- * Korean sentence-final endings, plus ordinary terminal punctuation.
- *
- * The single-syllable endings must be ATTACHED to a stem — `[가-힣]` before
- * them — because a sentence-final ending is a suffix, never a word of its own.
- * Matching them bare cut mid-phrase on the adverb 다 ("all"): "우리가 살면서
- * 겪는 모든 일을 우리는 다" ends in 다, is past the trigger length, and was
- * flushed as a finished thought — handing the model a subject with no
- * predicate one word before 맡겨야 합니다 arrived. Recognised punctuation is
- * still a boundary on its own, so "모두 다." stays one.
+ * Boundary detection lives in `@/languages/segmentation` so the same rules
+ * serve every source language. The stabiliser was written for Korean and its
+ * regexes moved there unchanged; the default language below keeps every
+ * caller that never passed one behaving exactly as before.
  */
-const SENTENCE_END =
-  /(?:습니다|십시오|세요|군요)\s*[.?!。？！]?\s*$|[가-힣](?:다|요|까|죠|네)\s*[.?!。？！]?\s*$|[.?!。？！]\s*$/;
-
-/** Clause boundaries — a usable, if weaker, place to break a thought group. */
-const CLAUSE_END = /(?:고|며|면서|지만|는데|어서|아서|니까|으니|든지|거나)\s*,?\s*$/;
+const DEFAULT_LANGUAGE = "ko-KR";
 
 export interface StabiliserState {
   /** Stabilised Korean not yet sent for interpretation. */
@@ -51,11 +50,12 @@ export function pushStable(
   state: StabiliserState,
   text: string,
   now: number,
+  language: string = DEFAULT_LANGUAGE,
 ): StabiliserState {
   const clean = text.trim();
   if (!clean) return { ...state, lastEventAt: now };
   return {
-    pending: state.pending ? `${state.pending} ${clean}` : clean,
+    pending: state.pending ? joinTranscript(state.pending, clean, language) : clean,
     pendingSince: state.pendingSince ?? now,
     lastEventAt: now,
   };
@@ -70,11 +70,12 @@ export function restorePending(
   state: StabiliserState,
   text: string,
   now: number,
+  language: string = DEFAULT_LANGUAGE,
 ): StabiliserState {
   const clean = text.trim();
   if (!clean) return state;
   return {
-    pending: state.pending ? `${clean} ${state.pending}` : clean,
+    pending: state.pending ? joinTranscript(clean, state.pending, language) : clean,
     pendingSince: Math.min(state.pendingSince ?? now, now),
     lastEventAt: state.lastEventAt,
   };
@@ -102,19 +103,26 @@ export function flushReason(
   state: StabiliserState,
   config: LagConfig,
   now: number,
+  language: string = DEFAULT_LANGUAGE,
 ): FlushReason {
   const pending = state.pending.trim();
   if (!pending) return null;
 
   const waited = state.pendingSince === null ? 0 : now - state.pendingSince;
   const quiet = now - state.lastEventAt;
+  const length = transcriptLength(pending, language);
+  const rules = boundaryRulesFor(language);
 
   if (waited >= config.maxHoldMs) return "timeout";
-  if (pending.length < config.minTriggerChars) return null;
-  if (SENTENCE_END.test(pending)) return "sentence";
-  if (quiet >= config.stabiliseMs) return "quiet";
+  if (length < config.minTriggerChars) return null;
+  if (endsSentence(pending, language)) return "sentence";
+  // A recogniser that rarely punctuates (Thai, some Chinese paths) leaves the
+  // quiet window as the main boundary; shorten it a little so speech that
+  // never carries a full stop is not always cut by the hold ceiling instead.
+  const quietWindow = rules.punctuationReliable ? config.stabiliseMs : Math.round(config.stabiliseMs * 0.8);
+  if (quiet >= quietWindow) return "quiet";
   // A clause boundary only earns a flush once the buffer is genuinely long.
-  if (CLAUSE_END.test(pending) && pending.length >= config.minTriggerChars * 2) {
+  if (endsClause(pending, language) && length >= config.minTriggerChars * 2) {
     return "clause";
   }
   return null;
@@ -151,33 +159,15 @@ export function shouldAnticipate(
 }
 
 /**
- * Split a stabilised Korean sentence into interpretation-sized units.
- *
- * Korean delays the predicate, so the useful break points are the connective
- * endings — that is where an interpreter can start a clause in English without
- * knowing how the Korean finishes.
+ * Split a stabilised sentence into interpretation-sized units along its
+ * language's clause structure. Korean delays the predicate, so its useful
+ * break points are the connective endings — that is where an interpreter can
+ * start a clause without knowing how the source finishes.
  */
-export function splitThoughtUnits(text: string, maxChars = 60): string[] {
-  const clean = text.trim();
-  if (!clean) return [];
-  if (clean.length <= maxChars) return [clean];
-
-  const pieces = clean
-    .split(/(?<=(?:고|며|면서|지만|는데|어서|아서|니까|은|는))\s+|(?<=[,、])\s*/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
-  const out: string[] = [];
-  let buffer = "";
-  for (const piece of pieces) {
-    const candidate = buffer ? `${buffer} ${piece}` : piece;
-    if (candidate.length > maxChars && buffer) {
-      out.push(buffer);
-      buffer = piece;
-    } else {
-      buffer = candidate;
-    }
-  }
-  if (buffer) out.push(buffer);
-  return out;
+export function splitThoughtUnits(
+  text: string,
+  maxChars = 60,
+  language: string = DEFAULT_LANGUAGE,
+): string[] {
+  return splitByLanguage(text, language, maxChars);
 }

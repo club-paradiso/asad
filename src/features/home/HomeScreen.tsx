@@ -43,7 +43,7 @@ export function HomeScreen() {
                   href="/live"
                   title="라이브 통역"
                   who="한 사람이 말하고, 당신이 옮깁니다"
-                  detail="설교 · 강연 · 회의 · 한국어 → 영어"
+                  detail="설교 · 강연 · 회의 · 언어 쌍 선택"
                   primary
                 />
                 <ModeCard
@@ -136,7 +136,7 @@ function DefaultLanguageSetting() {
       </div>
 
       <p className="mt-3 border-t border-[var(--line)] pt-3 text-xs leading-relaxed text-[var(--fg-dim)]">
-        현재 {selected.ko}로 설정됨 · 라이브 통역은 현재 한국어 → 영어 고정
+        현재 {selected.ko}로 설정됨 · 라이브 통역의 언어 쌍은 시작 화면에서 고릅니다
       </p>
     </section>
   );

@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import { appEnv } from "@/lib/env";
 import { guardInferenceRoute } from "@/lib/guard";
-import { findLanguage } from "@/counter/languages";
+import { resolveLanguage, sttLanguageFor, whisperPromptFor } from "@/languages/registry";
 import type { SttCredentials } from "@/providers/stt/types";
 import {
   COUNTER_TOKEN_HEADER,
@@ -46,10 +46,11 @@ export async function POST(request: Request) {
     usage?: unknown;
     code?: unknown;
   };
+  // Any registry language, in any spelling a browser produces; canonicalised
+  // so `zh-Hant-HK` mints a Traditional-Chinese session and not a Simplified
+  // one. Unknown tags fall back to Korean, as the console always has.
   const requestedLanguage =
-    typeof body.language === "string" && findLanguage(body.language)
-      ? body.language
-      : "ko-KR";
+    (typeof body.language === "string" ? resolveLanguage(body.language)?.id : undefined) ?? "ko-KR";
   const suppliedCounterToken = counterTokenFrom(request);
   let counterTurn = body.usage === "counter" || !!suppliedCounterToken;
   if (counterTurn) {
@@ -103,7 +104,13 @@ export async function POST(request: Request) {
   if (!key) return fallback("OPENAI_API_KEY is not set.");
 
   const model = env.stt.openaiModel;
-  const session = await mintOpenAiSession(key, model, requestedLanguage);
+  const session = await mintOpenAiSession(key, model, {
+    // The Whisper base code from the registry, never `split("-")[0]` on a raw
+    // tag: `zh-TW` is `zh` either way, but the registry also says which
+    // languages Whisper must not be asked for at all.
+    language: sttLanguageFor("openai", requestedLanguage),
+    prompt: whisperPromptFor(requestedLanguage),
+  });
 
   if (counterTurn && !session) {
     return fallback("An ephemeral OpenAI transcription session could not be issued.");
@@ -150,7 +157,12 @@ async function mintDeepgramKey(accountKey: string): Promise<string | null> {
 async function mintOpenAiSession(
   apiKey: string,
   model: string,
-  language: string,
+  transcription: {
+    /** Whisper base code; null leaves the model to auto-detect rather than forcing a neighbour. */
+    language: string | null;
+    /** Script-biasing prompt (Traditional vs Simplified Chinese), when the registry defines one. */
+    prompt: string | undefined;
+  },
 ): Promise<string | null> {
   try {
     const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
@@ -162,7 +174,11 @@ async function mintOpenAiSession(
       },
       body: JSON.stringify({
         input_audio_format: "pcm16",
-        input_audio_transcription: { model, language: language.split("-")[0] },
+        input_audio_transcription: {
+          model,
+          ...(transcription.language ? { language: transcription.language } : {}),
+          ...(transcription.prompt ? { prompt: transcription.prompt } : {}),
+        },
       }),
     });
     if (!response.ok) return null;

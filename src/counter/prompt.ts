@@ -7,6 +7,8 @@ import {
   type GlossaryEntry,
 } from "./domain-vocabulary";
 import { findCounterProfile, type CounterProfileId } from "./profiles";
+// Per-language writing and recogniser lines are shared with the Live prompt.
+import { sourceVoiceGuidance, targetLanguageGuidance } from "@/languages/writing-guidance";
 
 export const COUNTER_SYSTEM_PROMPT = `You translate a face-to-face conversation at a service counter — a clinic reception, a government office, a help desk. Two people are standing in front of each other and do not share a language.
 
@@ -69,47 +71,6 @@ export interface CounterPromptInput {
   from?: "host" | "guest";
 }
 
-function targetLanguageGuidance(targetLang: string): string | null {
-  switch (targetLang.toLowerCase()) {
-    case "zh-cn":
-      return "TARGET WRITING: Use natural Mainland Mandarin in Simplified Chinese (简体中文). Do not output pinyin or Traditional Chinese unless the source explicitly contains it.";
-    case "zh-tw":
-      return "TARGET WRITING: Use natural Taiwan Mandarin in Traditional Chinese (繁體中文). Do not output pinyin or Simplified-only wording unless the source explicitly contains it.";
-    case "ja-jp":
-      return "TARGET WRITING: Use natural modern Japanese service-counter speech. Prefer ordinary polite Japanese, not stiff legalistic prose.";
-    case "ko-kr":
-      return "TARGET WRITING: Use natural Korean 존댓말 suitable for a public-facing counter. Avoid translationese and unnecessary Sino-Korean formality.";
-    case "vi-vn":
-      return "TARGET WRITING: Use natural contemporary Vietnamese for a service counter. Do not invent kinship terms when the relationship is unknown.";
-    case "th-th":
-      return "TARGET WRITING: Use clear contemporary Thai suitable for a service counter, with natural politeness and no added explanation.";
-    case "id-id":
-      return "TARGET WRITING: Use natural contemporary Indonesian suitable for a public-facing service interaction.";
-    case "ar-sa":
-      return "TARGET WRITING: Use clear Modern Standard Arabic appropriate for a service interaction unless the source itself requires a named dialect expression.";
-    case "ru-ru":
-      return "TARGET WRITING: Use natural contemporary Russian suitable for a service counter, preserving formal/informal address without becoming bureaucratic.";
-    case "mn-mn":
-      return "TARGET WRITING: Use natural modern Mongolian in Cyrillic suitable for a service interaction.";
-    case "uz-uz":
-      return "TARGET WRITING: Use natural modern Uzbek in Latin script unless the source explicitly requires another script.";
-    case "ne-np":
-      return "TARGET WRITING: Use clear modern Nepali in Devanagari suitable for a service interaction.";
-    case "km-kh":
-      return "TARGET WRITING: Use clear modern Khmer suitable for a service counter.";
-    case "my-mm":
-      return "TARGET WRITING: Use clear modern Burmese suitable for a service counter.";
-    case "ug-cn":
-      return [
-        "TARGET WRITING: Use modern Uyghur in the Perso-Arabic script (ئۇيغۇر ئەرەب يېزىقى).",
-        "Uyghur is a Turkic language written in an Arabic-derived script. It is NOT Arabic, NOT Uzbek, and NOT Turkish. Do not output Arabic, Uzbek, or Turkish, and do not substitute vocabulary from them.",
-        "Keep Latin-script administrative tokens exactly as written and in Latin script — residence status codes such as E-7 or D-10, HiKorea, ARC, phone numbers, passport numbers, and dates in numerals. Do not transliterate them into Arabic script and do not reorder their characters.",
-      ].join(" ");
-    default:
-      return null;
-  }
-}
-
 /**
  * Terminology the model must not improvise.
  *
@@ -166,29 +127,6 @@ function registerGuidance(from: "host" | "guest" | undefined): string | null {
     return "SPEAKER IS THE VISITOR: They may be using a second language imperfectly. Translate what they actually said, tidying grammar only where it does not change meaning. Do not complete their account, do not add a consequence they did not state, and do not make them sound more or less certain than they were.";
   }
   return null;
-}
-
-function sourceVoiceGuidance(sourceLang: string): string | null {
-  switch (sourceLang.toLowerCase()) {
-    case "zh-cn":
-      return "MANDARIN ASR: Spoken Mandarin may contain homophone substitutions or missing word boundaries. Repair only when one reading is strongly supported by grammar and recent turns. Preserve names, numbers, dates, document names, visa/status codes, and addresses exactly as recognized when uncertain; lower confidence instead of guessing.";
-    case "zh-tw":
-      return "TAIWAN MANDARIN ASR: Spoken Mandarin may contain homophone substitutions, mixed Simplified/Traditional characters, or missing boundaries. Normalize obvious script noise only when meaning is unchanged. Never guess a name, number, date, document, status code, or address.";
-    case "vi-vn":
-      return "VIETNAMESE ASR: Be alert to missing tone distinctions and short function-word errors. Repair only obvious grammatical artifacts; do not guess names, numbers, dates, or document terms.";
-    case "th-th":
-      return "THAI ASR: Word boundaries may be absent or inconsistent. Re-segment obvious phrases for understanding, but do not alter factual values or proper nouns.";
-    case "ar-sa":
-      return "ARABIC ASR: Dialectal speech may be rendered imperfectly in standard spelling. Translate the intended utterance only when strongly supported; preserve uncertain names and factual values and lower confidence.";
-    case "mn-mn":
-    case "uz-uz":
-    case "ne-np":
-    case "km-kh":
-    case "my-mm":
-      return "LOWER-RESOURCE ASR: Treat odd tokens as possible recognition errors, but repair only when grammar and recent context make the intended reading clear. Never silently guess names, numbers, dates, documents, or identifiers.";
-    default:
-      return null;
-  }
 }
 
 export function buildCounterPrompt(input: CounterPromptInput): string {
