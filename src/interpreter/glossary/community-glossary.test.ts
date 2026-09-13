@@ -13,7 +13,7 @@ describe("community sermon glossary", () => {
     );
   });
 
-  it("adds volunteer terminology to sermon mode", () => {
+  it("adds volunteer terminology in a worship context", () => {
     const matches = matchGlossary(
       "성령의 충만 가운데 결단의 시간을 갖겠습니다.",
       "worship",

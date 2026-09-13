@@ -96,3 +96,52 @@ describe("formatElapsed", () => {
     expect(formatElapsed(-5_000)).toBe("0:00");
   });
 });
+
+describe("a session that stopped listening", () => {
+  const base = {
+    connection: "idle" as const,
+    health: { stt: "ok", llm: "ok", bible: "ok" } as const,
+    ai: "live" as const,
+  };
+
+  it("outranks a recogniser's late 'closed' event", () => {
+    // The recogniser reports its terminal error and then, a beat later,
+    // reports that it closed. The close arrives last and reads as `idle`, so
+    // the strip used to settle on the one word that means nothing is wrong.
+    const status = consoleStatus({
+      ...base,
+      fault: {
+        kind: "permission",
+        message: "Microphone access was refused.",
+        recovering: false,
+        attempts: 0,
+      },
+    });
+    expect(status.label).toBe("No microphone");
+    expect(status.problem).toBe(true);
+    expect(status.detail).toMatch(/Resume/);
+  });
+
+  it("says a dropped transport is coming back and nothing is lost", () => {
+    const status = consoleStatus({
+      ...base,
+      connection: "reconnecting",
+      fault: { kind: "transport", message: "socket closed", recovering: true, attempts: 1 },
+    });
+    expect(status.label).toBe("Reconnecting");
+    expect(status.detail).toMatch(/Nothing on screen is lost/);
+  });
+
+  it("names the input rather than the network when the device went", () => {
+    const status = consoleStatus({
+      ...base,
+      fault: { kind: "device", message: "gone", recovering: false, attempts: 0 },
+    });
+    expect(status.label).toBe("Input lost");
+    expect(status.detail).not.toMatch(/connection/i);
+  });
+
+  it("stays quiet when there is no fault", () => {
+    expect(consoleStatus({ ...base, connection: "live", fault: null }).problem).toBe(false);
+  });
+});

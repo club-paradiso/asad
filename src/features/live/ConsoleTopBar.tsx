@@ -25,6 +25,7 @@ import { Button, StatusDot } from "@/components/ui/primitives";
 import type { AiState } from "./AiStatus";
 import { cn } from "@/lib/cn";
 import { findLanguage } from "@/lib/languages";
+import type { SessionFault } from "./transport-supervisor";
 import {
   CONTEXT_LABEL_EN,
   CONTEXT_MODES,
@@ -74,13 +75,25 @@ export function consoleStatus(input: {
   health: SubsystemHealth;
   ai: AiState;
   /**
+   * The session's own verdict on why it stopped listening, when it has one.
+   *
+   * It outranks `connection`, and it has to: a recogniser reports its terminal
+   * error and then, a beat later, reports that it closed. The close arrives
+   * last and reads as `idle`, so the strip used to settle on "Idle" — the one
+   * word that means "nothing is wrong" — while the microphone was refused and
+   * the session was over.
+   */
+  fault?: SessionFault | null;
+  /**
    * Demo mode. Its English is scripted, so "there is no model answering" is
    * the arrangement rather than a fault — and the demo ribbon already says so.
    * Warning about it would be the console crying wolf for a whole session.
    */
   scripted?: boolean;
 }): ConsoleStatus {
-  const { connection, health, ai, scripted = false } = input;
+  const { connection, health, ai, fault, scripted = false } = input;
+
+  if (fault) return statusForFault(fault);
 
   if (connection === "offline") {
     return {
@@ -138,7 +151,51 @@ export function consoleStatus(input: {
 
   if (connection === "live") return { state: "live", label: "Live", problem: false };
 
+  // A scripted run that reached its last beat is finished, not idle. "Idle" is
+  // the word for "waiting", and it left the demo looking like it had stalled.
+  if (scripted && connection === "idle") {
+    return { state: "idle", label: "Demo finished", problem: false };
+  }
+
   return { state: connection, label: "Idle", problem: false };
+}
+
+/**
+ * One line per reason a session stopped listening.
+ *
+ * Each answers the interpreter's two questions — can I keep going, and is
+ * there anything for me to do — in the same place and in plain language.
+ */
+function statusForFault(fault: SessionFault): ConsoleStatus {
+  if (fault.recovering) {
+    return {
+      state: "reconnecting",
+      label: "Reconnecting",
+      detail: "Audio is held while it retries. Nothing on screen is lost.",
+      problem: true,
+    };
+  }
+
+  const detail: Record<SessionFault["kind"], string> = {
+    permission: "Grant microphone access, then tap Resume. The transcript is kept.",
+    device: "Reconnect the input or pick another, then tap Resume. The transcript is kept.",
+    unsupported: "This browser or deployment cannot run the input you chose.",
+    transport: "The connection did not come back. Tap Resume to try again.",
+  };
+
+  const label: Record<SessionFault["kind"], string> = {
+    permission: "No microphone",
+    device: "Input lost",
+    unsupported: "Not available",
+    transport: "Not listening",
+  };
+
+  return {
+    state: "error",
+    label: label[fault.kind],
+    detail: detail[fault.kind],
+    problem: true,
+  };
 }
 
 export function ConsoleTopBar({
@@ -146,6 +203,7 @@ export function ConsoleTopBar({
   health,
   elapsedMs,
   aiState,
+  fault,
   context,
   sourceLanguage,
   targetLanguage,
@@ -158,6 +216,8 @@ export function ConsoleTopBar({
   health: SubsystemHealth;
   elapsedMs: number;
   aiState: AiState;
+  /** Why the session stopped listening, when it has. Outranks `connection`. */
+  fault?: SessionFault | null;
   /** What the session resolved the setting to, and how it got there. */
   context?: ContextState;
   sourceLanguage?: string;
@@ -167,7 +227,7 @@ export function ConsoleTopBar({
   onOpenSettings: () => void;
   onEnd: () => void;
 }) {
-  const status = consoleStatus({ connection, health, ai: aiState, scripted });
+  const status = consoleStatus({ connection, health, ai: aiState, fault, scripted });
   const pair =
     sourceLanguage && targetLanguage
       ? `${shortTag(sourceLanguage)} → ${shortTag(targetLanguage)}`

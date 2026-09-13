@@ -1,5 +1,5 @@
 /**
- * Volunteer-maintained Korean → English church glossary for ASAD sermon mode.
+ * Volunteer-maintained Korean → English church glossary, used in a worship context.
  *
  * Generated from the supplied "기독교 영단어 500개" workbook. The workbook
  * has 500 numbered rows and 447 unique Korean headwords. Duplicate headwords

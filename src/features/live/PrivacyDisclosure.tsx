@@ -71,7 +71,7 @@ const COPY: Record<
     intro:
       "With the current configuration, the Korean transcript and the English assistance are sent to:",
     sensitivity:
-      "Sermons often include testimonies, prayer requests and names. If this session is sensitive, use local-only mode — it sends nothing anywhere, and Scripture, terminology and wordplay detection all still work.",
+      "A live session carries whatever the speaker says — names, testimonies, medical or legal detail, an unpublished manuscript. If this one is sensitive, use local-only mode: it sends nothing anywhere, and Scripture, terminology and wordplay detection all still work.",
     accept: "I understand — continue",
     localOnly: "Use local-only mode",
     detailsDoc: "docs/privacy.md",

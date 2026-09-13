@@ -3,7 +3,7 @@ import { BRAND } from "@/lib/brand";
 
 export const metadata = {
   title: `Booth preflight · ${BRAND.name}`,
-  description: "Local-only church interpretation booth audio input check for ASAD Sermon Mode.",
+  description: "Local-only church interpretation booth audio input check for ASAD live interpretation.",
 };
 
 export default function BoothPreflightPage() {

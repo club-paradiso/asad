@@ -1,7 +1,7 @@
 import type { AudioInputOption } from "./useAudioInputs";
 
 /**
- * Browser-local preference for the physical church feed used by Sermon Mode.
+ * Browser-local preference for the physical church feed used in a booth.
  *
  * Only the opaque MediaDeviceInfo.deviceId is persisted. No audio, transcript,
  * church name, device label, or session content is stored.

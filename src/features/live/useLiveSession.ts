@@ -177,11 +177,21 @@ export function useLiveSession(options: LiveSessionOptions) {
 
   const supervisorRef = useRef<TransportSupervisor | null>(null);
 
-  // The scripted demo only exists for Korean → English. Its beats are authored
-  // Korean with authored English; running it on another pair would show an
-  // interpreter a translation that is not of the language they selected.
+  /**
+   * The scripted demo only exists for Korean → English. Its beats are authored
+   * Korean with authored English; running it on another pair would show an
+   * interpreter a translation that is not of the language they selected.
+   *
+   * `auto` gets the sermon script rather than the neutral one, because the
+   * sermon is the richer demonstration — Scripture, terminology and wordplay
+   * all fire — and because watching the context chip move from "Auto" to
+   * "Auto · Worship" while it plays IS the feature.
+   */
   const script: DemoScript = useMemo(
-    () => demoScriptFor(options.context === "worship" ? "sermon" : "general"),
+    () =>
+      demoScriptFor(
+        options.context === "auto" || options.context === "worship" ? "sermon" : "general",
+      ),
     [options.context],
   );
 

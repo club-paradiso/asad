@@ -222,6 +222,7 @@ export function LiveConsole({
           lastProvider,
           started: phase === "running",
         })}
+        fault={fault}
         context={snapshot.context}
         sourceLanguage={settings.sourceLanguage}
         targetLanguage={settings.targetLanguage}

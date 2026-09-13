@@ -28,7 +28,7 @@ describe("Korean whole-word matching", () => {
 });
 
 describe("glossary matching", () => {
-  it("finds theological terms in sermon mode", () => {
+  it("finds theological terms in a worship context", () => {
     const matches = matchGlossary("우리는 하나님의 부르심을 받은 사람들입니다.", "worship");
     const terms = matches.map((m) => m.korean);
     expect(terms).toContain("부르심");
