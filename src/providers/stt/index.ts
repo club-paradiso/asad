@@ -17,6 +17,7 @@ export * from "./types";
 export { MicrophoneCapture, Pcm16UtteranceBuffer } from "./audio";
 export { transcribeWithHuggingFace } from "./hf";
 export { DemoSpeechProvider, derivePartials } from "./demo";
+export { speechFailureKind, speechFailureMessage, type SpeechFailureKind } from "./failure";
 export { WebSpeechProvider } from "./webspeech";
 export {
   ensureMicrophonePermission,

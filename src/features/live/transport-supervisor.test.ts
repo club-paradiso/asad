@@ -185,3 +185,32 @@ describe("ending", () => {
     expect(h.states).toHaveLength(seen);
   });
 });
+
+describe("before anything has ever been heard", () => {
+  it("treats a reported fault as a failed start, not an interruption", async () => {
+    // A recogniser's `onerror` fires during the first open as readily as in
+    // the fortieth minute, and the two need different affordances: Start when
+    // nothing was ever heard, Resume when a session is waiting behind it.
+    const h = harness({
+      open: async () => {
+        // Resolves, as a recogniser that reached `onstart` does — but the
+        // fault is reported before it ever produced a word.
+        return new Promise<boolean>((resolve) => {
+          h.supervisor.report("permission", "denied");
+          resolve(true);
+        });
+      },
+    });
+    await h.supervisor.start();
+    expect(h.supervisor.state().phase).toBe("failed-to-start");
+  });
+
+  it("treats the same fault as an interruption once a session is open", async () => {
+    const h = harness();
+    await h.supervisor.start();
+    h.supervisor.report("permission", "denied");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(h.supervisor.state().phase).toBe("interrupted");
+  });
+});

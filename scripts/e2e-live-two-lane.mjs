@@ -23,6 +23,7 @@ import { chromium } from "playwright";
 import { chromiumLaunchOptions } from "./browser.mjs";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { chooseLag, chooseRecogniser, start } from "./launcher.mjs";
 
 const base = process.argv[2] ?? "http://localhost:3000";
 const outDir = process.argv[3] ?? "./e2e-out";
@@ -76,6 +77,7 @@ async function setUpPage(context, { koreanLines, provisionalLines }) {
 
       window.Translator = {
         create(options) {
+          window.__probe.translatorCreated = options;
           options?.monitor?.({
             addEventListener(type, listener) {
               if (type === "downloadprogress") listener({ loaded: 1 });
@@ -214,9 +216,9 @@ const waitForRow = (page, match, timeout = 10_000) =>
   });
 
   await page.goto(`${base}/live`, { waitUntil: "networkidle" });
-  await page.getByRole("radio", { name: /^브라우저/ }).click();
-  await page.getByRole("radio", { name: /^빠르게/ }).click();
-  await page.getByRole("button", { name: "통역 시작" }).click();
+  await chooseRecogniser(page, "webspeech");
+  await chooseLag(page, "fast");
+  await start(page);
 
   try {
   // 1. Provisional before cloud.
@@ -357,9 +359,9 @@ const waitForRow = (page, match, timeout = 10_000) =>
   });
 
   await page.goto(`${base}/live`, { waitUntil: "networkidle" });
-  await page.getByRole("radio", { name: /^브라우저/ }).click();
-  await page.getByRole("radio", { name: /^빠르게/ }).click();
-  await page.getByRole("button", { name: "통역 시작" }).click();
+  await chooseRecogniser(page, "webspeech");
+  await chooseLag(page, "fast");
+  await start(page);
   let rows = [];
   let probe = { translatorCalls: [] };
   try {

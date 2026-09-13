@@ -41,6 +41,7 @@ import {
   STT_PROVIDER_INFO,
   createSpeechProvider,
   fetchSttCredentials,
+  speechFailureKind,
   type SpeechProvider,
   type SttProviderId,
   type SttStatus,
@@ -561,7 +562,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         providerErrorRef.current = err.message;
         setError(err.message);
       });
-      provider.onStatus((status) => {
+      provider.onStatus((status, detail) => {
         engineRef.current?.setConnection(mapStatus(status));
         engineRef.current?.setHealth(
           "stt",
@@ -569,14 +570,14 @@ export function useLiveSession(options: LiveSessionOptions) {
         );
 
         // A recogniser reporting a terminal error is no longer listening. What
-        // happens next depends entirely on WHY, which the provider knows and
-        // this does not — so its own message is classified rather than
-        // overwritten with a guess about the venue's Wi-Fi.
+        // happens next depends entirely on WHY — and the provider knows, so it
+        // hands its own error CODE over as `detail`. Classifying the human
+        // sentence instead is how "Microphone access was refused" came to be
+        // treated as a lost audio device.
         if (status === "error") {
           const message =
-            providerErrorRef.current ??
-            "Speech recognition stopped unexpectedly.";
-          supervisor.report(classifyProviderFailure(message), message);
+            providerErrorRef.current ?? "Speech recognition stopped unexpectedly.";
+          supervisor.report(speechFailureKind(detail), message);
         }
       });
 
@@ -718,18 +719,27 @@ export function useLiveSession(options: LiveSessionOptions) {
     if (options.prep) engineRef.current?.setPrep(options.prep);
   }, [options.prep]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Set on the way IN as well as cleared on the way out.
+    //
+    // It was only ever cleared, and that is a bug with teeth under React's
+    // StrictMode, which mounts, unmounts and remounts: the cleanup ran once,
+    // `mountedRef` stayed false for the rest of the page's life, and the
+    // on-device translator was destroyed the moment it finished preparing —
+    // so the fast lane silently never existed and every turn waited on the
+    // cloud.
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
       supervisorRef.current?.dispose();
       supervisorRef.current = null;
       browserTranslatorRef.current?.destroy();
       browserTranslatorRef.current = null;
+      browserTranslatorPreparationRef.current = null;
       flushClientTelemetry();
       void teardown();
-    },
-    [flushClientTelemetry, teardown],
-  );
+    };
+  }, [flushClientTelemetry, teardown]);
 
   const correct = useCallback((from: string, to: string, english?: string) => {
     engineRef.current?.correct(from, to, english);
@@ -773,27 +783,6 @@ export class TransportError extends Error {
   }
 }
 
-/**
- * Classify a recogniser's own terminal error message.
- *
- * The provider layer already writes these for the interpreter rather than for
- * a log, and `speechFailureMessage` produces a small, known set. Anything that
- * does not name a permission or a device is treated as transport, because
- * transport is the recoverable answer and guessing "unrecoverable" costs a
- * session.
- */
-export function classifyProviderFailure(message: string): SessionFailureKind {
-  const text = message.toLowerCase();
-  if (/(permission|not-?allowed|denied|blocked|allow (?:the )?microphone)/u.test(text)) {
-    return "permission";
-  }
-  if (/(microphone|audio input|device|no input|disconnected)/u.test(text)) return "device";
-  if (/(not supported|unsupported|cannot|does not support|not set up)/u.test(text)) {
-    return "unsupported";
-  }
-  return "transport";
-}
-
 /** Turn anything thrown by `openTransport` into a classified, sayable fault. */
 export function describeStartFailure(error: unknown): { kind: SessionFailureKind; message: string } {
   if (error instanceof TransportError) return { kind: error.kind, message: error.message };
@@ -817,7 +806,9 @@ export function describeStartFailure(error: unknown): { kind: SessionFailureKind
         message: "The audio input could not be opened — another application may be using it.",
       };
     }
-    return { kind: classifyProviderFailure(error.message), message: error.message };
+    // A recogniser that rejected `connect()` carries its own code.
+    const code = (error as Error & { code?: string }).code;
+    return { kind: speechFailureKind(code), message: error.message };
   }
   return { kind: "transport", message: "Could not start the session." };
 }

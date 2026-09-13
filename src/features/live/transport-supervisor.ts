@@ -80,9 +80,29 @@ export interface TransportSupervisorDeps {
 
 export class TransportSupervisor {
   private phase: TransportPhase = "idle";
+  /**
+   * Whether the transport has ever been open.
+   *
+   * The distinction the whole class turns on: a fault BEFORE anything was ever
+   * heard leaves no session state worth preserving, so the launcher's Start is
+   * the right affordance. After that, Resume is — and the two look identical
+   * from inside a recogniser's `onerror`, which fires during the first open as
+   * readily as during the fortieth minute.
+   */
+  private everOpened = false;
   private fault: SessionFault | null = null;
   private attempts = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Which open attempt is current.
+   *
+   * A recogniser can report a terminal fault WHILE its own `connect()` is
+   * still resolving — `onerror` then `onstart` is an ordinary sequence. Without
+   * this, the open resolving "successfully" a moment later would overwrite the
+   * fault with `open`, and the console would claim to be listening to a
+   * microphone that had just been refused.
+   */
+  private openToken = 0;
   private disposed = false;
   private readonly setTimer: NonNullable<TransportSupervisorDeps["setTimer"]>;
   private readonly clearTimer: NonNullable<TransportSupervisorDeps["clearTimer"]>;
@@ -117,7 +137,7 @@ export class TransportSupervisor {
    */
   report(kind: SessionFailureKind, message: string): void {
     if (this.disposed || this.phase === "recovering") return;
-    void this.handle({ kind, message }, { firstOpen: false });
+    void this.handle({ kind, message }, { firstOpen: !this.everOpened });
   }
 
   /** Ending is explicit and final: no scheduled reconnection outlives it. */
@@ -152,17 +172,19 @@ export class TransportSupervisor {
     if (options.firstOpen || this.attempts === 0) this.fault = null;
     this.emit();
 
+    const token = (this.openToken += 1);
     try {
       const opened = await this.deps.open();
-      if (this.disposed) return false;
+      if (this.disposed || token !== this.openToken) return false;
       if (!opened) return false;
       this.attempts = 0;
       this.fault = null;
+      this.everOpened = true;
       this.phase = "open";
       this.emit();
       return true;
     } catch (error) {
-      if (this.disposed) return false;
+      if (this.disposed || token !== this.openToken) return false;
       await this.handle(this.deps.classify(error), options);
       return false;
     }
@@ -179,6 +201,8 @@ export class TransportSupervisor {
     failure: { kind: SessionFailureKind; message: string },
     options: { firstOpen: boolean },
   ): Promise<void> {
+    // Invalidate any open still in flight: its success is no longer the truth.
+    this.openToken += 1;
     const retryable =
       failure.kind === "transport" &&
       !options.firstOpen &&
