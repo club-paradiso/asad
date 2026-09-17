@@ -13,6 +13,11 @@ import { appEnv, type AppEnv } from "@/lib/env";
 import { parseCounterOutput, type CounterOutput } from "@/lib/schema";
 import { toLlmError } from "@/providers/llm/errors";
 import { telemetry } from "@/lib/telemetry";
+import {
+  completeViaVercelGateway,
+  vercelGatewayAvailable,
+  VERCEL_GATEWAY_MODEL,
+} from "@/providers/llm/vercel-gateway";
 import { isSensitiveCounterProfile } from "./profiles";
 import { COUNTER_JSON_SCHEMA, COUNTER_SYSTEM_PROMPT, buildCounterPrompt } from "./prompt";
 import type { CounterPromptInput } from "./prompt";
@@ -98,6 +103,72 @@ export const __resetSensitiveCounterRouter = () => {
   sensitiveRouter = null;
 };
 
+async function translateViaGateway(
+  input: CounterRoutingInput,
+  started: number,
+): Promise<TranslationResult> {
+  try {
+    const response = await completeViaVercelGateway(
+      {
+        system: COUNTER_SYSTEM_PROMPT,
+        user: buildCounterPrompt(input),
+        maxOutputTokens: 500,
+        temperature: input.action === "simplify" || input.rephrase ? 0.35 : 0.2,
+        jsonSchema: COUNTER_JSON_SCHEMA,
+        thinking: "none",
+      },
+      { timeoutMs: COUNTER_DEADLINE_MS },
+    );
+
+    const output = parseCounterOutput(response.text);
+    telemetry.recordSchemaResult(output !== null);
+    if (!output) {
+      return {
+        ok: false,
+        provider: "vercel-gateway",
+        model: response.model ?? VERCEL_GATEWAY_MODEL,
+        latencyMs: Date.now() - started,
+        error: "The Vercel Gateway translation did not match the required schema.",
+      };
+    }
+
+    telemetry.recordLatency({
+      stage: "provider_response",
+      ms: response.latencyMs,
+      provider: "vercel-gateway",
+      model: response.model ?? VERCEL_GATEWAY_MODEL,
+    });
+
+    if (!output.translation.trim()) {
+      return {
+        ok: false,
+        provider: "vercel-gateway",
+        model: response.model ?? VERCEL_GATEWAY_MODEL,
+        latencyMs: Date.now() - started,
+        error: output.note || "Nothing intelligible to translate.",
+      };
+    }
+
+    return {
+      ok: true,
+      output,
+      provider: "vercel-gateway",
+      model: response.model ?? VERCEL_GATEWAY_MODEL,
+      latencyMs: Date.now() - started,
+    };
+  } catch (error) {
+    const llmError = toLlmError(error);
+    telemetry.recordFailure(llmError.kind);
+    return {
+      ok: false,
+      provider: "vercel-gateway",
+      model: VERCEL_GATEWAY_MODEL,
+      latencyMs: Date.now() - started,
+      error: llmError.message,
+    };
+  }
+}
+
 export async function translateForCounter(
   input: CounterRoutingInput & { routingKey?: string },
 ): Promise<TranslationResult> {
@@ -111,16 +182,21 @@ export async function translateForCounter(
   // Open weights first when asked for, but only as an ordering for general
   // sessions. The sensitive router is already hard-pinned to OpenRouter.
   const prefer = appEnv().llm.counterPreferOpen ? OPEN_WEIGHT : undefined;
+  const routedCloud = router.wouldReach(prefer);
 
-  // No cloud provider at all. The local interpreter cannot translate arbitrary
-  // language pairs, so say so rather than emit something useless.
-  if (!router.wouldReach(prefer)) {
+  // Sensitive profiles remain hard-pinned to the explicitly protected
+  // OpenRouter path. The Vercel Gateway is only a recovery route for ordinary
+  // Counter translation and therefore cannot weaken that policy boundary.
+  if (!routedCloud) {
+    if (!sensitive && vercelGatewayAvailable()) {
+      return translateViaGateway(input, started);
+    }
     return {
       ok: false,
       latencyMs: Date.now() - started,
       error: sensitive
         ? "민감업무 보호 모드의 허용된 번역 제공자를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
-        : "No translation provider is configured. Counter Mode needs an LLM key — see docs/counter-mode.md.",
+        : "No translation provider is configured. Counter Mode needs an LLM provider.",
     };
   }
 
@@ -159,6 +235,9 @@ export async function translateForCounter(
     telemetry.recordSchemaResult(output !== null);
 
     if (!output) {
+      if (!sensitive && vercelGatewayAvailable()) {
+        return translateViaGateway(input, started);
+      }
       return {
         ok: false,
         provider: result.provider,
@@ -176,6 +255,9 @@ export async function translateForCounter(
     });
 
     if (!output.translation.trim()) {
+      if (!sensitive && vercelGatewayAvailable()) {
+        return translateViaGateway(input, started);
+      }
       return {
         ok: false,
         provider: result.provider,
@@ -195,6 +277,12 @@ export async function translateForCounter(
   } catch (error) {
     const llmError = toLlmError(error);
     telemetry.recordFailure(llmError.kind);
+
+    if (!sensitive && vercelGatewayAvailable()) {
+      const recovered = await translateViaGateway(input, started);
+      if (recovered.ok) return recovered;
+    }
+
     return {
       ok: false,
       latencyMs: Date.now() - started,
