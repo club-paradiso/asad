@@ -48,7 +48,7 @@ export async function completeViaVercelGateway(
 ): Promise<LlmResponse> {
   const token = vercelGatewayToken();
   if (!token) {
-    throw new LlmError("Vercel AI Gateway authentication is unavailable.", "configuration");
+    throw new LlmError("Vercel AI Gateway authentication is unavailable.", "auth");
   }
 
   const body: Record<string, unknown> = {
