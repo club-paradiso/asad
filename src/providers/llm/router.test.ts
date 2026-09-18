@@ -224,16 +224,53 @@ describe("circuit breaker", () => {
     expect(breaker.state).toBe("healthy");
   });
 
-  it("never retries an invalid API key", () => {
-    const breaker = new CircuitBreaker("groq");
+  it("benches a provider on one auth failure, but not for ever until it is confirmed", () => {
+    let now = 0;
+    const breaker = new CircuitBreaker("groq", undefined, () => now);
     breaker.recordFailure("auth", "401");
-    // One strike, not three: proving a bad key is still bad costs a phrase.
+    // One strike still stops the bleeding: proving a bad key is still bad costs
+    // a phrase, and we do not pay it on the next sentence.
     expect(breaker.canAttempt()).toBe(false);
-    expect(breaker.snapshot().permanentlyDisabled).toBe(true);
+    expect(breaker.snapshot().permanentlyDisabled).toBeUndefined();
+    expect(breaker.snapshot().authFailures).toBe(1);
+
+    // ...but exactly one probe decides. A 403 from an egress proxy, a rotating
+    // credential or a brief vendor incident recovers by itself instead of
+    // ending cloud interpretation for the life of the process.
+    now += 90_000;
+    expect(breaker.canAttempt()).toBe(true);
   });
 
-  it("never retries a rejected model id", () => {
-    const breaker = new CircuitBreaker("groq");
+  it("permanently disables a provider once a second auth failure confirms it", () => {
+    let now = 0;
+    const breaker = new CircuitBreaker("groq", undefined, () => now);
+    breaker.recordFailure("auth", "401");
+    now += 90_000;
+    breaker.recordFailure("auth", "401");
+    expect(breaker.snapshot().permanentlyDisabled).toBe(true);
+    expect(breaker.canAttempt()).toBe(false);
+  });
+
+  it("forgets an unconfirmed auth failure once the provider answers", () => {
+    let now = 0;
+    const breaker = new CircuitBreaker("gemini", undefined, () => now);
+    breaker.recordFailure("auth", "403 from the edge");
+    now += 90_000;
+    breaker.recordSuccess();
+    expect(breaker.snapshot().authFailures).toBeUndefined();
+
+    // A single later 403 must therefore not be treated as the second strike of
+    // an incident that already resolved.
+    breaker.recordFailure("auth", "403 again, months later");
+    expect(breaker.snapshot().permanentlyDisabled).toBeUndefined();
+  });
+
+  it("confirms a rejected model id the same way", () => {
+    let now = 0;
+    const breaker = new CircuitBreaker("groq", undefined, () => now);
+    breaker.recordFailure("bad_request", "no such model");
+    expect(breaker.snapshot().permanentlyDisabled).toBeUndefined();
+    now += 90_000;
     breaker.recordFailure("bad_request", "no such model");
     expect(breaker.snapshot().permanentlyDisabled).toBe(true);
   });

@@ -39,6 +39,8 @@ import type {
 } from "@/types";
 import { emptyPrepSheet } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
+import { analyseCodeSwitch, isAlreadyTargetLanguage } from "@/lib/code-switch";
+import { chunkTranslation } from "@/lib/chunk-text";
 import { detectScriptureReferences } from "../scripture/detect";
 import {
   liveGlossary,
@@ -209,6 +211,16 @@ export interface EngineOptions {
  * request is already running and will carry the Korean instead.
  */
 export const PROVISIONAL_TIMEOUT_MS = 2_500;
+
+/**
+ * How a unit that was already spoken in the target language is labelled.
+ *
+ * Not a translation and not a model: the speaker said it, we are showing it.
+ * Naming it honestly matters because the console and the telemetry both read
+ * the provider label to decide how much the English on screen is worth.
+ */
+export const PASSTHROUGH_PROVIDER = "source-passthrough";
+export const PASSTHROUGH_MODEL = "verbatim";
 
 /**
  * How many Scripture hints one turn may carry. Matches the cap in
@@ -544,8 +556,20 @@ export class InterpretationEngine {
    */
   private canFlush(): boolean {
     if (this.options.provisional?.isReady()) return this.provisionalInFlight === null;
+    // Without a fast lane the engine stays single-flight: the stabiliser buffer
+    // IS the queue, and it holds one growing unit rather than a list.
+    //
+    // Letting turns be cut and coalesced here instead was tried and measured
+    // (`npm run bench:live -- --simulate-cloud`, 10 simulated minutes). It buys
+    // one tick — the stabiliser preserves `pendingSince`, so the held unit
+    // flushes on the very next tick once the socket frees, not on a fresh
+    // trigger — and it costs tail latency, because the oldest turn in a
+    // coalesced unit waits for the newest. p50 was unchanged at ~5.7s and the
+    // maximum went from 17.2s to 29.7s. The idea was wrong; the note is here so
+    // it is not re-derived.
     return this.cloudInFlight === null && this.pendingUnit === null;
   }
+
 
   // -------------------------------------------------------------------------
   // Interpretation
@@ -558,15 +582,30 @@ export class InterpretationEngine {
     this.pendingOriginAt = null;
     if (!pending) return;
 
+    // Deterministic, synchronous, and done once per unit rather than per token:
+    // which scripts this unit is actually written in.
+    const codeSwitch = analyseCodeSwitch(pending, { source: this.source, target: this.target });
+    if (codeSwitch.decidable && codeSwitch.guestTerms.length > 0) {
+      this.stats.codeSwitchedTurns += 1;
+    }
+
+    // The speaker delivered a whole sentence in the language we are producing —
+    // a quotation, a title, an English aside. Translating English into English
+    // is slower AND worse, so the fast lane for this unit is simply showing it.
+    const passthrough = isAlreadyTargetLanguage(pending, {
+      source: this.source,
+      target: this.target,
+    }, codeSwitch);
+
     const lane = this.options.provisional;
-    const laneReady = !!lane && lane.isReady();
+    const laneReady = !passthrough && !!lane && lane.isReady();
     const turn = createTurn({
       id: (this.turnCounter += 1),
       text: pending,
       stableAt,
       boundary: reason,
       continuesPrevious: this.lastBoundary !== null && this.lastBoundary !== "sentence",
-      provisional: laneReady ? "pending" : "off",
+      provisional: passthrough || laneReady ? "pending" : "off",
     });
     this.turns.push(turn);
     if (this.turns.length > MAX_TURN_RECORDS) this.turns.splice(0, this.turns.length - MAX_TURN_RECORDS);
@@ -576,6 +615,10 @@ export class InterpretationEngine {
     // cut it, and the unit restored by `restorePending` is the same open
     // thought the next call has to finish.
     this.lastBoundary = reason;
+
+    // Applied before the contextual request is even built, so the interpreter
+    // has the words on screen in the same tick the recogniser settled them.
+    if (passthrough) this.applyPassthrough(turn, pending);
 
     const provisionalWork = laneReady && lane ? this.runProvisional(lane, turn) : Promise.resolve();
     const contextualWork = this.scheduleContextual(turn);
@@ -648,12 +691,59 @@ export class InterpretationEngine {
     });
   }
 
+  /**
+   * Render a unit that was already spoken in the target language.
+   *
+   * The fast lane's whole job is to put *something usable* on screen before the
+   * cloud answers. When the speaker has just said an entire English sentence,
+   * the fastest correct rendering of it is the sentence — and it costs no
+   * model, no socket and no language pack, so it works on every browser rather
+   * than only on desktop Chrome.
+   *
+   * It goes in as a PROVISIONAL chunk, not a committed one, for the same reason
+   * every other fast-lane result does: the contextual lane may still tidy
+   * punctuation or fold it into the surrounding thought, and it is allowed to
+   * do that right up until the interpreter has probably said it.
+   */
+  private applyPassthrough(turn: LogicalTurn, text: string): void {
+    const now = this.elapsed();
+    const drafts = this.settleTerminology(
+      chunkTranslation(text).map((chunk) => ({ text: chunk, confidence: "high" as const })),
+    );
+    if (drafts.length === 0) {
+      settleProvisional(turn, "failed");
+      this.stats.provisionalFailed += 1;
+      return;
+    }
+    const { chunks, added } = insertTurnChunks(this.chunks, drafts, [turn.id], now, {
+      provisional: true,
+    });
+    this.chunks = trimChunks(chunks);
+    turn.provisionalAppliedAt = this.clock;
+    settleProvisional(turn, "applied");
+    this.stats.provisionalApplied += 1;
+    this.stats.provisionalPassthrough += 1;
+    this.options.onTurnTiming?.({
+      turnId: turn.id,
+      lane: "provisional",
+      stableAt: turn.stableAt,
+      safeAt: this.clock,
+      provider: PASSTHROUGH_PROVIDER,
+      model: PASSTHROUGH_MODEL,
+      hasSafe: added.length > 0,
+      hasAnticipated: false,
+    });
+  }
+
   // --- Lane B: contextual -----------------------------------------------------
 
   private scheduleContextual(turn: LogicalTurn): Promise<void> {
+    // Either the socket is busy, or turns are already waiting for it. The
+    // second case only became reachable once flushing stopped being gated on
+    // the cloud, and joining the queue is the whole point: a turn must never
+    // overtake the speech that came before it.
     if (this.cloudInFlight) {
       const { unit, dropped } = enqueueContextual(this.pendingUnit, turn);
-      this.pendingUnit = unit;
       turn.contextual = "queued";
       this.stats.coalescedTurns += 1;
       this.stats.maxPendingTurns = Math.max(this.stats.maxPendingTurns, unit.turns.length);
@@ -667,6 +757,7 @@ export class InterpretationEngine {
           this.pendingOriginAt = Math.min(this.pendingOriginAt ?? old.stableAt, old.stableAt);
         }
       }
+      this.pendingUnit = unit;
       return Promise.resolve();
     }
     return this.dispatchContextual({ turns: [turn] });

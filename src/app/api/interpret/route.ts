@@ -37,6 +37,7 @@ import {
 } from "@/lib/shared-telemetry";
 import { guardInferenceRoute, readCookie, SESSION_COOKIE } from "@/lib/guard";
 import { escalationDecision, escalationImproves } from "@/providers/llm/escalation";
+import { liveGatewayRecovery } from "@/providers/llm/live-recovery";
 import { createQualityProvider } from "@/providers/llm/factory";
 import { appEnv } from "@/lib/env";
 
@@ -51,6 +52,15 @@ export const dynamic = "force-dynamic";
  * validated.
  */
 const MAX_BODY_BYTES = 32 * 1024;
+
+/**
+ * Time held back from the cloud chain so the deterministic floor always fits.
+ *
+ * The floor answers in single-digit milliseconds, but the reserve is what stops
+ * the last cloud attempt from consuming the entire turn and leaving nothing for
+ * the answer that is guaranteed to arrive.
+ */
+const LOCAL_FLOOR_RESERVE_MS = 250;
 
 /**
  * Live Mode is a continuous workload, not a one-shot chat request. A provider
@@ -130,8 +140,16 @@ export async function POST(request: Request) {
       ? null
       : router.preferred(undefined, routingKey));
 
-  // No cloud candidate at all: answer locally without pretending otherwise.
-  if (!preferred || preferred === "local") {
+  // The gateway recovery route, when this deployment has one. It is reached
+  // only after the configured chain fails — but it must also be reachable when
+  // there is no configured chain at all, which is the exact shape of the
+  // "transcription works, interpretation never appears" report: a deployment
+  // whose only provider key ran out of free allowance, sitting on Vercel with a
+  // perfectly good OIDC token it never used for Live.
+  const recovery = liveGatewayRecovery();
+
+  // No cloud route of any kind: answer locally without pretending otherwise.
+  if ((!preferred || preferred === "local") && !recovery) {
     return respond({
       output: localOutput(),
       provider: "local",
@@ -143,11 +161,15 @@ export async function POST(request: Request) {
   }
 
   /* --- Context budgeting ------------------------------------------------ */
-  const caps = capabilitiesFor(preferred);
+  // With no configured provider the budget is judged against the deterministic
+  // floor's baseline, which is the conservative choice: the recovery route gets
+  // the smaller prompt rather than one sized for a provider that is not there.
+  const budgetAgainst: LlmProviderId = preferred ?? "local";
+  const caps = capabilitiesFor(budgetAgainst);
   const decision = chooseProfile({
     recommendedLiveTokens: caps.recommendedLiveContextTokens,
-    quotaPressure: router.pressureFor(preferred),
-    latencyP95Ms: telemetry.stage("provider_response", preferred).p95 || undefined,
+    quotaPressure: router.pressureFor(budgetAgainst),
+    latencyP95Ms: telemetry.stage("provider_response", budgetAgainst).p95 || undefined,
     lag: input.lag,
   });
 
@@ -171,7 +193,7 @@ export async function POST(request: Request) {
   recordLiveLatency({
     stage: "trigger_to_dispatch",
     ms: dispatchedAt - receivedAt,
-    provider: preferred,
+    provider: budgetAgainst,
   });
 
   const turnDeadline = turnBudgetFor(input.lag);
@@ -192,7 +214,16 @@ export async function POST(request: Request) {
         signal: turnController.signal,
       },
       {
-        deadlineMs: deadlineFor({ workflow: "live", lag: input.lag, provider: preferred }),
+        deadlineMs: deadlineFor({
+          workflow: "live",
+          lag: input.lag,
+          provider: preferred ?? undefined,
+        }),
+        // The whole turn, not one provider's slice of it. Without this a chain
+        // of three providers each allowed its own deadline answers twelve
+        // seconds late, which for simultaneous interpretation is the same thing
+        // as not answering — and costs three times the money to do it.
+        turnDeadlineMs: turnDeadline - LOCAL_FLOOR_RESERVE_MS,
         estimatedTokens: systemTokens + contextTokens + pendingTokens,
         validate: (response) => parseInterpreterOutput(response.text) !== null,
         // This preference outranks a sticky provider that is healthy for one
@@ -200,6 +231,7 @@ export async function POST(request: Request) {
         // remains available as fallback inside the router.
         prefer: livePreference,
         routingKey,
+        recovery: recovery ?? undefined,
       },
     );
 
@@ -252,20 +284,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // Attribute the measurement to whatever actually answered. A recovery turn
+    // recorded against the provider that failed makes the diagnostics page
+    // report healthy latency for a provider that served nothing.
+    const servedBy = result.via ?? result.provider;
     recordLiveLatency({
       stage: "provider_response",
       ms: result.response.latencyMs,
-      provider: result.provider,
+      provider: servedBy,
       model: result.model,
     });
     recordLiveLatency({
       stage: "server_to_safe",
       ms: Date.now() - receivedAt,
-      provider: result.provider,
+      provider: servedBy,
       model: escalatedTo ?? result.model,
     });
     telemetry.recordTokens({
-      provider: result.provider,
+      provider: servedBy,
       systemTokens,
       contextTokens,
       pendingTokens,
@@ -277,7 +313,12 @@ export async function POST(request: Request) {
 
     return respond({
       output: finalOutput,
-      provider: result.provider,
+      // What actually served this turn. A recovery route is named, never
+      // attributed to a configured provider that did not answer — the console
+      // reads this to decide how much the English on screen is worth, and
+      // /diagnostics reads it to explain why the primary chain was bypassed.
+      provider: result.via ?? result.provider,
+      via: result.via,
       // The model that actually produced what is on screen. When escalation
       // replaced the answer, saying the primary model produced it would make
       // the diagnostics page lie about a mid-session model change.

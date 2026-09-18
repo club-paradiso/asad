@@ -65,6 +65,15 @@ stable Korean ─▶ turn N ─┬─▶ on-device English  ─▶ current chunk
                                                    ONLY while they are still current
 ```
 
+There is a third source of provisional English, and it costs nothing at all:
+a unit the speaker delivered **in the target language already** — a quotation, a
+title, an English aside. Translating English into English is slower and worse,
+so the fastest correct rendering of it is the sentence. It needs no model, no
+socket and no language pack, so unlike Chrome's translator it works in every
+browser, and it lands in the same tick the recogniser settled the words. It is
+still a *provisional* chunk: the contextual lane may tidy it right up until the
+interpreter has probably said it. See `docs/live-code-switching.md`.
+
 The temporal state machine is unchanged. A provisional chunk is a `current`
 chunk carrying `turnId` and `provisional`; it commits on the same dwell clock
 as any other chunk, and once committed it is as immutable as any other. A

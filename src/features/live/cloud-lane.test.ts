@@ -8,7 +8,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { InterpretRequest } from "@/lib/schema";
 import type { BrowserTranslatorSession } from "@/providers/llm/browser-translator";
 import { ClientLatencyQueue } from "./client-latency";
-import { createCloudLane, INTERPRET_RETRY_DELAYS_MS } from "./cloud-lane";
+import {
+  clientTurnBudgetMs,
+  createCloudLane,
+  INTERPRET_RETRY_DELAYS_MS,
+} from "./cloud-lane";
 import { SESSION_QUOTA_BYPASS_MS, TEMPORARY_RATE_LIMIT_BYPASS_MS } from "./cloud-degradation";
 
 const request: InterpretRequest = {
@@ -41,11 +45,19 @@ const quotaDead = () =>
     reason: "OpenRouter rate limit exceeded: free-models-per-day quota exhausted",
   });
 
-function lane(options: { translator?: boolean; responses: Array<() => Response> }) {
+function lane(options: {
+  translator?: boolean;
+  responses: Array<() => Response>;
+  /** Wall-clock the mocked transport burns on every attempt. */
+  elapsePerCall?: number;
+}) {
   let now = 1_000_000;
   const fetchImpl = vi.fn(async () => {
     const next = options.responses.shift();
     if (!next) throw new Error("unexpected fetch");
+    // Responses may move the clock, which is how the turn-budget rules are
+    // exercised without real timers.
+    now += options.elapsePerCall ?? 0;
     return next();
   });
   const translate = vi.fn(async (input: string) => `EN(${input})`);
@@ -167,5 +179,78 @@ describe("cloud lane", () => {
     });
     await expect(l.interpret(request, controller.signal, turn(false))).rejects.toThrow();
     expect(l.translate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The turn budget.
+ *
+ * Three attempts, each able to burn a full server turn, was roughly seventeen
+ * seconds of one sentence — and the fetch itself had no deadline at all, so a
+ * connection that opened and then stalled held this lane open indefinitely and
+ * nothing else dispatched behind it.
+ */
+describe("the turn budget", () => {
+  const serverError = () => new Response("", { status: 503 });
+
+  it("stops retrying once the answer could no longer be read in time", async () => {
+    const l = lane({
+      responses: Array.from({ length: INTERPRET_RETRY_DELAYS_MS.length }, () => serverError),
+      // Each attempt eats most of this turn, leaving no room for a third.
+      elapsePerCall: clientTurnBudgetMs(request.lag) * 0.45,
+    });
+    const result = await l.interpret(request, new AbortController().signal, turn(false));
+    expect(result.provider).toBe("browser-on-device");
+    // One retry, not two: after the second attempt there is no useful budget
+    // left, so the lane takes what it can get rather than spending the rest of
+    // the turn proving the server is still broken.
+    expect(l.fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("still uses its full ladder when attempts are cheap", async () => {
+    const l = lane({
+      responses: Array.from({ length: INTERPRET_RETRY_DELAYS_MS.length }, () => serverError),
+      elapsePerCall: 50,
+    });
+    await l.interpret(request, new AbortController().signal, turn(false));
+    expect(l.fetchImpl).toHaveBeenCalledTimes(INTERPRET_RETRY_DELAYS_MS.length);
+  });
+
+  it("falls back rather than waiting out a transport that never answers", async () => {
+    // A stalled connection: the request is accepted and then nothing happens
+    // until something aborts it. Before the deadline existed nothing did, so
+    // the contextual lane stayed occupied for the rest of the session and the
+    // console simply stopped producing English.
+    vi.useFakeTimers();
+    try {
+      const translate = vi.fn(async (input: string) => `EN(${input})`);
+      const stalled = createCloudLane({
+        fetchImpl: (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              const error = new Error("aborted");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }),
+        browserTranslator: () => ({ translate, destroy() {} }),
+        local: () => ({ safeChunks: [{ text: "[local]", confidence: "low" }], confidence: "low" }),
+        telemetry: new ClientLatencyQueue("t"),
+      });
+
+      const pending = stalled.interpret(request, new AbortController().signal, turn(false));
+      await vi.advanceTimersByTimeAsync(clientTurnBudgetMs(request.lag) + 10);
+      const result = await pending;
+
+      expect(result.provider).toBe("browser-on-device");
+      expect(result.reason).toContain("did not answer inside this turn");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives a safer lag profile a longer budget than a faster one", () => {
+    expect(clientTurnBudgetMs("safe")).toBeGreaterThan(clientTurnBudgetMs("balanced"));
+    expect(clientTurnBudgetMs("balanced")).toBeGreaterThan(clientTurnBudgetMs("fast"));
   });
 });

@@ -23,14 +23,43 @@ const flag = (name, fallback) => {
 const minutes = Number(flag("minutes", "10"));
 const lag = flag("lag", "balanced");
 const forceProfile = flag("profile");
+/**
+ * Hold each answer for a simulated cloud round trip, with NO on-device fast
+ * lane — which is what Safari, Firefox and every phone actually run.
+ *
+ * Without this the harness answers in under a millisecond, so it measures
+ * engine overhead and nothing else: the one number it cannot show is what a
+ * real provider's latency does to the pipeline around it. The delays below are
+ * a stated simulation, not a measurement of any vendor.
+ */
+const simulateCloud = args.includes("--simulate-cloud");
+const cloudMin = Number(flag("cloud-min", "400"));
+const cloudMax = Number(flag("cloud-max", "3200"));
 
 console.log(`\ntong-yuck live pipeline benchmark`);
-console.log(`Simulating ${minutes} minutes of Korean speech at lag=${lag}\n`);
+console.log(`Simulating ${minutes} minutes of Korean speech at lag=${lag}`);
+if (simulateCloud) {
+  console.log(
+    `Cloud-first path: simulated provider latency ${cloudMin}–${cloudMax}ms, no on-device fast lane`,
+  );
+}
+console.log("");
 
 const result = await runLiveBenchmark({
   minutes,
   lag,
   forceProfile,
+  twoLane: simulateCloud
+    ? {
+        provisional: "off",
+        provisionalDelayMs: 0,
+        cloudDelayMs: { min: cloudMin, max: cloudMax },
+        spikeRate: 0.06,
+        spikeMs: 5_000,
+        cloudFailureRate: 0.03,
+        seed: 20260918,
+      }
+    : undefined,
   onProgress: (m) => console.log(m),
 });
 
@@ -66,9 +95,19 @@ console.log(`    peak context tokens  ${result.bounds.peakContextTokens}`);
 console.log(`    max concurrent calls ${result.bounds.maxInFlight}`);
 console.log("");
 
+if (result.twoLane) {
+  const pct = (p) =>
+    `p50 ${Math.round(p.p50)}ms · p90 ${Math.round(p.p90)}ms · p95 ${Math.round(p.p95)}ms · max ${Math.round(p.max)}ms (n=${p.count})`;
+  console.log(`  cloud-first path (simulated)`);
+  console.log(`    stable → interpretation  ${pct(result.twoLane.stableToContextual)}`);
+  console.log(`    turns / coalesced        ${result.twoLane.lanes.turns} / ${result.twoLane.lanes.coalescedTurns}`);
+  console.log(`    uncovered source beats   ${result.twoLane.uncoveredKorean}`);
+  console.log("");
+}
+
 const dir = join(process.cwd(), "benchmarks", "results");
 mkdirSync(dir, { recursive: true });
-const name = `live-${minutes}min-${lag}`;
+const name = simulateCloud ? `live-cloud-${minutes}min-${lag}` : `live-${minutes}min-${lag}`;
 writeFileSync(join(dir, `${name}.json`), JSON.stringify(result, null, 2));
 console.log(`Wrote benchmarks/results/${name}.json`);
 

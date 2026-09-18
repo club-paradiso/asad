@@ -332,6 +332,88 @@ export const LANGUAGES: LanguageDefinition[] = [
 ];
 
 /* --------------------------------------------------------------------------
+ * Code-switching
+ * ------------------------------------------------------------------------ */
+
+/**
+ * How well a recogniser family keeps a SECOND language intact inside a stream
+ * whose declared language is the first.
+ *
+ * This is a different question from `SttFidelity`, which asks how well a
+ * provider serves ONE language. A real speaker says "오늘 살펴볼 개념은 social
+ * capital입니다", and what happens to those two English words depends entirely
+ * on how the decoder was built:
+ *
+ *   inherent    the model is multilingual by construction and the language tag
+ *               only BIASES it. The Whisper family works this way: ask for
+ *               Korean and an embedded English phrase still comes back as
+ *               English. This is the best case and needs no extra parameter.
+ *   multi-model the provider has a dedicated multilingual model reached by its
+ *               own language code. Deepgram's `language=multi` is this — and it
+ *               is worth stating plainly that KOREAN IS NOT IN THAT SET, so the
+ *               product's primary pair cannot use it.
+ *   none        monolingual decoding. A foreign span is forced through this
+ *               language's phonology and comes back as an invented native-script
+ *               approximation. The browser recogniser is here.
+ *
+ * Declared, never discovered — same principle as `SttFidelity`. Sending
+ * `language=multi` to find out whether Korean is supported is a socket that
+ * gets refused mid-service.
+ */
+export type CodeSwitchSupport = "inherent" | "multi-model" | "none";
+
+/**
+ * The languages Deepgram's multilingual code-switching model covers.
+ *
+ * Verified against Deepgram's published Nova-3 multilingual coverage
+ * (2026-09): ten languages, and Korean is not one of them. Korean remains a
+ * strong MONOLINGUAL Nova-3 model, which is why the product still routes
+ * Korean sessions to `ko` and leans on keyterm prompting instead.
+ *
+ * Kept as bases rather than tags because the multilingual model selects a
+ * language, not a region.
+ */
+const DEEPGRAM_CODE_SWITCH_BASES: ReadonlySet<string> = new Set([
+  "en", "es", "fr", "de", "hi", "ru", "pt", "ja", "it", "nl",
+]);
+
+/** The code Deepgram's multilingual model is reached by. */
+const DEEPGRAM_MULTILINGUAL_CODE = "multi";
+
+/**
+ * Whether Deepgram can decode this language as part of a code-switched stream.
+ *
+ * Both halves matter: the language must be in the multilingual model AND be one
+ * Deepgram serves at all, so a language the registry does not route to Deepgram
+ * cannot accidentally claim multilingual coverage.
+ */
+export function deepgramCodeSwitches(code: string): boolean {
+  const definition = findLanguage(code);
+  return !!definition?.stt.deepgram && DEEPGRAM_CODE_SWITCH_BASES.has(definition.base);
+}
+
+/**
+ * The language code a Deepgram stream should declare for this pair.
+ *
+ * `multi` only when Deepgram genuinely covers BOTH sides — otherwise the
+ * session's own language, which is what it has always sent. Returning null
+ * means Deepgram cannot serve the source language at all, exactly as
+ * `deepgramLanguage` already reported.
+ */
+export function deepgramStreamLanguage(
+  source: string | undefined,
+  guest?: string,
+): string | null {
+  const primary = findLanguage(source ?? "")?.stt.deepgram?.code ?? null;
+  if (!primary) return null;
+  if (!guest) return primary;
+  if (findLanguage(source ?? "")?.base === findLanguage(guest)?.base) return primary;
+  return deepgramCodeSwitches(source ?? "") && deepgramCodeSwitches(guest)
+    ? DEEPGRAM_MULTILINGUAL_CODE
+    : primary;
+}
+
+/* --------------------------------------------------------------------------
  * Lookup
  * ------------------------------------------------------------------------ */
 

@@ -47,6 +47,16 @@ Two properties are load-bearing:
 send anyway. No extra call is ever made to decide the context, and
 `context-and-terminology.test.ts` asserts the call count.
 
+**Every textual family reads the same window.** Structure and terminology were
+originally lifetime counters while discourse read a rolling 1,200 characters,
+and that asymmetry had a specific victim: an academic keynote that opens with a
+prayer. Three resolved Scripture references anywhere in seventy minutes pinned
+the maximum +9 on worship permanently, the incumbency rule then held it there,
+and the session stayed a worship service for an hour on the strength of a
+reading that ended in the first minute. Evidence now ages out of all the textual
+families together, because context is a property of what is being said *now*.
+See `docs/live-code-switching.md` §4.
+
 **Automatic resolution never invalidates work.** A USER override changes the
 contract every in-flight request was built on, so it aborts and restores them.
 A gradual refinement does not: throwing away a request that is about to answer,

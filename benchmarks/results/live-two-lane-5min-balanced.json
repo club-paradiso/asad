@@ -25,13 +25,13 @@
   "tokens": {
     "perCall": {
       "count": 53,
-      "p50": 844,
-      "p90": 924,
-      "p95": 935,
-      "max": 946,
-      "mean": 854
+      "p50": 863,
+      "p90": 943,
+      "p95": 955,
+      "max": 966,
+      "mean": 874
     },
-    "sessionTotal": 45267,
+    "sessionTotal": 46314,
     "profileCounts": {
       "ultra-compact": 53
     }
@@ -44,7 +44,7 @@
   "bounds": {
     "finalChunks": 107,
     "finalSegments": 55,
-    "peakContextTokens": 946,
+    "peakContextTokens": 966,
     "maxInFlight": 1
   },
   "slo": {
@@ -107,7 +107,10 @@
       "coalesceOverflowDrops": 0,
       "maxPendingTurns": 2,
       "maxCloudInFlight": 1,
-      "maxProvisionalInFlight": 1
+      "maxProvisionalInFlight": 1,
+      "terminologyFixes": 3,
+      "codeSwitchedTurns": 0,
+      "provisionalPassthrough": 0
     },
     "cloudFailuresInjected": 1,
     "translatorFailuresInjected": 1,

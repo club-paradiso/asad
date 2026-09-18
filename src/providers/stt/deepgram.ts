@@ -10,7 +10,7 @@
  * short-lived key server-side and this provider receives only that.
  */
 import { SocketSpeechProvider } from "./socket";
-import { deepgramLanguage } from "./language";
+import { deepgramSessionLanguage } from "./language";
 import type { SttProviderId, SttProviderOptions } from "./types";
 
 interface DeepgramAlternative {
@@ -36,7 +36,11 @@ export class DeepgramSpeechProvider extends SocketSpeechProvider {
       throw new Error("No Deepgram token — check STT configuration on the server.");
     }
 
-    const language = deepgramLanguage(this.options.language);
+    // The DOMINANT language, or Deepgram's multilingual model when it genuinely
+    // covers both sides of this session. The registry decides; sending `multi`
+    // for a pair Deepgram does not cover there would be a socket refused
+    // mid-service rather than a feature.
+    const language = deepgramSessionLanguage(this.options.language, this.options.guestLanguage);
     if (!language) {
       throw new Error(
         `Deepgram does not support the requested Counter language: ${this.options.language ?? "unknown"}`,
@@ -74,7 +78,11 @@ export class DeepgramSpeechProvider extends SocketSpeechProvider {
         : {}),
     });
 
-    // Terminology hints from the prep sheet materially help proper nouns.
+    // Terminology hints from the prep sheet materially help proper nouns — and
+    // they are the ONLY lever a monolingual Korean stream has against an
+    // English technical term, because Deepgram's multilingual model does not
+    // cover Korean. Keyterm prompting works for monolingual and multilingual
+    // Nova-3 alike, so the same list is sent either way.
     for (const hint of (this.options.hints ?? []).slice(0, 50)) {
       if (hint.trim()) params.append("keyterm", hint.trim());
     }

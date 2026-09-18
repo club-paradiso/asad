@@ -5,7 +5,7 @@
  * a recurring cost on every interpretation call, so the production hot-path
  * size must be directly measurable rather than inferred from source length.
  */
-import { systemPromptFor } from "../src/interpreter/prompts/live.ts";
+import { buildLiveUserPrompt, systemPromptFor } from "../src/interpreter/prompts/live.ts";
 import { CORE_CONTRACT } from "../src/interpreter/prompts/shared.ts";
 import { RESOLVED_CONTEXTS } from "../src/interpreter/context/context-mode.ts";
 import { estimateTokens } from "../src/lib/telemetry.ts";
@@ -55,5 +55,53 @@ for (const [source, target] of [
       ).padStart(7)}`,
     );
   }
+}
+
+/**
+ * What a code-switched turn costs on top of a monolingual one.
+ *
+ * The steer that tells the model to carry English spans through unchanged is
+ * emitted only when there ARE English spans, so an ordinary Korean sermon pays
+ * nothing for it. That claim is worth measuring rather than asserting: the live
+ * path dispatches ~11 times a minute for the length of a service.
+ */
+const emptyHistory = {
+  recentKorean: [],
+  recentEnglish: [],
+  glossary: [],
+  entities: [],
+  scripture: [],
+  corrections: [],
+};
+const turn = (pending) =>
+  buildLiveUserPrompt({
+    context: "lecture",
+    source: "ko-KR",
+    target: "en-US",
+    lag: "balanced",
+    pending,
+    history: emptyHistory,
+    continuesPrevious: false,
+    allowAnticipation: false,
+  });
+
+console.log("\nPer-turn user prompt, by what the speaker actually said\n");
+console.log("  kind                     chars   ~tokens");
+const SAMPLES = [
+  ["monolingual Korean", "오늘 우리가 함께 살펴볼 내용을 정리하겠습니다."],
+  ["Korean + English noun", "이번 quarter의 conversion rate가 낮습니다."],
+  ["Korean + technical phrase", "오늘은 retrieval augmented generation, 그러니까 RAG 구조를 보겠습니다."],
+  ["a quoted English sentence", "I don't think this is going to work."],
+];
+let monolingual = 0;
+for (const [label, pending] of SAMPLES) {
+  const prompt = turn(pending);
+  const tokens = estimateTokens(prompt);
+  if (!monolingual) monolingual = tokens;
+  const delta = tokens - monolingual;
+  console.log(
+    `  ${label.padEnd(24)} ${String(prompt.length).padStart(5)}   ${String(tokens).padStart(7)}` +
+      (delta ? `   (+${delta} vs monolingual)` : "   (baseline)"),
+  );
 }
 console.log("");

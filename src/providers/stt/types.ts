@@ -37,8 +37,18 @@ export interface SpeechProvider {
 }
 
 export interface SttProviderOptions {
-  /** BCP-47 language tag; Korean throughout the MVP. */
+  /** BCP-47 tag of the language the speaker is expected to speak. */
   language?: string;
+  /**
+   * The OTHER language this stream is expected to carry.
+   *
+   * A session tag is a statement about the DOMINANT language, never a promise
+   * that every token belongs to it: a Korean speaker says "conversion rate" and
+   * "Putnam" without switching sessions. Recognisers that can decode a second
+   * language want to be told which one; recognisers that cannot are unaffected,
+   * because the registry decides what each of them is actually sent.
+   */
+  guestLanguage?: string;
   /**
    * Stop after one natural utterance instead of continuously restarting.
    * Counter Mode uses this while Live Mode keeps the continuous default.

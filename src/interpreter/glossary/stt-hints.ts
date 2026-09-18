@@ -1,4 +1,5 @@
 import type { PrepSheet, ResolvedContext } from "@/types";
+import { guestTermsIn } from "@/lib/code-switch";
 import { isWorshipContext } from "../context/context-mode";
 import { THEOLOGICAL_LEXICON } from "./lexicon";
 import { matchGlossary } from "./matcher";
@@ -53,11 +54,28 @@ const WORSHIP_BASELINE = [
  * This is intentionally not "send all 447 terms". Recognition hints bias the
  * acoustic model; irrelevant hints can make recognition worse, not better.
  */
+export interface SttHintOptions {
+  limit?: number;
+  /**
+   * Whether the guest language's own forms belong in the recogniser vocabulary.
+   *
+   * They do whenever a session is interpreting BETWEEN two languages, which is
+   * every live session: the speaker will say "Putnam", "conversion rate" and
+   * "RAG" in the middle of Korean sentences, and a keyterm list containing only
+   * Korean gives the recogniser no reason to believe it heard English. Counter
+   * Mode passes false for a one-language turn.
+   */
+  includeGuestForms?: boolean;
+}
+
 export function buildSttHints(
   context: ResolvedContext,
   prep: PrepSheet | undefined,
-  limit = STT_HINT_LIMIT,
+  options: SttHintOptions | number = {},
 ): string[] {
+  const settings: SttHintOptions = typeof options === "number" ? { limit: options } : options;
+  const limit = settings.limit ?? STT_HINT_LIMIT;
+  const includeGuestForms = settings.includeGuestForms ?? false;
   const out: string[] = [];
   const seen = new Set<string>();
 
@@ -71,6 +89,19 @@ export function buildSttHints(
   add(prep?.speaker);
   for (const entity of prep?.entities ?? []) add(entity.korean);
   for (const item of prep?.glossary ?? []) add(item.korean);
+
+  // The SAME terms in the guest language.
+  //
+  // A recogniser hint list biases what the acoustic model is willing to hear.
+  // Listing 사회적 자본 and not "social capital" tells it, in effect, that
+  // English is not expected — which is exactly wrong for a speaker who says
+  // both in one sentence. These are terms the interpreter already wrote down,
+  // so they cost nothing to collect and are the highest-value English the
+  // session has.
+  if (includeGuestForms) {
+    for (const entity of prep?.entities ?? []) add(entity.english);
+    for (const item of prep?.glossary ?? []) add(item.english);
+  }
 
   const prepCorpus = [
     prep?.title,
@@ -87,6 +118,16 @@ export function buildSttHints(
     // but only terms present in today's prep material earn recogniser budget.
     for (const match of matchGlossary(prepCorpus, context, prep?.glossary ?? [])) {
       add(match.korean);
+    }
+  }
+
+  // Latin-script terms the interpreter typed into today's material — product
+  // names, acronyms, foreign names, anything that will be said aloud in the
+  // guest language. Deterministic, already on the prep sheet, and the one place
+  // a session's real English vocabulary is written down before it is spoken.
+  if (includeGuestForms && prepCorpus) {
+    for (const term of guestTermsIn(prepCorpus, limit)) {
+      if (term.length >= 3) add(term);
     }
   }
 

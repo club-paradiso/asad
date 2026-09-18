@@ -205,6 +205,14 @@ export const CONTEXT_SWITCH_MARGIN = 3;
 export const CONTEXT_MIN_SCORE = 4;
 /** Added to the floor while the session has barely started. */
 export const CONTEXT_WARMUP_MARGIN = 2;
+/**
+ * Upper bound on the number of windowed observations kept.
+ *
+ * At the measured ~11 turns a minute the character window holds roughly thirty
+ * of them; this only exists so an observation carrying structural hits and no
+ * text of its own cannot accumulate without bound over a 70-minute service.
+ */
+export const MAX_WINDOW_SIGNALS = 64;
 
 export interface ContextState {
   /** What the user asked for. */
@@ -236,13 +244,34 @@ export interface ContextObservation {
  * Stateful on purpose: context is a property of the session, not of a
  * sentence, and the incumbency rule needs somewhere to live.
  */
+/**
+ * One observation's contribution to the rolling window.
+ *
+ * The structure and terminology families used to be LIFETIME counters while the
+ * discourse family read a 1,200-character window, and that asymmetry was a bug
+ * with a specific victim: an academic keynote that opens with a prayer or quotes
+ * a verse in passing. Three resolved references anywhere in seventy minutes
+ * pinned +9 on worship for the whole session, the incumbency rule then held
+ * worship in place, and the lecture never came back — from evidence that had
+ * scrolled off the screen forty minutes earlier.
+ *
+ * Context is a property of what is being said NOW. Every textual family now
+ * reads the same stretch of speech, so evidence ages out of all of them
+ * together.
+ */
+interface WindowedSignal {
+  chars: number;
+  scripture: number;
+  worshipTerms: number;
+}
+
 export class ContextResolver {
   private mode: ContextMode;
   private prep: PrepSheet | undefined;
   private window = "";
   private observed = 0;
-  private scripture = 0;
-  private worshipTerms = 0;
+  private signals: WindowedSignal[] = [];
+  private windowChars = 0;
   private modelVotes: Partial<Record<ResolvedContext, number>> = {};
   private inferred: ResolvedContext = "generic";
   private confidenceValue = 0;
@@ -272,18 +301,49 @@ export class ContextResolver {
   observe(observation: ContextObservation): boolean {
     const before = this.state().resolved;
 
-    if (observation.text?.trim()) {
-      this.window = `${this.window} ${observation.text.trim()}`.slice(-CONTEXT_WINDOW_CHARS);
-      this.observed += observation.text.trim().length;
+    const text = observation.text?.trim() ?? "";
+    if (text) {
+      this.window = `${this.window} ${text}`.slice(-CONTEXT_WINDOW_CHARS);
+      this.observed += text.length;
     }
-    this.scripture += observation.scriptureHits ?? 0;
-    this.worshipTerms += observation.worshipTermHits ?? 0;
+    const scripture = observation.scriptureHits ?? 0;
+    const worshipTerms = observation.worshipTermHits ?? 0;
+    if (text || scripture || worshipTerms) {
+      this.signals.push({ chars: text.length, scripture, worshipTerms });
+      this.windowChars += text.length;
+      this.trimSignals();
+    }
     if (observation.modelHint) {
       this.modelVotes[observation.modelHint] = (this.modelVotes[observation.modelHint] ?? 0) + 1;
     }
 
     this.recompute();
     return this.state().resolved !== before;
+  }
+
+  /**
+   * Drop observations that have scrolled out of the window the discourse family
+   * reads, so every textual signal ages at the same rate.
+   */
+  private trimSignals(): void {
+    while (
+      this.signals.length > 1 &&
+      (this.windowChars > CONTEXT_WINDOW_CHARS || this.signals.length > MAX_WINDOW_SIGNALS)
+    ) {
+      this.windowChars -= this.signals.shift()?.chars ?? 0;
+    }
+  }
+
+  /** Structure and terminology evidence inside the current window. */
+  private windowedSignals(): WindowedSignal {
+    return this.signals.reduce<WindowedSignal>(
+      (total, signal) => ({
+        chars: total.chars + signal.chars,
+        scripture: total.scripture + signal.scripture,
+        worshipTerms: total.worshipTerms + signal.worshipTerms,
+      }),
+      { chars: 0, scripture: 0, worshipTerms: 0 },
+    );
   }
 
   private recompute(): void {
@@ -296,11 +356,14 @@ export class ContextResolver {
     }
 
     // Structure: Scripture references are the strongest single worship signal
-    // and the only one that cannot be produced by vocabulary alone.
-    scores.worship += Math.min(9, this.scripture * 3);
+    // and the only one that cannot be produced by vocabulary alone. Read over
+    // the same window as everything else, so a verse quoted in a lecture stops
+    // counting once the lecture has moved on from it.
+    const recent = this.windowedSignals();
+    scores.worship += Math.min(9, recent.scripture * 3);
     // Terminology: density rather than count, so a long session does not drift
     // into worship merely by running long.
-    const per1k = this.observed > 0 ? (this.worshipTerms * 1000) / this.observed : 0;
+    const per1k = recent.chars > 0 ? (recent.worshipTerms * 1000) / recent.chars : 0;
     scores.worship += Math.min(5, per1k);
 
     // The model's read. Weighted highest of the textual families because it is

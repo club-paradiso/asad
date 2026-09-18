@@ -193,7 +193,12 @@ export class WebSpeechProvider extends BaseSpeechProvider {
           // the English the interpreter is reading. Forty minutes in, every
           // recogniser event re-ranked forty minutes of settled transcript.
           if (result.isFinal && i < event.resultIndex) continue;
-          const text = pickSpeechAlternative(alternativesFor(result), this.options.language);
+          const text = pickSpeechAlternative(alternativesFor(result), this.options.language, {
+            // The session's own terminology breaks ties between hypotheses the
+            // browser rated equally. It is the only signal available here that
+            // knows this speaker is about to say "RAG" rather than "라그".
+            hints: this.options.hints,
+          });
           if (!text) continue;
           hasResult = true;
           if (result.isFinal) {
