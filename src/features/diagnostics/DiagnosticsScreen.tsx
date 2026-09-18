@@ -94,6 +94,10 @@ interface ProviderRow {
   breakerState: string;
   consecutiveFailures: number;
   lastFailureKind?: string;
+  authFailures: number;
+  awaitingAuthConfirmation: boolean;
+  permanentlyDisabled: boolean;
+  retryAt: number | null;
   quota: {
     free?: { requestsPerMinute?: number; tokensPerMinute?: number; requestsPerDay?: number };
     viableForLiveSermon?: boolean;
@@ -122,6 +126,7 @@ interface Payload {
     keyConfigured: boolean | null;
     ephemeralKeysAvailable: boolean | null;
     model: string;
+    codeSwitching: { defaultPair: string; support: string; detail: string };
   };
   llm: {
     routingMode: string;
@@ -130,6 +135,15 @@ interface Payload {
     active: string | null;
     chain: string[];
     warnings: string[];
+    recovery: {
+      route: string;
+      configured: boolean;
+      blockedByPrivacyMode: boolean;
+      model: string | null;
+      credential: string | null;
+      privacy: string;
+      served: number;
+    };
     providers: ProviderRow[];
     openrouter: OpenRouterConfigRow;
   };
@@ -364,6 +378,30 @@ export function DiagnosticsScreen() {
           tone={data.llm.active && data.llm.active !== "local" ? "ok" : "warn"}
         />
         <Row k="Live fallback chain" v={<code className="text-xs">{data.llm.chain.join(" → ")}</code>} />
+        {/* The answer to "was there anything else to try?" when Live goes
+            quiet. Before this route existed for Live, the answer was no. */}
+        <Row
+          k="Cloud recovery route"
+          v={
+            data.llm.recovery.configured ? (
+              <>
+                <code className="text-xs">{data.llm.recovery.route}</code>
+                {" · "}
+                <code className="text-xs">{data.llm.recovery.model}</code>
+                {` · via ${data.llm.recovery.credential}`}
+                {data.llm.recovery.served > 0 ? ` · served ${data.llm.recovery.served} turn(s)` : ""}
+              </>
+            ) : data.llm.recovery.blockedByPrivacyMode ? (
+              "a gateway credential is present but strict privacy mode ignores an ambient host token — set AI_GATEWAY_API_KEY to opt in deliberately"
+            ) : (
+              "not configured — a total provider failure ends at the local interpreter"
+            )
+          }
+          tone={data.llm.recovery.configured ? "ok" : "warn"}
+        />
+        {data.llm.recovery.configured && (
+          <Row k="Recovery privacy" v={data.llm.recovery.privacy} tone="ok" />
+        )}
       </Section>
 
       {data.llm.warnings.length > 0 && (
@@ -542,6 +580,23 @@ export function DiagnosticsScreen() {
                 <p className="mt-1.5 text-xs text-[var(--warn)]">{p.ineligibleReason}</p>
               )}
 
+              {/* "Wrong key" and "something returned 403 once" look identical
+                  from the console and need opposite responses, so say which. */}
+              {p.permanentlyDisabled && (
+                <p className="mt-1.5 text-xs text-[var(--danger)]">
+                  Disabled for this process after {p.authFailures} confirmed{" "}
+                  {p.lastFailureKind ?? "configuration"} failures. Fix the configuration and
+                  redeploy.
+                </p>
+              )}
+              {p.awaitingAuthConfirmation && (
+                <p className="mt-1.5 text-xs text-[var(--warn)]">
+                  One {p.lastFailureKind ?? "auth"} failure seen — cooling down, then one probe
+                  decides whether this is a bad credential or a blip.
+                  {p.retryAt ? ` Next attempt at ${new Date(p.retryAt).toLocaleTimeString()}.` : ""}
+                </p>
+              )}
+
               {p.configured && (
                 <div className="mt-2 grid gap-x-6 gap-y-0.5 text-xs text-[var(--fg-dim)] sm:grid-cols-2">
                   <span>
@@ -659,6 +714,11 @@ export function DiagnosticsScreen() {
             tone={data.stt.ephemeralKeysAvailable ? "ok" : "bad"}
           />
         )}
+        <Row
+          k={`Mixed speech (${data.stt.codeSwitching.defaultPair})`}
+          v={`${data.stt.codeSwitching.support} — ${data.stt.codeSwitching.detail}`}
+          tone={data.stt.codeSwitching.support === "none" ? "warn" : "ok"}
+        />
       </Section>
 
       <Section title="Counter Mode">

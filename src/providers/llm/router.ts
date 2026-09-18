@@ -44,7 +44,8 @@ export const OPEN_WEIGHT: ProviderFilter = (id, model) =>
   id !== "local" && isOpenWeightModel(model);
 
 export interface RouteAttempt {
-  provider: LlmProviderId;
+  /** A configured provider, or a recovery route's label. */
+  provider: LlmProviderId | string;
   model: string;
   ok: boolean;
   latencyMs: number;
@@ -52,16 +53,54 @@ export interface RouteAttempt {
   message?: string;
 }
 
+/**
+ * A last cloud route tried after every configured provider has failed, and
+ * before the deterministic floor.
+ *
+ * Deliberately NOT a provider: it has no API key in the environment, no circuit
+ * breaker, no quota tracker and no place in the preference order. It is an
+ * escape hatch that exists because a deployment's configured providers can all
+ * be unreachable at once — an exhausted free allowance, a bad key, an egress
+ * failure — and the alternative is a console that goes silent while the
+ * recogniser keeps working perfectly.
+ *
+ * Injected rather than imported so the router stays free of `server-only`
+ * modules and so the rules can be tested without a network.
+ */
+export interface RouteRecovery {
+  /** Stable label for telemetry and diagnostics. Never a credential. */
+  id: string;
+  /** Whether the route is configured at all. Cheap and synchronous. */
+  available: () => boolean;
+  complete: (request: LlmRequest, options: { timeoutMs: number }) => Promise<LlmResponse>;
+}
+
 export interface RouteResult {
   response: LlmResponse;
   provider: LlmProviderId;
   model: string;
+  /**
+   * Set when a recovery route answered rather than a configured provider. The
+   * caller reports THIS as the provider, because saying `openrouter` when the
+   * gateway answered would make the diagnostics page lie.
+   */
+  via?: string;
   /** Every provider tried this turn, in order. */
   attempts: RouteAttempt[];
   /** True when the answer came from anything other than the preferred provider. */
   degraded: boolean;
   reason?: string;
 }
+
+/**
+ * The smallest cloud attempt worth starting.
+ *
+ * Below this a request cannot realistically return before the turn's answer
+ * stops being useful, so starting it spends money and latency to produce
+ * something the interpreter will never read. Walking on to the deterministic
+ * floor immediately is strictly better.
+ */
+export const MIN_USEFUL_ATTEMPT_MS = 700;
 
 export interface ProviderHealth {
   provider: LlmProviderId;
@@ -280,14 +319,46 @@ export class LlmRouter {
       prefer?: ProviderFilter;
       /** Session/workflow identity for provider affinity. Omit for one-shot work. */
       routingKey?: string;
+      /**
+       * Wall-clock budget for the WHOLE chain, not per provider.
+       *
+       * Without it, a chain of three providers each allowed a 3.5 second
+       * deadline answers in twelve seconds — which for simultaneous
+       * interpretation is indistinguishable from not answering. With it, each
+       * attempt gets whatever is actually left, and an attempt that cannot land
+       * in time is skipped rather than started.
+       */
+      turnDeadlineMs?: number;
+      /** Smallest attempt worth starting. Defaults to `MIN_USEFUL_ATTEMPT_MS`. */
+      minAttemptMs?: number;
+      /** Tried after every configured provider fails, before the local floor. */
+      recovery?: RouteRecovery;
     },
   ): Promise<RouteResult> {
     const attempts: RouteAttempt[] = [];
-    const chain = this.buildChain(options.prefer, options.routingKey);
+    const startedAt = this.now();
+    const minAttempt = options.minAttemptMs ?? MIN_USEFUL_ATTEMPT_MS;
+    const cloud = this.buildChain(options.prefer, options.routingKey).filter(
+      (id) => id !== "local",
+    );
 
-    for (const id of chain) {
+    /** What is left of the turn, or null when the caller set no budget. */
+    const remaining = (): number | null =>
+      options.turnDeadlineMs === undefined
+        ? null
+        : options.turnDeadlineMs - (this.now() - startedAt);
+
+    /** The deadline this attempt gets: the smaller of its own and what is left. */
+    const budgetFor = (base: number): number | null => {
+      const left = remaining();
+      if (left === null) return base;
+      if (left < minAttempt) return null;
+      return Math.min(base, left);
+    };
+
+    for (const id of cloud) {
       const eligibility = this.eligibility(id);
-      if (!eligibility.ok && id !== "local") {
+      if (!eligibility.ok) {
         attempts.push({
           provider: id,
           model: this.env.llm.providers[id].model,
@@ -302,11 +373,27 @@ export class LlmRouter {
       const provider = this.instanceFor(id);
       if (!provider) continue;
 
+      const budget = budgetFor(options.deadlineMs);
+      if (budget === null) {
+        // Out of turn. Say so as an attempt rather than silently skipping: the
+        // difference between "the provider failed" and "we never asked it"
+        // is the whole diagnosis when a session goes quiet.
+        attempts.push({
+          provider: id,
+          model: this.env.llm.providers[id].model,
+          ok: false,
+          latencyMs: 0,
+          failureKind: "deadline",
+          message: "no useful turn budget left",
+        });
+        continue;
+      }
+
       const breaker = this.breakerFor(id);
       const limiter = this.limiterFor(id);
       const started = this.now();
 
-      const timed = withDeadline(request, options.deadlineMs);
+      const timed = withDeadline(request, budget);
       try {
         const response = await provider.complete(timed.request);
 
@@ -323,13 +410,11 @@ export class LlmRouter {
         }
 
         breaker.recordSuccess();
-        // The local interpreter is the floor, never a preference. Making it
-        // sticky would mean one cloud failure silently ends cloud
-        // interpretation for the rest of the session, including after the
-        // provider recovers.
-        if (id !== "local" && options.routingKey) {
-          this.setSticky(options.routingKey, id);
-        }
+        // Stickiness is for CLOUD providers only, and the loop now carries none
+        // but those. The local interpreter must never become sticky: one cloud
+        // failure would then silently end cloud interpretation for the rest of
+        // the session, including long after the provider recovered.
+        if (options.routingKey) this.setSticky(options.routingKey, id);
         attempts.push({
           provider: id,
           model: response.model ?? provider.model,
@@ -342,7 +427,7 @@ export class LlmRouter {
           provider: id,
           model: response.model ?? provider.model,
           attempts,
-          degraded: id === "local" || attempts.length > 1,
+          degraded: attempts.length > 1,
           reason: attempts.length > 1 ? attempts[0].message : undefined,
         };
       } catch (error) {
@@ -376,11 +461,104 @@ export class LlmRouter {
       }
     }
 
-    // Unreachable in practice — `local` never throws — but the type demands it.
+    /* --- Recovery ------------------------------------------------------- */
+    // Every configured provider is unusable. That happens for reasons that have
+    // nothing to do with each other and everything to do with a bad day: a free
+    // allowance spent, a key rotated, egress blocked from one region. A second
+    // cloud route with its own credential path is the difference between "the
+    // model was slower than usual" and "the interpreter got nothing".
+    const recovery = options.recovery;
+    if (recovery?.available()) {
+      const budget = budgetFor(options.deadlineMs);
+      if (budget === null) {
+        attempts.push({
+          provider: recovery.id,
+          model: "recovery",
+          ok: false,
+          latencyMs: 0,
+          failureKind: "deadline",
+          message: "no useful turn budget left",
+        });
+      } else {
+        const started = this.now();
+        try {
+          const response = await recovery.complete(request, { timeoutMs: budget });
+          if (options.validate && !options.validate(response)) {
+            throw new LlmError(
+              `${recovery.id} returned output that failed schema validation.`,
+              "malformed_output",
+            );
+          }
+          attempts.push({
+            provider: recovery.id,
+            model: response.model ?? "recovery",
+            ok: true,
+            latencyMs: response.latencyMs,
+          });
+          return {
+            response,
+            // The chain's own answer to "whose configured provider was this?"
+            // remains honest: none of them. `via` carries what actually served
+            // the turn, and the caller reports that.
+            provider: "local",
+            via: recovery.id,
+            model: response.model ?? recovery.id,
+            attempts,
+            degraded: true,
+            reason: attempts[0]?.message,
+          };
+        } catch (error) {
+          const llmError = toLlmError(error);
+          attempts.push({
+            provider: recovery.id,
+            model: "recovery",
+            ok: false,
+            latencyMs: this.now() - started,
+            failureKind: llmError.kind,
+            message: llmError.message,
+          });
+          if (request.signal?.aborted) throw llmError;
+        }
+      }
+    }
+
+    /* --- The floor ------------------------------------------------------ */
+    // Never skipped and never deadline-gated: it is deterministic, in-process
+    // and answers in single-digit milliseconds. There is no configuration in
+    // which the console goes silent because a vendor is down.
+    const local = this.instanceFor("local");
+    if (local) {
+      const started = this.now();
+      const response = await local.complete(request);
+      attempts.push({
+        provider: "local",
+        model: response.model ?? local.model,
+        ok: true,
+        latencyMs: response.latencyMs || this.now() - started,
+      });
+      return {
+        response,
+        provider: "local",
+        model: response.model ?? local.model,
+        attempts,
+        degraded: true,
+        reason: attempts.length > 1 ? attempts[0].message : undefined,
+      };
+    }
+
+    // Unreachable in practice — `local` is always constructible — but the type
+    // demands it.
     throw new LlmError("No interpretation provider could answer.", "unknown");
   }
 
-  /** Cloud candidates, then always the local interpreter as the floor. */
+  /**
+   * Cloud candidates in the order this turn should try them, with the local
+   * interpreter appended as the floor.
+   *
+   * `complete` filters `local` back out and runs it explicitly at the end, so
+   * that a recovery route can sit between the last cloud provider and the
+   * deterministic answer. Everything else still reads this as the full chain.
+   */
   private buildChain(prefer?: ProviderFilter, routingKey?: string): LlmProviderId[] {
     const candidates = this.candidates();
     const sticky = routingKey ? this.sticky.get(routingKey) : undefined;

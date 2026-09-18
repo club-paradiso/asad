@@ -15,6 +15,7 @@
  */
 import type { InterpretRequest } from "@/lib/schema";
 import { interpreterOutputSchema } from "@/lib/schema";
+import { turnBudgetFor } from "@/providers/llm/deadlines";
 import type { InterpreterOutput } from "@/types";
 import type { ContextualTurnInfo, InterpretResult } from "@/interpreter/engine/session";
 import {
@@ -26,6 +27,73 @@ import { cloudBypassMsForFailure } from "./cloud-degradation";
 
 /** Short retries only. Live work cannot wait through a conventional API backoff. */
 export const INTERPRET_RETRY_DELAYS_MS = [0, 350, 900] as const;
+
+/**
+ * Network slack on top of the server's own turn budget.
+ *
+ * `/api/interpret` guarantees an answer inside `turnBudgetFor(lag)` because it
+ * always ends at the deterministic floor. Anything beyond that plus a little
+ * transit is not a slow model, it is a transport that is not going to answer.
+ */
+export const CLIENT_NETWORK_SLACK_MS = 1_200;
+
+/**
+ * The least time in which a retry could still produce something readable.
+ *
+ * Below this, retrying spends the rest of the turn to deliver English after the
+ * interpreter has already said the sentence — which is worse than useless,
+ * because it then appears on screen contradicting them.
+ */
+export const MIN_USEFUL_RETRY_MS = 1_200;
+
+/**
+ * How long this lane will pursue one turn before taking what it can get.
+ *
+ * WHAT THIS FIXES
+ *
+ * The retry ladder was three attempts with 0/350/900ms between them, and each
+ * attempt could burn a full server turn budget — so one bad turn could occupy
+ * roughly seventeen seconds before the fallback ran. Worse, the fetch itself
+ * had no deadline at all: a connection that opened and then stalled (a captive
+ * portal, a venue proxy, a suspended tab) left the contextual lane waiting
+ * forever, and with the lane occupied nothing else dispatched either.
+ *
+ * A live turn is worth a few seconds. After that the honest thing is to render
+ * whatever the fast lane or the local path can produce and move on.
+ */
+export const clientTurnBudgetMs = (lag: InterpretRequest["lag"] = "balanced"): number =>
+  turnBudgetFor(lag) + CLIENT_NETWORK_SLACK_MS;
+
+/**
+ * A signal that fires when the caller's does, or when the turn's budget runs
+ * out — whichever comes first.
+ *
+ * Written out rather than using `AbortSignal.any` so the behaviour is identical
+ * in every browser the console runs in, including the ones that matter most
+ * here (older Safari on a venue iPad).
+ */
+function withTurnDeadline(
+  signal: AbortSignal,
+  ms: number,
+): { signal: AbortSignal; expired: () => boolean; dispose: () => void } {
+  const controller = new AbortController();
+  let expired = false;
+  const timer = setTimeout(() => {
+    expired = true;
+    controller.abort();
+  }, ms);
+  const onAbort = () => controller.abort(signal.reason);
+  if (signal.aborted) controller.abort(signal.reason);
+  else signal.addEventListener("abort", onAbort, { once: true });
+  return {
+    signal: controller.signal,
+    expired: () => expired,
+    dispose: () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+    },
+  };
+}
 
 export const BROWSER_TRANSLATOR_PROVIDER = "browser-on-device";
 export const BROWSER_TRANSLATOR_MODEL = "chrome-translator";
@@ -87,6 +155,10 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
     turn?: ContextualTurnInfo,
   ): Promise<InterpretResult> => {
     let firstClientDispatchedAt: number | undefined;
+    const turnStartedAt = now();
+    const turnBudgetMs = clientTurnBudgetMs(request.lag);
+    /** Milliseconds of this turn still worth spending. */
+    const budgetLeft = () => turnBudgetMs - (now() - turnStartedAt);
 
     /**
      * The fast lane already rendered this turn's English on-device. A second
@@ -159,14 +231,24 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
 
     for (let attempt = 0; attempt < INTERPRET_RETRY_DELAYS_MS.length; attempt += 1) {
       if (attempt > 0) {
+        // Retrying is only worth it while the answer could still be read in
+        // time. Past that the turn is over whatever the network eventually says.
+        if (budgetLeft() < MIN_USEFUL_RETRY_MS) {
+          return localFallback(
+            `${lastFailure} The turn ran out of time, so it used the local backup path.`,
+          );
+        }
         await sleep(INTERPRET_RETRY_DELAYS_MS[attempt], signal);
       }
 
+      // The request gets whatever is left of the turn and not a millisecond
+      // more. A stalled connection used to hold this lane open indefinitely.
+      const deadline = withTurnDeadline(signal, Math.max(1, budgetLeft()));
       try {
         if (firstClientDispatchedAt === undefined) firstClientDispatchedAt = now();
         const response = await deps.fetchImpl("/api/interpret", {
           method: "POST",
-          signal,
+          signal: deadline.signal,
           headers: { "content-type": "application/json" },
           body: JSON.stringify(wireRequest),
         });
@@ -239,6 +321,14 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
           await sleep(serverDelay, signal);
         }
       } catch (err) {
+        // A turn-level abort is the engine invalidating this work; a deadline
+        // abort is ours, and means the transport did not answer in time. The
+        // two look identical to `fetch`, so the deadline says which it was.
+        if (deadline.expired() && !signal.aborted) {
+          return localFallback(
+            "Interpretation did not answer inside this turn, so it used the local backup path.",
+          );
+        }
         if (signal.aborted || (err instanceof Error && err.name === "AbortError")) throw err;
         lastFailure = err instanceof Error ? err.message : "Interpretation network request failed.";
         if (attempt === INTERPRET_RETRY_DELAYS_MS.length - 1) {
@@ -246,6 +336,8 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
             `${lastFailure} The connection did not recover, so this turn used the local backup path.`,
           );
         }
+      } finally {
+        deadline.dispose();
       }
     }
 

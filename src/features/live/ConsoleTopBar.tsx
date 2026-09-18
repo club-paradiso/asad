@@ -140,6 +140,18 @@ export function consoleStatus(input: {
     };
   }
 
+  // A backup cloud route answered. Not a fault and not rule-based output — but
+  // a different model, and the one consequence an interpreter can act on is
+  // that terminology it has not seen settled may come back worded differently.
+  if (!scripted && ai === "recovered") {
+    return {
+      state: "degraded",
+      label: "Backup model",
+      detail: "The usual model is unavailable. Wording of settled terms may shift.",
+      problem: true,
+    };
+  }
+
   if (!scripted && (health.llm === "degraded" || ai === "degraded")) {
     return {
       state: "degraded",

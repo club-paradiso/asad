@@ -501,10 +501,15 @@ export function useLiveSession(options: LiveSessionOptions) {
       const current = optionsRef.current;
 
       // The recogniser gets only the highest-value terms. In a worship context
-      // this includes community-glossary terms that occur in today's prep.
+      // this includes community-glossary terms that occur in today's prep, and
+      // in every live session it includes the TARGET-language forms of those
+      // same terms — the speaker will say "Putnam" and "conversion rate" inside
+      // Korean sentences, and a Korean-only vocabulary tells the recogniser the
+      // opposite.
       const hints = buildSttHints(
         contextFromMode(current.context, engine.snapshot().context.inferred),
         current.prep,
+        { includeGuestForms: true },
       );
 
       const credentials =
@@ -543,6 +548,11 @@ export function useLiveSession(options: LiveSessionOptions) {
       const provider = createSpeechProvider({
         provider: effectiveSource,
         language: current.sourceLanguage,
+        // A live session is by definition bilingual, and the language the
+        // interpreter is producing is the one the speaker is most likely to
+        // drop into mid-sentence. Recognisers that can use that are told; the
+        // rest are unaffected.
+        guestLanguage: current.targetLanguage,
         hints,
         credentials,
         demo: {

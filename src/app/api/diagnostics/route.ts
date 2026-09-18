@@ -18,6 +18,14 @@ import { COUNTER_LANGUAGES } from "@/counter/languages";
 import { QUICK_PHRASES, quickPhraseCoverage } from "@/counter/quick-phrases";
 import { hasStrings } from "@/counter/ui-strings";
 import { counterVoiceSupport } from "@/providers/stt/capability";
+import { sttCodeSwitchSupport } from "@/providers/stt/language";
+import { DEFAULT_LIVE_SOURCE, DEFAULT_LIVE_TARGET, languageName } from "@/lib/languages";
+import {
+  LIVE_RECOVERY_ID,
+  liveRecoveryAllowed,
+  liveRecoveryModel,
+} from "@/providers/llm/live-recovery";
+import { vercelGatewayAvailable } from "@/providers/llm/vercel-gateway";
 import { LLM_PROVIDER_IDS } from "@/providers/llm/types";
 import { telemetry } from "@/lib/telemetry";
 import { readSharedLatencySnapshot, sharedTelemetryInfo } from "@/lib/shared-telemetry";
@@ -140,6 +148,32 @@ export async function GET() {
         // The token is never serialised; this indicates configuration only.
         policy: "general-counter-only",
       },
+
+      // What happens to a SECOND language inside this recogniser's stream.
+      //
+      // Operators reported English being rendered as Korean phonetics and had
+      // no way to tell whether that was the recogniser, the model or the app.
+      // It is usually the recogniser, and which one it is decides what can be
+      // done about it, so the honest answer is reported here rather than
+      // guessed from the transcript.
+      codeSwitching: (() => {
+        const provider = env.stt.provider;
+        const pair = { source: DEFAULT_LIVE_SOURCE, target: DEFAULT_LIVE_TARGET };
+        const support =
+          provider === "demo"
+            ? "none"
+            : sttCodeSwitchSupport(provider, pair.source, pair.target);
+        return {
+          defaultPair: `${languageName(pair.source)} → ${languageName(pair.target)}`,
+          support,
+          detail:
+            support === "inherent"
+              ? "The recogniser decodes both languages natively; the language tag only biases it."
+              : support === "multi-model"
+                ? "Routed to the vendor's multilingual model, which decodes both languages in one stream."
+                : "Monolingual decoding. Guest-language spans are defended by the alternative picker and by terminology hints, not by the recogniser.",
+        };
+      })(),
     },
 
     llm: {
@@ -150,6 +184,35 @@ export async function GET() {
       active: liveActive,
       chain: liveChain,
       warnings: plan.warnings,
+
+      // The route that answers when every configured provider cannot.
+      //
+      // Reported whether or not it has been used, because the question an
+      // operator is asking when Live goes quiet is "was there anything else to
+      // try?" — and before this existed, for Live, the answer was no.
+      recovery: (() => {
+        const credentialPresent = vercelGatewayAvailable();
+        const configured = liveRecoveryAllowed();
+        return {
+          route: LIVE_RECOVERY_ID,
+          configured,
+          // The one case where a credential exists and the route still will not
+          // be used: strict privacy, where an ambient host token is not a
+          // deployer's decision about whose servers see this speech.
+          blockedByPrivacyMode: credentialPresent && !configured,
+          model: configured ? liveRecoveryModel() : null,
+          // Which credential is present, never its value.
+          credential: !configured
+            ? null
+            : process.env.AI_GATEWAY_API_KEY?.trim()
+              ? "AI_GATEWAY_API_KEY"
+              : "VERCEL_OIDC_TOKEN",
+          privacy:
+            "Requests pin zero data retention and disallow prompt training; the gateway fails closed if that cannot be honoured.",
+          // Turns this route has actually served on this instance.
+          served: telemetry.stage("provider_response", LIVE_RECOVERY_ID).count,
+        };
+      })(),
 
       // The gateway's own configuration. Reported whether or not OpenRouter is
       // currently serving turns: a deployer needs to see the policy they set,
@@ -203,6 +266,14 @@ export async function GET() {
           breakerState: health.breaker.state,
           consecutiveFailures: health.breaker.consecutiveFailures,
           lastFailureKind: health.breaker.lastFailure?.kind,
+          // Distinguishes "the key is wrong" from "something returned 403 once".
+          // The first is permanent; the second is one probe away from recovery,
+          // and an operator staring at a silent console needs to know which.
+          authFailures: health.breaker.authFailures ?? 0,
+          awaitingAuthConfirmation:
+            (health.breaker.authFailures ?? 0) > 0 && !health.breaker.permanentlyDisabled,
+          permanentlyDisabled: !!health.breaker.permanentlyDisabled,
+          retryAt: health.breaker.openUntil ?? null,
           quota: {
             free: caps.freeTierQuota,
             viableForLiveSermon: viability?.viable,

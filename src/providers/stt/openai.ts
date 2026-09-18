@@ -9,6 +9,8 @@
  * minted by `/api/stt/token`.
  */
 import { SocketSpeechProvider } from "./socket";
+import { whisperLanguage } from "./language";
+import { languageName } from "@/lib/languages";
 import type { SttProviderId, SttProviderOptions } from "./types";
 
 interface OpenAiRealtimeMessage {
@@ -50,15 +52,49 @@ export class OpenAiSpeechProvider extends SocketSpeechProvider {
     };
   }
 
+  /**
+   * The vocabulary prompt.
+   *
+   * Whisper-family transcription takes a free-text prompt, and it is the
+   * highest-value lever this provider has for code-switched speech: the model
+   * already decodes English inside Korean audio, but it needs to know that
+   * "RAG", "E-7" and a speaker's name are the strings being said. Naming the
+   * guest language explicitly matters too — a `language: "ko"` hint otherwise
+   * pushes borderline spans back into Hangul.
+   */
+  private transcriptionPrompt(): string | undefined {
+    const terms = (this.options.hints ?? [])
+      .map((hint) => hint.trim())
+      .filter(Boolean)
+      .slice(0, 40);
+    const guest = this.options.guestLanguage;
+    const sameLanguage =
+      !guest || whisperLanguage(guest)?.code === whisperLanguage(this.options.language)?.code;
+    const lines: string[] = [];
+    if (!sameLanguage) {
+      lines.push(
+        `The speaker mixes ${languageName(guest)} words, names and technical terms into ${languageName(
+          this.options.language ?? "ko-KR",
+        )}. Transcribe those spans in ${languageName(guest)} exactly as spoken; do not transliterate them.`,
+      );
+    }
+    if (terms.length) lines.push(`Expected terms: ${terms.join(", ")}.`);
+    return lines.length ? lines.join(" ") : undefined;
+  }
+
   protected openMessage(): string {
+    // Resolved through the registry, never `tag.split("-")[0]`. The registry is
+    // the only thing that knows which code this vendor accepts and what using
+    // it costs — the same rule `/api/stt/token` already follows.
+    const whisper = whisperLanguage(this.options.language);
     return JSON.stringify({
       type: "transcription_session.update",
       session: {
         input_audio_format: "pcm16",
         input_audio_transcription: {
           model: this.options.credentials?.model ?? "gpt-live-transcribe",
-          language: this.options.language?.split("-")[0] ?? "ko",
-          prompt: (this.options.hints ?? []).slice(0, 40).join(", ") || undefined,
+          language: whisper?.code ?? "ko",
+          prompt: this.transcriptionPrompt(),
         },
         turn_detection: {
           type: "server_vad",

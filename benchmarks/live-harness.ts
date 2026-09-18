@@ -41,6 +41,15 @@ const SYLLABLES_PER_SECOND = 6;
  * none of it measures a real translator or a real cloud model.
  */
 export interface TwoLaneSimulation {
+  /**
+   * Whether the on-device fast lane exists at all.
+   *
+   * `"off"` is the configuration most sessions actually run in — Safari,
+   * Firefox and every phone have no Chrome Translator — and it is the one the
+   * engine's flush gating used to punish, so it needs to be measurable rather
+   * than assumed.
+   */
+  provisional?: "on" | "off";
   /** Mocked on-device translator latency, virtual ms. */
   provisionalDelayMs: number;
   /** Mocked cloud latency range, virtual ms. Drawn per call from a seeded PRNG. */
@@ -205,7 +214,7 @@ export async function runLiveBenchmark(options: LiveBenchOptions): Promise<LiveB
     return delay;
   };
 
-  const provisionalLane: ProvisionalLane | undefined = twoLane
+  const provisionalLane: ProvisionalLane | undefined = twoLane && twoLane.provisional !== "off"
     ? {
         isReady: () => true,
         provider: "browser-on-device",

@@ -23,12 +23,33 @@ export interface BreakerConfig {
   /** First cooldown, doubled on each consecutive open (capped). */
   baseCooldownMs: number;
   maxCooldownMs: number;
+  /**
+   * How many permanent-looking failures it takes to bench a provider for the
+   * life of the process.
+   *
+   * It used to take one, and that was a real outage waiting to happen. A 401 or
+   * 403 is not always a bad key: an egress proxy in front of the deployment, a
+   * brief vendor incident, a credential being rotated, a regional edge
+   * hiccup — all of them present as 403, and all of them clear on their own.
+   * Under the old rule a single one of those ended cloud interpretation for
+   * every session on that instance until somebody redeployed, which is exactly
+   * the "transcription works, interpretation never appears" report.
+   *
+   * Two is the right number. A genuinely bad key costs one extra request a
+   * couple of minutes later and is then benched permanently as before; a blip
+   * costs one cooldown and recovers by itself.
+   */
+  permanentConfirmations: number;
+  /** Cooldown before the one confirming probe of a permanent-looking failure. */
+  permanentProbeMs: number;
 }
 
 export const DEFAULT_BREAKER: BreakerConfig = {
   threshold: 3,
   baseCooldownMs: 20_000,
   maxCooldownMs: 5 * 60_000,
+  permanentConfirmations: 2,
+  permanentProbeMs: 90_000,
 };
 
 export interface BreakerSnapshot {
@@ -42,6 +63,11 @@ export interface BreakerSnapshot {
   lastFailure?: { kind: LlmFailureKind; message: string; at: number };
   /** Set when the failure is permanent — no probe will ever be attempted. */
   permanentlyDisabled?: boolean;
+  /**
+   * Permanent-looking failures seen without an intervening success. One means
+   * "awaiting confirmation": the provider is cooling down, not written off.
+   */
+  authFailures?: number;
 }
 
 export class CircuitBreaker {
@@ -51,6 +77,8 @@ export class CircuitBreaker {
   private opens = 0;
   private openUntil?: number;
   private permanent = false;
+  /** Permanent-class failures since the last success. */
+  private permanentSignals = 0;
   private lastFailure?: BreakerSnapshot["lastFailure"];
 
   constructor(
@@ -79,14 +107,19 @@ export class CircuitBreaker {
     this.totalSuccesses += 1;
     this.openUntil = undefined;
     this.opens = 0;
+    // The provider answered, so whatever the earlier 401 was, it was not a
+    // configuration error. Start the confirmation count again.
+    this.permanentSignals = 0;
   }
 
   /**
    * Record a failure.
    *
    * Authentication and known deployment-level model/configuration failures do
-   * not heal while the process keeps the same environment, so they are disabled
-   * immediately. Request-specific rejections are classified separately as
+   * not heal while the process keeps the same environment — but only once they
+   * are confirmed. The first one opens a long cooldown and the next attempt is
+   * the probe that decides; two in a row disable the provider permanently.
+   * Request-specific rejections are classified separately as
    * `request_rejected`; those count as ordinary transient failures instead of
    * benching the provider forever after one incompatible turn.
    */
@@ -100,8 +133,16 @@ export class CircuitBreaker {
     this.lastFailure = { kind, message, at: this.now() };
 
     if (kind === "auth" || kind === "bad_request") {
-      this.permanent = true;
-      this.openUntil = Number.POSITIVE_INFINITY;
+      this.permanentSignals += 1;
+      if (this.permanentSignals >= this.config.permanentConfirmations) {
+        this.permanent = true;
+        this.openUntil = Number.POSITIVE_INFINITY;
+        return;
+      }
+      // First sighting: cool down and let exactly one probe decide. Deliberately
+      // NOT counted against `opens`, so a confirmed-transient 403 does not also
+      // lengthen the ordinary backoff afterwards.
+      this.openUntil = this.now() + this.config.permanentProbeMs;
       return;
     }
 
@@ -127,6 +168,7 @@ export class CircuitBreaker {
       openUntil: Number.isFinite(this.openUntil) ? this.openUntil : undefined,
       lastFailure: this.lastFailure,
       permanentlyDisabled: this.permanent || undefined,
+      authFailures: this.permanentSignals || undefined,
     };
   }
 
@@ -135,5 +177,6 @@ export class CircuitBreaker {
     this.openUntil = undefined;
     this.permanent = false;
     this.opens = 0;
+    this.permanentSignals = 0;
   }
 }

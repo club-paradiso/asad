@@ -44,15 +44,19 @@ export function vercelGatewayAvailable(): boolean {
 
 export async function completeViaVercelGateway(
   request: LlmRequest,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; model?: string } = {},
 ): Promise<LlmResponse> {
   const token = vercelGatewayToken();
   if (!token) {
     throw new LlmError("Vercel AI Gateway authentication is unavailable.", "auth");
   }
 
+  // Counter and Live have different budgets, so each names its own model and
+  // the shared default covers anything that does not care.
+  const model = options.model?.trim() || VERCEL_GATEWAY_MODEL;
+
   const body: Record<string, unknown> = {
-    model: VERCEL_GATEWAY_MODEL,
+    model,
     temperature: request.temperature ?? 0.2,
     max_tokens: request.maxOutputTokens ?? 700,
     messages: [
@@ -103,7 +107,7 @@ export async function completeViaVercelGateway(
 
   return {
     text: content,
-    model: data.model ?? VERCEL_GATEWAY_MODEL,
+    model: data.model ?? model,
     usage: mapUsage(data.usage),
     rateLimit,
     latencyMs,

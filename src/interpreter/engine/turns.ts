@@ -151,6 +151,13 @@ export interface LaneStats {
   maxProvisionalInFlight: number;
   /** Proper-noun spellings rewritten to an already-settled form. */
   terminologyFixes: number;
+  /** Turns whose source carried guest-language spans. A count, never a word. */
+  codeSwitchedTurns: number;
+  /**
+   * Turns already spoken in the target language, rendered without translating
+   * them at all. The cheapest possible provisional English.
+   */
+  provisionalPassthrough: number;
 }
 
 export const emptyLaneStats = (): LaneStats => ({
@@ -172,6 +179,8 @@ export const emptyLaneStats = (): LaneStats => ({
   maxCloudInFlight: 0,
   maxProvisionalInFlight: 0,
   terminologyFixes: 0,
+  codeSwitchedTurns: 0,
+  provisionalPassthrough: 0,
 });
 
 /** How many turn records the engine keeps for bookkeeping. */

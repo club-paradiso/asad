@@ -8,7 +8,7 @@
     "providerResponse": {
       "count": 111,
       "p50": 0,
-      "p90": 0,
+      "p90": 1,
       "p95": 1,
       "max": 1,
       "mean": 0
@@ -25,13 +25,13 @@
   "tokens": {
     "perCall": {
       "count": 111,
-      "p50": 2726,
-      "p90": 2773,
-      "p95": 2787,
-      "max": 2787,
-      "mean": 2694
+      "p50": 1911,
+      "p90": 1939,
+      "p95": 1942,
+      "max": 1948,
+      "mean": 1867
     },
-    "sessionTotal": 299084,
+    "sessionTotal": 207270,
     "profileCounts": {
       "full": 111
     }
@@ -42,9 +42,9 @@
     "local": 111
   },
   "bounds": {
-    "finalChunks": 237,
+    "finalChunks": 56,
     "finalSegments": 111,
-    "peakContextTokens": 2787,
+    "peakContextTokens": 1948,
     "maxInFlight": 1
   },
   "slo": {

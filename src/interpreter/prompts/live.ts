@@ -7,6 +7,8 @@
  */
 import type { ResolvedContext } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
+import { analyseCodeSwitch } from "@/lib/code-switch";
+import { languageName } from "@/lib/languages";
 import { compactSystemPrompt } from "./compact";
 import { contextDelta } from "./domains";
 import {
@@ -88,6 +90,49 @@ function boundarySteer(request: InterpretRequest): string | null {
   return lines.length ? lines.join("\n") : null;
 }
 
+/**
+ * What to do when the speaker was not speaking only one language.
+ *
+ * Real speech mixes. "오늘 살펴볼 개념은 social capital입니다" is one Korean
+ * sentence with two English words in it, and the instruction the model needs is
+ * the opposite of the obvious one: do NOT translate those two words, because
+ * they are already in the language being produced and re-rendering them is how
+ * *social capital* becomes *societal wealth* halfway through a lecture on
+ * Putnam.
+ *
+ * Two cases, and the difference matters:
+ *
+ *   MIXED  — a source-language sentence carrying guest-language spans. Keep the
+ *            spans verbatim, translate everything around them.
+ *   TARGET — the speaker said a whole sentence in the target language, usually
+ *            a quotation. Reproduce it; do not paraphrase it into different
+ *            words that the interpreter will then have to un-say.
+ *
+ * Costs nothing on an ordinary monolingual turn: the analysis is deterministic
+ * and emits no text at all when there is no guest script present, so the ~11
+ * calls a minute of a normal Korean sermon are byte-identical to before.
+ */
+function codeSwitchSteer(request: InterpretRequest): string | null {
+  const analysis = analyseCodeSwitch(request.pending, {
+    source: request.source,
+    target: request.target,
+  });
+  if (!analysis.decidable || analysis.guestTerms.length === 0) return null;
+
+  const target = languageName(request.target);
+  const preserve = `Preserve exactly: ${analysis.guestTerms.join(", ")}.`;
+
+  if (analysis.dominant === "target") {
+    return `ALREADY ${target.toUpperCase()}
+This unit is already in ${target} — a quotation or a passage the speaker delivered directly. Reproduce it as spoken. Do not re-translate, paraphrase or improve it. ${preserve}`;
+  }
+
+  return `MIXED SOURCE
+The speaker is code-switching: the spans below are already ${target} and are the terms the room knows. Carry them through unchanged and translate only the ${languageName(
+    request.source,
+  )} around them. Never render them phonetically. ${preserve}`;
+}
+
 export function buildLiveUserPrompt(request: InterpretRequest): string {
   const sections: string[] = [];
 
@@ -142,6 +187,9 @@ export function buildLiveUserPrompt(request: InterpretRequest): string {
   }
 
   sections.push(`SOURCE TO INTERPRET NOW (stabilised):\n${request.pending}`);
+
+  const codeSwitch = codeSwitchSteer(request);
+  if (codeSwitch) sections.push(codeSwitch);
 
   if (request.partial?.trim()) {
     sections.push(

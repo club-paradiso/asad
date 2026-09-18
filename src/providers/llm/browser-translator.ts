@@ -14,6 +14,7 @@
  * polyfill would defeat the point of a zero-cost, on-device fallback.
  */
 import type { ParsedInterpreterOutput } from "@/lib/schema";
+import { chunkTranslation } from "@/lib/chunk-text";
 
 export type BrowserTranslatorStatus = "unsupported" | "preparing" | "ready" | "failed";
 
@@ -122,33 +123,10 @@ export async function translateWithBrowserTranslator(
 }
 
 /**
- * Keep every fallback chunk inside `chunkDraftSchema`'s 400-character limit.
- * Normal live units are far shorter; the defensive splitter exists so a long
- * final flush cannot turn an otherwise successful local translation into a
- * schema-invalid result.
+ * Re-exported so existing callers and tests keep one import site.
+ *
+ * The rule itself moved to `@/lib/chunk-text` once the engine's pass-through
+ * lane needed the same splitting: a target-language utterance rendered without
+ * translation has to satisfy exactly the same schema limits as a translated one.
  */
-export function chunkTranslation(text: string, maxChars = 380): string[] {
-  const clean = text.replace(/\s+/g, " ").trim();
-  if (!clean) return [];
-
-  const sentences = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
-  const chunks: string[] = [];
-
-  for (const sentence of sentences) {
-    let rest = sentence.trim();
-    while (rest.length > maxChars) {
-      const window = rest.slice(0, maxChars + 1);
-      const splitAt = Math.max(window.lastIndexOf(" "), window.lastIndexOf(","));
-      const at = splitAt >= Math.floor(maxChars * 0.55) ? splitAt : maxChars;
-      chunks.push(rest.slice(0, at).trim());
-      rest = rest.slice(at).trim();
-    }
-    if (rest) chunks.push(rest);
-  }
-
-  // InterpreterOutput allows at most eight safe chunks. This only matters for
-  // pathological multi-kilobyte final flushes; keep the latest material rather
-  // than manufacturing an invalid ninth chunk.
-  if (chunks.length <= 8) return chunks;
-  return [...chunks.slice(0, 7), chunks.slice(7).join(" ").slice(0, maxChars).trim()].filter(Boolean);
-}
+export { chunkTranslation };
