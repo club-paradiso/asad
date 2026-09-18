@@ -336,6 +336,54 @@ export const LANGUAGES: LanguageDefinition[] = [
  * ------------------------------------------------------------------------ */
 
 /**
+ * Every distinct character block the registry knows how to recognise.
+ *
+ * Derived from the registry rather than written out again: the language records
+ * already carry a `scriptPattern` each, and several SHARE one object — `zh-CN`
+ * and `zh-TW` the Han pattern, `ru`, `uk` and `mn` the Cyrillic one, `ar` and
+ * `ur` the Arabic one. Collecting the distinct objects therefore produces
+ * exactly the set of blocks that can be told apart, with nothing to drift.
+ */
+const SCRIPT_PATTERNS: readonly RegExp[] = (() => {
+  const distinct = new Set<RegExp>();
+  for (const language of LANGUAGES) {
+    if (language.scriptPattern) distinct.add(language.scriptPattern);
+  }
+  return [...distinct];
+})();
+
+/** Latin carries no registry pattern because it is the implicit default. */
+const LATIN_SCRIPT = /\p{Script=Latin}/u;
+
+const LATIN_FAMILY = -1;
+const UNKNOWN_FAMILY = -2;
+
+/**
+ * Which recognisable block a character belongs to.
+ *
+ * A number rather than an ISO code, and deliberately so: the honest label for
+ * the Han block is "the one Simplified Chinese, Traditional Chinese and
+ * Japanese share", and stamping `Hans` on a character would be a precision the
+ * character does not have.
+ */
+function scriptFamilyOf(char: string): number {
+  for (let index = 0; index < SCRIPT_PATTERNS.length; index += 1) {
+    if (SCRIPT_PATTERNS[index].test(char)) return index;
+  }
+  return LATIN_SCRIPT.test(char) ? LATIN_FAMILY : UNKNOWN_FAMILY;
+}
+
+/**
+ * Whether two characters are written in the same recognisable block.
+ *
+ * Used to find word boundaries that a writing system makes obvious: no lexical
+ * item is half Hangul and half Han, half Cyrillic and half Latin, or half
+ * Devanagari and half anything else.
+ */
+export const sameScriptFamily = (a: string, b: string): boolean =>
+  scriptFamilyOf(a) === scriptFamilyOf(b);
+
+/**
  * How well a recogniser family keeps a SECOND language intact inside a stream
  * whose declared language is the first.
  *

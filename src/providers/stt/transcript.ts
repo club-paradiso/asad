@@ -1,11 +1,25 @@
 /** Language-aware transcript cleanup shared by browser and cloud STT paths. */
-import { findLanguage } from "@/lib/languages";
+import { findLanguage, sameScriptFamily } from "@/lib/languages";
 
 const SIMPLIFIED_HINT = /[这国证签办体门长话发务关续请号录处华]/u;
 const TRADITIONAL_HINT = /[這國證簽辦體門長話發務關續請號錄處華]/u;
 
-/** Latin letters and digits — the guest script almost every loanword arrives in. */
-const GUEST_CHAR = /[A-Za-z0-9À-ɏ]/u;
+/**
+ * Latin, by Unicode property rather than by a hand-written range.
+ *
+ * Latin is a legitimate guest in EVERY session, whatever the pair: `OpenAI`,
+ * `API`, `E-7` and `GPT-4o` are said aloud inside Korean, Chinese, Russian and
+ * Arabic speech alike. That universality is why it keeps a constant of its own
+ * rather than being derived from the pair.
+ *
+ * The property escape also fixes a real gap: the previous range stopped at
+ * U+024F, which excluded Latin Extended Additional — that is, most written
+ * Vietnamese. `vốn` matched and `hội` did not.
+ */
+const LATIN = /\p{Script=Latin}/u;
+
+/** Latin letters or digits: the characters an identifier is built from. */
+const LATIN_OR_DIGIT = /[\p{Script=Latin}\p{N}]/u;
 
 // STT defaults to Korean elsewhere in the app (webSpeechLanguage/deepgramLanguage).
 // Keep helpers consistent when a caller omits a language rather than inventing
@@ -67,6 +81,17 @@ export interface AlternativePickOptions {
    * that contains one of them is more likely to be the one the speaker said.
    */
   hints?: readonly string[];
+  /**
+   * The OTHER language this session expects to hear — normally the one the
+   * interpreter is producing.
+   *
+   * Without it the picker can only credit Latin as a legitimate guest, which
+   * is what made the original bug survive for every non-Latin pair: in a
+   * Korean→Chinese session `오늘 핵심 개념은 社会资本입니다` scored WORSE than the
+   * Koreanised invention `오늘 핵심 개념은 사회자본입니다`, for exactly the same
+   * reason the English case did.
+   */
+  guestLanguage?: string;
 }
 
 /**
@@ -113,6 +138,15 @@ export function pickSpeechAlternative(
   const hints = normaliseHints(options.hints);
   if (!script) return hints.length ? usable.reduce(byHintsOnly(hints)) : usable[0];
 
+  // What this session has a reason to expect alongside its own script: the
+  // language the interpreter is producing, plus Latin, which carries the
+  // acronyms and product names that turn up in speech of every language.
+  const guestScript = options.guestLanguage
+    ? findLanguage(options.guestLanguage)?.scriptPattern ?? LATIN
+    : null;
+  const isExpectedGuest = (char: string) =>
+    LATIN_OR_DIGIT.test(char) || (guestScript !== null && guestScript.test(char));
+
   const score = (text: string) => {
     const decidable = [...text].filter((char) => /[\p{L}\p{N}]/u.test(char));
     if (!decidable.length) return -1;
@@ -121,7 +155,7 @@ export function pickSpeechAlternative(
     // is the wrong writing system. Rank it by the old, strict ratio.
     if (expected === 0) return scriptVariantBonus(text, language);
     const guest = decidable.filter(
-      (char) => !script.test(char) && GUEST_CHAR.test(char),
+      (char) => !script.test(char) && isExpectedGuest(char),
     ).length;
     return (
       (expected + guest) / decidable.length +
@@ -185,20 +219,26 @@ const latinBoundary = (left: string, right: string): boolean =>
  * anyway. The concatenation exists for exactly one reason — one browser
  * recognition event can split a single Korean lexical item across result slots
  * (안녕 + 하세요) — and that reason cannot apply across a script change, because
- * no lexical item is half Hangul and half Latin. Without this rule the same
- * concatenation glued an English word onto the preceding Hangul (`오늘social`),
+ * no lexical item is half Hangul and half Han, half Hangul and half Cyrillic,
+ * or half Hangul and half Latin. Without this rule the same concatenation
+ * glued the guest word onto the preceding Hangul (`오늘social`, `오늘社会资本`),
  * which then reached the stabiliser, the glossary matcher and the model as one
  * unrecognisable token.
  *
- * Genuinely unspaced scripts are left alone: Chinese and Japanese set a Latin
- * insertion tight against the surrounding characters, and `joinTranscriptParts`
- * has always produced 我的名字是Kim deliberately.
+ * It used to compare Latin membership, which meant it fired for a Latin guest
+ * and silently did nothing for every other script — a Chinese, Russian,
+ * Mongolian, Arabic, Hindi or Thai guest span was glued on exactly as before.
+ * Comparing the registry's character blocks covers all of them at once.
+ *
+ * Genuinely unspaced scripts are left alone by the caller: Chinese and Japanese
+ * set an inserted word tight against the surrounding characters, and
+ * `joinTranscriptParts` has always produced 我的名字是Kim deliberately.
  */
 const scriptBoundary = (left: string, right: string): boolean => {
   const before = left.slice(-1);
   const after = right.slice(0, 1);
   if (!/\p{L}/u.test(before) || !/\p{L}/u.test(after)) return false;
-  return GUEST_CHAR.test(before) !== GUEST_CHAR.test(after);
+  return !sameScriptFamily(before, after);
 };
 
 function joinNoSpaceLanguageParts(

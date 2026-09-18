@@ -588,6 +588,12 @@ export class InterpretationEngine {
     if (codeSwitch.decidable && codeSwitch.guestTerms.length > 0) {
       this.stats.codeSwitchedTurns += 1;
     }
+    // Counted separately because they mean opposite things to an operator
+    // reading /diagnostics: one says the pair cannot be read from script at
+    // all, the other says a third writing system turned up in a session that
+    // expected two.
+    if (!codeSwitch.decidable) this.stats.undecidablePairTurns += 1;
+    if (codeSwitch.unexpectedScript) this.stats.unexpectedScriptTurns += 1;
 
     // The speaker delivered a whole sentence in the language we are producing —
     // a quotation, a title, an English aside. Translating English into English

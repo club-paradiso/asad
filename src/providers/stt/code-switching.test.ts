@@ -178,7 +178,7 @@ describe("what each recogniser is actually asked for", () => {
     expect(params.getAll("keyterm")).toEqual(["social capital", "Putnam"]);
   });
 
-  it("gives OpenAI the registry's language code and a code-switching prompt", () => {
+  it("gives OpenAI the expected languages, the keywords, and no singular language", () => {
     const provider = new OpenAiSpeechProvider({
       language: "ko-KR",
       guestLanguage: "en-US",
@@ -188,14 +188,25 @@ describe("what each recogniser is actually asked for", () => {
     const message = JSON.parse(
       (provider as unknown as { openMessage(): string }).openMessage(),
     ) as {
-      session: { input_audio_transcription: { language: string; prompt?: string } };
+      session: {
+        input_audio_transcription: {
+          language?: string;
+          languages?: string[];
+          keywords?: string[];
+          prompt?: string;
+        };
+      };
     };
     const transcription = message.session.input_audio_transcription;
-    // Resolved through the registry rather than `tag.split("-")[0]`.
-    expect(transcription.language).toBe("ko");
-    expect(transcription.prompt).toContain("English");
+    // The field this model documents for "the recording may contain more than
+    // one language", which is what a live interpretation session always is.
+    expect(transcription.languages).toEqual(["ko", "en"]);
+    // And never alongside the singular one: OpenAI's migration guidance is
+    // explicit that both must not be sent.
+    expect(transcription.language).toBeUndefined();
+    expect(transcription.keywords).toEqual(["RAG", "Putnam"]);
+    // The prompt now carries only what neither structured field can express.
     expect(transcription.prompt).toContain("do not transliterate");
-    expect(transcription.prompt).toContain("RAG");
   });
 
   it("says nothing about a guest language when there is not one", () => {

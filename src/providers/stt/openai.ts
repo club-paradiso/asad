@@ -9,8 +9,10 @@
  * minted by `/api/stt/token`.
  */
 import { SocketSpeechProvider } from "./socket";
-import { whisperLanguage } from "./language";
-import { languageName } from "@/lib/languages";
+import {
+  buildOpenAiTranscriptionConfig,
+  openAiTranscriptionCapabilities,
+} from "./openai-transcription";
 import type { SttProviderId, SttProviderOptions } from "./types";
 
 interface OpenAiRealtimeMessage {
@@ -48,66 +50,53 @@ export class OpenAiSpeechProvider extends SocketSpeechProvider {
     const base = credentials.url ?? "wss://api.openai.com/v1/realtime?intent=transcription";
     return {
       url: base,
-      protocols: ["realtime", `openai-insecure-api-key.${credentials.token}`, "openai-beta.realtime-v1"],
+      // Two subprotocols, not three. The third used to be
+      // `openai-beta.realtime-v1`, which opts the socket into the BETA realtime
+      // interface — and the beta interface's transcription config has no
+      // `languages` and no `keywords`, and does not list this deployment's
+      // model. Asking for the beta contract and then sending GA-only fields is
+      // how the multilingual hint could be built correctly and still never
+      // reach the vendor.
+      protocols: ["realtime", `openai-insecure-api-key.${credentials.token}`],
     };
   }
 
-  /**
-   * The vocabulary prompt.
-   *
-   * Whisper-family transcription takes a free-text prompt, and it is the
-   * highest-value lever this provider has for code-switched speech: the model
-   * already decodes English inside Korean audio, but it needs to know that
-   * "RAG", "E-7" and a speaker's name are the strings being said. Naming the
-   * guest language explicitly matters too — a `language: "ko"` hint otherwise
-   * pushes borderline spans back into Hangul.
-   */
-  private transcriptionPrompt(): string | undefined {
-    const terms = (this.options.hints ?? [])
-      .map((hint) => hint.trim())
-      .filter(Boolean)
-      .slice(0, 40);
-    const guest = this.options.guestLanguage;
-    const sameLanguage =
-      !guest || whisperLanguage(guest)?.code === whisperLanguage(this.options.language)?.code;
-    const lines: string[] = [];
-    if (!sameLanguage) {
-      lines.push(
-        `The speaker mixes ${languageName(guest)} words, names and technical terms into ${languageName(
-          this.options.language ?? "ko-KR",
-        )}. Transcribe those spans in ${languageName(guest)} exactly as spoken; do not transliterate them.`,
-      );
-    }
-    if (terms.length) lines.push(`Expected terms: ${terms.join(", ")}.`);
-    return lines.length ? lines.join(" ") : undefined;
-  }
-
   protected openMessage(): string {
-    // Resolved through the registry, never `tag.split("-")[0]`. The registry is
-    // the only thing that knows which code this vendor accepts and what using
-    // it costs — the same rule `/api/stt/token` already follows.
-    const whisper = whisperLanguage(this.options.language);
+    // Every context field comes from one place, which also builds the ephemeral
+    // session `/api/stt/token` mints. The two used to construct their own, and
+    // a recogniser configured two different ways at two different moments is a
+    // bug nobody sees until a live service behaves unlike every test.
+    const model = this.options.credentials?.model ?? "gpt-live-transcribe";
+    const transcription = buildOpenAiTranscriptionConfig({
+      model,
+      primaryLanguage: this.options.language,
+      guestLanguage: this.options.guestLanguage,
+      keywords: this.options.hints,
+    });
+
     return JSON.stringify({
       type: "transcription_session.update",
       session: {
         input_audio_format: "pcm16",
-        input_audio_transcription: {
-          model: this.options.credentials?.model ?? "gpt-live-transcribe",
-          language: whisper?.code ?? "ko",
-          prompt: this.transcriptionPrompt(),
-        },
-        turn_detection: {
-          type: "server_vad",
-          // Counter speech hesitates. 400 ms of silence ends a turn while
-          // someone is still working out how to say "체류자격 변경"; a second
-          // is closer to how long a real pause at a desk actually lasts, and
-          // tapping stop still ends the turn immediately.
-          silence_duration_ms: this.options.utterance ? 900 : 400,
-          // Include the audio just before speech was detected, so the first
-          // syllable of a turn is transcribed rather than used to trigger the
-          // detector and then discarded.
-          prefix_padding_ms: 500,
-        },
+        input_audio_transcription: transcription,
+        // Omitted entirely for a model that documents no VAD, rather than sent
+        // and ignored. `gpt-realtime-whisper` is the one such model today.
+        ...(openAiTranscriptionCapabilities(model).turnDetection
+          ? {
+              turn_detection: {
+                type: "server_vad",
+                // Counter speech hesitates. 400 ms of silence ends a turn while
+                // someone is still working out how to say "체류자격 변경"; a second
+                // is closer to how long a real pause at a desk actually lasts, and
+                // tapping stop still ends the turn immediately.
+                silence_duration_ms: this.options.utterance ? 900 : 400,
+                // Include the audio just before speech was detected, so the first
+                // syllable of a turn is transcribed rather than used to trigger the
+                // detector and then discarded.
+                prefix_padding_ms: 500,
+              },
+            }
+          : {}),
       },
     });
   }

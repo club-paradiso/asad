@@ -1,5 +1,5 @@
 import type { PrepSheet, ResolvedContext } from "@/types";
-import { guestTermsIn } from "@/lib/code-switch";
+import { notableTermsIn } from "@/lib/code-switch";
 import { isWorshipContext } from "../context/context-mode";
 import { THEOLOGICAL_LEXICON } from "./lexicon";
 import { matchGlossary } from "./matcher";
@@ -121,12 +121,16 @@ export function buildSttHints(
     }
   }
 
-  // Latin-script terms the interpreter typed into today's material — product
-  // names, acronyms, foreign names, anything that will be said aloud in the
-  // guest language. Deterministic, already on the prep sheet, and the one place
-  // a session's real English vocabulary is written down before it is spoken.
+  // The notable terms the interpreter typed into today's material — proper
+  // nouns, product names, acronyms, identifiers; anything a recogniser will
+  // otherwise get wrong. Deterministic, already on the prep sheet, and the one
+  // place a session's real vocabulary is written down before it is spoken.
+  //
+  // Script-independent by design: 퍼트넘, Vercel, RAG and E-7 are all worth
+  // biasing for, and a Korean→Chinese service's prep sheet yields its own
+  // terms the same way a Korean→English one does.
   if (includeGuestForms && prepCorpus) {
-    for (const term of guestTermsIn(prepCorpus, limit)) {
+    for (const term of notableTermsIn(prepCorpus, limit)) {
       if (term.length >= 3) add(term);
     }
   }

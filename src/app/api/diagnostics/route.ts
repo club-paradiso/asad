@@ -19,6 +19,10 @@ import { QUICK_PHRASES, quickPhraseCoverage } from "@/counter/quick-phrases";
 import { hasStrings } from "@/counter/ui-strings";
 import { counterVoiceSupport } from "@/providers/stt/capability";
 import { sttCodeSwitchSupport } from "@/providers/stt/language";
+import {
+  buildOpenAiTranscriptionConfig,
+  openAiTranscriptionCapabilities,
+} from "@/providers/stt/openai-transcription";
 import { DEFAULT_LIVE_SOURCE, DEFAULT_LIVE_TARGET, languageName } from "@/lib/languages";
 import {
   LIVE_RECOVERY_ID,
@@ -172,6 +176,43 @@ export async function GET() {
               : support === "multi-model"
                 ? "Routed to the vendor's multilingual model, which decodes both languages in one stream."
                 : "Monolingual decoding. Guest-language spans are defended by the alternative picker and by terminology hints, not by the recogniser.",
+        };
+      })(),
+
+      // Which contract this deployment's configured OpenAI model is on, and
+      // what it will therefore be sent.
+      //
+      // Worth reporting because the two families differ in the one field that
+      // matters here: the newer one takes `languages` (a list) and `keywords`,
+      // the older one takes `language` (one) and a prose `prompt`. A deployer
+      // overriding OPENAI_STT_MODEL should be able to see which they got rather
+      // than discover it from a transcript.
+      openai: (() => {
+        const model = env.stt.openaiModel;
+        const caps = openAiTranscriptionCapabilities(model);
+        const example = buildOpenAiTranscriptionConfig({
+          model,
+          primaryLanguage: DEFAULT_LIVE_SOURCE,
+          guestLanguage: DEFAULT_LIVE_TARGET,
+        });
+        return {
+          model,
+          family: caps.family,
+          expectedLanguages: caps.expectedLanguages,
+          keywords: caps.keywords,
+          turnDetection: caps.turnDetection,
+          // Which realtime interface the socket and the token mint negotiate.
+          // `languages` and `keywords` exist only on GA, so a deployment that
+          // somehow ended up on beta would be silently monolingual.
+          interface: "ga",
+          // Field NAMES only — nothing from a prep sheet or a transcript.
+          fieldsSent: Object.keys(example).filter((key) => key !== "model"),
+          note:
+            caps.family === "gpt-transcribe"
+              ? "Sends the expected-language list and literal keywords; never the singular `language` alongside them."
+              : caps.turnDetection
+                ? "Sends a single `language` and a prose `prompt`. An unrecognised model resolves here, which is the safer of the two contracts."
+                : "Sends a single `language` only: this model documents no prompt and no VAD, so neither is sent.",
         };
       })(),
     },

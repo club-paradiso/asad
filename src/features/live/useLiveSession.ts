@@ -515,7 +515,13 @@ export function useLiveSession(options: LiveSessionOptions) {
       const credentials =
         current.source === "demo" || current.source === "webspeech"
           ? undefined
-          : ((await fetchSttCredentials(current.sourceLanguage, undefined, "live")) ?? undefined);
+          : ((await fetchSttCredentials(
+              current.sourceLanguage,
+              undefined,
+              "live",
+              undefined,
+              current.targetLanguage,
+            )) ?? undefined);
 
       // Never silently replace a real microphone with the scripted demo. That
       // looked like a successful session while listening to nothing the speaker

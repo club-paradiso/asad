@@ -198,6 +198,10 @@ export class WebSpeechProvider extends BaseSpeechProvider {
             // browser rated equally. It is the only signal available here that
             // knows this speaker is about to say "RAG" rather than "라그".
             hints: this.options.hints,
+            // And the language the interpreter is producing is the one the
+            // speaker is most likely to drop into, so its script counts as
+            // correctly recognised rather than as noise.
+            guestLanguage: this.options.guestLanguage,
           });
           if (!text) continue;
           hasResult = true;
