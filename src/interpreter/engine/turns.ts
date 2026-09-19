@@ -158,6 +158,17 @@ export interface LaneStats {
    * them at all. The cheapest possible provisional English.
    */
   provisionalPassthrough: number;
+  /**
+   * Turns whose pair shares one writing system, so script evidence was refused
+   * rather than invented. High on an English→Vietnamese or Russian→Mongolian
+   * session and zero on a Korean→English one — which is the honest shape.
+   */
+  undecidablePairTurns: number;
+  /**
+   * Turns carrying a run in a script belonging to NEITHER side of the pair: a
+   * third language the session did not expect. Preserved, never classified.
+   */
+  unexpectedScriptTurns: number;
 }
 
 export const emptyLaneStats = (): LaneStats => ({
@@ -181,6 +192,8 @@ export const emptyLaneStats = (): LaneStats => ({
   terminologyFixes: 0,
   codeSwitchedTurns: 0,
   provisionalPassthrough: 0,
+  undecidablePairTurns: 0,
+  unexpectedScriptTurns: 0,
 });
 
 /** How many turn records the engine keeps for bookkeeping. */

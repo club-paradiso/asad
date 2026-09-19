@@ -147,6 +147,7 @@ async function requestSttCredentials(
   signal?: AbortSignal,
   usage: SttUsage = "live",
   counterAccess?: CounterAccess,
+  guestLanguage?: string,
 ): Promise<SttCredentials | null> {
   const response = await guardedFetch("/api/stt/token", {
     method: "POST",
@@ -154,7 +155,7 @@ async function requestSttCredentials(
       "content-type": "application/json",
       ...(counterAccess ? { [COUNTER_TOKEN_HEADER]: counterAccess.token } : {}),
     },
-    body: JSON.stringify({ language, usage, code: counterAccess?.code }),
+    body: JSON.stringify({ language, guestLanguage, usage, code: counterAccess?.code }),
     signal,
   });
   if (!response.ok) return null;
@@ -229,6 +230,8 @@ export async function fetchSttCredentials(
   signal?: AbortSignal,
   usage: SttUsage = "live",
   counterAccess?: CounterAccess,
+  /** The other language this session expects to hear. Live only; a counter turn is one language. */
+  guestLanguage?: string,
 ): Promise<SttCredentials | null> {
   if (usage === "counter" && counterAccess) {
     const key = prefetchKey(language, usage, counterAccess);
@@ -247,5 +250,5 @@ export async function fetchSttCredentials(
     }
   }
 
-  return requestSttCredentials(language, signal, usage, counterAccess);
+  return requestSttCredentials(language, signal, usage, counterAccess, guestLanguage);
 }

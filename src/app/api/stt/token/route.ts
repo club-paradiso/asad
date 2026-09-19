@@ -18,6 +18,10 @@ import { appEnv } from "@/lib/env";
 import { guardInferenceRoute } from "@/lib/guard";
 import { findLanguage } from "@/lib/languages";
 import { whisperLanguage } from "@/providers/stt/language";
+import {
+  buildOpenAiTranscriptionConfig,
+  openAiClientSecretBody,
+} from "@/providers/stt/openai-transcription";
 import type { SttCredentials } from "@/providers/stt/types";
 import {
   COUNTER_TOKEN_HEADER,
@@ -44,6 +48,7 @@ export async function POST(request: Request) {
 
   const body = (guarded.body ?? {}) as {
     language?: unknown;
+    guestLanguage?: unknown;
     usage?: unknown;
     code?: unknown;
   };
@@ -51,6 +56,14 @@ export async function POST(request: Request) {
     typeof body.language === "string" && findLanguage(body.language)
       ? body.language
       : "ko-KR";
+  // The other language this session expects to hear. A live session is bilingual
+  // by definition, and the ephemeral session must be minted with the same
+  // expectation the websocket will then be configured with — otherwise the
+  // recogniser is told two different things a moment apart.
+  const requestedGuest =
+    typeof body.guestLanguage === "string" && findLanguage(body.guestLanguage)
+      ? body.guestLanguage
+      : undefined;
   const suppliedCounterToken = counterTokenFrom(request);
   let counterTurn = body.usage === "counter" || !!suppliedCounterToken;
   if (counterTurn) {
@@ -109,7 +122,14 @@ export async function POST(request: Request) {
   // `zh` and SAYS SO rather than quietly returning Simplified characters and
   // reporting success.
   const whisper = whisperLanguage(requestedLanguage);
-  const session = await mintOpenAiSession(key, model, whisper?.code ?? requestedLanguage.split("-")[0]);
+  const session = await mintOpenAiSession(
+    key,
+    buildOpenAiTranscriptionConfig({
+      model,
+      primaryLanguage: requestedLanguage,
+      guestLanguage: requestedGuest,
+    }),
+  );
 
   if (counterTurn && !session) {
     return fallback("An ephemeral OpenAI transcription session could not be issued.");
@@ -153,29 +173,43 @@ async function mintDeepgramKey(accountKey: string): Promise<string | null> {
   }
 }
 
-/** Ask OpenAI for an ephemeral realtime transcription session token. */
+/**
+ * Ask OpenAI for an ephemeral realtime transcription session token.
+ *
+ * The transcription config is built by the shared builder rather than assembled
+ * here, so the session this mints and the session the websocket then updates
+ * carry the same model, the same language expectation and the same field names.
+ *
+ * THE GA INTERFACE, NOT THE BETA ONE
+ *
+ * This used to POST `/v1/realtime/transcription_sessions` with an
+ * `OpenAI-Beta: realtime=v1` header, which is the BETA realtime interface. That
+ * interface's transcription config documents exactly three fields — `language`,
+ * `model`, `prompt` — and lists three models, none of them this deployment's.
+ * `languages` and `keywords`, the two fields that let a session say "this audio
+ * contains more than one language" and "here is the vocabulary", exist only on
+ * GA. Building them correctly and then handing them to the beta endpoint would
+ * have been a fix that could not work.
+ *
+ * So: the GA client-secret endpoint, no beta header, and the session
+ * configuration nested the way GA nests it — `session.audio.input`, with the
+ * PCM format as an object rather than the old `pcm16` string. The websocket's
+ * own `transcription_session.update` keeps its flat field names, because that
+ * event is specified flat on GA too.
+ */
 async function mintOpenAiSession(
   apiKey: string,
-  model: string,
-  /** Already resolved to what the vendor accepts — never a raw BCP-47 tag. */
-  language: string,
+  transcription: ReturnType<typeof buildOpenAiTranscriptionConfig>,
 ): Promise<string | null> {
   try {
-    const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
+    const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-        "OpenAI-Beta": "realtime=v1",
-      },
-      body: JSON.stringify({
-        input_audio_format: "pcm16",
-        input_audio_transcription: { model, language },
-      }),
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(openAiClientSecretBody(transcription)),
     });
     if (!response.ok) return null;
-    const data = (await response.json()) as { client_secret?: { value?: string } };
-    return data.client_secret?.value ?? null;
+    const data = (await response.json()) as { value?: string };
+    return data.value ?? null;
   } catch {
     return null;
   }

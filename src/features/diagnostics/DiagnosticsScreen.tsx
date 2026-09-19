@@ -127,6 +127,16 @@ interface Payload {
     ephemeralKeysAvailable: boolean | null;
     model: string;
     codeSwitching: { defaultPair: string; support: string; detail: string };
+    openai: {
+      model: string;
+      family: string;
+      expectedLanguages: boolean;
+      keywords: boolean;
+      turnDetection: boolean;
+      interface: string;
+      fieldsSent: string[];
+      note: string;
+    };
   };
   llm: {
     routingMode: string;
@@ -719,6 +729,22 @@ export function DiagnosticsScreen() {
           v={`${data.stt.codeSwitching.support} — ${data.stt.codeSwitching.detail}`}
           tone={data.stt.codeSwitching.support === "none" ? "warn" : "ok"}
         />
+        {data.stt.provider === "openai" && (
+          <Row
+            k="Transcription contract"
+            v={
+              <>
+                <code className="text-xs">{data.stt.openai.family}</code>
+                {" on "}
+                <code className="text-xs">{data.stt.openai.interface}</code>
+                {" · sends "}
+                <code className="text-xs">{data.stt.openai.fieldsSent.join(", ") || "model only"}</code>
+                {` — ${data.stt.openai.note}`}
+              </>
+            }
+            tone={data.stt.openai.expectedLanguages ? "ok" : "warn"}
+          />
+        )}
       </Section>
 
       <Section title="Counter Mode">

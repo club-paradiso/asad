@@ -113,14 +113,20 @@ describe("OpenAI realtime turn detection", () => {
     expect(detection.prefix_padding_ms).toBeGreaterThan(0);
   });
 
-  it("passes vocabulary hints through as a transcription prompt", () => {
+  it("passes vocabulary hints through as literal keywords", () => {
+    // The configured default is `gpt-live-transcribe`, which has a dedicated
+    // `keywords` field for exactly this. Terms used to be folded into an
+    // English sentence in `prompt` instead — describing to a model, in prose,
+    // something it had a structured parameter for.
     const session = openai({
       language: "en-US",
       utterance: true,
       hints: ["alien registration", "E-7"],
     }).session();
-    const transcription = session.input_audio_transcription as { prompt?: string };
-    expect(transcription.prompt).toContain("alien registration");
-    expect(transcription.prompt).toContain("E-7");
+    const transcription = session.input_audio_transcription as {
+      keywords?: string[];
+      prompt?: string;
+    };
+    expect(transcription.keywords).toEqual(["alien registration", "E-7"]);
   });
 });
