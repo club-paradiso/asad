@@ -52,6 +52,11 @@ describe("availability", () => {
     expect(liveGatewayRecovery()?.id).toBe(LIVE_RECOVERY_ID);
   });
 
+  it("is available from the current request's OIDC token when the env snapshot is absent", () => {
+    expect(liveRecoveryAllowed(KEY)).toBe(true);
+    expect(liveGatewayRecovery(KEY)?.id).toBe(LIVE_RECOVERY_ID);
+  });
+
   it("is available from an explicit gateway key", () => {
     setEnv({ AI_GATEWAY_API_KEY: KEY });
     expect(liveRecoveryAllowed()).toBe(true);
@@ -66,6 +71,12 @@ describe("strict privacy mode", () => {
     setEnv({ VERCEL_OIDC_TOKEN: KEY, LLM_PRIVACY_MODE: "strict" });
     expect(liveRecoveryAllowed()).toBe(false);
     expect(liveGatewayRecovery()).toBeNull();
+  });
+
+  it("also ignores a request-scoped host token in strict mode", () => {
+    setEnv({ LLM_PRIVACY_MODE: "strict" });
+    expect(liveRecoveryAllowed(KEY)).toBe(false);
+    expect(liveGatewayRecovery(KEY)).toBeNull();
   });
 
   it("accepts a key the deployer set on purpose", () => {

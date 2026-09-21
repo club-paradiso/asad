@@ -223,6 +223,9 @@ export async function POST(request: Request) {
   // general session on the strict, single-provider privacy path until a
   // concrete non-sensitive desk/conversation profile is established.
   const forceSensitiveRouting = effectiveProfileId === "general";
+  // In Vercel Functions the current OIDC credential is request-scoped. It is
+  // deliberately threaded only through server code and never persisted.
+  const gatewayToken = request.headers.get("x-vercel-oidc-token")?.trim() || undefined;
 
   const result = await translateForCounter({
     text,
@@ -237,7 +240,25 @@ export async function POST(request: Request) {
     profileId: effectiveProfileId,
     forceSensitiveRouting,
     routingKey: `counter:${code}`,
+    gatewayToken,
   });
+
+  if (!result.ok) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        event: "counter_translation_failed",
+        provider: result.provider ?? null,
+        latencyMs: result.latencyMs,
+        gatewayRecoveryAvailable: Boolean(
+          process.env.AI_GATEWAY_API_KEY?.trim() ||
+            gatewayToken ||
+            process.env.VERCEL_OIDC_TOKEN?.trim(),
+        ),
+        reason: result.error ?? "unknown",
+      }),
+    );
+  }
 
   const base = {
     id: nextId(),
