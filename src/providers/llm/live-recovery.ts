@@ -77,8 +77,8 @@ export const liveRecoveryModel = (): string =>
  * changes is whether reaching a new set of servers happened by configuration or
  * by hosting.
  */
-export function liveRecoveryAllowed(): boolean {
-  if (!vercelGatewayAvailable()) return false;
+export function liveRecoveryAllowed(requestToken?: string | null): boolean {
+  if (!vercelGatewayAvailable(requestToken)) return false;
   if (appEnv().llm.privacyMode !== "strict") return true;
   return !!process.env.AI_GATEWAY_API_KEY?.trim();
 }
@@ -92,15 +92,16 @@ export function liveRecoveryAllowed(): boolean {
  * configured the gateway should not accumulate a failed gateway attempt on
  * every turn of every session.
  */
-export function liveGatewayRecovery(): RouteRecovery | null {
-  if (!liveRecoveryAllowed()) return null;
+export function liveGatewayRecovery(requestToken?: string | null): RouteRecovery | null {
+  if (!liveRecoveryAllowed(requestToken)) return null;
   return {
     id: LIVE_RECOVERY_ID,
-    available: liveRecoveryAllowed,
+    available: () => liveRecoveryAllowed(requestToken),
     complete: (request, options) =>
       completeViaVercelGateway(request, {
         timeoutMs: options.timeoutMs,
         model: liveRecoveryModel(),
+        token: requestToken,
       }),
   };
 }
