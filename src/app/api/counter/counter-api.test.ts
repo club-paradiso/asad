@@ -53,12 +53,16 @@ const patch = (body: { code: string; guestLang: string }) =>
     body: JSON.stringify(body),
   });
 
-const send = (body: { code: string; from: "host" | "guest"; [key: string]: unknown }) =>
+const send = (
+  body: { code: string; from: "host" | "guest"; [key: string]: unknown },
+  gatewayToken?: string,
+) =>
   new Request("http://localhost/api/counter/message", {
     method: "POST",
     headers: {
       ...authorised(),
       [COUNTER_TOKEN_HEADER]: participants.get(body.code)?.[body.from] ?? "invalid",
+      ...(gatewayToken ? { "x-vercel-oidc-token": gatewayToken } : {}),
     },
     body: JSON.stringify(
       Object.fromEntries(Object.entries(body).filter(([key]) => key !== "from")),
@@ -309,6 +313,24 @@ describe("POST /api/counter/message", () => {
     expect(body.message.originalText).toBe("3:00 · 2");
     expect(body.message.translatedText).toBe("3:00 · 2");
     expect(body.message.risks?.length).toBeGreaterThan(0);
+  });
+
+  it("threads the current request's Vercel OIDC token into translation recovery", async () => {
+    const code = await openSession();
+    const oidc = "oidc_" + "x".repeat(32);
+    const response = await SEND(
+      send(
+        { code, from: "host", source: "text", text: "예약하셨나요?" },
+        oidc,
+      ),
+    );
+
+    const body = await response.json();
+    expect(translateForCounter).toHaveBeenCalledWith(
+      expect.objectContaining({ gatewayToken: oidc }),
+    );
+    // The credential is routing state, not conversation data.
+    expect(JSON.stringify(body)).not.toContain(oidc);
   });
 
   it("translates ordinary text and flags the values worth confirming", async () => {
