@@ -15,7 +15,6 @@ import { resolveQuickPhrase } from "@/counter/quick-phrases";
 import { detectRisks } from "@/counter/risks";
 import { extractCriticalValues, validateTranslationIntegrity } from "@/counter/integrity";
 import { translateForCounter } from "@/counter/translate";
-import { vercelGatewayAvailable } from "@/providers/llm/vercel-gateway";
 import { detectCounterProfile } from "@/counter/profile-detection";
 import type { CounterMessage } from "@/counter/types";
 import { guardInferenceRoute } from "@/lib/guard";
@@ -251,7 +250,11 @@ export async function POST(request: Request) {
         event: "counter_translation_failed",
         provider: result.provider ?? null,
         latencyMs: result.latencyMs,
-        gatewayRecoveryAvailable: vercelGatewayAvailable(gatewayToken),
+        gatewayRecoveryAvailable: Boolean(
+          process.env.AI_GATEWAY_API_KEY?.trim() ||
+            gatewayToken ||
+            process.env.VERCEL_OIDC_TOKEN?.trim(),
+        ),
         reason: result.error ?? "unknown",
       }),
     );
