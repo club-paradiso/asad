@@ -48,7 +48,11 @@ const OPTIONAL_MODEL_FIELDS = new Set([
   "ANTHROPIC_LLM_MODEL",
 ]);
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Vercel Functions issue the OIDC token on the current request. Diagnostics
+  // must inspect the same source the inference routes use or it can falsely
+  // report that recovery is disabled while a valid token is present.
+  const gatewayToken = request.headers.get("x-vercel-oidc-token")?.trim() || undefined;
   const env = appEnv();
   const router = llmRouter();
   const plan = router.plan();
@@ -232,8 +236,8 @@ export async function GET() {
       // operator is asking when Live goes quiet is "was there anything else to
       // try?" — and before this existed, for Live, the answer was no.
       recovery: (() => {
-        const credentialPresent = vercelGatewayAvailable();
-        const configured = liveRecoveryAllowed();
+        const credentialPresent = vercelGatewayAvailable(gatewayToken);
+        const configured = liveRecoveryAllowed(gatewayToken);
         return {
           route: LIVE_RECOVERY_ID,
           configured,
