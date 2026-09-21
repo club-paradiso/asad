@@ -33,20 +33,35 @@ interface GatewayChatResponse {
   error?: { message?: string };
 }
 
-export function vercelGatewayToken(): string | null {
-  const token = process.env.AI_GATEWAY_API_KEY?.trim() || process.env.VERCEL_OIDC_TOKEN?.trim();
+/**
+ * Resolve a Gateway credential for the current request.
+ *
+ * Vercel Functions receive their OIDC token on the request context. Some
+ * runtimes also expose a VERCEL_OIDC_TOKEN environment variable, but treating
+ * that snapshot as the only source made recovery silently unavailable in
+ * production even while the current request carried a valid token.
+ *
+ * The caller may therefore pass the request-scoped token down explicitly. An
+ * operator-supplied AI_GATEWAY_API_KEY still wins, and the environment token is
+ * retained as a compatibility fallback for local/dev and older runtimes.
+ */
+export function vercelGatewayToken(requestToken?: string | null): string | null {
+  const token =
+    process.env.AI_GATEWAY_API_KEY?.trim() ||
+    requestToken?.trim() ||
+    process.env.VERCEL_OIDC_TOKEN?.trim();
   return token || null;
 }
 
-export function vercelGatewayAvailable(): boolean {
-  return vercelGatewayToken() !== null;
+export function vercelGatewayAvailable(requestToken?: string | null): boolean {
+  return vercelGatewayToken(requestToken) !== null;
 }
 
 export async function completeViaVercelGateway(
   request: LlmRequest,
-  options: { timeoutMs?: number; model?: string } = {},
+  options: { timeoutMs?: number; model?: string; token?: string | null } = {},
 ): Promise<LlmResponse> {
-  const token = vercelGatewayToken();
+  const token = vercelGatewayToken(options.token);
   if (!token) {
     throw new LlmError("Vercel AI Gateway authentication is unavailable.", "auth");
   }
