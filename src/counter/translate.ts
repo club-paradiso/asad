@@ -55,7 +55,11 @@ export interface TranslationResult {
  * session: doing that disables the normal provider fallback chain and makes one
  * vendor/model hiccup look like a language-specific translation outage.
  */
-type CounterRoutingInput = CounterPromptInput & { forceSensitiveRouting?: boolean };
+type CounterRoutingInput = CounterPromptInput & {
+  forceSensitiveRouting?: boolean;
+  /** Request-scoped Vercel OIDC token. Server-only; never copied into prompts or responses. */
+  gatewayToken?: string;
+};
 
 function routerForCounter(input: CounterRoutingInput): {
   router: LlmRouter;
@@ -117,7 +121,7 @@ async function translateViaGateway(
         jsonSchema: COUNTER_JSON_SCHEMA,
         thinking: "none",
       },
-      { timeoutMs: COUNTER_DEADLINE_MS },
+      { timeoutMs: COUNTER_DEADLINE_MS, token: input.gatewayToken },
     );
 
     const output = parseCounterOutput(response.text);
@@ -188,7 +192,7 @@ export async function translateForCounter(
   // OpenRouter path. The Vercel Gateway is only a recovery route for ordinary
   // Counter translation and therefore cannot weaken that policy boundary.
   if (!routedCloud) {
-    if (!sensitive && vercelGatewayAvailable()) {
+    if (!sensitive && vercelGatewayAvailable(input.gatewayToken)) {
       return translateViaGateway(input, started);
     }
     return {
@@ -235,7 +239,7 @@ export async function translateForCounter(
     telemetry.recordSchemaResult(output !== null);
 
     if (!output) {
-      if (!sensitive && vercelGatewayAvailable()) {
+      if (!sensitive && vercelGatewayAvailable(input.gatewayToken)) {
         return translateViaGateway(input, started);
       }
       return {
@@ -255,7 +259,7 @@ export async function translateForCounter(
     });
 
     if (!output.translation.trim()) {
-      if (!sensitive && vercelGatewayAvailable()) {
+      if (!sensitive && vercelGatewayAvailable(input.gatewayToken)) {
         return translateViaGateway(input, started);
       }
       return {
@@ -278,7 +282,7 @@ export async function translateForCounter(
     const llmError = toLlmError(error);
     telemetry.recordFailure(llmError.kind);
 
-    if (!sensitive && vercelGatewayAvailable()) {
+    if (!sensitive && vercelGatewayAvailable(input.gatewayToken)) {
       const recovered = await translateViaGateway(input, started);
       if (recovered.ok) return recovered;
     }
