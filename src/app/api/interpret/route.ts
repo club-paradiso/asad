@@ -140,13 +140,15 @@ export async function POST(request: Request) {
       ? null
       : router.preferred(undefined, routingKey));
 
-  // The gateway recovery route, when this deployment has one. It is reached
-  // only after the configured chain fails — but it must also be reachable when
-  // there is no configured chain at all, which is the exact shape of the
-  // "transcription works, interpretation never appears" report: a deployment
-  // whose only provider key ran out of free allowance, sitting on Vercel with a
-  // perfectly good OIDC token it never used for Live.
-  const recovery = liveGatewayRecovery();
+  // The gateway recovery route, when this deployment has one. Vercel issues
+  // the OIDC credential per request in Functions, so pass the current request's
+  // token instead of assuming a process environment snapshot exists.
+  const gatewayToken = request.headers.get("x-vercel-oidc-token")?.trim() || undefined;
+  // The route is reached only after the configured chain fails — but it must
+  // also be reachable when there is no configured chain at all, which is the
+  // exact shape of the "transcription works, interpretation never appears"
+  // report.
+  const recovery = liveGatewayRecovery(gatewayToken);
 
   // No cloud route of any kind: answer locally without pretending otherwise.
   if ((!preferred || preferred === "local") && !recovery) {
