@@ -28,7 +28,12 @@ if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1 || requestedLimi
 const file = join(dirname(fileURLToPath(import.meta.url)), "../benchmarks/earbud/synthetic-ko.json");
 const suite = JSON.parse(readFileSync(file, "utf8"));
 if (suite.version !== 1 || !Array.isArray(suite.items)) throw new Error("Invalid synthetic fixture suite.");
-const fixtures = suite.items.slice(0, requestedLimit);
+// Phase 4B live smoke deliberately spans different languages instead of
+// testing the first English-only rows; offline mock still covers all fixtures.
+const fixtures = (live
+  ? [...new Map(suite.items.map(item => [item.source, item])).values()]
+  : suite.items
+).slice(0, requestedLimit);
 const stats = [];
 const percentile = (values, q) => {
   if (!values.length) return null;
@@ -60,8 +65,12 @@ for (const row of fixtures) {
       picked = result.selected ?? null;
       adjudication = result.adjudication;
     }
-  } catch {
-    failure = "timeout or provider error";
+  } catch (error) {
+    // Provider adapter returns a bounded, safe status string, never source text.
+    const description = error instanceof Error ? error.message : "";
+    const http = /Index public API unavailable \\(\\d{3}\\)/.exec(description);
+    failure = http ? `HTTP ${http[1]}` :
+      /timeout|abort|deadline/i.test(description) ? "timeout" : "provider/network error";
   }
   const elapsedMs = Math.round(performance.now() - started);
   const numericSafe = preservesCriticalTokens(row.text, text ?? "");
