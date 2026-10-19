@@ -11,6 +11,11 @@ export async function GET() {
   const enabled = !!key && !env.llm.paidTier.has("gemini") && !!env.access.key;
   const ensemble = ensembleConfig();
   return NextResponse.json({
+    index: {
+      available: !!env.access.key && process.env.ASAD_INDEX_TRANSLATE_PUBLIC === "1",
+      model: "Index-Translate-35B-A3B",
+      note: "Isolated free public API probe for synthetic data only; subject to external availability, quotas and privacy terms.",
+    },
     ensemble: {
       available: ensemble.enabled,
       providers: ["Index-Translate-35B-A3B", "Azure Translator F0"],
