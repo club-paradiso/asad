@@ -15,6 +15,6 @@ describe("earbud audio media", () => {
   });
   it("creates a local tone without calling external services", () => {
     expect(testToneWav().type).toBe("audio/wav");
-    expect(testToneWav().size).toBe(44 + 9_600);
+    expect(testToneWav().size).toBe(44 + 48_000);
   });
 });
