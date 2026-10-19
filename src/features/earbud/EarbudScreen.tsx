@@ -12,6 +12,7 @@ import {
   type SttProviderId,
 } from "@/providers/stt";
 import { useBoothAudioInput } from "@/features/live/useBoothAudioInput";
+import { useCapability } from "@/hooks/useCapability";
 import { preferredSttSource } from "@/features/live/sourcePreference";
 import { useCloudConsent } from "@/features/live/useCloudConsent";
 import { useLiveSession } from "@/features/live/useLiveSession";
@@ -30,7 +31,7 @@ export function EarbudScreen() {
   const [language, setLanguage] = useState("en-US");
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [configFailed, setConfigFailed] = useState(false);
-  const [browserSupported, setBrowserSupported] = useState(false);
+  const browserSupported = useCapability(() => WebSpeechProvider.isSupported());
   const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(null);
   const [testConfirmed, setTestConfirmed] = useState(false);
   const [syntheticOnly, setSyntheticOnly] = useState(false);
@@ -40,10 +41,10 @@ export function EarbudScreen() {
   const playedIds = useRef(new Set<string>());
   const ending = useRef(false);
   const audio = useSpeechPlayback();
+  const { enqueue: enqueueAudio, enabled: audioEnabled } = audio;
 
   useEffect(() => {
     let mounted = true;
-    setBrowserSupported(WebSpeechProvider.isSupported());
     fetch("/api/config", { cache: "no-store" })
       .then((response) => {
         if (!response.ok) throw new Error("설정을 조회하지 못했습니다.");
@@ -116,9 +117,9 @@ export function EarbudScreen() {
     for (const chunk of chunks) {
       playedIds.current.add(chunk.id);
       // The local failover is deterministic assistance, not reliable translation.
-      if (audio.enabled && session.lastProvider !== "local") audio.enqueue(chunk.text);
+      if (audioEnabled && session.lastProvider !== "local") enqueueAudio(chunk.text);
     }
-  }, [session.snapshot.chunks, session.phase, session.lastProvider, audio.enqueue, audio.enabled]);
+  }, [session.snapshot.chunks, session.phase, session.lastProvider, enqueueAudio, audioEnabled]);
 
   const latest = [...session.snapshot.chunks].reverse()
     .find((chunk) => chunk.state === "committed" && !chunk.provisional);
