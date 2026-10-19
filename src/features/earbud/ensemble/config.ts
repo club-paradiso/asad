@@ -1,4 +1,5 @@
 import { appEnv } from "@/lib/env";
+import { resolveCounterRedisConfig } from "@/counter/store";
 
 /**
  * Never infer free-tier status from the mere existence of an Azure key.
@@ -10,7 +11,8 @@ export function ensembleConfig() {
   const secured = !!env.access.key;
   const index = secured && process.env.ASAD_EARBUD_ENSEMBLE === "1"
     && process.env.ASAD_INDEX_TRANSLATE_PUBLIC === "1";
-  const azure = secured && process.env.ASAD_EARBUD_ENSEMBLE === "1"
+  // Azure must be disabled if the shared, atomic monthly ledger is absent.
+  const azure = secured && !!resolveCounterRedisConfig() && process.env.ASAD_EARBUD_ENSEMBLE === "1"
     && process.env.ASAD_AZURE_F0_CONFIRMED === "1"
     && !!process.env.AZURE_TRANSLATOR_KEY?.trim();
   const judge = index && azure
