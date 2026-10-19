@@ -89,7 +89,7 @@ export function EarbudScreen() {
   const inputLost = source !== "webspeech" && source !== "demo"
     && !!audioInputs.deviceId && !audioInputs.selectionAvailable;
   const mayStart = !active && config !== null && config.llm.modelAvailable
-    && !gate?.gated || false;
+    && gate !== null && (!gate.gated || gate.authorised);
   // The gate and source are checked independently; a truthy model alone is not enough.
   const canStart = !!mayStart && consent.mayStart && source !== "demo"
     && sttSupport !== "unsupported" && !pairError && !inputLost
