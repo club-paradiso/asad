@@ -82,15 +82,15 @@ export function useSpeechPlayback() {
     }
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     objectUrl.current = URL.createObjectURL(blob);
-    audio.src = objectUrl.current;
-    audio.onended = () => finish(token);
-    audio.onerror = () => {
+    audio.setAttribute("src", objectUrl.current);
+    audio.addEventListener("ended", () => finish(token), { once: true });
+    audio.addEventListener("error", () => {
       if (generation.current !== token) return;
       setStatus("error");
       setNotice("오디오 파일 재생 실패. Safari 출력 경로·무음 모드·권한을 확인해.");
       backlog.current = [];
       busy.current = false;
-    };
+    }, { once: true });
     setStatus("preparing");
     try {
       await audio.play();
