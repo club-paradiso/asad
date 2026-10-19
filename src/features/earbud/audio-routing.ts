@@ -47,5 +47,8 @@ export function testToneWav(): Blob {
     const sample = Math.round(7000 * envelope * Math.sin(2 * Math.PI * 700 * i / rate));
     view.setInt16(i * 2, sample, true);
   }
-  return new Blob([pcm16ToWav(pcm)], { type: "audio/wav" });
+  const wav = pcm16ToWav(pcm);
+  const bytes = new ArrayBuffer(wav.byteLength);
+  new Uint8Array(bytes).set(wav);
+  return new Blob([bytes], { type: "audio/wav" });
 }
