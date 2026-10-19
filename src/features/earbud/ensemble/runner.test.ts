@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkCandidate, chooseTranslation, criticalTokens, overlap } from "./decision";
+import { checkCandidate, chooseTranslation, criticalTokens, overlap, preservesCriticalTokens } from "./decision";
 import { runEnsemble } from "./runner";
 
 const source = "My E-7-1 extension has not been approved, and I paid 120,000 won.";
@@ -8,6 +8,10 @@ const azure = "E-7-1 체류기간 연장이 아직 승인되지 않았으며, 12
 const c = (provider: "index" | "azure", text: string) => ({ provider, text, latencyMs: 12 });
 
 describe("earbud translation selection safety", () => {
+  it("accepts faithful Korean hh시 mm분 for a source clock, but rejects changed minutes", () => {
+    expect(preservesCriticalTokens("Come at 09:20", "09시 20분에 오세요.")).toBe(true);
+    expect(preservesCriticalTokens("Come at 09:20", "09시 30분에 오세요.")).toBe(false);
+  });
   it("retains all visa class and numeric identifiers", () => {
     expect(criticalTokens(source)).toEqual(expect.arrayContaining(["E-7-1", "120000"]));
     expect(checkCandidate(source, index).ok).toBe(true);
