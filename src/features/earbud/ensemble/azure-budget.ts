@@ -19,7 +19,7 @@ redis.call('PEXPIRE', KEYS[1], ARGV[3])
 return 1
 `;
 
-export function azureMonthlyBudgetLimit(source: NodeJS.ProcessEnv = process.env): number {
+export function azureMonthlyBudgetLimit(source: { ASAD_AZURE_F0_MONTHLY_CAP?: string } = process.env): number {
   const value = Number(source.ASAD_AZURE_F0_MONTHLY_CAP ?? "1500000");
   if (!Number.isSafeInteger(value) || value < 1000 || value > MAX_AZURE_F0_BUDGET)
     return MAX_AZURE_F0_BUDGET;
