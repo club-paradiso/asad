@@ -4,9 +4,9 @@ import { azureMonthlyBudgetLimit, budgetPeriod, reserveAzureCharactersWithConfig
 const config = {url:"https://redis.invalid",token:"TEST_REDIS_TOKEN",source:"upstash" } as const;
 describe("cross-instance Azure monthly F0 guard", () => {
   it("caps user budgets below the 2M tier and matches UTC billing month", () => {
-    expect(azureMonthlyBudgetLimit({ ASAD_AZURE_F0_MONTHLY_CAP: "2000000" } as NodeJS.ProcessEnv))
+    expect(azureMonthlyBudgetLimit({ ASAD_AZURE_F0_MONTHLY_CAP: "2000000" }))
       .toBe(1_500_000);
-    expect(azureMonthlyBudgetLimit({ ASAD_AZURE_F0_MONTHLY_CAP: "200000" } as NodeJS.ProcessEnv))
+    expect(azureMonthlyBudgetLimit({ ASAD_AZURE_F0_MONTHLY_CAP: "200000" }))
       .toBe(200000);
     expect(budgetPeriod(new Date("2026-10-31T23:59:59Z")).key).toContain("2026-10");
     expect(budgetPeriod(new Date("2026-11-01T00:00:00Z")).key).toContain("2026-11");
