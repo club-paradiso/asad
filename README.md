@@ -146,6 +146,10 @@ ASAD가 하는 일:
 
 외국어 발화를 한국어로 번역해 휴대전화의 기본 음성 출력(예: AirPods)으로 들으려면 [`/listen`](https://asad-what.vercel.app/listen)을 사용합니다. 이 URL은 기능이 배포된 후에만 접근할 수 있습니다. 안정화된 번역만 음성으로 읽으며, 시험용으로만 사용합니다. iOS에서는 마이크 입력과 AirPods 출력의 독립적인 선택·동시 작동을 보장하지 않습니다. 실제 민원인의 개인정보를 입력하거나 공식 통역에 사용하지 마세요. 개발 및 실기기 검증 기준은 [Earbud Mode 문서](docs/earbud-mode.md)를 참고하세요.
 
+## Smart Ensemble 품질 벤치마크 (합성 테스트만)
+
+`npm run bench:earbud`은 38개의 가상 민원 문장으로 오프라인 병렬 번역·판정 파이프라인을 확인합니다. 실제 모델이 아니라 모의 출력이며 성능 우위의 증거가 **아닙니다**. 외부 무료 Index API 테스트는 `npm run bench:earbud -- --index-live --confirm-synthetic-only --limit 3`으로 명시적으로 실행해야 합니다. Azure F0 실제 연동·월별 사용량 보호·환경변수 조건은 `docs/earbud-mode.md`를 참고하세요. 실제 민원 정보로 테스트하면 안 됩니다.
+
 ## 언어 지원
 
 언어에 대해 아는 것은 **`src/lib/languages.ts` 한 곳**에 모여 있습니다. 태그, 문자 체계, 쓰기 방향, 띄어쓰기 여부, 인식기별 지원 수준, 크롬 기기 내 번역기 코드, 그리고 그 언어를 어디에 내놓아도 되는지까지 전부요.
