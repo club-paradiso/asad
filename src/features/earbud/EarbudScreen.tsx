@@ -39,7 +39,7 @@ export function EarbudScreen() {
   const [earbudStatus, setEarbudStatus] = useState<EarbudFreeStatus | null>(null);
   const [latencySamples, setLatencySamples] = useState<number[]>([]);
   const [lag, setLag] = useState<"fast" | "balanced" | "safe">("balanced");
-  const [translationMode, setTranslationMode] = useState<TranslationMode>("ensemble");
+  const [translationMode, setTranslationMode] = useState<TranslationMode>("single");
   const [externalConsent, setExternalConsent] = useState(false);
   const browserSupported = useCapability(() => WebSpeechProvider.isSupported());
 
