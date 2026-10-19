@@ -33,7 +33,7 @@ export function preservesCriticalTokens(source: string, translated: string): boo
   const preserved = new Set(criticalTokens(translated));
   return criticalTokens(source).every(token => {
     if (preserved.has(token)) return true;
-    const clock = /^(\\d{1,2}):(\\d{2})$/.exec(token);
+    const clock = /^(\d{1,2}):(\d{2})$/.exec(token);
     if (!clock) return false;
     const hour = String(Number(clock[1])), minute = String(Number(clock[2]));
     // A safe equivalent time must keep both hour and minute in order.
