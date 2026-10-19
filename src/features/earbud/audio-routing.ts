@@ -39,12 +39,14 @@ export function pcm16ToWav(pcm: Uint8Array, sampleRate = 24_000): Uint8Array {
 
 /** A distinct media-element test, independent from Web Speech voice synthesis. */
 export function testToneWav(): Blob {
-  const rate = 24_000, frames = 4_800;
+  const rate = 24_000, frames = 24_000;
   const pcm = new Uint8Array(frames * 2);
   const view = new DataView(pcm.buffer);
   for (let i = 0; i < frames; i++) {
     const envelope = Math.min(1, i / 200) * Math.min(1, (frames - i) / 350);
-    const sample = Math.round(7000 * envelope * Math.sin(2 * Math.PI * 700 * i / rate));
+    const frequency = i < frames / 2 ? 650 : 900;
+    const gate = (i > frames * 0.42 && i < frames * 0.52) ? 0 : 1;
+    const sample = Math.round(12000 * gate * envelope * Math.sin(2 * Math.PI * frequency * i / rate));
     view.setInt16(i * 2, sample, true);
   }
   const wav = pcm16ToWav(pcm);
