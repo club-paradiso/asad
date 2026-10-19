@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { runEnsemble } from "../src/features/earbud/ensemble/runner.ts";
-import { checkCandidate, criticalTokens, overlap } from "../src/features/earbud/ensemble/decision.ts";
+import { checkCandidate, preservesCriticalTokens, overlap } from "../src/features/earbud/ensemble/decision.ts";
 import { translateIndex } from "../src/features/earbud/ensemble/providers.ts";
 
 const flags = process.argv.slice(2);
@@ -64,9 +64,7 @@ for (const row of fixtures) {
     failure = "timeout or provider error";
   }
   const elapsedMs = Math.round(performance.now() - started);
-  const referenceIdentifiers = new Set(criticalTokens(row.text));
-  const outputIdentifiers = new Set(criticalTokens(text ?? ""));
-  const numericSafe = [...referenceIdentifiers].every(t => outputIdentifiers.has(t));
+  const numericSafe = preservesCriticalTokens(row.text, text ?? "");
   const validation = text ? checkCandidate(row.text, text) : { ok: false };
   stats.push({
     id: row.id, lang: row.source, selected: picked, elapsedMs,
