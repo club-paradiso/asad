@@ -291,6 +291,8 @@ export const RATE_RULES = {
   sttToken: { limit: 10, windowMs: 60_000 },
   /** Batch fallback is intentionally scarce: one short Counter utterance. */
   sttHf: { limit: 6, windowMs: 60_000 },
+  earbudTtsSession: { limit: 10, windowMs: 60_000 },
+  earbudTtsAddress: { limit: 24, windowMs: 60_000 },
   /** The health check calls a provider; it is not a page-load endpoint. */
   health: { limit: 4, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
