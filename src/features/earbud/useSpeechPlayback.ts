@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_EARBUD_AUDIO_BACKLOG } from "./speakable";
+import { useCapability } from "@/hooks/useCapability";
 
 type AudioStatus = "unavailable" | "idle" | "speaking" | "error";
 
@@ -11,9 +12,9 @@ type AudioStatus = "unavailable" | "idle" | "speaking" | "error";
  * The explicit test button is therefore a release gate, not window dressing.
  */
 export function useSpeechPlayback() {
-  const [supported, setSupported] = useState(false);
+  const supported = useCapability(() => "speechSynthesis" in window && "SpeechSynthesisUtterance" in window);
   const [enabled, setEnabled] = useState(true);
-  const [status, setStatus] = useState<AudioStatus>("unavailable");
+  const [status, setStatus] = useState<AudioStatus>("idle");
   const [notice, setNotice] = useState<string | null>(null);
   const backlog = useRef<string[]>([]);
   const speaking = useRef(false);
@@ -21,14 +22,11 @@ export function useSpeechPlayback() {
   const draining = useRef<() => void>(() => {});
 
   useEffect(() => {
-    const available = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
-    setSupported(available);
-    setStatus(available ? "idle" : "unavailable");
     return () => {
       generation.current += 1;
       backlog.current = [];
       speaking.current = false;
-      if (available) window.speechSynthesis.cancel();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
   }, []);
 
@@ -107,5 +105,5 @@ export function useSpeechPlayback() {
     if (!value) stop();
   }, [stop]);
 
-  return { supported, enabled, status, notice, enqueue, test, stop, setPlayback };
+  return { supported, enabled, status: supported ? status : "unavailable", notice, enqueue, test, stop, setPlayback };
 }
