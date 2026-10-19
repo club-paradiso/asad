@@ -18,7 +18,12 @@ import { unspokenCommitted } from "./speakable";
 import { useSpeechPlayback } from "./useSpeechPlayback";
 
 const LANGUAGE_PRIORITY = ["en-US", "zh-CN", "ja-JP", "vi-VN", "id-ID", "uz-UZ", "mn-MN", "ru-RU"];
-type EarbudFreeStatus = { translation: { available: boolean; model: string; note: string }; tts: { available: boolean; model: string; note: string } };
+type EarbudFreeStatus = {
+  translation: { available: boolean; model: string; note: string };
+  ensemble: { available: boolean; providers: string[]; judgeEnabled: boolean; privacyNote: string; note: string };
+  tts: { available: boolean; model: string; note: string };
+};
+type TranslationMode = "ensemble" | "single";
 
 const AUDIO_STATES: Record<string, string> = {
   unavailable: "음성 출력 미지원",
@@ -33,7 +38,9 @@ export function EarbudScreen() {
   const [configFailed, setConfigFailed] = useState(false);
   const [earbudStatus, setEarbudStatus] = useState<EarbudFreeStatus | null>(null);
   const [latencySamples, setLatencySamples] = useState<number[]>([]);
-  const [lag, setLag] = useState<"fast" | "balanced" | "safe">("fast");
+  const [lag, setLag] = useState<"fast" | "balanced" | "safe">("balanced");
+  const [translationMode, setTranslationMode] = useState<TranslationMode>("ensemble");
+  const [externalConsent, setExternalConsent] = useState(false);
   const browserSupported = useCapability(() => WebSpeechProvider.isSupported());
 
   const [testConfirmed, setTestConfirmed] = useState(false);
@@ -75,7 +82,7 @@ export function EarbudScreen() {
     sourceLanguage: language,
     targetLanguage: "ko-KR",
     lag,
-    interpretEndpoint: "/api/earbud/interpret",
+    interpretEndpoint: translationMode === "ensemble" ? "/api/earbud/ensemble" : "/api/earbud/interpret",
     source,
     audioDeviceId:
       source === "webspeech" || source === "demo" ? undefined : audioInputs.deviceId || undefined,
@@ -89,13 +96,16 @@ export function EarbudScreen() {
   const pairError = liveLanguagePairProblem(language, "ko-KR");
   const inputLost = source !== "webspeech" && source !== "demo"
     && !!audioInputs.deviceId && !audioInputs.selectionAvailable;
-  const mayStart = !active && earbudStatus?.translation.available === true
+  const translationReady = translationMode === "ensemble"
+    ? earbudStatus?.ensemble?.available === true
+    : earbudStatus?.translation.available === true;
+  const mayStart = !active && translationReady
     && gate !== null && (!gate.gated || gate.authorised);
   // The gate and source are checked independently; a truthy model alone is not enough.
   const canStart = !!mayStart && consent.mayStart && source !== "demo"
     && sttSupport !== "unsupported" && !pairError && !inputLost
     && (audio.mode === "gemini" ? earbudStatus?.tts.available === true : audio.supported)
-    && testConfirmed && syntheticOnly;
+    && testConfirmed && syntheticOnly && externalConsent;
 
   const start = () => {
     if (!canStart) return;
@@ -144,7 +154,9 @@ export function EarbudScreen() {
     : gate === null ? "접근 권한 확인 중..."
     : gate.gated && !gate.authorised ? "접근 키 인증이 필요해."
     : !earbudStatus ? "무료 통역 모델의 준비 상태를 확인 중이야."
-    : !earbudStatus.translation.available ? "개인 비공개 배포에 Gemini 무료 API 키가 필요해. 유료 폴백은 차단되어 있어."
+    : !translationReady ? translationMode === "ensemble"
+      ? "병렬 번역은 아직 미설정이야. 비공개 배포의 Index 공용 API 활성화와 Azure F0 키가 필요해. 일반 단일 모델 모드로 바꿔 시험할 수 있어."
+      : "개인 비공개 배포에 Gemini 무료 API 키가 필요해. 유료 폴백은 차단되어 있어."
     : source === "demo" ? "이 기기의 브라우저 음성 인식이 지원되지 않아. 유료 STT 자동 전환은 금지했어."
     : pairError ? "선택한 입력 언어는 한국어 통역과 연결할 수 없어."
     : sttSupport === "unsupported" ? "현재 음성 인식기에서 이 언어를 지원하지 않아."
@@ -156,6 +168,7 @@ export function EarbudScreen() {
     : consent.phase === "declined" ? "데이터 전송 동의 없이 클라우드 통역을 시작할 수 없어."
     : !testConfirmed ? "이어폰으로 출력 테스트를 확인해."
     : !syntheticOnly ? "개인정보 없는 테스트 대화만 사용할 수 있어."
+    : !externalConsent ? "외부 번역 제공자에 동일한 가상 문장이 전송된다는 안내를 확인해."
     : null;
 
   const authenticate = useCallback(async () => {
@@ -250,6 +263,19 @@ export function EarbudScreen() {
               <option value="fast">빠르게</option><option value="balanced">균형</option><option value="safe">안전하게</option>
             </select>
           </label>
+          <div className="mt-3 rounded-xl border border-[var(--line)] p-3">
+            <label className="flex flex-col gap-2 text-sm font-semibold">통역 엔진
+              <select value={translationMode} disabled={active}
+                onChange={(event) => { setTranslationMode(event.target.value as TranslationMode); setExternalConsent(false); }}
+                className="min-h-12 rounded-lg border border-[var(--line-strong)] bg-[var(--bg)] px-3 text-base">
+                <option value="ensemble">Smart Ensemble · Index + Azure 병렬 검증</option>
+                <option value="single">Gemini 3.1 Flash-Lite · 단독 번역</option>
+              </select>
+            </label>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--fg-muted)]">
+              {translationMode === "ensemble" ? `가용 여부: ${earbudStatus?.ensemble?.available ? "설정됨" : "비활성"} · Gemini 재검증: ${earbudStatus?.ensemble?.judgeEnabled ? "사용" : "미설정"}. 두 번역이 불일치하고 검증할 수 없으면 소리를 내지 않아.` : "기존 Gemini 단독 경로와 비교하는 기준 모드야."}
+            </p>
+          </div>
           <p className="mt-2 text-xs text-[var(--fg-muted)]">실제 마이크와 에어팟 출력 동시 사용은 iOS에서 제한될 수 있어. 파일 재생 성공도 동시 통역 성공을 보장하지 않아.</p>
           {audio.notice && <p role="alert" className="mt-2 text-sm text-[var(--warn)]">{audio.notice}</p>}
         </section>
@@ -266,6 +292,13 @@ export function EarbudScreen() {
               <input type="checkbox" checked={syntheticOnly} onChange={(event) => setSyntheticOnly(event.target.checked)} disabled={active}
                 className="mt-1 size-4 shrink-0 accent-[var(--accent)]" />
               현재 테스트에는 가상 문장만 사용하고 여권번호, 외국인등록번호, 실제 민원·난민 진술 등 민감정보는 입력하지 않을게.
+            </label>
+            <label className="flex items-start gap-3">
+              <input type="checkbox" checked={externalConsent} onChange={(event) => setExternalConsent(event.target.checked)} disabled={active}
+                className="mt-1 size-4 shrink-0 accent-[var(--accent)]" />
+              {translationMode === "ensemble"
+                ? "동일한 가상 음성 인식 텍스트가 Bilibili Index-Translate와 Microsoft Azure에 병렬 전송되고, 충돌 시 설정에 따라 Google Gemini에도 전송될 수 있음을 확인했어. 제3자의 데이터 보관 정책은 별도 검토가 필요해."
+                : "가상 음성 인식 텍스트가 Google Gemini에 전송되며 무료 티어의 데이터 이용 정책이 적용될 수 있음을 확인했어."}
             </label>
           </div>
           {consent.phase === "needed" && (
@@ -302,7 +335,10 @@ export function EarbudScreen() {
             <span>{active ? "● 마이크 세션" : "○ 대기 중"} · {findLanguage(language)?.ko ?? language} → 한국어</span>
             <span>{session.snapshot.connection}</span>
           </div>
-          <p className="mt-3 text-xs text-[var(--fg-muted)]">무료 번역 모델: {earbudStatus?.translation.model ?? "준비 상태 확인 중"} · 유료 폴백 사용 안 함</p>
+          <p className="mt-3 text-xs text-[var(--fg-muted)]">통역: {translationMode === "ensemble" ? "Index-Translate + Azure F0 (선택적 Gemini Arbiter)" : earbudStatus?.translation.model ?? "준비 상태 확인 중"} · 유료 폴백 사용 안 함</p>
+          {session.lastProvider === "ensemble-abstained" && (
+            <p role="status" className="mt-2 rounded-lg border border-[var(--line-strong)] p-3 text-xs text-[var(--warn)]">번역 후보가 충분히 일치하지 않거나 모델이 응답하지 않아 음성 출력을 보류했어. 원문을 다시 확인해.</p>
+          )}
           {latencySamples.length > 0 && <p className="mt-1 text-xs text-[var(--fg-muted)]">확정 번역 → 음성 대기열 등록까지 평균(참고값): {Math.round(latencySamples.reduce((a,b)=>a+b,0)/latencySamples.length)}ms · {latencySamples.length}건</p>}
           <div className="mt-4 rounded-xl bg-[var(--bg)] p-4">
             <p className="text-xs font-semibold text-[var(--fg-dim)]">한국어 번역 · 확정된 문장</p>
