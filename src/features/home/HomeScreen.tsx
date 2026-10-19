@@ -52,6 +52,12 @@ export function HomeScreen() {
                   who="창구에서 마주 앉아 주고받습니다"
                   detail="선택한 기본 언어 · QR · 설치 없음"
                 />
+                <ModeCard
+                  href="/listen"
+                  title="이어폰 통역 · BETA"
+                  who="상대방의 말을 한국어 음성으로 듣습니다"
+                  detail="한쪽 에어팟 · 외국어 → 한국어 · 실기기 검증 필요"
+                />
               </div>
             </div>
 
