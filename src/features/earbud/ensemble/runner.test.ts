@@ -70,6 +70,26 @@ describe("parallel runner", () => {
     });
     expect(result.text).toBeNull();
   });
+  it("timeboxes a vendor promise that ignores cancellation instead of hanging the other model", async () => {
+    const start = Date.now();
+    const result = await runEnsemble({ text: source, source: "en-US" }, new AbortController().signal, {
+      index: async () => new Promise<string>(() => {}),
+      azure: async () => azure,
+      candidateTimeoutMs: 25,
+    });
+    expect(result.adjudication).toBe("abstain");
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
+  it("stops promptly on caller abort even if a vendor never resolves", async () => {
+    const controller = new AbortController();
+    const running = runEnsemble({ text: source, source: "en-US" }, controller.signal, {
+      index: async () => new Promise<string>(() => {}),
+      azure: async () => new Promise<string>(() => {}),
+      candidateTimeoutMs: 5000,
+    });
+    controller.abort();
+    await expect(running).rejects.toMatchObject({ name: "AbortError" });
+  });
   it("never emits a malformed third-model choice", async () => {
     const result = await runEnsemble({ text: source, source: "en-US" }, new AbortController().signal, {
       index: async () => index, azure: async () => azure,
