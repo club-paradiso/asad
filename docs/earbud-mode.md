@@ -142,3 +142,108 @@ accepts these limitations. No secrets are stored in source code.
       or STT stalling; if impossible, leave the mode in Draft.
 - [ ] Confirm no automatic calls to paid STT, OpenRouter, fallback gateways or
       premium translation models.
+
+
+---
+
+## Phase 3 · Smart Ensemble (draft preview, 2026-10-19)
+
+### Workflow
+
+```
+Web Speech STT (one recognized source utterance)
+   |-- in parallel --> Index-Translate-35B-A3B (public API)
+   +-- in parallel --> Azure Translator Text F0 (subscription key)
+       |
+       v
+ deterministic gate: Korean present + token/code/amount + negative meaning
+       |
+  strong lexical agreement -------------------> approved selected candidate
+       |
+  mismatch --> optional Gemini 3.5 Flash-Lite judge
+                    |   only selects "index"/"azure"/"abstain"
+                    |   cannot generate an alternative translation
+                    +-- verified choice ------> approved selected candidate
+                    +-- uncertain/no quota ---> abstain; do NOT speak
+       |
+ engine committed translation -> existing guarded AirPods TTS queue
+```
+
+The ensemble is an **experimental assistant**, not a proof of semantic
+correctness, nor a certified legal interpreter. It cannot repair hallucinated
+STT source text, correlated model errors or Safari's Bluetooth-routing bugs.
+The lexical similarity threshold is conservative and cannot validate semantic
+equivalence. The optional judge may be incorrect. A missing provider or quota
+error leads to **no spoken translation** instead of a silent paid fallback.
+
+Both Index and Azure receive the same fictional source text. When explicitly
+enabled, Gemini receives the source and two translations on disagreement.
+Neither provider nor transcripts are logged intentionally by ASAD.
+
+### Required private preview configuration
+
+```dotenv
+# Required: existing protected/private ASAD preview access gate.
+APP_ACCESS_KEY=<your existing key>
+
+# Turn on the endpoint: all three switches are required.
+ASAD_EARBUD_ENSEMBLE=1
+ASAD_INDEX_TRANSLATE_PUBLIC=1
+ASAD_AZURE_F0_CONFIRMED=1
+AZURE_TRANSLATOR_KEY=<key for a genuine Azure Translator F0 resource>
+
+# Optional if using a regional resource rather than global.
+AZURE_TRANSLATOR_REGION=koreacentral
+
+# Optional: only after you confirm Google API free-tier and no paid billing.
+ASAD_EARBUD_GEMINI_JUDGE=1
+GEMINI_API_KEY=<existing key on an unbilled free-tier project>
+```
+
+**Do not commit real credentials.** These values are NOT set automatically
+because that would require provider sign-up and confirmation of the user's own
+quota/billing status. A boolean operator flag cannot technically prevent an
+Azure/Gemini account being converted to paid billing; resource tier limits and
+provider dashboards must be checked. For multi-instance deployments, requests
+and Azure character usage require a shared quota budget (e.g. Redis); the
+current per-session/address request rate limit is **not** a cross-instance
+monthly spending cap. Leave these options disabled until that's configured.
+
+Official integration references:
+- Index-Translate public chat completion:
+  https://github.com/bilibili/Index-Translate
+- Azure Translator v3 translate:
+  https://learn.microsoft.com/en-us/rest/api/translator/translator/translate
+- Azure authentication:
+  https://learn.microsoft.com/en-us/azure/ai-services/translator/text-translation/reference/authentication
+
+### UI and fallback behavior
+
+- `/listen` allows explicit **Smart Ensemble** or **Gemini-only** selection
+  before a new session. Changing the selected mode resets the cached cloud
+  lane on the next Start. It cannot silently switch providers mid-session.
+- A separate explicit consent checkbox is mandatory for the selected providers,
+  in addition to the synthetic-only and audio tests.
+- `GET /api/earbud/status` exposes only booleans and model labels.
+- `POST /api/earbud/ensemble` reuses `interpretRequestSchema`, cookie/session
+  guards, bounded body and rate checks. All inference happens on the server.
+- Two candidates run in parallel with 2.7s per-provider deadline and an
+  optional 1.25s judge window. Outer turn deadline: 4.2s. Fast/other live
+  profile and network overhead may still cut a result short.
+- Low-confidence or no-consensus output is **not read aloud**. The UI explains
+  why it withheld speech; **no fabricated fallback translation** is voiced.
+- The optional judge can only choose an existing candidate or abstain.
+- Regression tests cover code/amount omission, lost English negation,
+  independent agreement, disagreement, a missing provider and failed judge.
+
+### Acceptance criteria
+
+- [ ] CI lint, TypeScript, unit tests, build and E2E pass
+- [ ] Live Index public endpoint response verified from a protected preview
+- [ ] Azure Translator F0 key and region verified on owner's free-tier account
+- [ ] Real Korean/English/Chinese/Indonesian/Vietnamese synthetic dialogue set:
+      at least 100 labeled turns; accuracy, critical entity retention, P50/P95
+      delay, no-consensus frequency and no unintended audio evaluated
+- [ ] Third-party privacy, terms and retention assessed before non-synthetic
+      data, and service-policy approval before any agency use
+- [ ] AirPods test audio before/after microphone activation on iPhone 15
