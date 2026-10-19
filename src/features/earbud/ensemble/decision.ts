@@ -1,0 +1,77 @@
+/**
+ * Conservative, deterministic gate for selecting a translation to SPEAK.
+ * This is not a learned reference-free translation quality metric. It can
+ * reject known hazards and detect disagreement, not certify meaning.
+ */
+export type EnsembleProvider = "index" | "azure";
+export interface TranslationCandidate {
+  provider: EnsembleProvider;
+  text: string;
+  latencyMs: number;
+}
+export type Selection =
+  | { kind: "accepted"; candidate: TranslationCandidate; agreement: number; reason: string }
+  | { kind: "needs-judge"; candidates: TranslationCandidate[]; reason: string }
+  | { kind: "abstain"; reason: string };
+
+const KOREAN = /[가-힣]/;
+// Avoid matching "1" from E-7-1 as a separate overlapping identifier.
+export function criticalTokens(text: string): string[] {
+  const tokens = text.match(/\b[A-Z]{1,4}-\d+(?:-\d+)*\b|\b\d+(?:[.,:/-]\d+)*%?\b/gi) ?? [];
+  return [...new Set(tokens.map((t) => t.replace(/,/g, "").toUpperCase()))];
+}
+function polarity(text: string): boolean {
+  return /(?:않|못|없|아니|미승인|미허가|불허|거부|금지|아직|취소|중단)/.test(text);
+}
+function sourceNegative(source: string): boolean | null {
+  // Only use this for English. Other languages require language-aware tests.
+  if (!/[A-Za-z]/.test(source) || /[\u3040-\u9fff]/.test(source)) return null;
+  return /\b(?:not|never|no|cannot|can't|won't|don't|doesn't|didn't|haven't|hasn't|isn't|aren't|without)\b/i.test(source);
+}
+export function checkCandidate(source: string, text: string): { ok: boolean; reason: string } {
+  const clean = text.trim();
+  if (!clean || clean.length > 800) return { ok: false, reason: "empty or oversized" };
+  if (!KOREAN.test(clean)) return { ok: false, reason: "missing Korean translation" };
+  if (/<\/?(?:think|reasoning|script|system|tool)>/i.test(clean))
+    return { ok: false, reason: "model markup" };
+  const identifiers = criticalTokens(source);
+  const translatedIdentifiers = new Set(criticalTokens(clean));
+  if (identifiers.some((v) => !translatedIdentifiers.has(v)))
+    return { ok: false, reason: "missing identifier, amount or number" };
+  const negative = sourceNegative(source);
+  if (negative === true && !polarity(clean))
+    return { ok: false, reason: "possibly lost source negation" };
+  return { ok: true, reason: "basic checks passed" };
+}
+function words(text: string): Set<string> {
+  return new Set(text.replace(/[.,!?，。！？():\[\]"']/g, " ").split(/\s+/).map(w => w.trim()).filter(Boolean));
+}
+export function overlap(a: string, b: string): number {
+  const x = words(a), y = words(b);
+  if (!x.size || !y.size) return 0;
+  const intersection = [...x].filter(w => y.has(w)).length;
+  return (2 * intersection) / (x.size + y.size);
+}
+export function chooseTranslation(source: string, incoming: TranslationCandidate[]): Selection {
+  const valid = incoming.filter(c => checkCandidate(source, c.text).ok);
+  if (!valid.length) return { kind: "abstain", reason: "no candidate passed essential safety checks" };
+  if (valid.length < 2) return {
+    kind: "abstain", reason: "only one provider returned a validated result; no consensus",
+  };
+  const [index, azure] = valid;
+  const similarity = overlap(index.text, azure.text);
+  if (polarity(index.text) !== polarity(azure.text))
+    return { kind: "needs-judge", candidates: valid, reason: "Korean negation mismatch" };
+  // A semantic paraphrase may legitimately have low word overlap; it requires
+  // an arbiter, not a falsely confident majority vote.
+  if (similarity < 0.72)
+    return { kind: "needs-judge", candidates: valid, reason: "translation wording/meaning disagreement" };
+  // Prefer the translation-specialist candidate at similar agreement, but
+  // never call this a correctness certificate.
+  return {
+    kind: "accepted",
+    candidate: valid.find(c => c.provider === "index") ?? index,
+    agreement: similarity,
+    reason: "independent candidates pass invariants and substantially agree",
+  };
+}
