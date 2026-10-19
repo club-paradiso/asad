@@ -206,8 +206,10 @@ quota/billing status. A boolean operator flag cannot technically prevent an
 Azure/Gemini account being converted to paid billing; resource tier limits and
 provider dashboards must be checked. For multi-instance deployments, requests
 and Azure character usage require a shared quota budget (e.g. Redis); the
-current per-session/address request rate limit is **not** a cross-instance
-monthly spending cap. Leave these options disabled until that's configured.
+ASAD now also requires Upstash Redis shared credentials to activate the
+ensemble. An atomic monthly reservation guards ASAD's own Azure calls, but it
+cannot see other projects calling the same Azure account. Leave it disabled
+until credentials, F0 resource tier, and usage limits are confirmed.
 
 Official integration references:
 - Index-Translate public chat completion:
@@ -247,3 +249,90 @@ Official integration references:
 - [ ] Third-party privacy, terms and retention assessed before non-synthetic
       data, and service-policy approval before any agency use
 - [ ] AirPods test audio before/after microphone activation on iPhone 15
+
+---
+
+## Phase 4A · Provider Activation & Benchmark Infrastructure (2026-10-19)
+
+**Implemented, not yet activated on the linked Vercel project**: the preview
+is missing `AZURE_TRANSLATOR_KEY` and `APP_ACCESS_KEY`. No operator-owned F0
+subscription can be created or confirmed from this repository, and the Index
+public API may still be inaccessible due to upstream WAF/region restrictions.
+
+### Provider contract repairs
+
+- Extracted transport adapters into `src/features/earbud/ensemble/providers.ts`.
+- Index-Translate public `/v1/chat/completions` sets the official documented
+  `chat_template_kwargs: {enable_thinking:false}` alongside model, user
+  instruction, max output tokens, low temperature and the published User-Agent.
+- Azure Translator v3 REST uses `from=<language>&to=ko` with the documented
+  subscription and optional region headers; all credentials are server-only.
+- Enforced **hard** per-provider deadlines even when a mocked/stalled upstream
+  ignores `AbortSignal`. A 4.2s outer budget still bounds the real endpoint.
+- Production `/listen` defaults to the existing single translation model
+  until Smart Ensemble is configured and explicitly selected.
+
+### Monthly Azure F0 reservation
+
+- The production endpoint reserves UTF-16 source character count through an
+  atomic Upstash Redis Lua script **before starting** either provider. If
+  Redis is absent/offline, the budget has been used up, or the shared
+  reservation fails, the endpoint rejects the request (503) without calling
+  Azure, Index or Gemini.
+- The bucket is per UTC calendar month with a per-month shared Redis key and
+  a TTL beyond the month-end boundary. A rejected reservation is rolled back
+  atomically, so concurrent requests cannot overshoot the ASAD cap.
+- Default safety cap: **1,500,000 characters/month** per ASAD deployment,
+  below Azure F0's advertised 2,000,000-character free allocation. Set a lower
+  bound with `ASAD_AZURE_F0_MONTHLY_CAP=200000` if desired. Values exceeding
+  1,500,000 are rejected in favor of the conservative default.
+- The counter is a **reservation**, not the Azure provider's authoritative
+  actual billing balance. Retries, cancellations, other applications,
+  billing-cycle boundaries, or resource/region changes can produce differences.
+  Do not enable billing upgrades. The account owner must periodically compare
+  portal usage to the application ledger. It prevents ASAD-originated overspend
+  only within the configured shared Redis namespace.
+
+### Deterministic, privacy-safe benchmark
+
+```bash
+# Offline, no credentials, no external API calls. CI runs this.
+npm run bench:earbud
+
+# Real public Index API, only invented examples; requires explicit consent.
+npm run bench:earbud -- --index-live --confirm-synthetic-only --limit 3
+```
+
+The fixture suite lives in `benchmarks/earbud/synthetic-ko.json` and contains
+**38 invented sample utterances** in 8 source languages: English, simplified
+Chinese, Japanese, Vietnamese, Indonesian, Mongolian, Uzbek and Russian.
+Every entry includes one human-authored Korean reference; these are not legal
+opinions or official translations.
+
+The CLI prints only aggregate metadata and per-case IDs/metrics, **not the
+source texts or candidate outputs**. It reports P50/P95 *execution* latency,
+reference lexical overlap (a weak proxy, **not COMET/semantic accuracy**),
+identifier/numeric retention, hard-check pass count, failures and abstentions.
+
+**Do not interpret the mock 100% accuracy or latency as a real benchmark.**
+Mock replies simply echo each synthetic reference and validate the evaluation
+pipeline, input checks and output contract. For a true live comparison, first
+verify Index public API accessibility and the Azure owner's genuine F0 tier.
+Then run matched synthetic cases through all three real adapters (including the
+protected quota-enforcing ASAD ensemble endpoint), add human labels for meaning
+fidelity, and measure latency distribution and refusal rates. That quality
+evaluation is still a release blocker.
+
+### Revised activation checklist
+
+- [x] No-billing default and provider-specific opt-in switches
+- [x] Published Index and Azure protocol reviewed and covered by mocked wire tests
+- [x] Atomic cross-instance monthly Azure F0 reservation and Redis fail-closed
+- [x] Deterministic mock benchmark suite and CI command
+- [ ] `APP_ACCESS_KEY` in branch-scoped protected Preview environment
+- [ ] `AZURE_TRANSLATOR_KEY` from verified free-only F0 resource
+- [ ] `ASAD_EARBUD_ENSEMBLE=1`, `ASAD_INDEX_TRANSLATE_PUBLIC=1`,
+      `ASAD_AZURE_F0_CONFIRMED=1` explicitly activated
+- [ ] Official public Index API live smoke (not only mocked)
+- [ ] Independent human-rated 100–200 case multilingual benchmark
+- [ ] iPhone/AirPods audio concurrency QA
