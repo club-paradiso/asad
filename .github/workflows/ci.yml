@@ -68,6 +68,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Earbud synthetic benchmark harness (mock only, no API calls)
+        run: npm run bench:earbud
+
       - name: Build
         run: npm run build
 
