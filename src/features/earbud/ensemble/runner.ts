@@ -24,18 +24,35 @@ export interface EnsembleDeps {
   judgeTimeoutMs?: number;
   now?: () => number;
 }
-async function within<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number, outer: AbortSignal): Promise<T> {
+/**
+ * A real timebox even if a buggy vendor ignores AbortSignal. Merely aborting
+ * a controller and awaiting its promise can hang the *entire* ensemble.
+ */
+async function within<T>(
+  run: (signal: AbortSignal) => Promise<T>, timeoutMs: number, outer: AbortSignal,
+): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const abort = () => controller.abort();
-  if (outer.aborted) controller.abort();
-  else outer.addEventListener("abort", abort, { once: true });
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let rejectOnAbort: ((reason: Error) => void) | undefined;
+  const timed = new Promise<never>((_, reject) => {
+    rejectOnAbort = reject;
+    timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error("Provider deadline exceeded."));
+    }, timeoutMs);
+  });
+  const onAbort = () => {
+    controller.abort();
+    rejectOnAbort?.(new DOMException("aborted", "AbortError"));
+  };
+  if (outer.aborted) onAbort();
+  else outer.addEventListener("abort", onAbort, { once: true });
   try {
-    if (controller.signal.aborted) throw new DOMException("aborted", "AbortError");
-    return await run(controller.signal);
+    if (outer.aborted) throw new DOMException("aborted", "AbortError");
+    return await Promise.race([run(controller.signal), timed]);
   } finally {
-    clearTimeout(timer);
-    outer.removeEventListener("abort", abort);
+    if (timeout) clearTimeout(timeout);
+    outer.removeEventListener("abort", onAbort);
   }
 }
 
