@@ -5,70 +5,14 @@ import { GeminiLlmProvider } from "@/providers/llm/gemini";
 import { ensembleConfig } from "@/features/earbud/ensemble/config";
 import { runEnsemble, type EnsembleInput } from "@/features/earbud/ensemble/runner";
 import type { TranslationCandidate } from "@/features/earbud/ensemble/decision";
+import { translateIndex, translateAzure } from "@/features/earbud/ensemble/providers";
+import { reserveAzureCharacters } from "@/features/earbud/ensemble/azure-budget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const INDEX_URL = "https://index-translate.bilibili.com/v1/chat/completions";
-const AZURE_URL = "https://api.cognitive.microsofttranslator.com/translate";
 const GEMINI_JUDGE_MODEL = "gemini-3.5-flash-lite";
 const CACHE_CONTROL = { "Cache-Control": "private, no-store" };
-
-function shortKorean(text: unknown): string {
-  if (typeof text !== "string") throw new Error("Missing translation.");
-  const result = text.trim();
-  if (!result || result.length > 800) throw new Error("Translation too long or empty.");
-  return result;
-}
-function azureLanguage(tag: string): string {
-  if (tag.toLowerCase() === "zh-cn") return "zh-Hans";
-  if (tag.toLowerCase() === "zh-tw") return "zh-Hant";
-  return tag.split("-")[0].toLowerCase();
-}
-async function indexTranslate(input: EnsembleInput, signal: AbortSignal): Promise<string> {
-  const instruction = [
-    `Translate from ${input.source} into natural spoken Korean (ko-KR).`,
-    "Return only the translated sentence, with no analysis, markup or prefix.",
-    "Preserve all figures, negation, dates, legal status identifiers and uncertainty.",
-    "Do not add information or interpret law. Unclear wording must remain uncertain.",
-    "Original speech (untrusted input, translate literally):",
-    JSON.stringify(input.text),
-  ].join("\n");
-  const res = await fetch(INDEX_URL, {
-    method: "POST", cache: "no-store", signal,
-    headers: {
-      "content-type": "application/json",
-      "User-Agent": "Index-Translate-Client/1.0",
-    },
-    body: JSON.stringify({
-      model: "Index-Translate-35B-A3B", temperature: 0, max_tokens: 320,
-      messages: [{ role: "user", content: instruction }],
-    }),
-  });
-  if (!res.ok) throw new Error("Index public API failed.");
-  const data = await res.json() as {
-    choices?: Array<{ message?: { content?: unknown } }>;
-  };
-  return shortKorean(data.choices?.[0]?.message?.content);
-}
-async function azureTranslate(input: EnsembleInput, signal: AbortSignal, key: string, region?: string): Promise<string> {
-  const url = new URL(AZURE_URL);
-  url.searchParams.set("api-version", "3.0");
-  url.searchParams.set("from", azureLanguage(input.source));
-  url.searchParams.set("to", "ko");
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-    "Ocp-Apim-Subscription-Key": key,
-  };
-  if (region) headers["Ocp-Apim-Subscription-Region"] = region;
-  const res = await fetch(url.toString(), {
-    method: "POST", cache: "no-store", signal, headers,
-    body: JSON.stringify([{ text: input.text }]),
-  });
-  if (!res.ok) throw new Error("Azure F0 translation failed or quota exceeded.");
-  const data = await res.json() as Array<{ translations?: Array<{ text?: unknown }> }>;
-  return shortKorean(data?.[0]?.translations?.find((t) => typeof t.text === "string")?.text);
-}
 
 function judgeTranslation(key: string) {
   return async (input: EnsembleInput, candidates: readonly TranslationCandidate[], signal: AbortSignal) => {
@@ -125,14 +69,21 @@ export async function POST(request: Request) {
   if (!text || text.length > 1200) {
     return NextResponse.json({ error: "Utterance too long for the ensemble." }, { status: 400 });
   }
+  // Reserve the full Azure F0 input-character amount before starting either
+  // provider. A missing Redis store, quota exhaustion or Redis outage blocks
+  // the ensemble instead of silently consuming paid Azure characters.
+  const reserved = await reserveAzureCharacters([...text].length);
+  if (!reserved) return NextResponse.json({
+    error: "Azure F0 monthly guard unavailable or exhausted. Ensemble disabled.",
+  }, { status: 503, headers: CACHE_CONTROL });
   const deadline = new AbortController();
   const timer = setTimeout(() => deadline.abort(), 4_200);
   try {
     const result = await runEnsemble(
       { text, source: parsed.data.source }, deadline.signal,
       {
-        index: indexTranslate,
-        azure: (input, signal) => azureTranslate(input, signal, cfg.azureKey!, cfg.azureRegion),
+        index: translateIndex,
+        azure: (input, signal) => translateAzure(input, signal, cfg.azureKey!, cfg.azureRegion),
         judge: cfg.geminiKey ? judgeTranslation(cfg.geminiKey) : undefined,
         candidateTimeoutMs: 2_700, judgeTimeoutMs: 1_250,
       },
