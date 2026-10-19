@@ -18,8 +18,8 @@ describe("cross-instance Azure monthly F0 guard", () => {
     expect(String(url)).toBe(config.url);
     const args = JSON.parse(String(init?.body));
     expect(args[0]).toBe("EVAL");
-    expect(args[3]).toBe(100);
-    expect(args[4]).toBe(1000);
+    expect(args[4]).toBe(100);
+    expect(args[5]).toBe(1000);
     const full = vi.fn(async () => new Response(JSON.stringify({result:0}))) as unknown as typeof fetch;
     expect(await reserveAzureCharactersWithConfig(config, 100, 1000, new Date(), full)).toBe(false);
   });
