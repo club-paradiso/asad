@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   // Reserve the full Azure F0 input-character amount before starting either
   // provider. A missing Redis store, quota exhaustion or Redis outage blocks
   // the ensemble instead of silently consuming paid Azure characters.
-  const reserved = await reserveAzureCharacters([...text].length);
+  const reserved = await reserveAzureCharacters(text.length);
   if (!reserved) return NextResponse.json({
     error: "Azure F0 monthly guard unavailable or exhausted. Ensemble disabled.",
   }, { status: 503, headers: CACHE_CONTROL });
