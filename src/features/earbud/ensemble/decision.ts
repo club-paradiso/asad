@@ -28,15 +28,27 @@ function sourceNegative(source: string): boolean | null {
   if (!/[A-Za-z]/.test(source) || /[\u3040-\u9fff]/.test(source)) return null;
   return /\b(?:not|never|no|cannot|can't|won't|don't|doesn't|didn't|haven't|hasn't|isn't|aren't|without)\b/i.test(source);
 }
+/** Accept a clock rendered naturally as Korean hh시 mm분, not arbitrary numbers. */
+export function preservesCriticalTokens(source: string, translated: string): boolean {
+  const preserved = new Set(criticalTokens(translated));
+  return criticalTokens(source).every(token => {
+    if (preserved.has(token)) return true;
+    const clock = /^(\\d{1,2}):(\\d{2})$/.exec(token);
+    if (!clock) return false;
+    const hour = String(Number(clock[1])), minute = String(Number(clock[2]));
+    // A safe equivalent time must keep both hour and minute in order.
+    const display = new RegExp(`(?:^|[^0-9])0?${hour}\\s*시\\s*0?${minute}\\s*분`);
+    return display.test(translated);
+  });
+}
+
 export function checkCandidate(source: string, text: string): { ok: boolean; reason: string } {
   const clean = text.trim();
   if (!clean || clean.length > 800) return { ok: false, reason: "empty or oversized" };
   if (!KOREAN.test(clean)) return { ok: false, reason: "missing Korean translation" };
   if (/<\/?(?:think|reasoning|script|system|tool)>/i.test(clean))
     return { ok: false, reason: "model markup" };
-  const identifiers = criticalTokens(source);
-  const translatedIdentifiers = new Set(criticalTokens(clean));
-  if (identifiers.some((v) => !translatedIdentifiers.has(v)))
+  if (!preservesCriticalTokens(source, clean))
     return { ok: false, reason: "missing identifier, amount or number" };
   const negative = sourceNegative(source);
   if (negative === true && !polarity(clean))
