@@ -20,7 +20,7 @@ if (live && !flags.includes("--confirm-synthetic-only")) {
   process.exit(2);
 }
 const limitOption = flags.indexOf("--limit");
-const requestedLimit = limitOption >= 0 ? Number(flags[limitOption + 1]) : (live ? 3 : 999);
+const requestedLimit = limitOption >= 0 ? Number(flags[limitOption + 1]) : (live ? 3 : 100);
 if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 100) {
   console.error("The --limit must be an integer between 1 and 100.");
   process.exit(2);
