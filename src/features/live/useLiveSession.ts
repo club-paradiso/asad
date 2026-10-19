@@ -650,6 +650,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     if (phase === "running" || phase === "starting" || phase === "recovering") return;
 
     const current = optionsRef.current;
+    // Reset cached cloud lane so selecting another endpoint between sessions works.
+    cloudLaneRef.current = null;
     // This function is called synchronously from the launcher's Start click.
     // Kick off Translator.create() before the first await so Chrome can use the
     // user's activation to download/instantiate the local language pack.
