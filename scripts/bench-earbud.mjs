@@ -68,7 +68,7 @@ for (const row of fixtures) {
   } catch (error) {
     // Provider adapter returns a bounded, safe status string, never source text.
     const description = error instanceof Error ? error.message : "";
-    const http = /Index public API unavailable \\(\\d{3}\\)/.exec(description);
+    const http = /Index public API unavailable \((\d{3})\)/.exec(description);
     failure = http ? `HTTP ${http[1]}` :
       /timeout|abort|deadline/i.test(description) ? "timeout" : "provider/network error";
   }
