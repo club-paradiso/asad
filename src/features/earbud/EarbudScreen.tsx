@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppConfig } from "@/app/api/config/route";
 import { LIVE_SOURCE_LANGUAGES, findLanguage, liveLanguagePairProblem } from "@/lib/languages";
 import { openSession, readSessionState, type SessionState } from "@/lib/session-client";
