@@ -34,7 +34,21 @@ function sourceNegative(source: string): boolean | null {
 /** Accept a clock rendered naturally as Korean hh시 mm분, not arbitrary numbers. */
 export function preservesCriticalTokens(source: string, translated: string): boolean {
   const preserved = new Set(criticalTokens(translated));
+  // Korean 10시 30분 → English 10:30 is an equivalent clock, not a
+  // missing number. Compare the whole time before accepting components.
+  const koreanClockComponents = new Set<string>();
+  for (const match of source.matchAll(/(\\d{1,2})\\s*시\\s*(\\d{1,2})\\s*분/g)) {
+    const hour = String(Number(match[1]));
+    const minute = String(Number(match[2]));
+    const numericClock = `${hour}:${minute.padStart(2, "0")}`;
+    const paddedClock = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+    if (preserved.has(numericClock) || preserved.has(paddedClock)) {
+      koreanClockComponents.add(hour);
+      koreanClockComponents.add(minute);
+    }
+  }
   return criticalTokens(source).every(token => {
+    if (koreanClockComponents.has(token)) return true;
     if (preserved.has(token)) return true;
     const clock = /^(\d{1,2}):(\d{2})$/.exec(token);
     if (!clock) return false;
