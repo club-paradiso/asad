@@ -15,6 +15,8 @@ export type Selection =
   | { kind: "abstain"; reason: string };
 
 const KOREAN = /[가-힣]/;
+const ENGLISH_WORD = /\b[a-z]{2,}\b/i;
+const ENGLISH_NEGATION = /\b(?:not|never|no|without|neither|nor|cannot|can\x27t|won\x27t|don\x27t|doesn\x27t|didn\x27t|hasn\x27t|haven\x27t|isn\x27t|aren\x27t|unapproved|denied|rejected|pending)\b/i;
 // Avoid matching "1" from E-7-1 as a separate overlapping identifier.
 export function criticalTokens(text: string): string[] {
   const tokens = text.match(/\b[A-Z]{1,4}-\d+(?:-\d+)*\b|\b\d+(?:[.,:/-]\d+)*%?\b/gi) ?? [];
@@ -24,7 +26,8 @@ function polarity(text: string): boolean {
   return /(?:않|못|없|아니|미승인|미허가|불허|거부|금지|아직|취소|중단)/.test(text);
 }
 function sourceNegative(source: string): boolean | null {
-  // Only use this for English. Other languages require language-aware tests.
+  // Only assert polarity for English and Korean; do not guess in other languages.
+  if (KOREAN.test(source)) return polarity(source) ? true : null;
   if (!/[A-Za-z]/.test(source) || /[\u3040-\u9fff]/.test(source)) return null;
   return /\b(?:not|never|no|cannot|can't|won't|don't|doesn't|didn't|haven't|hasn't|isn't|aren't|without)\b/i.test(source);
 }
@@ -42,16 +45,18 @@ export function preservesCriticalTokens(source: string, translated: string): boo
   });
 }
 
-export function checkCandidate(source: string, text: string): { ok: boolean; reason: string } {
+export function checkCandidate(source: string, text: string, target = "ko-KR"): { ok: boolean; reason: string } {
   const clean = text.trim();
   if (!clean || clean.length > 800) return { ok: false, reason: "empty or oversized" };
-  if (!KOREAN.test(clean)) return { ok: false, reason: "missing Korean translation" };
+  if (target === "ko-KR" && !KOREAN.test(clean)) return { ok: false, reason: "missing Korean translation" };
+  if (target === "en-US" && !ENGLISH_WORD.test(clean)) return { ok: false, reason: "missing English translation" };
+  if (target !== "ko-KR" && target !== "en-US") return { ok: false, reason: "unsupported target" };
   if (/<\/?(?:think|reasoning|script|system|tool)>/i.test(clean))
     return { ok: false, reason: "model markup" };
   if (!preservesCriticalTokens(source, clean))
     return { ok: false, reason: "missing identifier, amount or number" };
   const negative = sourceNegative(source);
-  if (negative === true && !polarity(clean))
+  if (negative === true && !(target === "ko-KR" ? polarity(clean) : ENGLISH_NEGATION.test(clean)))
     return { ok: false, reason: "possibly lost source negation" };
   return { ok: true, reason: "basic checks passed" };
 }
@@ -64,15 +69,16 @@ export function overlap(a: string, b: string): number {
   const intersection = [...x].filter(w => y.has(w)).length;
   return (2 * intersection) / (x.size + y.size);
 }
-export function chooseTranslation(source: string, incoming: TranslationCandidate[]): Selection {
-  const valid = incoming.filter(c => checkCandidate(source, c.text).ok);
+export function chooseTranslation(source: string, incoming: TranslationCandidate[], target = "ko-KR"): Selection {
+  const valid = incoming.filter(c => checkCandidate(source, c.text, target).ok);
   if (!valid.length) return { kind: "abstain", reason: "no candidate passed essential safety checks" };
   if (valid.length < 2) return {
     kind: "abstain", reason: "only one provider returned a validated result; no consensus",
   };
   const [index, azure] = valid;
   const similarity = overlap(index.text, azure.text);
-  if (polarity(index.text) !== polarity(azure.text))
+  const negation = (text: string) => target === "ko-KR" ? polarity(text) : ENGLISH_NEGATION.test(text);
+  if (negation(index.text) !== negation(azure.text))
     return { kind: "needs-judge", candidates: valid, reason: "Korean negation mismatch" };
   // A semantic paraphrase may legitimately have low word overlap; it requires
   // an arbiter, not a falsely confident majority vote.
