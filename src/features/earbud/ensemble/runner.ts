@@ -3,7 +3,7 @@ import {
   type TranslationCandidate,
 } from "./decision";
 
-export interface EnsembleInput { text: string; source: string }
+export interface EnsembleInput { text: string; source: string; target?: "ko-KR" | "en-US" }
 export type Translator = (input: EnsembleInput, signal: AbortSignal) => Promise<string>;
 export type Judge = (
   input: EnsembleInput, candidates: readonly TranslationCandidate[], signal: AbortSignal,
@@ -75,7 +75,7 @@ export async function runEnsemble(
   ]);
   if (outer.aborted) throw new DOMException("aborted", "AbortError");
   const candidates = settled.flatMap((part) => part.status === "fulfilled" ? [part.value] : []);
-  const selected = chooseTranslation(input.text, candidates);
+  const selected = chooseTranslation(input.text, candidates, input.target ?? "ko-KR");
   if (selected.kind === "accepted") {
     return {
       text: selected.candidate.text, selected: selected.candidate.provider,
@@ -91,7 +91,7 @@ export async function runEnsemble(
       );
       if (outer.aborted) throw new DOMException("aborted", "AbortError");
       const picked = selected.candidates.find(c => c.provider === choice);
-      if (picked && checkCandidate(input.text, picked.text).ok) {
+      if (picked && checkCandidate(input.text, picked.text, input.target ?? "ko-KR").ok) {
         return {
           text: picked.text, selected: picked.provider,
           confidence: "medium", adjudication: "judge",
