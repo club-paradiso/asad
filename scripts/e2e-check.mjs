@@ -90,7 +90,7 @@ await page.getByRole("button", { name: /End session|End/ }).click();
 await page.waitForTimeout(1500);
 
 const review = await page.locator("body").innerText();
-check("review renders", /SUGGESTED PREP FOR NEXT TIME/i.test(review));
+check("review renders", /다음에 준비할 것/.test(review));
 check("review lists Scripture", /1 Peter 2:9/.test(review));
 check("review carries the transcript", /베드로전서/.test(review));
 check(
@@ -101,7 +101,7 @@ await page.screenshot({ path: join(outDir, "review.png") });
 
 // --- Export ---------------------------------------------------------------
 const pendingDownload = page.waitForEvent("download");
-await page.getByRole("button", { name: "Export Markdown" }).click();
+await page.getByRole("button", { name: "Markdown 내보내기" }).click();
 const download = await pendingDownload;
 const exported = join(outDir, "session.md");
 await download.saveAs(exported);

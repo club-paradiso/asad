@@ -301,7 +301,7 @@ const waitForRow = (page, match, timeout = 10_000) =>
   await page.waitForTimeout(200);
   const beforeEnd = await chunkRows(page);
   await page.getByRole("button", { name: /End session|End/ }).click();
-  await page.waitForFunction(() => /SUGGESTED PREP FOR NEXT TIME/i.test(document.body.innerText), undefined, { timeout: 10_000 });
+  await page.waitForFunction(() => /다음에 준비할 것/.test(document.body.innerText), undefined, { timeout: 10_000 });
   const heldAtEnd = held.slice(2);
   for (const entry of heldAtEnd) await release(entry, "STALE-AFTER-END");
   await page.waitForTimeout(800);
