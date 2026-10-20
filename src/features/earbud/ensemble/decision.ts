@@ -37,7 +37,7 @@ export function preservesCriticalTokens(source: string, translated: string): boo
   // Korean 10시 30분 → English 10:30 is an equivalent clock, not a
   // missing number. Compare the whole time before accepting components.
   const koreanClockComponents = new Set<string>();
-  for (const match of source.matchAll(/(\\d{1,2})\\s*시\\s*(\\d{1,2})\\s*분/g)) {
+  for (const match of source.matchAll(/(\d{1,2})\s*시\s*(\d{1,2})\s*분/g)) {
     const hour = String(Number(match[1]));
     const minute = String(Number(match[2]));
     const numericClock = `${hour}:${minute.padStart(2, "0")}`;
