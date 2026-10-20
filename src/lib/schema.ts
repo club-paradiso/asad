@@ -105,7 +105,7 @@ export const glossaryItemSchema = z.object({
   english: z.string().min(1),
   note: z.string().max(160).optional(),
   alternatives: z.array(z.string()).max(4).optional(),
-  source: z.enum(["prep", "lexicon", "live"]).optional(),
+  source: z.enum(["prep", "lexicon", "glossary-pack", "live"]).optional(),
   register: z.boolean().optional(),
 });
 

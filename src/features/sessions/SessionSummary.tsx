@@ -16,7 +16,7 @@ import { Button, Label } from "@/components/ui/primitives";
 const duration = (ms: number) => {
   const minutes = Math.floor(ms / 60000);
   const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+  return `${minutes}분 ${seconds.toString().padStart(2, "0")}초`;
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -42,35 +42,34 @@ export function SessionSummary({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {session.title || "Session review"}
+            {session.title || "세션 복기"}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             {session.speaker ? `${session.speaker} · ` : ""}
-            {duration(review.durationMs)} · {review.segmentCount} segments ·{" "}
-            {review.chunkCount} English lines · {review.koreanCharacters.toLocaleString()} Korean
-            characters
+            {duration(review.durationMs)} · 세그먼트 {review.segmentCount}개 ·{" "}
+            영어 {review.chunkCount}줄 · 한국어 {review.koreanCharacters.toLocaleString()}자
           </p>
         </div>
         <Button tone="quiet" onClick={onClose}>
-          Done
+          닫기
         </Button>
       </header>
 
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => downloadSession(session, "markdown")}>
-          Export Markdown
+          Markdown 내보내기
         </Button>
         <Button size="sm" onClick={() => downloadSession(session, "txt")}>
-          Export TXT
+          TXT 내보내기
         </Button>
         <Button size="sm" onClick={() => downloadSession(session, "json")}>
-          Export JSON
+          JSON 내보내기
         </Button>
       </div>
 
-      <Section title="Suggested prep for next time">
+      <Section title="다음에 준비할 것">
         {review.suggestedPrepTerms.length === 0 ? (
-          <p className="text-sm text-[var(--fg-dim)]">Nothing recurred often enough to flag.</p>
+          <p className="text-sm text-[var(--fg-dim)]">반복되어 표시할 만큼 나온 표현이 없습니다.</p>
         ) : (
           <ul className="flex flex-col gap-1.5 text-sm">
             {review.suggestedPrepTerms.map((term) => (
@@ -87,7 +86,7 @@ export function SessionSummary({
         )}
       </Section>
 
-      <Section title="Interpretation challenges">
+      <Section title="통역이 까다로웠던 지점">
         <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-[var(--fg-muted)]">
           {review.challenges.map((challenge) => (
             <li key={challenge}>{challenge}</li>
@@ -96,7 +95,7 @@ export function SessionSummary({
       </Section>
 
       {review.recurringRecognitionErrors.length > 0 && (
-        <Section title="Recurring recognition errors">
+        <Section title="반복된 인식 오류">
           <ul className="flex flex-col gap-1 text-sm">
             {review.recurringRecognitionErrors.map((entry) => (
               <li key={`${entry.from}-${entry.to}`} className="font-korean">
@@ -111,7 +110,7 @@ export function SessionSummary({
       )}
 
       {review.scripture.length > 0 && (
-        <Section title="Scripture referenced">
+        <Section title="인용된 성경 구절">
           <ul className="flex flex-wrap gap-2 text-sm">
             {review.scripture.map((reference) => (
               <li
@@ -126,7 +125,7 @@ export function SessionSummary({
       )}
 
       {review.adapted.length > 0 && (
-        <Section title="Adapted, not literal">
+        <Section title="직역이 아닌 의역">
           <ul className="flex flex-col gap-2 text-sm">
             {review.adapted.map((chunk) => (
               <li key={chunk.id}>
@@ -139,7 +138,7 @@ export function SessionSummary({
       )}
 
       {review.uncertain.length > 0 && (
-        <Section title="Uncertain segments">
+        <Section title="확실하지 않았던 구간">
           <ul className="flex flex-col gap-1.5 text-sm text-[var(--fg-muted)]">
             {review.uncertain.map((chunk) => (
               <li key={chunk.id}>
@@ -152,7 +151,7 @@ export function SessionSummary({
       )}
 
       {review.culturalNotes.length > 0 && (
-        <Section title="Cultural notes">
+        <Section title="문화적 참고">
           <ul className="flex flex-col gap-2 text-sm">
             {review.culturalNotes.map((note) => (
               <li key={`${note.kind}-${note.korean}`}>
@@ -167,7 +166,7 @@ export function SessionSummary({
         </Section>
       )}
 
-      <Section title="Full transcript">
+      <Section title="전체 기록">
         <div className="scroll-y max-h-96 rounded-md border border-[var(--line)] bg-[var(--bg-raised)] p-3">
           {session.segments.map((segment) => (
             <p key={segment.id} className="font-korean mb-2 text-sm text-[var(--fg-muted)]">
@@ -177,7 +176,7 @@ export function SessionSummary({
         </div>
       </Section>
 
-      <Section title="Reconstructed English">
+      <Section title="재구성된 영어">
         <div className="scroll-y max-h-96 rounded-md border border-[var(--line)] bg-[var(--bg-raised)] p-3">
           <p className="text-sm leading-relaxed text-[var(--fg)]">
             {session.chunks.map((chunk) => chunk.text).join(" ")}

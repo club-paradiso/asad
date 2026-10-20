@@ -152,6 +152,12 @@ export interface BibleReference {
   text?: string;
   /** Translation the text came from, e.g. "WEB". */
   translation?: string;
+  /**
+   * Provenance of a model-returned reference. True when the local detector
+   * heard it or the session already knew it; false marks a claim the system
+   * records without endorsing. Locally detected references leave this unset.
+   */
+  verified?: boolean;
 }
 
 export interface GlossaryItem {
@@ -161,8 +167,8 @@ export interface GlossaryItem {
   note?: string;
   /** Alternative renderings the interpreter may prefer in context. */
   alternatives?: string[];
-  /** Where the entry came from — prep sheet, built-in lexicon, or live model. */
-  source?: "prep" | "lexicon" | "live";
+  /** Where the entry came from — prep sheet, built-in lexicon, church-interpreter glossary pack, or live model. */
+  source?: "prep" | "lexicon" | "glossary-pack" | "live";
   /**
    * True for discourse/register markers rather than terminology. These inform
    * the model's sense of register but are filtered off the live rail, where

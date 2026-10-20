@@ -98,15 +98,15 @@ export function SessionGlossaryEditor({
   return (
     <section className="flex flex-col gap-3 border-t border-[var(--line)] pt-5">
       <div>
-        <Label>Session terminology ({items.length})</Label>
+        <Label>세션 용어 ({items.length})</Label>
         <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
-          Add or override the wording you want for this session. Prep choices take priority over built-in and community glossary entries.
+          이번 세션에서 쓰고 싶은 표현을 추가하거나 덮어씁니다. 여기서 정한 표현이 내장·공유 용어집보다 우선합니다.
         </p>
       </div>
 
       <div className="grid gap-2 rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] p-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-[var(--fg-dim)]">Korean term</span>
+          <span className="text-xs font-medium text-[var(--fg-dim)]">한국어</span>
           <TextInput
             korean
             value={korean}
@@ -115,7 +115,7 @@ export function SessionGlossaryEditor({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-[var(--fg-dim)]">Preferred English</span>
+          <span className="text-xs font-medium text-[var(--fg-dim)]">영어 표현</span>
           <TextInput
             value={english}
             onChange={setEnglish}
@@ -123,12 +123,12 @@ export function SessionGlossaryEditor({
           />
         </label>
         <label className="flex flex-col gap-1.5 sm:col-span-2">
-          <span className="text-xs font-medium text-[var(--fg-dim)]">Interpreter note · optional</span>
+          <span className="text-xs font-medium text-[var(--fg-dim)]">통역 메모 · 선택 사항</span>
           <TextInput
             value={note}
             onChange={setNote}
             maxLength={PREP_GLOSSARY_NOTE_MAX_LENGTH}
-            placeholder="Use this wording throughout today's sermon"
+            placeholder="오늘 설교 내내 이 표현으로 통일"
           />
           <span className="text-[0.6875rem] text-[var(--fg-dim)]">
             {note.length}/{PREP_GLOSSARY_NOTE_MAX_LENGTH}
@@ -136,11 +136,11 @@ export function SessionGlossaryEditor({
         </label>
         <div className="flex flex-wrap gap-2 sm:col-span-2">
           <Button size="sm" tone="neutral" type="button" disabled={!valid} onClick={save}>
-            {editingKorean ? "Save override" : "Add term"}
+            {editingKorean ? "덮어쓰기 저장" : "용어 추가"}
           </Button>
           {editingKorean && (
             <Button size="sm" tone="quiet" type="button" onClick={reset}>
-              Cancel edit
+              편집 취소
             </Button>
           )}
         </div>
@@ -162,10 +162,10 @@ export function SessionGlossaryEditor({
               </div>
               <div className="flex shrink-0 gap-1">
                 <Button size="sm" tone="quiet" type="button" onClick={() => edit(item)}>
-                  Edit
+                  편집
                 </Button>
                 <Button size="sm" tone="quiet" type="button" onClick={() => remove(item)}>
-                  Remove
+                  삭제
                 </Button>
               </div>
             </li>
@@ -173,7 +173,7 @@ export function SessionGlossaryEditor({
         </ul>
       ) : (
         <p className="text-xs text-[var(--fg-dim)]">
-          No session-specific terms yet. The built-in sermon glossary still works normally.
+          아직 세션 용어가 없습니다. 내장 설교 용어집은 그대로 동작합니다.
         </p>
       )}
 
@@ -188,7 +188,7 @@ export function SessionGlossaryEditor({
           }}
           className="self-start"
         >
-          Clear session terminology
+          세션 용어 모두 지우기
         </Button>
       )}
     </section>
