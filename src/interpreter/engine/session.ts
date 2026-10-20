@@ -42,6 +42,7 @@ import type { InterpretRequest } from "@/lib/schema";
 import { analyseCodeSwitch, isAlreadyTargetLanguage } from "@/lib/code-switch";
 import { chunkTranslation } from "@/lib/chunk-text";
 import { detectScriptureReferences } from "../scripture/detect";
+import { verifyReferences } from "../scripture/format";
 import {
   liveGlossary,
   mergeGlossary,
@@ -975,7 +976,16 @@ export class InterpretationEngine {
   }
 
   private absorbContextualKnowledge(output: InterpreterOutput): void {
-    if (output.bibleReferences?.length) this.absorbScripture(output.bibleReferences);
+    if (output.bibleReferences?.length) {
+      // Model-returned references are claims, not facts: anything the local
+      // detector never heard (and the session does not already know) is still
+      // stored — delivered text is never rewritten — but flagged, so the rail
+      // and diagnostics can show it as unverified instead of presenting an
+      // invention as Scripture. This is the runtime half of "모르면 새로 쓰지
+      // 않는다"; the prompt half stays where it was.
+      const checked = verifyReferences(output.bibleReferences, this.scripture);
+      this.absorbScripture(checked);
+    }
     if (output.culturalNotes?.length) {
       this.culturalNotes = dedupeNotes([...output.culturalNotes, ...this.culturalNotes]).slice(0, 12);
     }
