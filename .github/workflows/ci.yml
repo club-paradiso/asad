@@ -71,14 +71,43 @@ jobs:
       - name: Earbud synthetic benchmark harness (mock only, no API calls)
         run: npm run bench:earbud
 
-      # Phase 4B: real public API only, 9 invented phrases covering 9 languages (including Korean source).
-      # No Azure/Gemini calls or secrets. Upstream WAF/quotas may reject CI runners;
-      # that is recorded as a validation blocker, not a production regression.
-      - name: Phase 4B Index public API live smoke (synthetic only)
-        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/earbud-listen-mvp' || github.head_ref == 'feat/earbud-global-ko-en')
-        timeout-minutes: 2
+      # Do not pound a free community provider with every PR commit.
+      # Two synthetic inputs: Korean→English and English→Korean, explicitly
+      # opt-in without secrets. An outage is a BLOCKER for provider activation,
+      # not a failure of lint/typecheck/local unit tests.
+      - name: Phase 4A Index live readiness check (2 fictional phrases)
+        id: index_smoke
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/earbud-global-ko-en'
+        timeout-minutes: 1
         continue-on-error: true
-        run: npm run bench:earbud -- --index-live --confirm-synthetic-only --limit 9
+        run: npm run bench:earbud -- --index-live --confirm-synthetic-only --sources ko-KR,en-US --limit 2 --timeout-ms 5000 --output /tmp/asad-index-readiness.json
+
+      - name: Phase 4A provider readiness verdict
+        if: always() && github.event_name == 'pull_request' && github.head_ref == 'feat/earbud-global-ko-en'
+        env:
+          INDEX_STEP: ${{ steps.index_smoke.outcome }}
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const result = fs.existsSync("/tmp/asad-index-readiness.json")
+            ? JSON.parse(fs.readFileSync("/tmp/asad-index-readiness.json", "utf8"))
+            : null;
+          const s = result?.summary;
+          const lines = [
+            "### Phase 4A Index provider readiness (external, nonblocking)",
+            "This is **not** an assertion of translation quality or iPhone playback.",
+            "Result: **" + (s?.runStatus ?? "NOT_RUN") + "**",
+            "Successful synthetic responses: **" + (s?.completed ?? 0) + "/" + (s?.fixtureCount ?? 2) + "**",
+            "Deadline: " + (s?.perRequestDeadlineMs ?? "not run") + " ms",
+            "P50 / P95: " + (s?.p50Ms ?? "n/a") + " / " + (s?.p95Ms ?? "n/a") + " ms",
+            "External step outcome: " + process.env.INDEX_STEP,
+            "Azure F0 was **not called**. No secret API keys used.",
+            "If UNAVAILABLE, leave provider activation gated until a later manual check."
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          if (!s || s.runStatus !== "RESPONDING_WITH_BASIC_CHECKS")
+            process.stdout.write("::warning::Index public API unavailable or slow. Do not interpret green CI as provider readiness.\n");
+          NODE
 
       - name: Build
         run: npm run build
