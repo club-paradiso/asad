@@ -4,6 +4,8 @@ import { guardInferenceRoute } from "@/lib/guard";
 import { interpretRequestSchema, parseInterpreterOutput } from "@/lib/schema";
 import { INTERPRETER_JSON_SCHEMA } from "@/interpreter/prompts/json-schema";
 import { GeminiLlmProvider } from "@/providers/llm/gemini";
+import { earbudPairProblem, earbudTargetName } from "@/features/earbud/language-pairs";
+import { checkCandidate } from "@/features/earbud/ensemble/decision";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
   });
   if (!guarded.ok) return guarded.response;
   const input = interpretRequestSchema.safeParse(guarded.body);
-  if (!input.success || input.data.target !== "ko-KR" || input.data.source === "ko-KR") {
+  if (!input.success || earbudPairProblem(input.data.source, input.data.target)) {
     return NextResponse.json({ error: "Invalid earbud language pair." }, { status: 400 });
   }
   const env = appEnv();
@@ -37,22 +39,24 @@ export async function POST(request: Request) {
     }, { status: 503 });
   }
   const source = input.data.source;
+  const target = input.data.target;
+  const targetName = earbudTargetName(target);
   const speech = input.data.pending.slice(0, 1800);
   // A short task-specific contract reduces token use and TTFT. The existing
   // validated response schema and the engine's time-locking still apply.
   const system = [
     "You are a faithful spoken-language interpreter for a mock practice dialogue.",
-    "Translate only from " + source + " into Korean (ko-KR).",
+    "Translate only from " + source + " into " + targetName + " (" + target + ").",
     "Keep names, visa classes, dates and amounts verbatim; do not invent details.",
     "Return JSON satisfying the provided schema. Use exactly one safeChunks item",
-    "with clear, natural, short Korean speech. Never use anticipatedChunks.",
+    "with clear, natural, short " + targetName + " speech. Never use anticipatedChunks.",
     "If audio transcription seems incomplete, translate only what's explicit.",
     "Do not give legal advice, status decisions or refugee-eligibility predictions.",
     "For untranslatable or ambiguous text output safeChunks: [] and confidence low.",
-    "Don't output source-language text pretending it is a Korean translation.",
+    "Don't output source-language text pretending it is a translated sentence.",
   ].join(" ");
   const previous = input.data.history?.recentKorean?.slice(-2) ?? [];
-  const user = `Prior utterances (context only): ${JSON.stringify(previous).slice(0, 500)}\nTranslate this utterance to Korean: ${speech}`;
+  const user = `Prior utterances (context only): ${JSON.stringify(previous).slice(0, 500)}\nTranslate this utterance to ${targetName}: ${speech}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 6_000);
   try {
@@ -69,7 +73,15 @@ export async function POST(request: Request) {
     // Server-side safety: never let anticipation or an out-of-language echo be
     // voiced as a completed translation. Engine client still checks confidence.
     output.anticipatedChunks = [];
-    return NextResponse.json({ output, provider: "gemini", model: MODEL }, {
+    // Reject a wrong-language or critical-fact-omitting translation before speech.
+    const accepted = output.safeChunks.filter(chunk => checkCandidate(speech, chunk.text, target).ok);
+    if (accepted.length !== 1 || output.safeChunks.length !== 1) {
+      output.safeChunks = [];
+      output.confidence = "low";
+    } else {
+      output.safeChunks = accepted;
+    }
+    return NextResponse.json({ output, provider: output.safeChunks.length ? "gemini" : "gemini-abstained", model: MODEL }, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
