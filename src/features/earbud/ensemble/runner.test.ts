@@ -12,6 +12,10 @@ describe("earbud translation selection safety", () => {
     expect(preservesCriticalTokens("Come at 09:20", "09시 20분에 오세요.")).toBe(true);
     expect(preservesCriticalTokens("Come at 09:20", "09시 30분에 오세요.")).toBe(false);
   });
+  it("preserves exact Korean 10시 30분 clock in English 10:30 but refuses 10:40", () => {
+    expect(preservesCriticalTokens("예약 시간은 10시 30분입니다.", "The appointment is at 10:30.")).toBe(true);
+    expect(preservesCriticalTokens("예약 시간은 10시 30분입니다.", "The appointment is at 10:40.")).toBe(false);
+  });
   it("validates Korean source into spoken English including negation and numbers", () => {
     const ko = "제 E-7-1 체류기간 연장은 아직 승인되지 않았고 120,000원을 냈습니다.";
     expect(checkCandidate(ko, "My E-7-1 extension has not been approved and I paid 120,000 won.", "en-US").ok).toBe(true);
