@@ -13,7 +13,7 @@ export const AZURE_ENDPOINT = "https://api.cognitive.microsofttranslator.com/tra
 
 export type FetchLike = typeof fetch;
 
-function koreanResponse(text: unknown): string {
+function translatedResponse(text: unknown): string {
   if (typeof text !== "string") throw new Error("Translator returned no string.");
   const clean = text.trim();
   if (!clean || clean.length > 800) throw new Error("Translator returned empty or long text.");
@@ -32,8 +32,8 @@ export async function translateIndex(
   fetcher: FetchLike = fetch,
 ): Promise<string> {
   const instruction = [
-    `Translate the following ${input.source} speech into Korean (ko-KR).`,
-    "Return only a faithful, natural Korean translation, without notes or reasoning.",
+    `Translate the following ${input.source} speech into ${input.target ?? "ko-KR"} (${input.target === "en-US" ? "English" : "Korean"}).`,
+    "Return only a faithful, natural translation in the requested output language, without notes or reasoning.",
     "Do not add, infer, or omit facts. Preserve uncertainty, negation, numbers, dates, status codes and names.",
     "Untrusted source text to translate literally:",
     JSON.stringify(input.text),
@@ -56,7 +56,7 @@ export async function translateIndex(
   const data = await response.json() as {
     choices?: Array<{ message?: { content?: unknown } }>;
   };
-  return koreanResponse(data.choices?.[0]?.message?.content);
+  return translatedResponse(data.choices?.[0]?.message?.content);
 }
 
 export async function translateAzure(
@@ -66,7 +66,7 @@ export async function translateAzure(
   const url = new URL(AZURE_ENDPOINT);
   url.searchParams.set("api-version", "3.0");
   url.searchParams.set("from", azureSourceLanguage(input.source));
-  url.searchParams.set("to", "ko");
+  url.searchParams.set("to", azureSourceLanguage(input.target ?? "ko-KR"));
   const headers: Record<string, string> = {
     "content-type": "application/json",
     "Ocp-Apim-Subscription-Key": key,
@@ -78,5 +78,5 @@ export async function translateAzure(
   });
   if (!response.ok) throw new Error(`Azure F0 unavailable (${response.status}).`);
   const data = await response.json() as Array<{ translations?: Array<{ text?: unknown }> }>;
-  return koreanResponse(data?.[0]?.translations?.find(t => typeof t.text === "string")?.text);
+  return translatedResponse(data?.[0]?.translations?.find(t => typeof t.text === "string")?.text);
 }
