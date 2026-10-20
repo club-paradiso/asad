@@ -34,6 +34,7 @@
  * clock, a network or a model.
  */
 import type { ContextMode, PrepSheet, ResolvedContext } from "@/types";
+import { detectChurchPreset, type ChurchPreset } from "./church-presets";
 
 export type { ContextMode, ResolvedContext };
 
@@ -117,6 +118,10 @@ const DISCOURSE: DiscoursePattern[] = [
   { context: "worship", pattern: /아멘|할렐루야|주님|하나님|기도하겠습니다|찬양|축복|성도\s*여러분/ug, weight: 3 },
   { context: "worship", pattern: /\bamen\b|\bhallelujah\b|\blet us pray\b|\bthe lord\b|\bcongregation\b/iug, weight: 3 },
   { context: "worship", pattern: /장\s*\d+\s*절|말씀|성경|복음서/ug, weight: 2 },
+  // Church gatherings: a prayer meeting, a Bible study and a retreat are all
+  // worship, and naming the gathering helps the resolver commit to worship
+  // rather than leave the session generic.
+  { context: "worship", pattern: /기도회|기도제목|중보기도|통성기도|성경공부|원어|수련회|부흥회|새벽기도/ug, weight: 2 },
 
   // Lecture — one speaker teaching a structured body of material.
   { context: "lecture", pattern: /오늘\s*강의|이번\s*시간(에|에는)|다음\s*장|슬라이드|정리하자면|과제|수강생|학생\s*여러분/ug, weight: 3 },
@@ -139,7 +144,7 @@ const DISCOURSE: DiscoursePattern[] = [
 
 /** Prep-sheet metadata evidence, available before a word is spoken. */
 const METADATA: DiscoursePattern[] = [
-  { context: "worship", pattern: /교회|성당|선교|목사|전도사|장로|예배|church|chapel|ministry|parish|pastor|worship/iug, weight: 4 },
+  { context: "worship", pattern: /교회|성당|선교|목사|전도사|장로|예배|기도회|성경공부|수련회|부흥회|새벽기도|설교|church|chapel|ministry|parish|pastor|worship/iug, weight: 4 },
   { context: "lecture", pattern: /대학|학교|강의|세미나|아카데미|university|college|lecture|seminar|course|academy/iug, weight: 3 },
   { context: "meeting", pattern: /회의|이사회|주주|워크숍|board|meeting|committee|standup|retrospective/iug, weight: 3 },
   { context: "event", pattern: /컨퍼런스|포럼|시상식|개막|축제|conference|forum|ceremony|festival|summit|gala/iug, weight: 3 },
@@ -419,6 +424,19 @@ export class ContextResolver {
       confidence: this.mode === "auto" ? this.confidenceValue : 1,
       warmingUp: this.mode === "auto" && this.inferred === "generic" && this.observed < CONTEXT_MIN_CHARS,
     };
+  }
+
+  /**
+   * The church gathering inside a worship session — 예배, 설교, 기도회,
+   * 성경공부 or 수련회 — or null when the session is not worship or the
+   * evidence is too thin to specialise.
+   *
+   * Read alongside `state()`, never instead of it: the preset refines worship,
+   * it never replaces the six contexts.
+   */
+  churchPreset(): ChurchPreset | null {
+    if (this.state().resolved !== "worship") return null;
+    return detectChurchPreset(this.window, this.prep);
   }
 }
 
