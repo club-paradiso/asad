@@ -34,7 +34,7 @@ export function useSpeechPlayback(targetLanguage: "ko-KR" | "en-US" = "ko-KR") {
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selected = useRef<EarbudPlaybackMode>("browser");
   const targetRef = useRef(targetLanguage);
-  targetRef.current = targetLanguage;
+  useEffect(() => { targetRef.current = targetLanguage; }, [targetLanguage]);
 
   const clearResources = useCallback(() => {
     if (watchdog.current) clearTimeout(watchdog.current);
