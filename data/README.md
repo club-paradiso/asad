@@ -28,6 +28,29 @@ ASAD does not send all 500 rows to the model on every live turn. That would wast
 
 The live sermon pipeline uses the normalized runtime coverage layer in `src/interpreter/glossary/community-glossary.ts`. `src/interpreter/glossary/matcher.ts` finds only terms that are actually present in the current Korean segment, with session/prep terminology and the hand-curated theological lexicon taking priority. `src/interpreter/prompts/live.ts` then injects those matched terms into the interpretation context.
 
+## Theological glossary pack (church-interpreter standard)
+
+`theological-glossary.json` is the curated standard for Korean-church interpreter
+volunteers: Korean theological headwords → standard English AND Chinese
+renderings, each with a category (`구원론`, `교리`, `예배`, `성경`, `직분`,
+`교회생활`) and a translator's note. Minimum 60 entries, enforced at import
+time by `src/interpreter/glossary/theological-glossary.ts` (zod-validated;
+duplicates and short packs fail loudly).
+
+Priority at match time, in order:
+
+1. session/prep terminology (the interpreter's explicit choice for the day)
+2. **this pack** — the standard rendering
+3. the hand-curated theological lexicon (donates notes/alternatives where the
+   pack is silent)
+4. the volunteer community glossary
+
+The pack is active in worship contexts only, like the theological lexicon. It
+also feeds `worshipTermHits`, the terminology-density signal the context
+resolver reads. `theological-glossary.test.ts` pins the entry count, the
+schema, and the priority order — a data edit that breaks the contract goes red
+here, not in a live service.
+
 For speech recognition, `src/interpreter/glossary/stt-hints.ts` selects a small high-value subset. Session-specific names and terminology come first, then glossary terms detected in the day's prep material, then a conservative sermon baseline. This keeps the glossary useful for Korean recognition without blindly biasing the recognizer with hundreds of irrelevant keyterms.
 
 ### Updating

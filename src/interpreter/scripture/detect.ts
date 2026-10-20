@@ -39,7 +39,14 @@ export interface DetectedReference extends BibleReference {
   index: number;
 }
 
-const buildDisplay = (
+/**
+ * The canonical display form — the 장:절 notation every consumer must use:
+ * "1 Peter 2:9", "John 3:16", "Romans 5:1-3", "Psalms 23".
+ *
+ * One function owns this shape so the rail, the prompt and the memory never
+ * drift into three different spellings of the same reference.
+ */
+export const buildDisplay = (
   book: string,
   chapter: number,
   verse?: number,

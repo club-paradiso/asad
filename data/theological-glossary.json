@@ -1,0 +1,560 @@
+{
+  "description": "한국교회 통역 봉사자를 위한 신학 용어집 — 한국어 표준 용어의 영어/중국어 표준 번역을 통역 파이프라인이 가장 먼저 참조하는 팩",
+  "entries": [
+    {
+      "category": "구원론",
+      "en": "justification",
+      "ko": "칭의",
+      "note": "법정적 선언 — 행위가 아닌 믿음으로 의롭다 여김을 받음",
+      "zh": "称义"
+    },
+    {
+      "category": "구원론",
+      "en": "sanctification",
+      "ko": "성화",
+      "note": "점진적으로 거룩해져 감 — 칭의와 구분되는 기술 용어",
+      "zh": "成圣"
+    },
+    {
+      "category": "구원론",
+      "en": "regeneration",
+      "ko": "중생",
+      "note": "거듭남 — 'born again'",
+      "zh": "重生"
+    },
+    {
+      "category": "구원론",
+      "en": "atonement",
+      "ko": "속죄",
+      "note": "죄의 값을 치름",
+      "zh": "赎罪"
+    },
+    {
+      "category": "구원론",
+      "en": "atonement",
+      "ko": "대속",
+      "note": "대신 속함이 핵심일 때는 'substitutionary atonement'",
+      "zh": "代赎"
+    },
+    {
+      "category": "구원론",
+      "en": "salvation",
+      "ko": "구원",
+      "note": "넓은 의미의 구원 전체",
+      "zh": "救恩"
+    },
+    {
+      "category": "구원론",
+      "en": "redemption",
+      "ko": "구속",
+      "note": "값을 치르고 건져냄",
+      "zh": "救赎"
+    },
+    {
+      "category": "구원론",
+      "en": "repentance",
+      "ko": "회개",
+      "note": "돌이킴 — 방향의 전환",
+      "zh": "悔改"
+    },
+    {
+      "category": "구원론",
+      "en": "forgiveness",
+      "ko": "용서",
+      "note": "죄사함",
+      "zh": "饶恕"
+    },
+    {
+      "category": "구원론",
+      "en": "forgiveness of sins",
+      "ko": "죄사함",
+      "note": "죄의 용서",
+      "zh": "赦罪"
+    },
+    {
+      "category": "구원론",
+      "en": "grace",
+      "ko": "은혜",
+      "note": "값없이 주시는 선물 — 인사·축복 문맥에서는 'blessing'",
+      "zh": "恩典"
+    },
+    {
+      "category": "구원론",
+      "en": "faith",
+      "ko": "믿음",
+      "note": "신뢰의 의미를 포함",
+      "zh": "信心"
+    },
+    {
+      "category": "구원론",
+      "en": "hope",
+      "ko": "소망",
+      "note": "막연한 바람이 아닌 확신에 찬 기대",
+      "zh": "盼望"
+    },
+    {
+      "category": "구원론",
+      "en": "love",
+      "ko": "사랑",
+      "note": "아가페적 사랑의 문맥에서",
+      "zh": "爱"
+    },
+    {
+      "category": "구원론",
+      "en": "eternal life",
+      "ko": "영생",
+      "note": "",
+      "zh": "永生"
+    },
+    {
+      "category": "교리",
+      "en": "the Trinity",
+      "ko": "삼위일체",
+      "note": "",
+      "zh": "三位一体"
+    },
+    {
+      "category": "교리",
+      "en": "the Father",
+      "ko": "성부",
+      "note": "",
+      "zh": "圣父"
+    },
+    {
+      "category": "교리",
+      "en": "the Son",
+      "ko": "성자",
+      "note": "",
+      "zh": "圣子"
+    },
+    {
+      "category": "교리",
+      "en": "the Holy Spirit",
+      "ko": "성령",
+      "note": "",
+      "zh": "圣灵"
+    },
+    {
+      "category": "교리",
+      "en": "the cross",
+      "ko": "십자가",
+      "note": "",
+      "zh": "十字架"
+    },
+    {
+      "category": "교리",
+      "en": "the resurrection",
+      "ko": "부활",
+      "note": "",
+      "zh": "复活"
+    },
+    {
+      "category": "교리",
+      "en": "the ascension",
+      "ko": "승천",
+      "note": "",
+      "zh": "升天"
+    },
+    {
+      "category": "교리",
+      "en": "the Second Coming",
+      "ko": "재림",
+      "note": "",
+      "zh": "再临"
+    },
+    {
+      "category": "교리",
+      "en": "the kingdom of heaven",
+      "ko": "천국",
+      "note": "마태복음의 용어 — '하나님 나라'와 구분",
+      "zh": "天国"
+    },
+    {
+      "category": "교리",
+      "en": "the kingdom of God",
+      "ko": "하나님 나라",
+      "note": "하나님의 통치 영역",
+      "zh": "神的国"
+    },
+    {
+      "category": "교리",
+      "en": "hell",
+      "ko": "지옥",
+      "note": "",
+      "zh": "地狱"
+    },
+    {
+      "category": "교리",
+      "en": "sin",
+      "ko": "죄",
+      "note": "",
+      "zh": "罪"
+    },
+    {
+      "category": "교리",
+      "en": "judgement",
+      "ko": "심판",
+      "note": "최후 심판의 문맥에서",
+      "zh": "审判"
+    },
+    {
+      "category": "교리",
+      "en": "covenant",
+      "ko": "언약",
+      "note": "하나님과 맺은 약속",
+      "zh": "圣约"
+    },
+    {
+      "category": "교리",
+      "en": "the law",
+      "ko": "율법",
+      "note": "모세 율법의 문맥에서",
+      "zh": "律法"
+    },
+    {
+      "category": "교리",
+      "en": "truth",
+      "ko": "진리",
+      "note": "",
+      "zh": "真理"
+    },
+    {
+      "category": "교리",
+      "en": "life",
+      "ko": "생명",
+      "note": "영적 생명의 문맥에서",
+      "zh": "生命"
+    },
+    {
+      "category": "교리",
+      "en": "the gospel",
+      "ko": "복음",
+      "note": "",
+      "zh": "福音"
+    },
+    {
+      "category": "예배",
+      "en": "worship",
+      "ko": "예배",
+      "note": "'예배 시간'은 보통 'the service'",
+      "zh": "敬拜"
+    },
+    {
+      "category": "예배",
+      "en": "sermon",
+      "ko": "설교",
+      "note": "",
+      "zh": "讲道"
+    },
+    {
+      "category": "예배",
+      "en": "prayer",
+      "ko": "기도",
+      "note": "",
+      "zh": "祷告"
+    },
+    {
+      "category": "예배",
+      "en": "praise",
+      "ko": "찬양",
+      "note": "찬양 시간 — 'worship music'",
+      "zh": "赞美"
+    },
+    {
+      "category": "예배",
+      "en": "hymn",
+      "ko": "찬송",
+      "note": "",
+      "zh": "圣诗"
+    },
+    {
+      "category": "예배",
+      "en": "offering",
+      "ko": "헌금",
+      "note": "",
+      "zh": "奉献"
+    },
+    {
+      "category": "예배",
+      "en": "the tithe",
+      "ko": "십일조",
+      "note": "",
+      "zh": "十分之一"
+    },
+    {
+      "category": "예배",
+      "en": "thanksgiving offering",
+      "ko": "감사헌금",
+      "note": "",
+      "zh": "感恩奉献"
+    },
+    {
+      "category": "예배",
+      "en": "Communion",
+      "ko": "성찬",
+      "note": "'the Lord's Supper'",
+      "zh": "圣餐"
+    },
+    {
+      "category": "예배",
+      "en": "baptism",
+      "ko": "세례",
+      "note": "",
+      "zh": "洗礼"
+    },
+    {
+      "category": "예배",
+      "en": "the benediction",
+      "ko": "축도",
+      "note": "예배를 마치는 축복 기도",
+      "zh": "祝祷"
+    },
+    {
+      "category": "예배",
+      "en": "early morning prayer",
+      "ko": "새벽기도",
+      "note": "한국교회의 새벽 예배 전통",
+      "zh": "晨祷"
+    },
+    {
+      "category": "예배",
+      "en": "intercessory prayer",
+      "ko": "중보기도",
+      "note": "남을 위한 기도",
+      "zh": "代祷"
+    },
+    {
+      "category": "예배",
+      "en": "prayer meeting",
+      "ko": "기도회",
+      "note": "",
+      "zh": "祷告会"
+    },
+    {
+      "category": "예배",
+      "en": "sanctuary",
+      "ko": "예배당",
+      "note": "예배 장소",
+      "zh": "圣堂"
+    },
+    {
+      "category": "성경",
+      "en": "the Word",
+      "ko": "말씀",
+      "note": "'오늘의 말씀' → 'today's passage'",
+      "zh": "神的话语"
+    },
+    {
+      "category": "성경",
+      "en": "the Bible",
+      "ko": "성경",
+      "note": "",
+      "zh": "圣经"
+    },
+    {
+      "category": "성경",
+      "en": "shepherd",
+      "ko": "목자",
+      "note": "'목자 되신 주' — the Shepherd",
+      "zh": "牧者"
+    },
+    {
+      "category": "성경",
+      "en": "the vine",
+      "ko": "포도나무",
+      "note": "요한복음 15장 — '나는 포도나무요'",
+      "zh": "葡萄树"
+    },
+    {
+      "category": "성경",
+      "en": "prophet",
+      "ko": "선지자",
+      "note": "",
+      "zh": "先知"
+    },
+    {
+      "category": "성경",
+      "en": "apostle",
+      "ko": "사도",
+      "note": "",
+      "zh": "使徒"
+    },
+    {
+      "category": "성경",
+      "en": "priest",
+      "ko": "제사장",
+      "note": "",
+      "zh": "祭司"
+    },
+    {
+      "category": "성경",
+      "en": "Gentiles",
+      "ko": "이방인",
+      "note": "",
+      "zh": "外邦人"
+    },
+    {
+      "category": "직분",
+      "en": "pastor",
+      "ko": "목사",
+      "note": "호칭으로는 'Pastor' + 이름",
+      "zh": "牧师"
+    },
+    {
+      "category": "직분",
+      "en": "elder",
+      "ko": "장로",
+      "note": "",
+      "zh": "长老"
+    },
+    {
+      "category": "직분",
+      "en": "deacon",
+      "ko": "집사",
+      "note": "",
+      "zh": "执事"
+    },
+    {
+      "category": "직분",
+      "en": "senior deaconess",
+      "ko": "권사",
+      "note": "한국교회 고유 직분 — 영어권에 대응 개념이 없어 설명이 필요",
+      "zh": "劝士"
+    },
+    {
+      "category": "직분",
+      "en": "evangelist",
+      "ko": "전도사",
+      "note": "부목사 문맥에서는 'assistant pastor'",
+      "zh": "传道士"
+    },
+    {
+      "category": "직분",
+      "en": "missionary",
+      "ko": "선교사",
+      "note": "",
+      "zh": "宣教士"
+    },
+    {
+      "category": "교회생활",
+      "en": "the church",
+      "ko": "교회",
+      "note": "",
+      "zh": "教会"
+    },
+    {
+      "category": "교회생활",
+      "en": "believers",
+      "ko": "성도",
+      "note": "회중을 부를 때 — 'brothers and sisters'",
+      "zh": "信徒"
+    },
+    {
+      "category": "교회생활",
+      "en": "disciple",
+      "ko": "제자",
+      "note": "",
+      "zh": "门徒"
+    },
+    {
+      "category": "교회생활",
+      "en": "evangelism",
+      "ko": "전도",
+      "note": "",
+      "zh": "传福音"
+    },
+    {
+      "category": "교회생활",
+      "en": "missions",
+      "ko": "선교",
+      "note": "",
+      "zh": "宣教"
+    },
+    {
+      "category": "교회생활",
+      "en": "testimony",
+      "ko": "간증",
+      "note": "",
+      "zh": "见证"
+    },
+    {
+      "category": "교회생활",
+      "en": "fellowship",
+      "ko": "교제",
+      "note": "",
+      "zh": "团契"
+    },
+    {
+      "category": "교회생활",
+      "en": "the retreat",
+      "ko": "수련회",
+      "note": "",
+      "zh": "退修会"
+    },
+    {
+      "category": "교회생활",
+      "en": "the revival meeting",
+      "ko": "부흥회",
+      "note": "",
+      "zh": "复兴会"
+    },
+    {
+      "category": "교회생활",
+      "en": "Bible study",
+      "ko": "성경공부",
+      "note": "",
+      "zh": "查经"
+    },
+    {
+      "category": "교회생활",
+      "en": "discipleship training",
+      "ko": "제자훈련",
+      "note": "",
+      "zh": "门徒训练"
+    },
+    {
+      "category": "교회생활",
+      "en": "commitment",
+      "ko": "헌신",
+      "note": "devotion의 뉘앙스도 포함",
+      "zh": "委身"
+    },
+    {
+      "category": "교회생활",
+      "en": "service",
+      "ko": "섬김",
+      "note": "serving의 뉘앙스도 포함",
+      "zh": "服侍"
+    },
+    {
+      "category": "교회생활",
+      "en": "obedience",
+      "ko": "순종",
+      "note": "",
+      "zh": "顺服"
+    },
+    {
+      "category": "교회생활",
+      "en": "godliness",
+      "ko": "경건",
+      "note": "",
+      "zh": "虔诚"
+    },
+    {
+      "category": "교회생활",
+      "en": "holiness",
+      "ko": "거룩",
+      "note": "",
+      "zh": "圣洁"
+    },
+    {
+      "category": "교회생활",
+      "en": "spiritual gift",
+      "ko": "은사",
+      "note": "",
+      "zh": "恩赐"
+    }
+  ],
+  "name": "theological-glossary",
+  "version": 1
+}
