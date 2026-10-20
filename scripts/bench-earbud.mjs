@@ -41,7 +41,7 @@ const percentile = (values, q) => {
   return Math.round(sorted[Math.ceil(q * sorted.length) - 1]);
 };
 for (const row of fixtures) {
-  const input = { source: row.source, text: row.text };
+  const input = { source: row.source, target: row.target ?? "ko-KR", text: row.text };
   const started = performance.now();
   let text = null;
   let picked = null;
@@ -74,9 +74,9 @@ for (const row of fixtures) {
   }
   const elapsedMs = Math.round(performance.now() - started);
   const numericSafe = preservesCriticalTokens(row.text, text ?? "");
-  const validation = text ? checkCandidate(row.text, text) : { ok: false };
+  const validation = text ? checkCandidate(row.text, text, input.target) : { ok: false };
   stats.push({
-    id: row.id, lang: row.source, selected: picked, elapsedMs,
+    id: row.id, lang: row.source, target: input.target, selected: picked, elapsedMs,
     adjudication, outputAvailable: Boolean(text),
     sourceTokenRetention: numericSafe, invariants: validation.ok,
     referenceWordOverlap: text ? Number(overlap(text, row.reference).toFixed(3)) : 0,
