@@ -123,7 +123,7 @@ export function PrepScreen() {
     setNotice(null);
     try {
       const nextBrief = localPrepBrief(currentInput(), { localOnly: true });
-      applyBrief(nextBrief, "Built locally — no prep content was sent to an AI provider.");
+      applyBrief(nextBrief, "기기에서 직접 만들었습니다. 준비 자료는 AI 제공자에게 전송되지 않았습니다.");
     } catch (error) {
       setStatus("error");
       setNotice(
