@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Entirely invented practice utterances; never actual immigration/asylum case data. Korean references are one plausible rendering, not gold legal advice.",
+  "description": "Invented practice utterances with Korean or English targets. Korean references are examples, not official translations. Never upload real cases.",
   "items": [
     {
       "id": "en-01",
@@ -356,6 +356,51 @@
       "reference": "제 비자 유효기간이 일주일 후 만료됩니다.",
       "tags": [
         "visa"
+      ]
+    },
+    {
+      "id": "ko-en-01",
+      "source": "ko-KR",
+      "target": "en-US",
+      "text": "제 체류기간 연장 신청은 아직 승인되지 않았습니다.",
+      "reference": "My extension of stay has not been approved yet.",
+      "tags": [
+        "negation",
+        "status"
+      ]
+    },
+    {
+      "id": "ko-en-02",
+      "source": "ko-KR",
+      "target": "en-US",
+      "text": "제 여권은 다음 주 금요일에 만료됩니다.",
+      "reference": "My passport expires next Friday.",
+      "tags": [
+        "date",
+        "document"
+      ]
+    },
+    {
+      "id": "ko-en-03",
+      "source": "ko-KR",
+      "target": "en-US",
+      "text": "예약 시간은 10시 30분입니다.",
+      "reference": "My appointment is at 10:30.",
+      "tags": [
+        "time",
+        "number"
+      ]
+    },
+    {
+      "id": "ko-en-04",
+      "source": "ko-KR",
+      "target": "en-US",
+      "text": "E-7-1 근로계약서 원본을 가져오지 않았습니다.",
+      "reference": "I did not bring the original E-7-1 employment contract.",
+      "tags": [
+        "code",
+        "negation",
+        "document"
       ]
     }
   ]
