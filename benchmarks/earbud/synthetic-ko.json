@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "description": "Entirely invented practice utterances; never actual immigration/asylum case data. Korean references are one plausible rendering, not gold legal advice.",
+  "items": [
+    {
+      "id": "en-01",
+      "source": "en-US",
+      "text": "My E-7-1 extension has not been approved yet.",
+      "reference": "제 E-7-1 체류기간 연장 신청은 아직 승인되지 않았습니다.",
+      "tags": [
+        "negation",
+        "code"
+      ]
+    },
+    {
+      "id": "en-02",
+      "source": "en-US",
+      "text": "Please return by October 25 at 14:30.",
+      "reference": "10월 25일 14시 30분까지 다시 오세요.",
+      "tags": [
+        "date",
+        "time"
+      ]
+    },
+    {
+      "id": "en-03",
+      "source": "en-US",
+      "text": "The fee is 35,000 won, not 350,000 won.",
+      "reference": "수수료는 350,000원이 아니라 35,000원입니다.",
+      "tags": [
+        "negation",
+        "amount"
+      ]
+    },
+    {
+      "id": "en-04",
+      "source": "en-US",
+      "text": "I renewed my passport yesterday.",
+      "reference": "어제 여권을 갱신했습니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "en-05",
+      "source": "en-US",
+      "text": "I don't have the original document with me.",
+      "reference": "원본 서류를 가지고 있지 않습니다.",
+      "tags": [
+        "negation",
+        "document"
+      ]
+    },
+    {
+      "id": "en-06",
+      "source": "en-US",
+      "text": "My F-6 visa expires in 12 days.",
+      "reference": "제 F-6 체류기간이 12일 후 만료됩니다.",
+      "tags": [
+        "code",
+        "number"
+      ]
+    },
+    {
+      "id": "en-07",
+      "source": "en-US",
+      "text": "The website says my appointment is at 09:20.",
+      "reference": "웹사이트에 예약 시간이 09시 20분으로 표시됩니다.",
+      "tags": [
+        "time"
+      ]
+    },
+    {
+      "id": "en-08",
+      "source": "en-US",
+      "text": "I changed my address three weeks ago.",
+      "reference": "3주 전에 주소를 변경했습니다.",
+      "tags": [
+        "address",
+        "number"
+      ]
+    },
+    {
+      "id": "en-09",
+      "source": "en-US",
+      "text": "The employment contract starts on November 1.",
+      "reference": "근로계약은 11월 1일부터 시작됩니다.",
+      "tags": [
+        "date"
+      ]
+    },
+    {
+      "id": "en-10",
+      "source": "en-US",
+      "text": "Can I receive a receipt for 120,000 won?",
+      "reference": "120,000원에 대한 영수증을 받을 수 있습니까?",
+      "tags": [
+        "amount",
+        "question"
+      ]
+    },
+    {
+      "id": "en-11",
+      "source": "en-US",
+      "text": "I haven't received my residence card.",
+      "reference": "아직 외국인등록증을 받지 못했습니다.",
+      "tags": [
+        "negation",
+        "document"
+      ]
+    },
+    {
+      "id": "en-12",
+      "source": "en-US",
+      "text": "My G-1-5 status was extended for 3 months.",
+      "reference": "제 G-1-5 체류기간이 3개월 연장되었습니다.",
+      "tags": [
+        "code",
+        "number"
+      ]
+    },
+    {
+      "id": "en-13",
+      "source": "en-US",
+      "text": "I would like to correct my date of birth.",
+      "reference": "생년월일을 정정하고 싶습니다.",
+      "tags": [
+        "identity"
+      ]
+    },
+    {
+      "id": "en-14",
+      "source": "en-US",
+      "text": "The flight is on Friday, but my appointment is on Monday.",
+      "reference": "항공편은 금요일이고 예약은 월요일입니다.",
+      "tags": [
+        "date"
+      ]
+    },
+    {
+      "id": "zh-01",
+      "source": "zh-CN",
+      "text": "我的护照下周到期。",
+      "reference": "제 여권은 다음 주에 만료됩니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "zh-02",
+      "source": "zh-CN",
+      "text": "我已经预约了周三上午十点。",
+      "reference": "수요일 오전 10시에 예약했습니다.",
+      "tags": [
+        "time"
+      ]
+    },
+    {
+      "id": "zh-03",
+      "source": "zh-CN",
+      "text": "我还没有收到外国人登录证。",
+      "reference": "아직 외국인등록증을 받지 못했습니다.",
+      "tags": [
+        "negation",
+        "document"
+      ]
+    },
+    {
+      "id": "zh-04",
+      "source": "zh-CN",
+      "text": "我想更改在韩国的住址。",
+      "reference": "한국 내 주소를 변경하고 싶습니다.",
+      "tags": [
+        "address"
+      ]
+    },
+    {
+      "id": "zh-05",
+      "source": "zh-CN",
+      "text": "这份材料不是原件，是复印件。",
+      "reference": "이 서류는 원본이 아니라 사본입니다.",
+      "tags": [
+        "negation",
+        "document"
+      ]
+    },
+    {
+      "id": "zh-06",
+      "source": "zh-CN",
+      "text": "请问需要支付多少手续费？",
+      "reference": "수수료를 얼마 내야 합니까?",
+      "tags": [
+        "question"
+      ]
+    },
+    {
+      "id": "ja-01",
+      "source": "ja-JP",
+      "text": "在留カードを再発行したいです。",
+      "reference": "외국인등록증을 재발급받고 싶습니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "ja-02",
+      "source": "ja-JP",
+      "text": "パスポートを持ってくるのを忘れました。",
+      "reference": "여권을 가져오는 것을 잊었습니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "ja-03",
+      "source": "ja-JP",
+      "text": "予約は来週の火曜日です。",
+      "reference": "예약은 다음 주 화요일입니다.",
+      "tags": [
+        "date"
+      ]
+    },
+    {
+      "id": "ja-04",
+      "source": "ja-JP",
+      "text": "この住所にはもう住んでいません。",
+      "reference": "이 주소에는 더 이상 살고 있지 않습니다.",
+      "tags": [
+        "negation",
+        "address"
+      ]
+    },
+    {
+      "id": "vi-01",
+      "source": "vi-VN",
+      "text": "Tôi cần gia hạn thời gian lưu trú.",
+      "reference": "체류기간을 연장해야 합니다.",
+      "tags": [
+        "visa"
+      ]
+    },
+    {
+      "id": "vi-02",
+      "source": "vi-VN",
+      "text": "Tôi chưa nhận được thẻ đăng ký người nước ngoài.",
+      "reference": "아직 외국인등록증을 받지 못했습니다.",
+      "tags": [
+        "negation",
+        "document"
+      ]
+    },
+    {
+      "id": "vi-03",
+      "source": "vi-VN",
+      "text": "Tôi chuyển nhà vào tuần trước.",
+      "reference": "지난주에 이사했습니다.",
+      "tags": [
+        "address"
+      ]
+    },
+    {
+      "id": "vi-04",
+      "source": "vi-VN",
+      "text": "Tôi quên mang hộ chiếu.",
+      "reference": "여권을 가져오는 것을 잊었습니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "id-01",
+      "source": "id-ID",
+      "text": "Saya ingin memperpanjang izin tinggal.",
+      "reference": "체류기간을 연장하고 싶습니다.",
+      "tags": [
+        "visa"
+      ]
+    },
+    {
+      "id": "id-02",
+      "source": "id-ID",
+      "text": "Paspor saya hilang kemarin.",
+      "reference": "어제 여권을 분실했습니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "id-03",
+      "source": "id-ID",
+      "text": "Saya belum menerima kartu registrasi orang asing.",
+      "reference": "아직 외국인등록증을 받지 못했습니다.",
+      "tags": [
+        "negation",
+        "document"
+      ]
+    },
+    {
+      "id": "id-04",
+      "source": "id-ID",
+      "text": "Saya pindah alamat dua hari yang lalu.",
+      "reference": "이틀 전에 주소를 변경했습니다.",
+      "tags": [
+        "address"
+      ]
+    },
+    {
+      "id": "mn-01",
+      "source": "mn-MN",
+      "text": "Миний паспортын хугацаа дуусах гэж байна.",
+      "reference": "제 여권 유효기간이 곧 만료됩니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "mn-02",
+      "source": "mn-MN",
+      "text": "Би оршин суух хугацаагаа сунгахыг хүсэж байна.",
+      "reference": "체류기간을 연장하고 싶습니다.",
+      "tags": [
+        "visa"
+      ]
+    },
+    {
+      "id": "uz-01",
+      "source": "uz-UZ",
+      "text": "Pasportimning muddati tugayapti.",
+      "reference": "제 여권 유효기간이 만료되고 있습니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "uz-02",
+      "source": "uz-UZ",
+      "text": "Yashash ruxsatimni uzaytirmoqchiman.",
+      "reference": "체류기간을 연장하고 싶습니다.",
+      "tags": [
+        "visa"
+      ]
+    },
+    {
+      "id": "ru-01",
+      "source": "ru-RU",
+      "text": "Я потерял паспорт вчера.",
+      "reference": "어제 여권을 분실했습니다.",
+      "tags": [
+        "document"
+      ]
+    },
+    {
+      "id": "ru-02",
+      "source": "ru-RU",
+      "text": "Срок действия моей визы истекает через неделю.",
+      "reference": "제 비자 유효기간이 일주일 후 만료됩니다.",
+      "tags": [
+        "visa"
+      ]
+    }
+  ]
+}

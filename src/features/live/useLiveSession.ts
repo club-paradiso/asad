@@ -123,6 +123,8 @@ export interface LiveSessionOptions {
   source: SttProviderId;
   /** Preferred physical booth input for providers that accept raw audio. */
   audioDeviceId?: string;
+  /** Optional isolated interpretation endpoint for specialized modes. */
+  interpretEndpoint?: string;
   /** Demo playback rate; 1 is real time. */
   demoSpeed?: number;
   /** Look up Scripture text. Skipped entirely in demo mode. */
@@ -299,6 +301,7 @@ export function useLiveSession(options: LiveSessionOptions) {
   /** Built lazily from Start's event handler, never during render. */
   const cloudLane = useCallback((): CloudLane => {
     cloudLaneRef.current ??= createCloudLane({
+      endpoint: optionsRef.current.interpretEndpoint,
       fetchImpl: (input, init) => guardedFetch(input, init),
       browserTranslator: () => browserTranslatorRef.current,
       local: (request) =>
@@ -647,6 +650,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     if (phase === "running" || phase === "starting" || phase === "recovering") return;
 
     const current = optionsRef.current;
+    // Reset cached cloud lane so selecting another endpoint between sessions works.
+    cloudLaneRef.current = null;
     // This function is called synchronously from the launcher's Start click.
     // Kick off Translator.create() before the first await so Chrome can use the
     // user's activation to download/instantiate the local language pack.

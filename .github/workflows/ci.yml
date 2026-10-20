@@ -68,6 +68,18 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Earbud synthetic benchmark harness (mock only, no API calls)
+        run: npm run bench:earbud
+
+      # Phase 4B: real public API only, 8 invented phrases covering 8 languages.
+      # No Azure/Gemini calls or secrets. Upstream WAF/quotas may reject CI runners;
+      # that is recorded as a validation blocker, not a production regression.
+      - name: Phase 4B Index public API live smoke (synthetic only)
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/earbud-listen-mvp'
+        timeout-minutes: 2
+        continue-on-error: true
+        run: npm run bench:earbud -- --index-live --confirm-synthetic-only --limit 8
+
       - name: Build
         run: npm run build
 

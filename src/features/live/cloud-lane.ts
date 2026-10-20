@@ -127,6 +127,8 @@ const retryAfterMs = (response: Response): number | null => {
 
 export interface CloudLaneDeps {
   fetchImpl: (input: string, init: RequestInit) => Promise<Response>;
+  /** Product-specific endpoint; normal live behavior remains unchanged. */
+  endpoint?: string;
   /** The already-prepared on-device translator, or null. Never awaits a download. */
   browserTranslator: () => BrowserTranslatorSession | null;
   /** Deterministic helper for the no-translation floor. */
@@ -246,7 +248,7 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
       const deadline = withTurnDeadline(signal, Math.max(1, budgetLeft()));
       try {
         if (firstClientDispatchedAt === undefined) firstClientDispatchedAt = now();
-        const response = await deps.fetchImpl("/api/interpret", {
+        const response = await deps.fetchImpl(deps.endpoint ?? "/api/interpret", {
           method: "POST",
           signal: deadline.signal,
           headers: { "content-type": "application/json" },
