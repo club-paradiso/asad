@@ -12,6 +12,7 @@ import type { GlossaryItem, ResolvedContext } from "@/types";
 import { isWorshipContext } from "../context/context-mode";
 import { COMMUNITY_SERMON_GLOSSARY } from "./community-glossary";
 import { lexiconFor, THEOLOGICAL_LEXICON } from "./lexicon";
+import { applyGlossaryPack, packGlossaryItems } from "./theological-glossary";
 import { findWholeWordOccurrences } from "./match-korean";
 
 export interface GlossaryMatch extends GlossaryItem {
@@ -31,10 +32,12 @@ const byLengthDesc = (a: GlossaryItem, b: GlossaryItem) =>
  * `extra` carries prep-sheet and model-supplied entries, which outrank the
  * built-in lexicon when both match the same Korean string.
  *
- * In a worship context the volunteer-maintained community glossary extends
- * coverage after the hand-curated lexicon. This ordering is intentional: broad
- * coverage must never silently replace a context-aware decision such as
- * 대속 → atonement.
+ * In a worship context the theological glossary pack is consulted FIRST — it
+ * carries the standardised English/Chinese renderings for church-interpreter
+ * volunteers — then the hand-curated lexicon (donating notes and alternatives
+ * the pack does not repeat), then the volunteer-maintained community glossary.
+ * This ordering is intentional: broad coverage must never silently replace a
+ * context-aware decision such as 대속 → atonement.
  */
 export function matchGlossary(
   text: string,
@@ -46,7 +49,7 @@ export function matchGlossary(
   const community = isWorshipContext(context) ? COMMUNITY_SERMON_GLOSSARY : [];
   const entries = dedupeByKorean([
     ...extra,
-    ...lexiconFor(context),
+    ...applyGlossaryPack(lexiconFor(context), context),
     ...community,
   ]).sort(byLengthDesc);
 
@@ -135,6 +138,7 @@ export function promptGlossary(
 export function worshipTermHits(text: string): number {
   if (!text.trim()) return 0;
   const entries = dedupeByKorean([
+    ...packGlossaryItems(),
     ...THEOLOGICAL_LEXICON,
     ...COMMUNITY_SERMON_GLOSSARY,
   ]).sort(byLengthDesc);
