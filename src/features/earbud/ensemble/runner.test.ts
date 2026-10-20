@@ -12,6 +12,18 @@ describe("earbud translation selection safety", () => {
     expect(preservesCriticalTokens("Come at 09:20", "09시 20분에 오세요.")).toBe(true);
     expect(preservesCriticalTokens("Come at 09:20", "09시 30분에 오세요.")).toBe(false);
   });
+  it("validates Korean source into spoken English including negation and numbers", () => {
+    const ko = "제 E-7-1 체류기간 연장은 아직 승인되지 않았고 120,000원을 냈습니다.";
+    expect(checkCandidate(ko, "My E-7-1 extension has not been approved and I paid 120,000 won.", "en-US").ok).toBe(true);
+    expect(checkCandidate(ko, "My E-7-1 extension was approved, I paid 120,000 won.", "en-US").ok).toBe(false);
+    expect(checkCandidate(ko, "제 E-7-1 연장은 아직 승인되지 않았습니다. 120,000원", "en-US").ok).toBe(false);
+    expect(checkCandidate(ko, "I have not received the approval letter.", "en-US").ok).toBe(false);
+  });
+  it("can select a matching English result from independent providers", () => {
+    const ko = "제 E-7-1 체류기간 연장은 아직 승인되지 않았습니다.";
+    const en = "My E-7-1 extension has not been approved.";
+    expect(chooseTranslation(ko, [c("index", en), c("azure", en)], "en-US").kind).toBe("accepted");
+  });
   it("retains all visa class and numeric identifiers", () => {
     expect(criticalTokens(source)).toEqual(expect.arrayContaining(["E-7-1", "120000"]));
     expect(checkCandidate(source, index).ok).toBe(true);
