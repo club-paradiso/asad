@@ -75,7 +75,7 @@ jobs:
       # No Azure/Gemini calls or secrets. Upstream WAF/quotas may reject CI runners;
       # that is recorded as a validation blocker, not a production regression.
       - name: Phase 4B Index public API live smoke (synthetic only)
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/earbud-listen-mvp'
+        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/earbud-listen-mvp' || github.head_ref == 'feat/earbud-global-ko-en')
         timeout-minutes: 2
         continue-on-error: true
         run: npm run bench:earbud -- --index-live --confirm-synthetic-only --limit 9
