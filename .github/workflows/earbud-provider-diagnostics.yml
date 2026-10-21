@@ -1,0 +1,80 @@
+# Manual, privacy-safe Index public provider check.
+# No Azure resource creation, no tokens, no identifiers, no automatic schedule.
+name: Earbud Provider Diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Comma-separated source tags (synthetic only). Default Korean and English."
+        required: true
+        default: "ko-KR,en-US"
+        type: string
+      deadline_ms:
+        description: "Per API call diagnostic deadline (1000 to 20000 ms)."
+        required: true
+        default: "12000"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  index-readiness:
+    name: Free Index provider | synthetic-only live readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Run synthetic-only public Index provider diagnostics
+        id: live
+        continue-on-error: true
+        env:
+          SOURCES: ${{ inputs.sources }}
+          DEADLINE_MS: ${{ inputs.deadline_ms }}
+        run: |
+          # Shell input validation before constructing CLI argv.
+          if ! [[ "$SOURCES" =~ ^[a-zA-Z0-9,-]+$ ]]; then echo "Invalid source list"; exit 2; fi
+          if ! [[ "$DEADLINE_MS" =~ ^[0-9]{4,5}$ ]]; then echo "Invalid deadline"; exit 2; fi
+          npm run bench:earbud -- --index-live --confirm-synthetic-only \
+            --sources "$SOURCES" --limit 9 --timeout-ms "$DEADLINE_MS" \
+            --output ./earbud-provider-report.json
+      - name: Publish operational verdict
+        if: always()
+        env:
+          INDEX_STEP: ${{ steps.live.outcome }}
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const file = "./earbud-provider-report.json";
+          const s = fs.existsSync(file)
+            ? JSON.parse(fs.readFileSync(file, "utf8")).summary
+            : null;
+          const lines = [
+            "### Index-Translate external API readiness (synthetic utterances only)",
+            "Real provider was tested; not mocked. No actual applicant data, no Azure/Gemini calls.",
+            "Status: **" + (s?.runStatus ?? "NOT_RUN") + "**",
+            "Successful: **" + (s?.completed ?? 0) + "/" + (s?.fixtureCount ?? 0) + "**",
+            "P50/P95: **" + (s?.p50Ms ?? "n/a") + " / " + (s?.p95Ms ?? "n/a") + " ms**",
+            "Per-request deadline: **" + (s?.perRequestDeadlineMs ?? "n/a") + " ms**",
+            "Provider diagnostic step: **" + process.env.INDEX_STEP + "**",
+            "Response means only basic protocol/token checks passed. Human meaning accuracy is unverified.",
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          if (!s || s.runStatus !== "RESPONDING_WITH_BASIC_CHECKS")
+            process.stdout.write("::warning::Provider is not operational under this deadline. Do not enable the ensemble based on this run.\n");
+          NODE
+      - name: Preserve sanitized result report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: earbud-index-provider-readiness
+          path: earbud-provider-report.json
+          if-no-files-found: ignore
+          retention-days: 7

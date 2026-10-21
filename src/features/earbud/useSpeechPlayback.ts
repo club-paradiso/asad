@@ -13,7 +13,7 @@ const STALE_AFTER_MS = 8_000;
 const BROWSER_START_TIMEOUT_MS = 2_800;
 const BROWSER_FINISH_TIMEOUT_MS = 10_000;
 
-export function useSpeechPlayback() {
+export function useSpeechPlayback(targetLanguage: "ko-KR" | "en-US" = "ko-KR") {
   const supported = useCapability(() =>
     "speechSynthesis" in window && "SpeechSynthesisUtterance" in window);
   const audioElementSupported = useCapability(() => typeof Audio !== "undefined");
@@ -33,6 +33,8 @@ export function useSpeechPlayback() {
   const controller = useRef<AbortController | null>(null);
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selected = useRef<EarbudPlaybackMode>("browser");
+  const targetRef = useRef(targetLanguage);
+  useEffect(() => { targetRef.current = targetLanguage; }, [targetLanguage]);
 
   const clearResources = useCallback(() => {
     if (watchdog.current) clearTimeout(watchdog.current);
@@ -156,9 +158,12 @@ export function useSpeechPlayback() {
     const synth = window.speechSynthesis;
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "ko-KR";
+    utterance.lang = targetRef.current;
     utterance.rate = 1.12;
-    utterance.voice = synth.getVoices().find(v => v.lang.toLowerCase() === "ko-kr") ?? null;
+    const target = targetRef.current.toLowerCase();
+    utterance.voice = synth.getVoices().find(v => v.lang.toLowerCase() === target)
+      ?? synth.getVoices().find(v => v.lang.toLowerCase().startsWith(target.split("-")[0] + "-"))
+      ?? null;
     setStatus("preparing");
     let started = false;
     utterance.onstart = () => {
@@ -238,8 +243,9 @@ export function useSpeechPlayback() {
     setAudioSession(getAudioSessionState());
     const token = generation.current;
     if (selected.current === "browser" && "speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance("ASAD 한국어 음성 재생 점검입니다.");
-      utterance.lang = "ko-KR";
+      const utterance = new SpeechSynthesisUtterance(targetRef.current === "en-US"
+        ? "ASAD English speech output test." : "ASAD 한국어 음성 재생 점검입니다.");
+      utterance.lang = targetRef.current;
       utterance.onstart = () => { if (generation.current === token) setVoiceTest("started"); };
       utterance.onend = () => { if (generation.current === token) setVoiceTest("ended"); };
       utterance.onerror = () => { if (generation.current === token) setVoiceTest("failed"); };

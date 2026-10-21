@@ -38,6 +38,19 @@ describe("Phase 4B access-gated Index live-provider route", () => {
     expect((await POST(request())).status).toBe(503);
     expect(mocks.translate).not.toHaveBeenCalled();
   });
+  it("handles Korean speech translated into English with entity protection", async () => {
+    const koreanInput = { ...input, source: "ko-KR", target: "en-US",
+      pending: "제 E-7-1 체류기간 연장이 아직 승인되지 않았습니다." };
+    mocks.guard.mockResolvedValueOnce({ ok: true, body: koreanInput });
+    mocks.translate.mockResolvedValueOnce("My E-7-1 extension has not been approved yet.");
+    const payload = await (await POST(request())).json();
+    expect(payload.provider).toBe("index");
+    expect(payload.output.safeChunks[0].text).toContain("has not been approved");
+  });
+  it("rejects a same-language target", async () => {
+    mocks.guard.mockResolvedValueOnce({ ok: true, body: { ...input, source:"ko-KR", target:"ko-KR" } });
+    expect((await POST(request())).status).toBe(400);
+  });
   it("returns a committed-looking, validation-screened Korean translation", async () => {
     mocks.translate.mockResolvedValue("제 E-7-1 비자가 아직 승인되지 않았습니다.");
     const response = await POST(request());

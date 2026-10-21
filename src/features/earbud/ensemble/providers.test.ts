@@ -15,6 +15,26 @@ describe("official provider wire contracts", () => {
     expect(payload.model).toBe("Index-Translate-35B-A3B");
     expect(JSON.stringify(opts?.headers)).not.toContain("Bearer");
   });
+  it("passes target English to the real API contract when Korean is the source", async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(JSON.stringify({choices:[{message:{content:"My passport is expiring."}}]}), {status:200})
+    ) as unknown as typeof fetch;
+    await translateIndex({ source: "ko-KR", target: "en-US", text: "여권 유효기간이 만료됩니다." },
+      new AbortController().signal, fetcher);
+    const body = JSON.parse(String(vi.mocked(fetcher).mock.calls[0][1]?.body));
+    expect(body.messages[0].content).toContain("English");
+    expect(body.messages[0].content).toContain("en-US");
+  });
+  it("uses Azure from=ko to=en for Korean source and English output", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify([
+      {translations:[{to:"en",text:"My passport is expiring."}]}
+    ]), {status:200})) as unknown as typeof fetch;
+    await translateAzure({source:"ko-KR",target:"en-US",text:"여권이 만료됩니다."},
+      new AbortController().signal,"TEST",undefined,fetcher);
+    const url = String(vi.mocked(fetcher).mock.calls[0][0]);
+    expect(url).toContain("from=ko");
+    expect(url).toContain("to=en");
+  });
   it("uses documented Azure F0 REST translate endpoint and region header", async () => {
     const fetcher = vi.fn(async () =>
       new Response(JSON.stringify([{translations:[{to:"ko",text:"체류기간이 만료됩니다."}]}]),

@@ -4,6 +4,7 @@ import { guardInferenceRoute } from "@/lib/guard";
 import { interpretRequestSchema } from "@/lib/schema";
 import { checkCandidate } from "@/features/earbud/ensemble/decision";
 import { translateIndex, INDEX_MODEL } from "@/features/earbud/ensemble/providers";
+import { earbudPairProblem } from "@/features/earbud/language-pairs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     }, { status: 503, headers: HEADERS });
   }
   const parsed = interpretRequestSchema.safeParse(guarded.body);
-  if (!parsed.success || parsed.data.target !== "ko-KR" || parsed.data.source === "ko-KR") {
+  if (!parsed.success || earbudPairProblem(parsed.data.source, parsed.data.target)) {
     return NextResponse.json({ error: "Unsupported language pair." }, { status: 400 });
   }
   const text = parsed.data.pending.trim();
@@ -43,8 +44,8 @@ export async function POST(request: Request) {
   let translated: string | null = null;
   let reason = "Index API returned no translation.";
   try {
-    const result = await translateIndex({ text, source: parsed.data.source }, deadline);
-    const verdict = checkCandidate(text, result);
+    const result = await translateIndex({ text, source: parsed.data.source, target: parsed.data.target as "ko-KR" | "en-US" }, deadline);
+    const verdict = checkCandidate(text, result, parsed.data.target);
     if (verdict.ok) {
       translated = result;
       reason = "Index translation passed deterministic format and critical-token checks; semantics not yet human-validated.";

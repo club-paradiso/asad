@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppConfig } from "@/app/api/config/route";
-import { LIVE_SOURCE_LANGUAGES, findLanguage, liveLanguagePairProblem } from "@/lib/languages";
+import { LIVE_SOURCE_LANGUAGES, findLanguage } from "@/lib/languages";
+import { EARBUD_OUTPUT_LANGUAGES, earbudPairProblem, type EarbudOutputLanguage } from "./language-pairs";
 import { openSession, readSessionState, type SessionState } from "@/lib/session-client";
 import {
   WebSpeechProvider,
@@ -17,7 +18,7 @@ import { useLiveSession } from "@/features/live/useLiveSession";
 import { unspokenCommitted } from "./speakable";
 import { useSpeechPlayback } from "./useSpeechPlayback";
 
-const LANGUAGE_PRIORITY = ["en-US", "zh-CN", "ja-JP", "vi-VN", "id-ID", "uz-UZ", "mn-MN", "ru-RU"];
+const LANGUAGE_PRIORITY = ["ko-KR", "en-US", "zh-CN", "ja-JP", "vi-VN", "id-ID", "uz-UZ", "mn-MN", "ru-RU"];
 type EarbudFreeStatus = {
   translation: { available: boolean; model: string; note: string };
   index: { available: boolean; model: string; note: string };
@@ -35,6 +36,7 @@ const AUDIO_STATES: Record<string, string> = {
 
 export function EarbudScreen() {
   const [language, setLanguage] = useState("en-US");
+  const [targetLanguage, setTargetLanguage] = useState<EarbudOutputLanguage>("ko-KR");
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [configFailed, setConfigFailed] = useState(false);
   const [earbudStatus, setEarbudStatus] = useState<EarbudFreeStatus | null>(null);
@@ -52,7 +54,7 @@ export function EarbudScreen() {
   const playedIds = useRef(new Set<string>());
   const spokenText = useRef(new Set<string>());
   const ending = useRef(false);
-  const audio = useSpeechPlayback();
+  const audio = useSpeechPlayback(targetLanguage);
   const { enqueue: enqueueAudio, enabled: audioEnabled } = audio;
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function EarbudScreen() {
   const session = useLiveSession({
     context: "conversation",
     sourceLanguage: language,
-    targetLanguage: "ko-KR",
+    targetLanguage,
     lag,
     interpretEndpoint: translationMode === "ensemble"
       ? "/api/earbud/ensemble"
@@ -96,7 +98,7 @@ export function EarbudScreen() {
   const sources: SttProviderId[] = browserSupported ? ["webspeech"] : [];
 
   const sttSupport = source === "demo" ? "unsupported" : sttLanguageSupport(source, language);
-  const pairError = liveLanguagePairProblem(language, "ko-KR");
+  const pairError = earbudPairProblem(language, targetLanguage);
   const inputLost = source !== "webspeech" && source !== "demo"
     && !!audioInputs.deviceId && !audioInputs.selectionAvailable;
   const translationReady = translationMode === "ensemble"
@@ -109,7 +111,7 @@ export function EarbudScreen() {
   // The gate and source are checked independently; a truthy model alone is not enough.
   const canStart = !!mayStart && consent.mayStart && source !== "demo"
     && sttSupport !== "unsupported" && !pairError && !inputLost
-    && (audio.mode === "gemini" ? earbudStatus?.tts.available === true : audio.supported)
+    && (audio.mode === "gemini" ? (targetLanguage === "ko-KR" && earbudStatus?.tts.available === true) : audio.supported)
     && testConfirmed && syntheticOnly && externalConsent;
 
   const start = () => {
@@ -165,10 +167,12 @@ export function EarbudScreen() {
         ? "Index 공개 API 검증이 비활성 상태야. 비공개 Preview 설정을 확인해."
         : "개인 비공개 배포에 Gemini 무료 API 키가 필요해. 유료 폴백은 차단되어 있어."
     : source === "demo" ? "이 기기의 브라우저 음성 인식이 지원되지 않아. 유료 STT 자동 전환은 금지했어."
-    : pairError ? "선택한 입력 언어는 한국어 통역과 연결할 수 없어."
+    : pairError === "same-language" ? "원문과 통역 출력 언어가 같아. 서로 다른 언어를 선택해."
+    : pairError ? "이 입력·출력 언어 조합은 현재 테스트 모드에서 지원하지 않아."
     : sttSupport === "unsupported" ? "현재 음성 인식기에서 이 언어를 지원하지 않아."
     : inputLost ? "선택했던 오디오 입력 장치가 연결되어 있지 않아."
     : audio.mode === "browser" && !audio.supported ? "브라우저 음성 합성을 사용할 수 없어. 오디오 파일 방식이 필요해."
+    : audio.mode === "gemini" && targetLanguage !== "ko-KR" ? "영어 출력은 현재 무료 브라우저 음성 합성 모드만 지원해."
     : audio.mode === "gemini" && !earbudStatus.tts.available ? "무료 Gemini TTS가 아직 활성화되지 않았어."
     : consent.phase === "checking" ? "외부 음성·번역 공급자의 데이터 정책 확인 중..."
     : consent.phase === "needed" ? "먼저 데이터 전송 안내를 확인해."
@@ -193,7 +197,7 @@ export function EarbudScreen() {
           <div>
             <Link href="/" className="text-xs font-semibold tracking-widest text-[var(--fg-dim)]">ASAD / HOME ↗</Link>
             <h1 className="mt-2 text-3xl font-bold tracking-tight">이어폰 통역</h1>
-            <p className="mt-1 text-sm text-[var(--fg-muted)]">Earbud Mode · 외국어를 듣고 한국어로 확인하기</p>
+            <p className="mt-1 text-sm text-[var(--fg-muted)]">Earbud Mode · 한국어 ↔ 영어 테스트 · 국제 사용자 대응</p>
           </div>
           <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--fg-muted)]">BETA · MVP</span>
         </header>
@@ -203,10 +207,15 @@ export function EarbudScreen() {
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm font-medium">
               민원인이 말하는 언어
-              <select value={language} disabled={active} onChange={(event) => setLanguage(event.target.value)}
+              <select value={language} disabled={active} onChange={(event) => {
+                const next = event.target.value;
+                setLanguage(next);
+                if (next === targetLanguage) setTargetLanguage(next === "ko-KR" ? "en-US" : "ko-KR");
+                setExternalConsent(false);
+                setTestConfirmed(false);
+              }}
                 className="min-h-12 rounded-lg border border-[var(--line-strong)] bg-[var(--bg)] px-3 text-base">
                 {[...LIVE_SOURCE_LANGUAGES]
-                  .filter((item) => item.id !== "ko-KR")
                   .sort((a, b) => {
                     const aIndex = LANGUAGE_PRIORITY.indexOf(a.id);
                     const bIndex = LANGUAGE_PRIORITY.indexOf(b.id);
@@ -216,8 +225,18 @@ export function EarbudScreen() {
               </select>
             </label>
             <label className="flex flex-col gap-2 text-sm font-medium">
-              통역 음성
-              <div className="flex min-h-12 items-center rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 text-base">한국어 · 시스템 기본 출력</div>
+              통역 출력 언어 / Output language
+              <select value={targetLanguage} disabled={active} onChange={(event) => {
+                const next = event.target.value as EarbudOutputLanguage;
+                setTargetLanguage(next);
+                if (next !== "ko-KR" && audio.mode === "gemini") audio.changeMode("browser");
+                setExternalConsent(false);
+                setTestConfirmed(false);
+              }} className="min-h-12 rounded-lg border border-[var(--line-strong)] bg-[var(--bg)] px-3 text-base">
+                {EARBUD_OUTPUT_LANGUAGES.map(code => <option key={code} value={code}>
+                  {findLanguage(code)?.ko} · {findLanguage(code)?.endonym}
+                </option>)}
+              </select>
             </label>
             <label className="flex flex-col gap-2 text-sm font-medium">
               음성 인식 엔진
@@ -230,7 +249,7 @@ export function EarbudScreen() {
             <div className="flex flex-col gap-2 text-sm font-medium">
               출력 상태
               <div role="status" className="flex min-h-12 items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 text-sm">
-                <span>{AUDIO_STATES[audio.status]}</span>
+                <span>{audio.status === "speaking" ? `${findLanguage(targetLanguage)?.ko ?? targetLanguage} 음성 재생 중` : AUDIO_STATES[audio.status]}</span>
                 <button type="button" onClick={audio.testRoute} disabled={!audio.audioElementSupported}
                   className="min-h-10 rounded-md border border-[var(--line-strong)] px-3 text-xs font-semibold">출력 경로 테스트</button>
               </div>
@@ -253,11 +272,11 @@ export function EarbudScreen() {
               <select disabled={active} value={audio.mode} onChange={(e) => audio.changeMode(e.target.value as "browser" | "gemini")}
                 className="ml-auto min-h-11 rounded-lg border border-[var(--line)] bg-[var(--bg)] px-2">
                 <option value="browser">기기 내장 음성 (무료)</option>
-                {earbudStatus?.tts.available && <option value="gemini">Gemini 음성 파일 (무료 티어 한도)</option>}
+                {targetLanguage === "ko-KR" && earbudStatus?.tts.available && <option value="gemini">Gemini 음성 파일 (한국어만 지원)</option>}
               </select>
             </label>
             <button type="button" onClick={audio.testVoice} disabled={active || (audio.mode === "browser" && !audio.supported)}
-              className="min-h-11 w-full rounded-lg border border-[var(--line-strong)] px-3 text-sm font-semibold">한국어 음성 테스트</button>
+              className="min-h-11 w-full rounded-lg border border-[var(--line-strong)] px-3 text-sm font-semibold">{findLanguage(targetLanguage)?.ko ?? targetLanguage} 음성 테스트</button>
             <div className="grid grid-cols-2 gap-2 text-xs text-[var(--fg-muted)]">
               <span>오디오 파일 테스트: {audio.routeTest}</span><span>음성 합성 상태: {audio.voiceTest}</span>
               <span className="col-span-2">AudioSession: {audio.audioSession}</span>
@@ -298,7 +317,7 @@ export function EarbudScreen() {
             <label className="flex items-start gap-3">
               <input type="checkbox" checked={testConfirmed} onChange={(event) => setTestConfirmed(event.target.checked)} disabled={active}
                 className="mt-1 size-4 shrink-0 accent-[var(--accent)]" />
-              출력 경로 테스트와 한국어 음성 테스트를 직접 수행했고, 한쪽 에어팟에서 소리가 들리는 것을 확인했어.
+              출력 경로 테스트와 선택한 언어의 음성 테스트를 직접 수행했고, 한쪽 에어팟에서 소리가 들리는 것을 확인했어.
             </label>
             <label className="flex items-start gap-3">
               <input type="checkbox" checked={syntheticOnly} onChange={(event) => setSyntheticOnly(event.target.checked)} disabled={active}
@@ -346,7 +365,7 @@ export function EarbudScreen() {
 
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-4" aria-label="라이브 통역 결과">
           <div className="flex items-center justify-between gap-3 text-xs text-[var(--fg-muted)]">
-            <span>{active ? "● 마이크 세션" : "○ 대기 중"} · {findLanguage(language)?.ko ?? language} → 한국어</span>
+            <span>{active ? "● 마이크 세션" : "○ 대기 중"} · {findLanguage(language)?.ko ?? language} → {findLanguage(targetLanguage)?.ko ?? targetLanguage}</span>
             <span>{session.snapshot.connection}</span>
           </div>
           <p className="mt-3 text-xs text-[var(--fg-muted)]">통역: {translationMode === "ensemble" ? "Index-Translate + Azure F0 (선택적 Gemini Arbiter)" : translationMode === "index" ? "Index-Translate-35B-A3B · 실제 공개 API" : earbudStatus?.translation.model ?? "준비 상태 확인 중"} · 유료 폴백 사용 안 함</p>
@@ -355,7 +374,7 @@ export function EarbudScreen() {
           )}
           {latencySamples.length > 0 && <p className="mt-1 text-xs text-[var(--fg-muted)]">확정 번역 → 음성 대기열 등록까지 평균(참고값): {Math.round(latencySamples.reduce((a,b)=>a+b,0)/latencySamples.length)}ms · {latencySamples.length}건</p>}
           <div className="mt-4 rounded-xl bg-[var(--bg)] p-4">
-            <p className="text-xs font-semibold text-[var(--fg-dim)]">한국어 번역 · 확정된 문장</p>
+            <p className="text-xs font-semibold text-[var(--fg-dim)]">{findLanguage(targetLanguage)?.ko ?? targetLanguage} 번역 · 확정된 문장</p>
             <p aria-live="polite" className="mt-3 min-h-20 text-xl font-semibold leading-relaxed">
               {latest?.text ?? "통역 시작 후 확정된 문장이 여기에 표시돼."}
             </p>
