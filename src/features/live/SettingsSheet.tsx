@@ -19,6 +19,8 @@ import type {
 import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { CONTEXT_LABEL_EN, CONTEXT_MODES } from "@/interpreter/context/context-mode";
 import { romaniseName } from "@/lib/romanise";
+import { STT_PROVIDER_INFO, type SttProviderId } from "@/providers/stt";
+import type { InputHealth } from "./input-health";
 import {
   Button,
   Field,
@@ -40,6 +42,9 @@ export function SettingsSheet({
   wakeLockHeld,
   wakeLockSupported,
   degradedReason,
+  inputHealth,
+  inputLabel,
+  source,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,6 +57,12 @@ export function SettingsSheet({
   wakeLockHeld: boolean;
   wakeLockSupported: boolean;
   degradedReason?: string;
+  /** What the capture is hearing, when ASAD owns the capture. */
+  inputHealth?: InputHealth;
+  /** The device label the browser reported for the open capture. */
+  inputLabel?: string;
+  /** Which recogniser this session runs on. */
+  source?: SttProviderId;
 }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -179,7 +190,60 @@ export function SettingsSheet({
           </div>
         </Field>
 
+        {/* Which device the recogniser is actually hearing. Named here, in
+            full, because the strip only ever says "No signal" — the question
+            that follows is "no signal on WHAT", and the answer must be the
+            exact device, never a guess from a settings menu. */}
+        {source && source !== "demo" && (
+          <Field
+            label="Input"
+            hint={
+              inputHealth?.source === "raw"
+                ? "Measured on the audio ASAD is sending to the recogniser."
+                : "The browser's recogniser opens its own microphone; ASAD cannot see its level. Choose the input in the system sound settings."
+            }
+          >
+            <span className="block text-sm text-[var(--fg)]" data-testid="input-device">
+              {inputHealth?.source === "raw"
+                ? `Listening on ${inputLabel || "the system default input"}`
+                : `${STT_PROVIDER_INFO[source]?.label ?? source} is using the system default input`}
+              {inputHealth?.source === "raw" && (
+                <span
+                  className={
+                    inputHealth.state === "ok"
+                      ? "ml-2 text-[var(--ok)]"
+                      : inputHealth.state === "unknown"
+                        ? "ml-2 text-[var(--fg-dim)]"
+                        : "ml-2 text-[var(--warn)]"
+                  }
+                >
+                  ·{" "}
+                  {inputHealth.state === "ok"
+                    ? inputHealth.level === "good"
+                      ? "signal ok"
+                      : inputHealth.level === "hot"
+                        ? "signal hot"
+                        : "signal present"
+                    : inputHealth.state === "silent"
+                      ? "no signal"
+                      : inputHealth.state === "clipping"
+                        ? "clipping"
+                        : "waiting for audio"}
+                </span>
+              )}
+            </span>
+          </Field>
+        )}
+
         <div className="flex flex-col gap-2">
+          {source && source !== "demo" && source !== "webspeech" && (
+            <Toggle
+              checked={settings.noiseSuppression}
+              onChange={(noiseSuppression) => patch({ noiseSuppression })}
+              label="Noise suppression"
+              hint="Off for a mixer feed. Turn on only for a room microphone. Applies from the next session."
+            />
+          )}
           <Toggle
             checked={settings.showSource}
             onChange={(showSource) => patch({ showSource })}

@@ -26,6 +26,7 @@ import type { AiState } from "./AiStatus";
 import { cn } from "@/lib/cn";
 import { findLanguage } from "@/lib/languages";
 import type { SessionFault } from "./transport-supervisor";
+import type { InputHealth } from "./input-health";
 import {
   CONTEXT_LABEL_EN,
   CONTEXT_MODES,
@@ -90,8 +91,14 @@ export function consoleStatus(input: {
    * Warning about it would be the console crying wolf for a whole session.
    */
   scripted?: boolean;
+  /**
+   * What the raw-audio capture is hearing. A recogniser that is "listening"
+   * to twelve seconds of silence is not a working session, and until this
+   * existed the strip said Live while the mixer feed was unplugged.
+   */
+  input?: InputHealth;
 }): ConsoleStatus {
-  const { connection, health, ai, fault, scripted = false } = input;
+  const { connection, health, ai, fault, scripted = false, input: inputHealth } = input;
 
   if (fault) return statusForFault(fault);
 
@@ -122,6 +129,26 @@ export function consoleStatus(input: {
       state: "reconnecting",
       label: "Reconnecting",
       detail: "Audio is held while it retries. Nothing on screen is lost.",
+      problem: true,
+    };
+  }
+
+  // The input, before the model. No English can be right if no Korean is
+  // arriving, and both of these are things the interpreter (or the person
+  // next to them) can fix with a cable or a knob.
+  if (inputHealth?.state === "silent") {
+    return {
+      state: "degraded",
+      label: "No signal",
+      detail: "Nothing is reaching the selected input. Check the feed and the cable.",
+      problem: true,
+    };
+  }
+  if (inputHealth?.state === "clipping") {
+    return {
+      state: "degraded",
+      label: "Input too loud",
+      detail: "The feed is distorting. Turn the source down before recognition suffers.",
       problem: true,
     };
   }
@@ -221,6 +248,7 @@ export function ConsoleTopBar({
   targetLanguage,
   onContextChange,
   scripted,
+  input,
   onOpenSettings,
   onEnd,
 }: {
@@ -230,6 +258,8 @@ export function ConsoleTopBar({
   aiState: AiState;
   /** Why the session stopped listening, when it has. Outranks `connection`. */
   fault?: SessionFault | null;
+  /** Level health of the raw-audio capture, when ASAD owns the capture. */
+  input?: InputHealth;
   /** What the session resolved the setting to, and how it got there. */
   context?: ContextState;
   sourceLanguage?: string;
@@ -239,7 +269,7 @@ export function ConsoleTopBar({
   onOpenSettings: () => void;
   onEnd: () => void;
 }) {
-  const status = consoleStatus({ connection, health, ai: aiState, fault, scripted });
+  const status = consoleStatus({ connection, health, ai: aiState, fault, scripted, input });
   const pair =
     sourceLanguage && targetLanguage
       ? `${shortTag(sourceLanguage)} → ${shortTag(targetLanguage)}`

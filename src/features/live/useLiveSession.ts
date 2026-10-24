@@ -63,6 +63,13 @@ import {
   createCloudLane,
   type CloudLane,
 } from "./cloud-lane";
+import {
+  BROWSER_MANAGED_INPUT_HEALTH,
+  InputHealthMonitor,
+  NO_INPUT_HEALTH,
+  sameInputHealth,
+  type InputHealth,
+} from "./input-health";
 
 /** How often the engine's clock advances. 100ms keeps trigger jitter below one tenth of a second. */
 const TICK_MS = 100;
@@ -73,6 +80,12 @@ const FINAL_INFLIGHT_WAIT_MS = 2200;
 const FINAL_FLUSH_WAIT_MS = 2800;
 /** Provisional render times kept for turns whose contextual result is still out. */
 const MAX_PROVISIONAL_RENDER_MARKS = 64;
+/**
+ * How often the input-health reading is re-published to React. The monitor
+ * sees every frame; the console only needs to know when the answer changes,
+ * and twice a second is quick enough to notice an unplugged feed.
+ */
+const INPUT_HEALTH_POLL_MS = 500;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -123,6 +136,8 @@ export interface LiveSessionOptions {
   source: SttProviderId;
   /** Preferred physical booth input for providers that accept raw audio. */
   audioDeviceId?: string;
+  /** Browser noise suppression on a raw-audio capture. Default off. */
+  noiseSuppression?: boolean;
   /** Optional isolated interpretation endpoint for specialized modes. */
   interpretEndpoint?: string;
   /** Demo playback rate; 1 is real time. */
@@ -161,6 +176,13 @@ export function useLiveSession(options: LiveSessionOptions) {
   const [lastProvider, setLastProvider] = useState<string | undefined>(undefined);
   const [browserTranslatorStatus, setBrowserTranslatorStatus] =
     useState<BrowserTranslatorStatus>("unsupported");
+  /**
+   * What the capture path is actually hearing, and from which device. Levels
+   * and labels only — never audio. `none` until a raw capture opens;
+   * `browser-managed` for a recogniser that owns its own microphone.
+   */
+  const [inputHealth, setInputHealth] = useState<InputHealth>(NO_INPUT_HEALTH);
+  const [inputLabel, setInputLabel] = useState("");
 
   const engineRef = useRef<InterpretationEngine | null>(null);
   const providerRef = useRef<SpeechProvider | null>(null);
@@ -179,6 +201,8 @@ export function useLiveSession(options: LiveSessionOptions) {
   const provisionalRenderedAtRef = useRef(new Map<number, number>());
 
   const supervisorRef = useRef<TransportSupervisor | null>(null);
+  const inputMonitorRef = useRef(new InputHealthMonitor());
+  const inputPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /**
    * The scripted demo only exists for Korean → English. Its beats are authored
@@ -439,6 +463,13 @@ export function useLiveSession(options: LiveSessionOptions) {
   const teardown = useCallback(async () => {
     if (tickRef.current) clearInterval(tickRef.current);
     tickRef.current = null;
+    if (inputPollRef.current) clearInterval(inputPollRef.current);
+    inputPollRef.current = null;
+    inputMonitorRef.current.reset();
+    if (mountedRef.current) {
+      setInputHealth(NO_INPUT_HEALTH);
+      setInputLabel("");
+    }
     // Invalidate ownership before the first await. A track-ended callback can
     // race with AudioWorklet startup; the startup tail uses the ref identity
     // as its cancellation check and must see teardown synchronously.
@@ -606,9 +637,13 @@ export function useLiveSession(options: LiveSessionOptions) {
         if (!MicrophoneCapture.isSupported()) {
           throw new TransportError("unsupported", "This browser cannot capture microphone audio.");
         }
+        const monitor = inputMonitorRef.current;
         const mic = new MicrophoneCapture({
           deviceId: current.audioDeviceId || undefined,
+          noiseSuppression: current.noiseSuppression === true,
           onFrame: (frame) => provider.sendAudio(frame),
+          // Numbers about the frames already being sent — not a second stream.
+          onLevel: (level) => monitor.observe(level),
           onError: (err) => setError(err.message),
           onEnded: () => {
             supervisor.report(
@@ -625,6 +660,21 @@ export function useLiveSession(options: LiveSessionOptions) {
         // finishing. In that case terminal teardown has already detached this
         // mic; never let the tail of this call resurrect the session.
         if (micRef.current !== mic) return false;
+
+        monitor.start();
+        setInputLabel(mic.trackInfo()?.label ?? "");
+        setInputHealth(monitor.snapshot());
+        if (inputPollRef.current) clearInterval(inputPollRef.current);
+        inputPollRef.current = setInterval(() => {
+          const next = monitor.snapshot();
+          setInputHealth((previous) => (sameInputHealth(previous, next) ? previous : next));
+        }, INPUT_HEALTH_POLL_MS);
+      } else {
+        // The browser recogniser opens its own microphone; ASAD never sees the
+        // samples, so it cannot honestly report a level. Say so rather than
+        // showing a meter that measures nothing.
+        setInputLabel("");
+        setInputHealth(current.source === "demo" ? NO_INPUT_HEALTH : BROWSER_MANAGED_INPUT_HEALTH);
       }
 
       tickRef.current = setInterval(() => engineRef.current?.tick(), TICK_MS);
@@ -774,6 +824,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     demoBeat,
     lastProvider,
     browserTranslatorStatus,
+    inputHealth,
+    inputLabel,
     startedAt,
     script,
     start,

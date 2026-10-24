@@ -132,3 +132,30 @@ describe("launcher privacy readiness", () => {
     expect(privacy.value).not.toMatch(/학습하지 않습니다/);
   });
 });
+
+describe("launcher input kind", () => {
+  it("names the laptop microphone as not the console feed in a worship booth", () => {
+    const [, input] = readinessRows({
+      config: null,
+      context: "worship",
+      source: "deepgram",
+      audioInputLabel: "MacBook Air 마이크",
+      audioInputSupported: true,
+      boothPreflightVerified: true,
+    });
+    expect(input).toMatchObject({ label: "입력", level: "limited" });
+    expect(input.value).toMatch(/콘솔 피드가 아닙니다/);
+  });
+
+  it("leaves a USB input alone", () => {
+    const [, input] = readinessRows({
+      config: null,
+      context: "worship",
+      source: "deepgram",
+      audioInputLabel: "USB Audio Device (0d8c:0014)",
+      audioInputSupported: true,
+      boothPreflightVerified: true,
+    });
+    expect(input.level).toBe("ready");
+  });
+});

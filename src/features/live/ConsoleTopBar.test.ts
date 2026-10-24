@@ -145,3 +145,53 @@ describe("a session that stopped listening", () => {
     expect(consoleStatus({ ...base, connection: "live", fault: null }).problem).toBe(false);
   });
 });
+
+describe("consoleStatus and the input", () => {
+  const input = (state: "ok" | "silent" | "clipping" | "unknown") => ({
+    source: "raw" as const,
+    state,
+    level: state === "ok" ? ("good" as const) : ("silent" as const),
+    silentForMs: 0,
+    clippedFramesRecently: 0,
+  });
+
+  it("stays quiet while the input carries signal", () => {
+    expect(
+      consoleStatus({ connection: "live", health: healthy, ai: "live", input: input("ok") }),
+    ).toEqual({ state: "live", label: "Live", problem: false });
+  });
+
+  it("says so when the recogniser has heard only silence for a while", () => {
+    const result = consoleStatus({ connection: "live", health: healthy, ai: "live", input: input("silent") });
+    expect(result).toMatchObject({ state: "degraded", label: "No signal", problem: true });
+    expect(result.detail).not.toMatch(/error|failed|\d{3}|undefined|null/i);
+  });
+
+  it("says so when the input is distorting", () => {
+    const result = consoleStatus({ connection: "live", health: healthy, ai: "live", input: input("clipping") });
+    expect(result).toMatchObject({ state: "degraded", label: "Input too loud", problem: true });
+  });
+
+  it("ranks a lost recogniser above a silent input", () => {
+    expect(
+      consoleStatus({ connection: "live", health: { ...healthy, stt: "down" }, ai: "live", input: input("silent") }),
+    ).toMatchObject({ label: "Not listening" });
+  });
+
+  it("ranks a silent input above a reduced model — no Korean means no English", () => {
+    expect(
+      consoleStatus({ connection: "live", health: { ...healthy, llm: "degraded" }, ai: "degraded", input: input("silent") }),
+    ).toMatchObject({ label: "No signal" });
+  });
+
+  it("says nothing about an input it cannot measure", () => {
+    expect(
+      consoleStatus({
+        connection: "live",
+        health: healthy,
+        ai: "live",
+        input: { source: "browser-managed", state: "unknown", level: "silent", silentForMs: 0, clippedFramesRecently: 0 },
+      }),
+    ).toMatchObject({ label: "Live", problem: false });
+  });
+});

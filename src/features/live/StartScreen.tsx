@@ -62,6 +62,7 @@ import { LanguagePair } from "./LanguagePair";
 import { useLiveSession } from "./useLiveSession";
 import { useBoothAudioInput } from "./useBoothAudioInput";
 import { isBoothPreflightAcknowledged } from "./booth-preflight-ack";
+import { describeAudioInput } from "./audio-input-kind";
 import { preferredSttSource } from "./sourcePreference";
 import { sttDisclosureFor, useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
@@ -189,6 +190,7 @@ export function StartScreen() {
     prep,
     source,
     audioDeviceId: canChooseAudioInput ? audioDeviceId || undefined : undefined,
+    noiseSuppression: settings.noiseSuppression,
   });
 
   // Resolved here, before the tap, so pressing Start can never outrun it.
@@ -636,6 +638,19 @@ export function readinessRows(input: {
               level: "blocked",
               detail: "입력을 다시 연결하거나 시스템 기본값 또는 다른 입력을 선택하세요.",
             }
+          : input.context === "worship" &&
+              input.audioInputLabel &&
+              describeAudioInput(input.audioInputLabel).suitability === "bad"
+            ? {
+                // The one mistake a volunteer cannot see from the meter: the
+                // laptop microphone shows a healthy level — of the room. Name
+                // the device for what it is, before the session rather than in
+                // the session summary.
+                label: "입력",
+                value: `${input.audioInputLabel} · 콘솔 피드가 아닙니다`,
+                level: "limited",
+                detail: `${describeAudioInput(input.audioInputLabel).note} 부스에서는 콘솔이 연결된 USB 어댑터나 외장 입력을 고르세요.`,
+              }
           : input.context === "worship" && input.boothPreflightVerified !== true
             ? {
                 label: "입력",
