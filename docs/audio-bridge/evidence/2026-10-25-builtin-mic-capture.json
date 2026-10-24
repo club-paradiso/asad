@@ -1,0 +1,21 @@
+{
+  "activeWindowRatio" : 0.023809523809523808,
+  "channels" : 1,
+  "clippedSampleRatio" : 0,
+  "dcOffset" : 1.0270711712492712e-06,
+  "device" : "MacBook Air 마이크",
+  "explanation" : "Real samples with speech-like level arrived. This proves capture from this device; it does not by itself prove which physical source produced them.",
+  "frames" : 185220,
+  "peakDbfs" : -27.513538360595703,
+  "perChannelRmsDbfs" : [
+    -49.109683990478516
+  ],
+  "rmsDbfs" : -49.109683990478516,
+  "sampleRate" : 44100,
+  "seconds" : 4,
+  "silentWindowRatio" : 0.40476190476190477,
+  "transport" : "built-in",
+  "uid" : "BuiltInMicrophoneDevice",
+  "verdict" : "USABLE",
+  "wav" : null
+}

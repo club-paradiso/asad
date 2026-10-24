@@ -97,6 +97,22 @@ The ASAD feed should contain the Korean speaker/program audio and should **not**
 
 The launcher therefore treats **Input Device** and **Speech Recognition Provider** as different decisions. Deepgram/OpenAI can consume a specifically selected browser audio input; Web Speech uses the browser/system default input and cannot be reliably device-routed by ASAD.
 
+### Zero-budget path on a MacBook (no interface available)
+
+When the booth has only a laptop, a consumer USB-C dongle and consumer
+cables, the question is not "which feed is best" but "does any feed reach
+macOS at all". That investigation, its electrical reasoning, the exact booth
+test and the honest verdict for the audited MacBook Air M1 are in
+[`audio-bridge/macbook-m1-feasibility.md`](./audio-bridge/macbook-m1-feasibility.md).
+The native probe it uses lives in `tools/audio-probe/` and answers, from the
+command line, whether a device macOS enumerates actually delivers samples.
+
+Whatever the path, the live console now measures the audio it sends: after
+twelve silent seconds the strip reads **No signal**, sustained clipping reads
+**Input too loud**, and Session settings names the device being listened to.
+The launcher and the preflight say in words when the selected input is the
+laptop's own microphone or a phone rather than a console feed.
+
 ### Exact-device rule
 
 When the operator explicitly selects a mixer or USB audio interface, ASAD requests that exact browser device. The browser is not allowed to silently substitute another microphone.

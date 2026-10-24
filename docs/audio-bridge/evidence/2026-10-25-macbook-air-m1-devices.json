@@ -1,0 +1,129 @@
+{
+  "devices" : [
+    {
+      "availableSampleRates" : [
+        44100,
+        48000,
+        88200,
+        96000
+      ],
+      "currentInputSource" : "MacBook Air 마이크",
+      "hasInput" : true,
+      "id" : 84,
+      "index" : 0,
+      "inputChannels" : 1,
+      "inputSources" : [
+        "MacBook Air 마이크"
+      ],
+      "isAlive" : true,
+      "isDefaultInput" : true,
+      "isDefaultOutput" : false,
+      "isRunningSomewhere" : true,
+      "manufacturer" : "Apple Inc.",
+      "name" : "MacBook Air 마이크",
+      "nominalSampleRate" : 44100,
+      "outputChannels" : 0,
+      "transport" : "built-in",
+      "uid" : "BuiltInMicrophoneDevice"
+    },
+    {
+      "availableSampleRates" : [
+        44100,
+        48000,
+        88200,
+        96000
+      ],
+      "hasInput" : false,
+      "id" : 77,
+      "index" : 1,
+      "inputChannels" : 0,
+      "inputSources" : [
+
+      ],
+      "isAlive" : true,
+      "isDefaultInput" : false,
+      "isDefaultOutput" : true,
+      "isRunningSomewhere" : false,
+      "manufacturer" : "Apple Inc.",
+      "name" : "MacBook Air 스피커",
+      "nominalSampleRate" : 44100,
+      "outputChannels" : 2,
+      "transport" : "built-in",
+      "uid" : "BuiltInSpeakerDevice"
+    },
+    {
+      "availableSampleRates" : [
+        48000
+      ],
+      "hasInput" : true,
+      "id" : 96,
+      "index" : 2,
+      "inputChannels" : 1,
+      "inputSources" : [
+
+      ],
+      "isAlive" : true,
+      "isDefaultInput" : false,
+      "isDefaultOutput" : false,
+      "isRunningSomewhere" : false,
+      "manufacturer" : "Apple Inc.",
+      "name" : "‘좌영춘의 Z Fold8’ 마이크",
+      "nominalSampleRate" : 48000,
+      "outputChannels" : 0,
+      "transport" : "continuity-wired",
+      "uid" : "C2AB8737-ED92-43A6-B950-764A00000003"
+    },
+    {
+      "availableSampleRates" : [
+        44100,
+        48000,
+        88200,
+        96000,
+        176400,
+        192000
+      ],
+      "hasInput" : true,
+      "id" : 89,
+      "index" : 3,
+      "inputChannels" : 2,
+      "inputSources" : [
+
+      ],
+      "isAlive" : true,
+      "isDefaultInput" : false,
+      "isDefaultOutput" : false,
+      "isRunningSomewhere" : false,
+      "manufacturer" : "zoom.us",
+      "name" : "ZoomAudioDevice",
+      "nominalSampleRate" : 44100,
+      "outputChannels" : 2,
+      "transport" : "virtual",
+      "uid" : "zoom.us.zoomaudiodevice.001"
+    },
+    {
+      "availableSampleRates" : [
+        44100,
+        48000,
+        88200,
+        96000
+      ],
+      "hasInput" : false,
+      "id" : 50,
+      "index" : 4,
+      "inputChannels" : 0,
+      "inputSources" : [
+
+      ],
+      "isAlive" : true,
+      "isDefaultInput" : false,
+      "isDefaultOutput" : false,
+      "isRunningSomewhere" : false,
+      "manufacturer" : "Apple Inc.",
+      "name" : "다중 출력 기기",
+      "nominalSampleRate" : 44100,
+      "outputChannels" : 2,
+      "transport" : "aggregate",
+      "uid" : "~:AMS2_StackedOutput:0"
+    }
+  ]
+}
