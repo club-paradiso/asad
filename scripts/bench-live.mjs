@@ -45,10 +45,14 @@ if (simulateCloud) {
 }
 console.log("");
 
+const localOnly = args.includes("--local");
+if (localOnly) console.log("Provider credentials ignored (--local): measuring the engine against the local interpreter.\n");
+
 const result = await runLiveBenchmark({
   minutes,
   lag,
   forceProfile,
+  localOnly,
   twoLane: simulateCloud
     ? {
         provisional: "off",
