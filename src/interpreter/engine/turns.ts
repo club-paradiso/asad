@@ -169,6 +169,12 @@ export interface LaneStats {
    * third language the session did not expect. Preserved, never classified.
    */
   unexpectedScriptTurns: number;
+  /**
+   * Stable results dropped because they repeated the previous segment within
+   * two seconds — a recogniser replay, never a person repeating themselves
+   * (short repeats are kept). A count, never a word.
+   */
+  duplicateStableDropped: number;
 }
 
 export const emptyLaneStats = (): LaneStats => ({
@@ -194,6 +200,7 @@ export const emptyLaneStats = (): LaneStats => ({
   provisionalPassthrough: 0,
   undecidablePairTurns: 0,
   unexpectedScriptTurns: 0,
+  duplicateStableDropped: 0,
 });
 
 /** How many turn records the engine keeps for bookkeeping. */
