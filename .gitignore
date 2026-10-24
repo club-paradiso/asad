@@ -31,3 +31,6 @@ yarn-error.log*
 # and uploads them as an artifact; they are a build product, not source.
 e2e-out/
 shot.png
+
+# Compiled native probe (build with tools/audio-probe/build.sh)
+tools/audio-probe/audio-probe
