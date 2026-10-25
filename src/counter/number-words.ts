@@ -111,10 +111,42 @@ const KOREAN_NATIVE: WordTable = {
 /** Counter words a native numeral must be attached to before it counts. */
 const KOREAN_COUNTERS =
   "명|분|개|장|부|번째|번|시간|시|달|주|개월|사람|곳|통|권|매|건|살|병|잔|줄|쌍|대|마리|가지|군데|차례|회";
+/** Native tens. 스무 only appears bare (스무 장); 스물 takes a unit (스물두 장). */
+const KOREAN_TENS: WordTable = { 스무: 20, 스물: 20, 서른: 30, 마흔: 40, 쉰: 50 };
+const KOREAN_UNITS = ["하나", "한", "둘", "두", "셋", "세", "넷", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"];
 const KOREAN_NATIVE_RE = new RegExp(
-  `(${Object.keys(KOREAN_NATIVE).join("|")})\\s?(?:${KOREAN_COUNTERS})`,
+  `(?:(${Object.keys(KOREAN_TENS).join("|")})\\s?)?(${KOREAN_UNITS.join("|")})?\\s?(?:${KOREAN_COUNTERS})`,
   "gu",
 );
+
+const EN_TENS = ["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const EN_UNITS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const EN_COMPOUND_RE = new RegExp(
+  `(?<![\\p{L}\\p{N}])(${EN_TENS.join("|")})[-\\s](${EN_UNITS.join("|")})(?![\\p{L}\\p{N}])`,
+  "giu",
+);
+
+const CJK_DIGITS: Record<string, number> = { 一: 1, 二: 2, 两: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+const CJK_RUN_RE = /[一二两兩三四五六七八九十]+/gu;
+
+/** Value of a Chinese/Japanese numeral run up to 99, or null when it is a lone 一. */
+function cjkNumeral(run: string): number | null {
+  if (run === "一") return null;
+  const tenAt = run.indexOf("十");
+  if (tenAt === -1) {
+    // Digit sequence without a tens marker, e.g. 二 or 三五 (read digit by digit).
+    let value = 0;
+    for (const char of run) value = value * 10 + (CJK_DIGITS[char] ?? 0);
+    return value;
+  }
+  if (run.indexOf("十", tenAt + 1) !== -1) return null; // 十十 is noise, not a number
+  const before = run.slice(0, tenAt);
+  const after = run.slice(tenAt + 1);
+  if (before.length > 1 || after.length > 1) return null;
+  const tens = before ? CJK_DIGITS[before] ?? 0 : 1;
+  const units = after ? CJK_DIGITS[after] ?? 0 : 0;
+  return tens * 10 + units;
+}
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -133,7 +165,16 @@ export function softNumbers(text: string, language: string | undefined): number[
 
   const words = WORDS[base];
   if (words) {
-    const lower = value.toLocaleLowerCase("en-US");
+    let lower = value.toLocaleLowerCase("en-US");
+    // Compounds first, as whole values: "twenty-two" is 22, not a 20 and a 2
+    // that could each excuse a wrong digit elsewhere. The matched text is
+    // blanked so the single-word pass cannot see its parts.
+    if (base === "en") {
+      lower = lower.replace(EN_COMPOUND_RE, (whole, tens: string, unit: string, offset: number) => {
+        found.push({ at: offset, value: EN[tens] + EN[unit] });
+        return " ".repeat(whole.length);
+      });
+    }
     for (const [word, number] of Object.entries(words)) {
       const pattern = new RegExp(
         `(?<![\\p{L}\\p{N}])${escapeRegExp(word)}(?![\\p{L}\\p{N}])`,
@@ -144,15 +185,26 @@ export function softNumbers(text: string, language: string | undefined): number[
     }
   }
 
-  const substrings = SUBSTRINGS[base];
-  if (substrings) {
-    for (const [token, number] of Object.entries(substrings)) {
-      let from = 0;
-      for (;;) {
-        const at = value.indexOf(token, from);
-        if (at === -1) break;
-        found.push({ at, value: number });
-        from = at + token.length;
+  if (base === "zh" || base === "ja") {
+    // Whole numeral runs: 十二 is 12, 二十三 is 23. A run that is only 一 is
+    // skipped, as before, so 一起 and 一下 excuse nothing.
+    CJK_RUN_RE.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = CJK_RUN_RE.exec(value)) !== null) {
+      const number = cjkNumeral(match[0]);
+      if (number !== null) found.push({ at: match.index, value: number });
+    }
+  } else {
+    const substrings = SUBSTRINGS[base];
+    if (substrings) {
+      for (const [token, number] of Object.entries(substrings)) {
+        let from = 0;
+        for (;;) {
+          const at = value.indexOf(token, from);
+          if (at === -1) break;
+          found.push({ at, value: number });
+          from = at + token.length;
+        }
       }
     }
   }
@@ -161,7 +213,11 @@ export function softNumbers(text: string, language: string | undefined): number[
     KOREAN_NATIVE_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = KOREAN_NATIVE_RE.exec(value)) !== null) {
-      found.push({ at: match.index, value: KOREAN_NATIVE[match[1]] });
+      if (!match[1] && !match[2]) continue;
+      // 스물두 장 is 22, not a 2: the tens word, when present, is part of the value.
+      const tens = match[1] ? KOREAN_TENS[match[1]] : 0;
+      const unit = match[2] ? KOREAN_NATIVE[match[2]] : 0;
+      found.push({ at: match.index, value: tens + unit });
     }
   }
 
