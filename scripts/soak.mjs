@@ -20,6 +20,7 @@ const before = process.memoryUsage().heapUsed;
 const result = await runLiveBenchmark({
   minutes,
   lag: "balanced",
+  localOnly: args.includes("--local"),
   onProgress: (m) => console.log(m),
 });
 if (global.gc) global.gc();

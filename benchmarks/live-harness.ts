@@ -74,6 +74,18 @@ export interface LiveBenchOptions {
   forceProfile?: ContextProfile;
   /** Run the two-lane engine against mocked delayed lanes. Absent = cloud-first, as before. */
   twoLane?: TwoLaneSimulation;
+  /**
+   * Ignore every provider credential in the environment and measure the
+   * engine against the local interpreter only.
+   *
+   * The harness runs on a virtual clock, so a real provider that takes four
+   * seconds to time out lets the simulated service run minutes ahead of it:
+   * with a GEMINI_API_KEY exported in the shell, a "10-minute" run made two
+   * calls instead of a hundred and reported nothing useful. Pass `--local` to
+   * the bench and soak scripts to get the engine measurement regardless of
+   * what the shell happens to export.
+   */
+  localOnly?: boolean;
   onProgress?: (message: string) => void;
 }
 
@@ -127,6 +139,23 @@ export interface LiveBenchResult {
   };
 }
 
+/** Variables that would route a benchmark turn to a real, billed provider. */
+const PROVIDER_CREDENTIALS = [
+  "GEMINI_API_KEY",
+  "GROQ_API_KEY",
+  "OPENROUTER_API_KEY",
+  "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "AI_GATEWAY_API_KEY",
+  "VERCEL_OIDC_TOKEN",
+];
+
+export function withoutProviderCredentials(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const copy: NodeJS.ProcessEnv = { ...source };
+  for (const name of PROVIDER_CREDENTIALS) delete copy[name];
+  return copy;
+}
+
 /** Deterministic PRNG so a soak is repeatable. */
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -168,7 +197,7 @@ export async function runLiveBenchmark(options: LiveBenchOptions): Promise<LiveB
   const lag = options.lag ?? "balanced";
   const log = options.onProgress ?? (() => {});
 
-  const env = parseEnv();
+  const env = parseEnv(options.localOnly ? withoutProviderCredentials(process.env) : process.env);
   const router = new LlmRouter(env);
 
   let now = 0;

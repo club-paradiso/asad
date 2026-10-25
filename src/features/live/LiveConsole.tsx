@@ -80,6 +80,8 @@ export function LiveConsole({
     startedAt,
     lastProvider,
     browserTranslatorStatus,
+    inputHealth,
+    inputLabel,
     start,
     resume,
     stop,
@@ -223,6 +225,7 @@ export function LiveConsole({
           started: phase === "running",
         })}
         fault={fault}
+        input={inputHealth}
         context={snapshot.context}
         sourceLanguage={settings.sourceLanguage}
         targetLanguage={settings.targetLanguage}
@@ -392,6 +395,9 @@ export function LiveConsole({
         wakeLockHeld={wakeLock.held}
         wakeLockSupported={wakeLock.supported}
         degradedReason={snapshot.degradedReason}
+        inputHealth={inputHealth}
+        inputLabel={inputLabel}
+        source={source}
       />
     </div>
   );

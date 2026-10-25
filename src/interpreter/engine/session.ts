@@ -94,6 +94,7 @@ import {
   drain,
   emptyStabiliser,
   flushReason,
+  isDuplicateStable,
   pushStable,
   restorePending,
   shouldAnticipate,
@@ -487,6 +488,16 @@ export class InterpretationEngine {
 
     const stableAt = this.clock;
     const previous = this.segments[this.segments.length - 1];
+    if (previous && isDuplicateStable(previous, corrected, this.elapsed())) {
+      // The recogniser said the same sentence twice within two seconds. That is
+      // a replay, not the speaker; interpreting it again would put the same
+      // English on screen twice and the interpreter would say it twice.
+      this.stats.duplicateStableDropped += 1;
+      this.partial = null;
+      this.stabiliser = touch(this.stabiliser, stableAt);
+      this.emit();
+      return;
+    }
     if (previous && !TRANSCRIPT_CONTENT.test(corrected)) {
       // Recognisers finalise trailing punctuation as a result of its own —
       // WebKit adds the full stop a beat after the words. On its own that is

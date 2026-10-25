@@ -7,16 +7,16 @@
   "latency": {
     "providerResponse": {
       "count": 103,
-      "p50": 0,
+      "p50": 1,
       "p90": 1,
-      "p95": 1,
-      "max": 1,
-      "mean": 0
+      "p95": 2,
+      "max": 7,
+      "mean": 1
     },
     "stableToSafe": {
       "count": 101,
-      "p50": 200,
-      "p90": 201,
+      "p50": 201,
+      "p90": 203,
       "p95": 801,
       "max": 2801,
       "mean": 270
@@ -25,13 +25,13 @@
   "tokens": {
     "perCall": {
       "count": 103,
-      "p50": 1918,
-      "p90": 1948,
-      "p95": 1965,
-      "max": 2017,
-      "mean": 1871
+      "p50": 1943,
+      "p90": 1973,
+      "p95": 1991,
+      "max": 2056,
+      "mean": 1895
     },
-    "sessionTotal": 192715,
+    "sessionTotal": 195157,
     "profileCounts": {
       "full": 103
     }
@@ -44,7 +44,7 @@
   "bounds": {
     "finalChunks": 56,
     "finalSegments": 111,
-    "peakContextTokens": 2017,
+    "peakContextTokens": 2056,
     "maxInFlight": 1
   },
   "slo": {
@@ -110,7 +110,10 @@
       "maxProvisionalInFlight": 0,
       "terminologyFixes": 0,
       "codeSwitchedTurns": 0,
-      "provisionalPassthrough": 0
+      "provisionalPassthrough": 0,
+      "undecidablePairTurns": 0,
+      "unexpectedScriptTurns": 0,
+      "duplicateStableDropped": 0
     },
     "cloudFailuresInjected": 2,
     "translatorFailuresInjected": 0,

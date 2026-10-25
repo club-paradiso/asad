@@ -11,7 +11,7 @@
  * large text, a marker in the margin for the line that is live, and a visually
  * unmistakable treatment for anything predicted rather than confirmed.
  */
-import { forwardRef } from "react";
+import { forwardRef, memo } from "react";
 import type { InterpretationChunk } from "@/types";
 import { cn } from "@/lib/cn";
 import { findLanguage } from "@/lib/languages";
@@ -21,7 +21,14 @@ interface ChunkLineProps {
   isActive: boolean;
 }
 
-const ChunkLine = forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
+/**
+ * Memoised, because the console re-renders on every recogniser event — about
+ * ten to twenty times a second while someone is speaking — and chunk objects
+ * are immutable once created. Without this every line of the session re-ran
+ * its render on each Korean partial; with it only the active line (whose ref
+ * callback is new each time) and genuinely changed lines do.
+ */
+const ChunkLine = memo(forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
   { chunk, isActive },
   ref,
 ) {
@@ -115,7 +122,7 @@ const ChunkLine = forwardRef<HTMLDivElement, ChunkLineProps>(function ChunkLine(
       )}
     </div>
   );
-});
+}));
 
 export function TargetStream({
   chunks,

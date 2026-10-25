@@ -26,7 +26,37 @@ import type { LagConfig } from "./lag";
  * still a boundary on its own, so "모두 다." stays one.
  */
 const SENTENCE_END =
-  /(?:습니다|십시오|세요|군요)\s*[.?!。？！]?\s*$|[가-힣](?:다|요|까|죠|네)\s*[.?!。？！]?\s*$|[.?!。？！]\s*$/;
+  /(?:습니다|십시오|세요|군요|소서|아멘)\s*[.?!。？！]?\s*$|[가-힣](?:다|요|까|죠|네)\s*[.?!。？！]?\s*$|[.?!。？！]\s*$/;
+
+/**
+ * Two endings above are specific to worship and were missing: the supplicative
+ * 소서 (하옵소서 / 여기소서 / 인도하소서) that closes a line of prayer, and
+ * 아멘, which closes the prayer itself. Without them a closing prayer — the
+ * most formulaic, most predictable speech in a service — was only ever flushed
+ * on silence or on the hold ceiling, a second or more after the thought ended.
+ */
+
+/**
+ * A recogniser occasionally finalises the same sentence twice in quick
+ * succession: a socket that reconnected and replayed buffered audio, a browser
+ * recogniser restarted on a long pause, a provider's own duplicate final. The
+ * engine drops an exact repeat of the previous segment that arrives inside
+ * this window, but only for text long enough that a person would not have
+ * said it twice on purpose — "아멘. 아멘." is speech, not an artefact.
+ */
+export const DUPLICATE_STABLE_WINDOW_MS = 2_000;
+export const DUPLICATE_STABLE_MIN_CHARS = 12;
+
+export function isDuplicateStable(
+  previous: { text: string; at: number },
+  text: string,
+  nowElapsed: number,
+): boolean {
+  const clean = text.trim();
+  if (clean.length < DUPLICATE_STABLE_MIN_CHARS) return false;
+  if (clean !== previous.text.trim()) return false;
+  return nowElapsed - previous.at <= DUPLICATE_STABLE_WINDOW_MS;
+}
 
 /** Clause boundaries — a usable, if weaker, place to break a thought group. */
 const CLAUSE_END = /(?:고|며|면서|지만|는데|어서|아서|니까|으니|든지|거나)\s*,?\s*$/;

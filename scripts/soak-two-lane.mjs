@@ -45,6 +45,7 @@ const result = await runLiveBenchmark({
   minutes,
   lag,
   forceProfile: "ultra-compact",
+  localOnly: args.includes("--local"),
   twoLane: simulation,
   onProgress: (m) => console.log(m),
 });

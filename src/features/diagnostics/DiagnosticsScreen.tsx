@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Button, Label, StatusDot } from "@/components/ui/primitives";
 import { useCapability } from "@/hooks/useCapability";
 import { cn } from "@/lib/cn";
+import { LiveReadiness } from "./LiveReadiness";
 
 /**
  * Read as "what a visitor speaking this language actually gets".
@@ -373,6 +374,20 @@ export function DiagnosticsScreen() {
           </ul>
         </div>
       )}
+
+      {/* First, because it is the question a volunteer in a booth actually
+          has. Everything below is the evidence; this is the verdict. */}
+      <Section title="Live readiness">
+        <LiveReadiness
+          stt={{
+            provider: data.stt.provider,
+            credentialsRequired: data.stt.credentialsRequired,
+            keyConfigured: data.stt.keyConfigured,
+          }}
+          llm={{ active: data.llm.active }}
+          slo={data.telemetry.slo}
+        />
+      </Section>
 
       <Section title="Interpretation routing">
         <Row k="Mode" v={<code>{data.llm.routingMode}</code>} />

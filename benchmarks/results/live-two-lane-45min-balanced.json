@@ -10,28 +10,28 @@
       "p50": 0,
       "p90": 1,
       "p95": 1,
-      "max": 1,
-      "mean": 0
+      "max": 5,
+      "mean": 1
     },
     "stableToSafe": {
       "count": 466,
-      "p50": 200,
-      "p90": 800,
+      "p50": 201,
+      "p90": 801,
       "p95": 1000,
-      "max": 2400,
-      "mean": 305
+      "max": 2401,
+      "mean": 306
     }
   },
   "tokens": {
     "perCall": {
       "count": 481,
-      "p50": 870,
-      "p90": 925,
-      "p95": 950,
-      "max": 980,
-      "mean": 874
+      "p50": 891,
+      "p90": 944,
+      "p95": 965,
+      "max": 994,
+      "mean": 891
     },
-    "sessionTotal": 420316,
+    "sessionTotal": 428479,
     "profileCounts": {
       "ultra-compact": 481
     }
@@ -44,7 +44,7 @@
   "bounds": {
     "finalChunks": 400,
     "finalSegments": 499,
-    "peakContextTokens": 980,
+    "peakContextTokens": 994,
     "maxInFlight": 1
   },
   "slo": {
@@ -108,7 +108,12 @@
       "maxPendingTurns": 2,
       "maxCloudInFlight": 1,
       "maxProvisionalInFlight": 1,
-      "terminologyFixes": 30
+      "terminologyFixes": 30,
+      "codeSwitchedTurns": 0,
+      "provisionalPassthrough": 0,
+      "undecidablePairTurns": 0,
+      "unexpectedScriptTurns": 0,
+      "duplicateStableDropped": 0
     },
     "cloudFailuresInjected": 15,
     "translatorFailuresInjected": 12,

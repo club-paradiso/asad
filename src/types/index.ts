@@ -277,6 +277,13 @@ export interface SessionSettings {
   fontScale: number;
   /** Session transcripts are only ever stored when the user opts in. */
   saveHistory: boolean;
+  /**
+   * Ask the browser to noise-suppress a raw-audio capture. Off by default: a
+   * mixer feed is already clean, and suppression tuned for laptops removes the
+   * quiet consonants Korean recognition depends on. Ignored by the browser's
+   * own recogniser, which owns its microphone.
+   */
+  noiseSuppression: boolean;
 }
 
 export const defaultSettings = (): SessionSettings => ({
@@ -290,6 +297,7 @@ export const defaultSettings = (): SessionSettings => ({
   showScripture: true,
   fontScale: 1,
   saveHistory: false,
+  noiseSuppression: false,
 });
 
 /** A user-issued correction, remembered for the rest of the session. */
