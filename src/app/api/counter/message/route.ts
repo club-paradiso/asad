@@ -26,7 +26,9 @@ import {
   counterTokenFrom,
   participantForToken,
 } from "@/counter/access";
-import { toParticipantMessage } from "@/counter/types";
+import { toParticipantMessage, type Participant } from "@/counter/types";
+import { afterResponse } from "@/lib/after-response";
+import { telemetry } from "@/lib/telemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,52 +60,92 @@ export async function POST(request: Request) {
   const clientRequestId = MESSAGE_ID_RE.test(rawRequestId) ? rawRequestId : undefined;
 
   const store = counterStore();
-  const session = await store.get(code);
+  const token = counterTokenFrom(request);
+  const receivedAt = Date.now();
+
+  // One read does the whole admission: existence, visitor language,
+  // capability, duplicate detection, action validity, and profile detection.
+  // The store writes only when the profile actually changed, so an ordinary
+  // turn costs a single Redis GET here instead of a GET, a second GET and a
+  // compare-and-set. Profile detection still runs against the newest copy of
+  // the session, so a concurrent sensitive turn that just upgraded the
+  // conversation is honoured exactly as before.
+  const { source, rephraseOf, action, actionOf } = parsed.data;
+  let text = parsed.data.text;
+  let from: Participant | null = null;
+  let rejection: NextResponse | null = null;
+  let duplicateOf: CounterMessage | undefined;
+  const session = await store.update(code, (s) => {
+    rejection = null;
+    duplicateOf = undefined;
+    if (!s.guestLang) {
+      rejection = NextResponse.json(
+        { error: "Waiting for the visitor to choose a language." },
+        { status: 409 },
+      );
+      return false;
+    }
+    from = participantForToken(s, token);
+    if (!from) {
+      rejection = NextResponse.json({ error: "Session authorisation required." }, { status: 401 });
+      return false;
+    }
+    const sender = from;
+    if (clientRequestId) {
+      duplicateOf = s.messages.find(
+        (message) => message.from === sender && message.clientRequestId === clientRequestId,
+      );
+      if (duplicateOf) return false;
+    }
+    if ((action && !actionOf) || (!action && actionOf) || (action && source !== "text")) {
+      rejection = NextResponse.json({ error: "Invalid message action." }, { status: 400 });
+      return false;
+    }
+    if (action && actionOf) {
+      const original = s.messages.find(
+        (message) => message.id === actionOf && message.from === sender,
+      );
+      if (!original || original.source === "quick-phrase" || original.source === "confirm") {
+        rejection = NextResponse.json(
+          { error: "That message cannot be translated again." },
+          { status: 400 },
+        );
+        return false;
+      }
+      text = original.originalText;
+    }
+    if (source === "quick-phrase" || source === "confirm") return false;
+
+    // An exact keyword match can promote a session into a specialised profile.
+    // Evaluated against the freshest copy of the conversation, inside the
+    // mutation, so a concurrent sensitive turn is never missed.
+    const next = detectCounterProfile({
+      text,
+      deskLabel: s.deskLabel,
+      recent: s.messages.slice(-6).map((message) => ({ text: message.originalText })),
+      currentProfileId: s.profileId,
+    });
+    if (next === s.profileId) return false;
+    s.profileId = next;
+  });
   if (!session) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
-  if (!session.guestLang) {
-    return NextResponse.json(
-      { error: "Waiting for the visitor to choose a language." },
-      { status: 409 },
-    );
+  if (rejection) return rejection;
+  if (duplicateOf) {
+    const duplicate: CounterMessage = duplicateOf;
+    return NextResponse.json({
+      message: toParticipantMessage(duplicate, from!),
+      viaModel: duplicate.source !== "quick-phrase" && duplicate.source !== "confirm",
+      duplicate: true,
+    });
   }
-
-  const from = participantForToken(session, counterTokenFrom(request));
   if (!from) {
     return NextResponse.json({ error: "Session authorisation required." }, { status: 401 });
   }
-
-  const { source, rephraseOf, action, actionOf } = parsed.data;
-  let text = parsed.data.text;
-
-  if (clientRequestId) {
-    const duplicate = session.messages.find(
-      (message) => message.from === from && message.clientRequestId === clientRequestId,
-    );
-    if (duplicate) {
-      return NextResponse.json({
-        message: toParticipantMessage(duplicate, from),
-        viaModel: duplicate.source !== "quick-phrase" && duplicate.source !== "confirm",
-        duplicate: true,
-      });
-    }
-  }
-
-  if ((action && !actionOf) || (!action && actionOf) || (action && source !== "text")) {
-    return NextResponse.json({ error: "Invalid message action." }, { status: 400 });
-  }
-  if (action && actionOf) {
-    const original = session.messages.find(
-      (message) => message.id === actionOf && message.from === from,
-    );
-    if (!original || original.source === "quick-phrase" || original.source === "confirm") {
-      return NextResponse.json({ error: "That message cannot be translated again." }, { status: 400 });
-    }
-    text = original.originalText;
-  }
   const originalLang = sourceLangFor(session, from);
   const targetLang = targetLangFor(session, from);
+  telemetry.recordLatency({ stage: "counter_admission", ms: Date.now() - receivedAt });
 
   const persistOnce = async (
     message: Omit<CounterMessage, "seq">,
@@ -117,7 +159,7 @@ export async function POST(request: Request) {
         : undefined;
       if (existing) {
         duplicate = true;
-        return;
+        return false;
       }
       appendMessage(s, message);
     });
@@ -152,6 +194,7 @@ export async function POST(request: Request) {
       if (!persisted) {
         return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
       }
+      telemetry.recordLatency({ stage: "counter_server_total", ms: Date.now() - receivedAt });
       return NextResponse.json({
         message: toParticipantMessage(persisted.message, from),
         viaModel: false,
@@ -179,6 +222,7 @@ export async function POST(request: Request) {
     if (!persisted) {
       return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
     }
+    telemetry.recordLatency({ stage: "counter_server_total", ms: Date.now() - receivedAt });
     return NextResponse.json({
       message: toParticipantMessage(persisted.message, from),
       viaModel: false,
@@ -195,32 +239,10 @@ export async function POST(request: Request) {
     lang: m.originalLang,
   }));
 
-  const detectedProfileId = detectCounterProfile({
-    text,
-    deskLabel: session.deskLabel,
-    recent,
-    currentProfileId: session.profileId,
-  });
-  let effectiveProfileId = session.profileId;
-  // Always re-evaluate inside the atomic mutation. A concurrent sensitive turn
-  // may have upgraded the session after this request's initial read; skipping
-  // the mutation merely because this stale snapshot looked unchanged would
-  // let the ambiguous turn use the general policy.
-  const updated = await store.update(code, (current) => {
-    current.profileId = detectCounterProfile({
-      text,
-      deskLabel: current.deskLabel,
-      recent: current.messages.slice(-6).map((message) => ({
-        text: message.originalText,
-      })),
-      currentProfileId: current.profileId,
-    });
-  });
-  effectiveProfileId = updated?.profileId ?? detectedProfileId;
-  // An exact keyword match can promote a session into a specialised profile,
-  // but lack of a match is not proof that an utterance is non-sensitive—most
-  // supported languages cannot be exhaustively enumerated. Keep an unresolved
-  // general session on the strict, single-provider privacy path until a
+  const effectiveProfileId = session.profileId;
+  // Lack of a keyword match is not proof that an utterance is non-sensitive —
+  // most supported languages cannot be exhaustively enumerated — so an
+  // unresolved general session is kept out of the Learning Vault until a
   // concrete non-sensitive desk/conversation profile is established.
   const forceSensitiveRouting = effectiveProfileId === "general";
   // In Vercel Functions the current OIDC credential is request-scoped. It is
@@ -243,7 +265,14 @@ export async function POST(request: Request) {
     gatewayToken,
   });
 
+  telemetry.recordLatency({
+    stage: "counter_translation",
+    ms: result.latencyMs,
+    provider: result.provider,
+    model: result.model,
+  });
   if (!result.ok) {
+    telemetry.recordFailure("counter_translation_failed");
     console.warn(
       JSON.stringify({
         level: "warn",
@@ -310,28 +339,31 @@ export async function POST(request: Request) {
     if (reviewFlags.length) message.reviewFlags = reviewFlags;
   }
 
+  const persistStarted = Date.now();
   const persisted = await persistOnce(message);
   if (!persisted) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
+  telemetry.recordLatency({ stage: "counter_persist", ms: Date.now() - persistStarted });
 
   if (!persisted.duplicate && message.status === "done" && !forceSensitiveRouting) {
-    try {
-      await recordLearningCandidate({
-        sourceText: message.originalText,
-        modelTranslation: message.translatedText,
-        sourceLang: message.originalLang,
-        targetLang: message.targetLang,
-        profileId: effectiveProfileId,
-        confidence: message.confidence,
-        integrity: message.integrity,
-        reviewFlags: message.reviewFlags,
-      });
-    } catch {
-      console.warn("Learning Vault write failed.");
-    }
+    // Nobody at the counter is waiting for this write. It runs once the
+    // response is on its way rather than adding a Redis round trip to the
+    // time the sender watches their message spin.
+    const candidate = {
+      sourceText: message.originalText,
+      modelTranslation: message.translatedText,
+      sourceLang: message.originalLang,
+      targetLang: message.targetLang,
+      profileId: effectiveProfileId,
+      confidence: message.confidence,
+      integrity: message.integrity,
+      reviewFlags: message.reviewFlags,
+    };
+    afterResponse(() => recordLearningCandidate(candidate), "Learning Vault write");
   }
 
+  telemetry.recordLatency({ stage: "counter_server_total", ms: Date.now() - receivedAt });
   return NextResponse.json({
     message: toParticipantMessage(persisted.message, from),
     viaModel: true,

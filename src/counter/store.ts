@@ -29,6 +29,14 @@ export interface CounterStoreStats {
   totalMessages: number;
 }
 
+/**
+ * A mutation's verdict. Returning `false` means "nothing to write": the store
+ * hands back the session it read without a second round trip. The message
+ * route uses this to read, authorise and re-classify a turn in one Redis GET,
+ * and to pay for the compare-and-set only when the classification changed.
+ */
+export type CounterMutation = (session: CounterSession) => void | false;
+
 export interface CounterStore {
   readonly kind: "memory" | "redis";
   readonly shared: boolean;
@@ -39,10 +47,7 @@ export interface CounterStore {
     profileId?: CounterProfileId;
   }): Awaitable<CounterSession>;
   get(code: string): Awaitable<CounterSession | undefined>;
-  update(
-    code: string,
-    mutate: (session: CounterSession) => void,
-  ): Awaitable<CounterSession | undefined>;
+  update(code: string, mutate: CounterMutation): Awaitable<CounterSession | undefined>;
   end(code: string): Awaitable<boolean>;
   /** Diagnostics only — counts, never content. */
   stats(): Awaitable<CounterStoreStats>;
@@ -99,16 +104,13 @@ class MemoryCounterStore implements CounterStore {
     return session ? cloneSession(session) : undefined;
   }
 
-  update(
-    code: string,
-    mutate: (session: CounterSession) => void,
-  ): CounterSession | undefined {
+  update(code: string, mutate: CounterMutation): CounterSession | undefined {
     this.sweep();
     const current = this.sessions.get(code);
     if (!current) return undefined;
 
     const session = cloneSession(current);
-    mutate(session);
+    if (mutate(session) === false) return cloneSession(current);
     session.lastActivityAt = this.now();
     boundMessages(session);
     this.sessions.set(code, session);
@@ -263,10 +265,7 @@ class RedisCounterStore implements CounterStore {
     return parseEnvelope(raw).session;
   }
 
-  async update(
-    code: string,
-    mutate: (session: CounterSession) => void,
-  ): Promise<CounterSession | undefined> {
+  async update(code: string, mutate: CounterMutation): Promise<CounterSession | undefined> {
     const key = this.key(code);
 
     for (let attempt = 0; attempt < UPDATE_RETRIES; attempt += 1) {
@@ -275,7 +274,9 @@ class RedisCounterStore implements CounterStore {
 
       const current = parseEnvelope(raw);
       const session = cloneSession(current.session);
-      mutate(session);
+      // A declined mutation costs one GET, not a GET and an EVAL: the caller
+      // read the newest session and decided nothing about it needs to change.
+      if (mutate(session) === false) return current.session;
       session.lastActivityAt = this.now();
       boundMessages(session);
 

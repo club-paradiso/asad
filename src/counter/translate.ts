@@ -28,6 +28,21 @@ import type { CounterPromptInput } from "./prompt";
  */
 export const COUNTER_DEADLINE_MS = 6000;
 
+/**
+ * Wall-clock budget for the WHOLE turn, every provider and the gateway
+ * recovery included.
+ *
+ * Without it a chain of three configured providers, each allowed the full
+ * per-attempt deadline, could keep two people staring at a spinner for
+ * eighteen seconds before admitting failure. With it, each later attempt
+ * gets only what is left, and an attempt that cannot land in time is skipped
+ * so the sender sees "failed, try again" while retrying is still useful.
+ */
+export const COUNTER_TURN_BUDGET_MS = 10_000;
+
+/** Smallest provider attempt worth starting inside the turn budget. */
+export const COUNTER_MIN_ATTEMPT_MS = 1_200;
+
 // Sensitive turns need the same circuit-breaker and quota memory as ordinary
 // turns. Recreating this router per request repeatedly probes an unavailable
 // provider and makes every turn pay the full outage latency.
@@ -111,6 +126,16 @@ async function translateViaGateway(
   input: CounterRoutingInput,
   started: number,
 ): Promise<TranslationResult> {
+  const remaining = COUNTER_TURN_BUDGET_MS - (Date.now() - started);
+  if (remaining < COUNTER_MIN_ATTEMPT_MS) {
+    return {
+      ok: false,
+      provider: "vercel-gateway",
+      model: VERCEL_GATEWAY_MODEL,
+      latencyMs: Date.now() - started,
+      error: "Translation took too long. Please try again.",
+    };
+  }
   try {
     const response = await completeViaVercelGateway(
       {
@@ -121,7 +146,7 @@ async function translateViaGateway(
         jsonSchema: COUNTER_JSON_SCHEMA,
         thinking: "none",
       },
-      { timeoutMs: COUNTER_DEADLINE_MS, token: input.gatewayToken },
+      { timeoutMs: Math.min(COUNTER_DEADLINE_MS, remaining), token: input.gatewayToken },
     );
 
     const output = parseCounterOutput(response.text);
@@ -218,6 +243,8 @@ export async function translateForCounter(
       },
       {
         deadlineMs: COUNTER_DEADLINE_MS,
+        turnDeadlineMs: COUNTER_TURN_BUDGET_MS,
+        minAttemptMs: COUNTER_MIN_ATTEMPT_MS,
         validate: (response) => parseCounterOutput(response.text) !== null,
         prefer,
         routingKey: input.routingKey,
