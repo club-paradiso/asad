@@ -577,11 +577,12 @@ export class RemoteMicSender {
       this.set({ reconnectAttempts: attempt + 1, phase: "reconnecting" });
       const fresh = attempt >= ICE_RESTART_DELAYS_MS.length;
       void this.serial(() => this.negotiate(fresh));
-      // If this attempt does not connect, try again.
+      // If this attempt does not connect, try again. A fresh peer needs a
+      // full offer/answer round trip through signalling, so give it longer.
       this.restartTimer = this.deps.setTimer(() => {
         this.restartTimer = null;
         if (this.pc?.connectionState !== "connected") this.scheduleRecovery();
-      }, 8000);
+      }, fresh ? 15_000 : 8000);
     }, delay);
   }
 

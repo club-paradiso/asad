@@ -258,10 +258,24 @@ describe("ICE candidate handling", () => {
     expect(record.candidates.sender.length).toBeLessThanOrEqual(MAX_CANDIDATES_PER_ROLE);
   });
 
+  it("keeps an unanswered replacement offer when the old peer still reports connected", () => {
+    const pairing = approved();
+    const { record } = pairing;
+    applySignal(record, "sender", offer(record, 1), T0);
+    applySignal(record, "receiver", { action: "answer", id: record.id, sdp: ANSWER_SDP, generation: 1, peerId: "peer-aaaaaaaa" }, T0);
+    applySignal(record, "receiver", { action: "status", id: record.id, connection: "connected", micActive: true, muted: false }, T0);
+    // The phone drops and offers a fresh peer; the MacBook's old peer heartbeats "connected".
+    applySignal(record, "sender", offer(record, 2, "peer-bbbbbbbb"), T0);
+    applySignal(record, "receiver", { action: "status", id: record.id, connection: "connected", micActive: true, muted: false }, T0);
+    expect(record.offer?.generation).toBe(2);
+    expect(viewFor(record, "receiver", 0).description?.peerId).toBe("peer-bbbbbbbb");
+  });
+
   it("drops SDP and candidates once the MacBook reports the peer connected", () => {
     const pairing = approved();
     const { record } = pairing;
     applySignal(record, "sender", offer(record, 1), T0);
+    applySignal(record, "receiver", { action: "answer", id: record.id, sdp: ANSWER_SDP, generation: 1, peerId: "peer-aaaaaaaa" }, T0);
     applySignal(record, "receiver", { action: "status", id: record.id, connection: "connected", micActive: true, muted: false }, T0);
     expect(record.offer).toBeNull();
     expect(record.answer).toBeNull();

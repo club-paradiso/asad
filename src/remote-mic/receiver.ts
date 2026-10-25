@@ -217,6 +217,8 @@ export class RemoteMicReceiver {
   private busy: Promise<void> = Promise.resolve();
   private disposed = false;
   private everConnected = false;
+  /** An offer is being negotiated; poll fast until the peer connects. */
+  private negotiating = false;
 
   constructor(private readonly options: ReceiverDeps) {
     this.deps = resolvePeerDeps(options);
@@ -341,6 +343,11 @@ export class RemoteMicReceiver {
   }
 
   private nextPollDelay(): number {
+    // A renegotiation in flight, or a track that has gone quiet (the phone
+    // may already be offering a replacement peer while this one still reads
+    // "connected"): check promptly rather than at the steady-state pace.
+    if (this.negotiating) return POLL_MS.negotiating;
+    if (this.state.phase === "connected" && this.state.trackMuted) return POLL_MS.interrupted;
     switch (this.state.phase) {
       case "waiting":
       case "awaiting-approval":
@@ -452,12 +459,15 @@ export class RemoteMicReceiver {
       return;
     }
 
+    this.negotiating = true;
     if (!this.pc || this.peerId !== offer.peerId) {
       // A different sender peer: the phone reloaded or restarted its mic.
       // Close the old peer FIRST so two tracks can never coexist.
       this.closePeer();
       this.pc = this.createPeer();
       this.peerId = offer.peerId;
+      // The old stream is gone; do not keep claiming "connected".
+      this.set({ phase: "connecting" });
     }
     const pc = this.pc;
     this.generation = offer.generation;
@@ -626,6 +636,7 @@ export class RemoteMicReceiver {
 
   private onConnectionState(state: RTCPeerConnectionState) {
     if (state === "connected") {
+      this.negotiating = false;
       this.clearInterruptionTimer();
       const now = this.deps.now();
       if (!this.everConnected) {

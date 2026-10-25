@@ -332,12 +332,36 @@ check("restart does not duplicate the stream (one live track)", resumed?.liveTra
 
 /* --- Connection interruption ------------------------------------------------- */
 const beforeDrop = stt.nonSilent;
+if (process.env.E2E_DEBUG) {
+  for (const [label, page] of [["phone", phone.page], ["desk", desk.page]]) {
+    page.on("response", async (response) => {
+      if (!response.url().includes("/api/remote-mic/")) return;
+      const request = response.request();
+      let action = "";
+      try { action = JSON.parse(request.postData() ?? "{}").action ?? ""; } catch {}
+      let body = "";
+      try { body = (await response.text()).slice(0, 160); } catch {}
+      console.log(`[${label}] ${request.method()} ${new URL(response.url()).pathname} ${action} -> ${response.status()} ${body.replace(/"sdp":"[^"]*"/g, '"sdp":"…"')}`);
+    });
+  }
+}
 await phone.page.evaluate(() => window.__asadRemoteMicSender.simulateNetworkDrop());
 const recovered = await until(async () => {
   const [d, p] = await Promise.all([remoteState(desk.page), senderState(phone.page)]);
   return d?.phase === "connected" && p?.phase === "connected" && d.liveTracks === 1 && stt.nonSilent > beforeDrop + 20 ? d : null;
 }, 30_000);
-check("abrupt peer loss: bounded reconnection restores audio to STT", !!recovered);
+check(
+  "abrupt peer loss: bounded reconnection restores audio to STT",
+  !!recovered,
+  recovered
+    ? ""
+    : JSON.stringify({
+        desktop: await remoteState(desk.page).then((s) => s && { phase: s.phase, liveTracks: s.liveTracks, trackMuted: s.trackMuted }),
+        phone: await senderState(phone.page),
+        nonSilentSinceDrop: stt.nonSilent - beforeDrop,
+        sttConnections: stt.connections,
+      }),
+);
 check("transcript survives the interruption", /받아쓰기/.test(await desk.page.locator("body").innerText()));
 check("still no MacBook microphone opened", (await desk.page.evaluate(() => window.__gumCalls)) === 0);
 

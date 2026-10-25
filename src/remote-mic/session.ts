@@ -286,7 +286,17 @@ export function applySignal(
       // Minimise what signalling storage holds: once the MacBook reports the
       // peer connected, the SDP and candidates (which carry network addresses)
       // have done their job. A later ICE restart posts fresh ones.
-      if (role === "receiver" && request.connection === "connected") clearNegotiation(record);
+      // Only once the CURRENT offer has been answered: a heartbeat from the
+      // MacBook's old peer can still read "connected" moments after the phone
+      // posted a replacement offer, and clearing then would delete that offer
+      // before the MacBook ever saw it.
+      if (
+        role === "receiver" &&
+        request.connection === "connected" &&
+        record.answer?.generation === record.generation
+      ) {
+        clearNegotiation(record);
+      }
       touch(record, now);
       return { ok: true, value: null };
     }
