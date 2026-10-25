@@ -219,6 +219,8 @@ export class RemoteMicReceiver {
   private everConnected = false;
   /** An offer is being negotiated; poll fast until the peer connects. */
   private negotiating = false;
+  /** An answer created locally whose POST has not yet succeeded. */
+  private pendingAnswer: { sdp: string; generation: number; peerId: string } | null = null;
 
   constructor(private readonly options: ReceiverDeps) {
     this.deps = resolvePeerDeps(options);
@@ -372,6 +374,7 @@ export class RemoteMicReceiver {
       if (this.id !== id) return;
       this.pollFailures = 0;
       await this.serial(() => this.handleView(view));
+      if (this.pendingAnswer) await this.serial(() => this.deliverAnswer());
     } catch (error) {
       if (this.id !== id) return;
       if (error instanceof RemoteMicApiError && (error.status === 404 || error.status === 410)) {
@@ -483,16 +486,12 @@ export class RemoteMicReceiver {
       const sdp = pc.localDescription?.sdp ?? answer.sdp ?? "";
       this.answeredGeneration = offer.generation;
       if (this.state.phase !== "connected") this.set({ phase: "connecting" });
-      await this.options.api.signal(this.token!, {
-        action: "answer",
-        id: this.id!,
-        sdp,
-        generation: offer.generation,
-        peerId: offer.peerId,
-      });
       const queued = this.pendingRemote.splice(0);
       for (const candidate of queued) await this.addRemoteCandidate(candidate);
-      this.flushLocalCandidates();
+      // Delivery is retried on later polls if it fails: the local answer is
+      // already set, so losing the POST must not strand the phone's offer.
+      this.pendingAnswer = { sdp, generation: offer.generation, peerId: offer.peerId };
+      await this.deliverAnswer();
     } catch (error) {
       if (error instanceof RemoteMicApiError && error.code === "STALE_GENERATION") return;
       this.answeredGeneration = offer.generation;
@@ -503,6 +502,23 @@ export class RemoteMicReceiver {
         },
       });
     }
+  }
+
+  /** Post the pending answer. Transient failures keep it for the next poll. */
+  private async deliverAnswer() {
+    const pending = this.pendingAnswer;
+    if (!pending || !this.id || !this.token) return;
+    try {
+      await this.options.api.signal(this.token, { action: "answer", id: this.id, ...pending });
+    } catch (error) {
+      if (error instanceof RemoteMicApiError && (error.code === "STALE_GENERATION" || error.status === 404 || error.status === 410)) {
+        if (this.pendingAnswer === pending) this.pendingAnswer = null;
+        return;
+      }
+      return; // keep it; pollOnce retries
+    }
+    if (this.pendingAnswer === pending) this.pendingAnswer = null;
+    this.flushLocalCandidates();
   }
 
   private async addRemoteCandidate(candidate: SignalCandidate) {
@@ -735,6 +751,7 @@ export class RemoteMicReceiver {
     this.remoteDescriptionSet = false;
     this.pendingRemote = [];
     this.pendingLocal = [];
+    this.pendingAnswer = null;
     this.statsMemory = null;
     if (this.statsTimer) this.deps.clearTimer(this.statsTimer);
     this.statsTimer = null;
