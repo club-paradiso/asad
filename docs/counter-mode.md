@@ -247,9 +247,27 @@ the active backend and stays available even when the Redis health check fails.
 
 ### Transport
 
-Short polling at ~1.2s with a sequence cursor. Turn-taking at a counter does not
-need sub-second delivery, and polling works everywhere — including serverless,
-where long-lived SSE connections do not.
+Short polling with a sequence cursor, at a cadence that follows the
+conversation: 500 ms while turns are being exchanged (or while this device has
+a send in flight), 1.2 s after 20 s of quiet, 2.5 s after two minutes, 8 s in a
+hidden tab. Polling works everywhere — including serverless, where long-lived
+SSE connections do not — and the adaptive cadence keeps the recipient's wait
+small exactly when it matters without making an idle desk the busiest client
+on the server. See `src/features/counter/polling.ts` and
+`docs/counter-overhaul/latency-baseline.md`.
+
+A sent message is shown to its sender at once, marked as translating, and is
+replaced by the stored message when the server answers; if every retry fails
+it stays on screen as failed, with its text, and can be resent or discarded.
+
+### Surviving a reload
+
+Each tab keeps its room code, capability token and chosen language in
+`sessionStorage` so a reload — which iOS Safari performs on backgrounded tabs
+without asking — returns to the same conversation instead of being refused as
+a second visitor. The record is per tab, never contains a message, expires
+with the server's four-hour idle lifetime and is removed when the conversation
+ends or the server refuses the token.
 
 ---
 
@@ -261,7 +279,8 @@ that:
 - **Nothing becomes a retained transcript.** Production can hold the active
   session in shared Redis for serverless continuity, but it is discarded on
   end or after the four-hour idle timeout and is never written to browser
-  storage or disk.
+  storage or disk. The only thing a browser keeps is the per-tab resume
+  record above — a code and a capability, never a message.
 - **Quick phrases never reach a model** — they are local lookups.
 - **The visitor is told**, on the join screen before they say anything, which
   provider will see their words — in their own language, from

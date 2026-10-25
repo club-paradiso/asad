@@ -1,0 +1,123 @@
+{
+  "base": "http://localhost:3100",
+  "at": "2026-10-25T04:52:36.108Z",
+  "quickPhraseDeliveryMs": [
+    261,
+    876,
+    116
+  ],
+  "quickPhraseDeliveryP50": 261,
+  "timings": [
+    {
+      "name": "staff sees the visitor joined",
+      "ms": 792
+    },
+    {
+      "name": "quick phrase reaches the visitor (/안녕하세요/)",
+      "ms": 261
+    },
+    {
+      "name": "quick phrase reaches the visitor (/잠시만 기다려/)",
+      "ms": 876
+    },
+    {
+      "name": "quick phrase reaches the visitor (/신분증|여권/)",
+      "ms": 116
+    },
+    {
+      "name": "staff sees the visitor's message (original text, whatever the translation did)",
+      "ms": 188
+    },
+    {
+      "name": "visitor learns the conversation ended",
+      "ms": 821
+    },
+    {
+      "name": "quick phrase reaches the visitor (/신분증|여권/)",
+      "ms": 261
+    }
+  ],
+  "checks": [
+    {
+      "name": "staff sees a room code",
+      "passed": true,
+      "detail": "HTWX"
+    },
+    {
+      "name": "visitor joins in Vietnamese",
+      "passed": true,
+      "detail": "77 ms"
+    },
+    {
+      "name": "staff sees the visitor joined",
+      "passed": true,
+      "detail": "792 ms"
+    },
+    {
+      "name": "quick phrase reaches the visitor (/안녕하세요/)",
+      "passed": true,
+      "detail": "261 ms"
+    },
+    {
+      "name": "quick phrase reaches the visitor (/잠시만 기다려/)",
+      "passed": true,
+      "detail": "876 ms"
+    },
+    {
+      "name": "quick phrase reaches the visitor (/신분증|여권/)",
+      "passed": true,
+      "detail": "116 ms"
+    },
+    {
+      "name": "sender sees their message at once, marked as translating",
+      "passed": true,
+      "detail": "63 ms"
+    },
+    {
+      "name": "typed message settles to a definite status",
+      "passed": true,
+      "detail": "failed after 1864 ms (1500 ms of that is the simulated hold)"
+    },
+    {
+      "name": "original text never lost",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "staff sees the visitor's message (original text, whatever the translation did)",
+      "passed": true,
+      "detail": "188 ms"
+    },
+    {
+      "name": "visitor survives a page reload on the same conversation",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "staff End asks once before acting",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "visitor learns the conversation ended",
+      "passed": true,
+      "detail": "821 ms"
+    },
+    {
+      "name": "staff gets a fresh code for the next visitor",
+      "passed": true,
+      "detail": "FADY"
+    },
+    {
+      "name": "quick phrase reaches the visitor (/신분증|여권/)",
+      "passed": true,
+      "detail": "261 ms"
+    },
+    {
+      "name": "RTL bubble keeps a Latin status code intact",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "problems": []
+}
