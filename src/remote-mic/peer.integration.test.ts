@@ -5,7 +5,7 @@ import { POST as SIGNAL } from "@/app/api/remote-mic/signal/route";
 import { SESSION_COOKIE, __resetGuards, issueSessionToken } from "@/lib/guard";
 import { __resetEnvCache } from "@/lib/env";
 import { FakePeerConnection, FakeStream, FakeTrack } from "@/test/fake-webrtc";
-import { createRemoteMicApi } from "./client";
+import { RemoteMicApiError, createRemoteMicApi } from "./client";
 import { parsePairingFragment } from "./protocol";
 import { RemoteMicReceiver } from "./receiver";
 import { RemoteMicSender } from "./sender";
@@ -235,6 +235,41 @@ describe("remote microphone pairing and negotiation (signalling integration)", (
     expect(claim).not.toHaveBeenCalled();
     expect(ctx.receiver.snapshot().phase).toBe("waiting");
     ctx.receiver.dispose();
+    sender.dispose();
+  });
+
+  it("retries a lost answer instead of stranding the phone's offer", async () => {
+    const base = createRemoteMicApi({ fetch: routeFetch, guardedFetch: routeFetch });
+    let failures = 0;
+    const flaky = {
+      ...base,
+      signal: async (token: string, request: Parameters<typeof base.signal>[1]) => {
+        if (request.action === "answer" && failures < 2) {
+          failures += 1;
+          throw new RemoteMicApiError(0, "NETWORK", "Network request failed.");
+        }
+        return base.signal(token, request);
+      },
+    };
+    const receiver = new RemoteMicReceiver({
+      api: flaky,
+      origin: "https://asad.example",
+      createPeerConnection: createPeer,
+      attachSink: () => () => {},
+      ...fastTimers,
+    });
+    const ctx = setup();
+    await receiver.pair();
+    const sender = ctx.makeSender(parsePairingFragment(new URL(receiver.snapshot().pairingUrl!).hash));
+    await sender.start();
+    await until(() => receiver.snapshot().phase === "awaiting-approval", "claim seen");
+    await receiver.approve();
+    await until(
+      () => receiver.snapshot().phase === "connected" && sender.snapshot().phase === "connected",
+      "connected despite two failed answer posts",
+    );
+    expect(failures).toBe(2);
+    receiver.dispose();
     sender.dispose();
   });
 

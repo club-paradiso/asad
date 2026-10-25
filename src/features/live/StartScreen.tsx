@@ -32,7 +32,7 @@
  * interpreter's "I understand" IS the user gesture that starts the session.
  * Both constraints hold, and neither is traded away.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ContextMode, ResolvedContext, StoredSession } from "@/types";
 import { prepStore, settingsStore } from "@/lib/storage";
@@ -59,7 +59,11 @@ import {
 import { CONTEXT_LABEL_KO } from "@/interpreter/context/context-mode";
 import { LiveConsole } from "./LiveConsole";
 import { LanguagePair } from "./LanguagePair";
-import { useLiveSession } from "./useLiveSession";
+import {
+  REMOTE_MIC_DISCONNECTED,
+  REMOTE_MIC_NOT_CONNECTED,
+  useLiveSession,
+} from "./useLiveSession";
 import { useBoothAudioInput } from "./useBoothAudioInput";
 import { isBoothPreflightAcknowledged } from "./booth-preflight-ack";
 import { describeAudioInput } from "./audio-input-kind";
@@ -75,6 +79,14 @@ import {
   remotePreflight,
   type RemotePreflight,
 } from "@/features/remote-mic/RemoteMicPanel";
+
+/** Sentinel for "no stream was present when the session was interrupted". */
+const NO_STREAM = {} as MediaStream;
+
+/** Auto-resume applies only to interruptions caused by the phone going away. */
+export function shouldAutoResumeRemote(faultMessage: string | undefined): boolean {
+  return faultMessage === REMOTE_MIC_NOT_CONNECTED || faultMessage === REMOTE_MIC_DISCONNECTED;
+}
 
 /** Where a raw-audio session listens. Continuity iPhones are a `device`. */
 type AudioMode = "device" | "remote";
@@ -219,16 +231,32 @@ export function StartScreen() {
   // The phone came back after the session gave up waiting for it (a long
   // pause, or more than the bounded automatic retries). Someone tapped Start
   // on the phone, which is intent enough: pick the session back up.
+  //
+  // Only for an interruption the PHONE caused, and only once a NEW stream has
+  // arrived since: a recogniser failure with the phone still connected must
+  // stay interrupted, or this would undo the supervisor's bounded retries.
   const remoteStream = remote.state.stream;
   const remoteConnected = remote.state.phase === "connected";
   const sessionPhase = session.phase;
+  const faultMessage = session.fault?.message;
   const resumeSession = session.resume;
+  const streamAtInterruption = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    if (sessionPhase !== "interrupted") streamAtInterruption.current = null;
+  }, [sessionPhase]);
   useEffect(() => {
     if (!remoteMode || screen !== "live" || sessionPhase !== "interrupted") return;
-    if (!remoteConnected || !remoteStream) return;
+    if (!shouldAutoResumeRemote(faultMessage)) return;
+    if (streamAtInterruption.current === null) {
+      // Remember what was there when it gave up; resume only for a newer one.
+      streamAtInterruption.current = remoteStream ?? NO_STREAM;
+      return;
+    }
+    if (!remoteConnected || !remoteStream || remoteStream === streamAtInterruption.current) return;
+    streamAtInterruption.current = remoteStream;
     const timer = window.setTimeout(() => void resumeSession(), 300);
     return () => window.clearTimeout(timer);
-  }, [remoteMode, screen, sessionPhase, remoteConnected, remoteStream, resumeSession]);
+  }, [remoteMode, screen, sessionPhase, faultMessage, remoteConnected, remoteStream, resumeSession]);
 
   // Resolved here, before the tap, so pressing Start can never outrun it.
   const consent = useCloudConsent(source);
