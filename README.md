@@ -151,6 +151,7 @@ ASAD는 원래 "말은 계속 나오는데 통역사의 뇌는 하나뿐인" 모
 | `/c/...` | QR을 찍고 들어오는 방문자 화면 |
 | `/prep` | 화자, 본문, 용어 등을 미리 넣어 AI에게 예습을 시킵니다 |
 | `/booth-preflight` | 믹서 입력, 신호 레벨, mix-minus 등을 점검합니다. 공연 시작 후 깨닫지 마세요 |
+| `/remote-mic` | 맥북 QR을 찍은 iPhone이 무선 마이크가 되는 화면 (원격 마이크) |
 | `/sessions` | 저장한 세션 복기 및 내보내기 |
 | `/diagnostics` | "왜 안 되지?"를 감정이 아니라 데이터로 확인하는 곳 |
 
@@ -523,6 +524,7 @@ npm run verify
 | [`docs/context-intelligence.md`](docs/context-intelligence.md) | 상황 자동 인식 · 언어 레지스트리 |
 | [`docs/live-upgrade-audit.md`](docs/live-upgrade-audit.md) | 이번 개편 전 감사 기록 |
 | [`docs/sermon-booth.md`](docs/sermon-booth.md) | 예배 통역/부스 운영 |
+| [`docs/remote-microphone.md`](docs/remote-microphone.md) | 원격 마이크: iPhone을 WebRTC 무선 마이크로 쓰기 |
 | [`docs/counter-mode.md`](docs/counter-mode.md) | Counter Mode 설계 |
 | [`docs/counter-storage.md`](docs/counter-storage.md) | Counter 공유 저장소 |
 | [`docs/free-tier-deployment.md`](docs/free-tier-deployment.md) | 무료 티어 운영 |

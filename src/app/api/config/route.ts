@@ -17,6 +17,8 @@ import {
 } from "@/providers/llm/capabilities";
 import { llmRouter } from "@/providers/llm";
 import { OPEN_WEIGHT } from "@/providers/llm/router";
+import { remoteMicStore } from "@/remote-mic/store";
+import { remoteMicTurnConfigured } from "@/remote-mic/ice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +63,17 @@ export interface AppConfig {
     /** The provider's own data-use note, in English. */
     note: string;
     openWeightModel: boolean;
+  };
+  /**
+   * Remote Microphone (iPhone over WebRTC). Flags only — never a relay
+   * credential, which is handed only to an authenticated pairing role.
+   */
+  remoteMic?: {
+    /** Pairing can work on this deployment (shared signalling store where required). */
+    available: boolean;
+    sharedStore: boolean;
+    /** A TURN relay is configured for networks where direct paths fail. */
+    turn: boolean;
   };
 }
 
@@ -108,6 +121,7 @@ export async function GET() {
       : undefined;
 
   const textAvailable = env.bible.provider !== "reference-only";
+  const remoteStore = remoteMicStore();
   // OpenRouter with `data_collection: deny` is not a provider that may train on
   // this sermon, and disclosing it as one would be crying wolf — the whole
   // value of this notice is that it only appears when it is true.
@@ -165,6 +179,11 @@ export async function GET() {
       openWeightModel: counterProvider
         ? OPEN_WEIGHT(counterProvider, env.llm.providers[counterProvider].model)
         : false,
+    },
+    remoteMic: {
+      available: remoteStore.shared || process.env.VERCEL !== "1",
+      sharedStore: remoteStore.shared,
+      turn: remoteMicTurnConfigured(),
     },
   };
 

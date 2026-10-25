@@ -113,6 +113,19 @@ twelve silent seconds the strip reads **No signal**, sustained clipping reads
 The launcher and the preflight say in words when the selected input is the
 laptop's own microphone or a phone rather than a console feed.
 
+### Remote Microphone (iPhone over Wi-Fi)
+
+When no cable can reach the laptop, a spare iPhone can be paired as a wireless
+microphone ([`remote-microphone.md`](./remote-microphone.md)). It is a **room
+microphone**, not a console feed: it hears the sanctuary, reverb, the
+congregation and possibly the interpreter. Place it near the pulpit or a PA
+speaker and away from the interpreter. The launcher's Remote Microphone panel
+is its preflight: it separates *paired*, *samples arriving*, *usable level*,
+*clipping/weak signal* and the operator's *correct source* confirmation, and
+the readiness row stays **Limited** in a worship context. Pairing alone is
+never treated as a working input, and ASAD never falls back to the laptop
+microphone if the phone disappears.
+
 ### Exact-device rule
 
 When the operator explicitly selects a mixer or USB audio interface, ASAD requests that exact browser device. The browser is not allowed to silently substitute another microphone.
@@ -152,6 +165,9 @@ Preflight reports **Ready for live** only after both conditions are true:
 2. the operator has explicitly confirmed mix-minus.
 
 A verified signal remains latched after **Stop test** so the operator can finish the checklist without keeping the test stream open. Starting a new test, changing the selected device, a capture failure or a hardware disconnect clears that readiness.
+
+For a paired iPhone, use the Remote Microphone panel on the launcher instead:
+the pairing lives with the launcher session, so its check happens there.
 
 A successful preflight proves only the local ASAD capture path. It does not replace a real sound check of the church's congregation-facing interpretation system.
 

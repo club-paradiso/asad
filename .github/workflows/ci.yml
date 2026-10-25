@@ -159,6 +159,10 @@ jobs:
       # Started detached and waited for, rather than slept at: a fixed sleep is
       # either too short on a slow runner or wasted time on a fast one.
       - name: Start the server
+        # Host candidates are all two local browser contexts need; skipping
+        # public STUN keeps the Remote Microphone check off the network.
+        env:
+          REMOTE_MIC_STUN_URLS: none
         run: |
           npm start -- --port 3000 > /tmp/server.log 2>&1 &
           for _ in $(seq 1 60); do
@@ -200,6 +204,13 @@ jobs:
       # checks what ASAD asks its providers for, not what they deliver.
       - name: Language-pair checks
         run: npm run e2e:live-languages -- http://localhost:3000
+
+      # Real browser-to-browser WebRTC between two Chromium contexts: pairing,
+      # approval, actual audio samples, the existing capture → STT path (mock
+      # Deepgram socket), stop/restart, abrupt peer loss and failure paths.
+      # Chromium with an iPhone viewport — not iOS Safari.
+      - name: Remote microphone (WebRTC) checks
+        run: npm run e2e:remote-mic -- http://localhost:3000 ./e2e-out/remote-mic
 
       # The screenshots are the point when a check fails: they show what the
       # page actually looked like, which no assertion message can.

@@ -136,6 +136,14 @@ export interface LiveSessionOptions {
   source: SttProviderId;
   /** Preferred physical booth input for providers that accept raw audio. */
   audioDeviceId?: string;
+  /**
+   * Where raw audio comes from. `remote` is the paired iPhone over WebRTC:
+   * its stream goes into the same `MicrophoneCapture`, and the MacBook's own
+   * microphone is never opened as a substitute.
+   */
+  audioSource?: "device" | "remote";
+  /** The paired phone's stream, read on every (re)open. Null when not connected. */
+  remoteStream?: () => MediaStream | null;
   /** Browser noise suppression on a raw-audio capture. Default off. */
   noiseSuppression?: boolean;
   /** Optional isolated interpretation endpoint for specialized modes. */
@@ -569,6 +577,18 @@ export function useLiveSession(options: LiveSessionOptions) {
       }
 
       const effectiveSource: SttProviderId = credentials?.provider ?? current.source;
+      const remote = current.audioSource === "remote";
+
+      // A remote microphone is raw audio, and only a raw-audio recogniser can
+      // hear it. The browser recogniser opens its own (local) microphone and
+      // the demo hears nothing — either would look like a working session
+      // while ignoring the phone entirely. Refuse instead of substituting.
+      if (remote && effectiveSource !== "deepgram" && effectiveSource !== "openai") {
+        throw new TransportError(
+          "unsupported",
+          REMOTE_MIC_NEEDS_RAW_STT,
+        );
+      }
 
       if (effectiveSource !== current.source) {
         // Not a fault, but not silent either: the interpreter agreed to send
@@ -631,6 +651,16 @@ export function useLiveSession(options: LiveSessionOptions) {
         }
       });
 
+      // Resolve the phone's stream BEFORE opening the recogniser, so a missing
+      // phone fails fast and never leaves a billed socket open with no audio.
+      const remoteStream = remote ? liveRemoteStream(current.remoteStream?.()) : null;
+      if (remote && !remoteStream) {
+        // `transport`, not `device`: after a brief phone reconnect the stream
+        // reappears on its own, and the supervisor's bounded retries pick it
+        // up without anyone having to press Resume.
+        throw new TransportError("transport", REMOTE_MIC_NOT_CONNECTED);
+      }
+
       await provider.connect();
 
       if (provider.needsAudio) {
@@ -639,13 +669,21 @@ export function useLiveSession(options: LiveSessionOptions) {
         }
         const monitor = inputMonitorRef.current;
         const mic = new MicrophoneCapture({
-          deviceId: current.audioDeviceId || undefined,
+          // With `stream` set, MicrophoneCapture never calls getUserMedia and
+          // never stops tracks it does not own: the remote receiver keeps them.
+          ...(remoteStream
+            ? { stream: remoteStream }
+            : { deviceId: current.audioDeviceId || undefined }),
           noiseSuppression: current.noiseSuppression === true,
           onFrame: (frame) => provider.sendAudio(frame),
           // Numbers about the frames already being sent — not a second stream.
           onLevel: (level) => monitor.observe(level),
           onError: (err) => setError(err.message),
           onEnded: () => {
+            if (remote) {
+              supervisor.report("transport", REMOTE_MIC_DISCONNECTED);
+              return;
+            }
             supervisor.report(
               "device",
               current.audioDeviceId
@@ -662,7 +700,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         if (micRef.current !== mic) return false;
 
         monitor.start();
-        setInputLabel(mic.trackInfo()?.label ?? "");
+        setInputLabel(remote ? REMOTE_MIC_INPUT_LABEL : (mic.trackInfo()?.label ?? ""));
         setInputHealth(monitor.snapshot());
         if (inputPollRef.current) clearInterval(inputPollRef.current);
         inputPollRef.current = setInterval(() => {
@@ -844,6 +882,20 @@ export function useLiveSession(options: LiveSessionOptions) {
 export type LiveSession = ReturnType<typeof useLiveSession>;
 
 export type { SessionFailureKind, SessionFault };
+
+export const REMOTE_MIC_INPUT_LABEL = "Remote microphone (iPhone · ASAD pairing)";
+export const REMOTE_MIC_NEEDS_RAW_STT =
+  "The remote iPhone microphone needs a raw-audio recogniser (Deepgram or OpenAI). The browser recogniser can only hear this Mac's own microphone, so the session was not started.";
+export const REMOTE_MIC_NOT_CONNECTED =
+  "The remote iPhone microphone is not connected. Reconnect it from the launcher (or tap Start Microphone on the iPhone), then tap Resume.";
+export const REMOTE_MIC_DISCONNECTED =
+  "The remote iPhone microphone disconnected. Waiting for it to reconnect — the transcript is kept.";
+
+/** The remote stream, only if it still carries a live audio track. */
+export function liveRemoteStream(stream: MediaStream | null | undefined): MediaStream | null {
+  if (!stream) return null;
+  return stream.getAudioTracks().some((track) => track.readyState === "live") ? stream : null;
+}
 
 /** A start/recovery failure carrying its own classification. */
 export class TransportError extends Error {
