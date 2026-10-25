@@ -295,6 +295,17 @@ export const RATE_RULES = {
   earbudTtsAddress: { limit: 24, windowMs: 60_000 },
   /** The health check calls a provider; it is not a page-load endpoint. */
   health: { limit: 4, windowMs: 60_000 },
+  /** Opening a Remote Microphone pairing (QR code). A person does this, rarely. */
+  remoteMicCreate: { limit: 8, windowMs: 60_000 },
+  /** Presenting a pairing secret. Bounds guessing even though secrets are 192-bit. */
+  remoteMicClaim: { limit: 12, windowMs: 60_000 },
+  /**
+   * Signalling per pairing role. Polling runs at ≤2/s while negotiating and
+   * every few seconds once connected; candidates and status add a few more.
+   */
+  remoteMicSignal: { limit: 300, windowMs: 60_000 },
+  /** The same, per source address — a church Wi-Fi may carry two pairings. */
+  remoteMicSignalAddress: { limit: 900, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 const limiters = new Map<string, RequestRateLimiter>();
