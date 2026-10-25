@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { CreateSttOptions, SpeechProvider, SttCredentials, SttStatus } from "@/providers/stt";
 import {
   CounterSpeechController,
+  utteranceDelay,
+  utteranceDelayFloor,
   type CounterSpeechDependencies,
   type CounterVoicePhase,
 } from "./counter-speech";
@@ -255,5 +257,36 @@ describe("CounterSpeechController", () => {
     run.providers[0].emitStable("أحتاج إلى مساعدة");
     await resultPromise;
     expect(run.createOptions[0]?.language).toBe("ar-SA");
+  });
+});
+
+describe("utterance endpointing", () => {
+  it("keeps the full language-specific wait for a sentence that has not ended", () => {
+    expect(utteranceDelay("ko-KR", 1700, "체류기간 연장 신청하려고")).toBe(1700);
+    expect(utteranceDelay("zh-CN", 1700, "我想申请")).toBe(1900);
+    expect(utteranceDelay("en-US", 1700, "I want to extend my")).toBe(1700);
+  });
+
+  it("shortens, but never removes, the wait once the recogniser has closed the sentence", () => {
+    expect(utteranceDelay("ko-KR", 1700, "체류기간을 연장하고 싶습니다.")).toBe(1020);
+    expect(utteranceDelay("en-US", 1700, "Do you have an appointment?")).toBe(1020);
+    expect(utteranceDelay("zh-CN", 1700, "我想延长居留期限。")).toBe(1140);
+    expect(utteranceDelay("ja-JP", 1700, "予約していますか？")).toBe(1020);
+    expect(utteranceDelay("ar-SA", 1700, "هل لديك موعد؟")).toBe(1020);
+    for (const language of ["ko-KR", "en-US", "zh-CN", "vi-VN", "th-TH"]) {
+      const shortened = utteranceDelay(language, 1700, "Done.");
+      expect(shortened).toBeGreaterThanOrEqual(900);
+      expect(shortened).toBeLessThan(utteranceDelayFloor(language, 1700));
+    }
+  });
+
+  it("ignores punctuation on a fragment too short to be a sentence", () => {
+    expect(utteranceDelay("en-US", 1700, ".")).toBe(1700);
+    expect(utteranceDelay("en-US", 1700, "")).toBe(1700);
+  });
+
+  it("still honours an explicit immediate finish", () => {
+    expect(utteranceDelay("ko-KR", 0, "끝났습니다.")).toBe(0);
+    expect(utteranceDelay("ko-KR", 25, "끝났습니다.")).toBe(25);
   });
 });

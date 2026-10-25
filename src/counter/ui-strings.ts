@@ -668,6 +668,8 @@ export interface CounterActionStrings {
   retry: string;
   integrityWarning: string;
   lowConfidence: string;
+  /** Drop a message this device could not send. */
+  discard: string;
 }
 
 const ACTION_EN: CounterActionStrings = {
@@ -675,6 +677,7 @@ const ACTION_EN: CounterActionStrings = {
   retry: "Translate again",
   integrityWarning: "An important value may not match the original. Please check it.",
   lowConfidence: "Some wording is uncertain. Please check it.",
+  discard: "Discard",
 };
 
 const ACTION_STRINGS: Record<string, CounterActionStrings> = {
@@ -684,96 +687,112 @@ const ACTION_STRINGS: Record<string, CounterActionStrings> = {
     retry: "다시 번역",
     integrityWarning: "중요한 값이 원문과 다를 수 있어요. 다시 확인해 주세요.",
     lowConfidence: "일부 내용이 불확실해요. 다시 확인해 주세요.",
+    discard: "삭제",
   },
   zh: {
     simplify: "说得更简单",
     retry: "重新翻译",
     integrityWarning: "重要信息可能与原文不一致，请核对。",
     lowConfidence: "部分内容不确定，请核对。",
+    discard: "放弃",
   },
   ja: {
     simplify: "もっと簡単に",
     retry: "もう一度翻訳",
     integrityWarning: "重要な値が原文と一致しない可能性があります。確認してください。",
     lowConfidence: "一部の内容が不確かです。確認してください。",
+    discard: "削除",
   },
   vi: {
     simplify: "Nói đơn giản hơn",
     retry: "Dịch lại",
     integrityWarning: "Một thông tin quan trọng có thể không khớp bản gốc. Hãy kiểm tra.",
     lowConfidence: "Một số nội dung chưa chắc chắn. Hãy kiểm tra.",
+    discard: "Bỏ",
   },
   th: {
     simplify: "ให้ง่ายขึ้น",
     retry: "แปลอีกครั้ง",
     integrityWarning: "ข้อมูลสำคัญอาจไม่ตรงกับต้นฉบับ กรุณาตรวจสอบ",
     lowConfidence: "เนื้อหาบางส่วนไม่แน่นอน กรุณาตรวจสอบ",
+    discard: "ลบ",
   },
   id: {
     simplify: "Buat lebih sederhana",
     retry: "Terjemahkan lagi",
     integrityWarning: "Nilai penting mungkin tidak sama dengan teks asli. Harap periksa.",
     lowConfidence: "Sebagian isi belum pasti. Harap periksa.",
+    discard: "Hapus",
   },
   ru: {
     simplify: "Сказать проще",
     retry: "Перевести снова",
     integrityWarning: "Важное значение может не совпадать с оригиналом. Проверьте его.",
     lowConfidence: "Часть текста неоднозначна. Проверьте её.",
+    discard: "Удалить",
   },
   uk: {
     simplify: "Сказати простіше",
     retry: "Перекласти ще раз",
     integrityWarning: "Важливе значення може не збігатися з оригіналом. Перевірте його.",
     lowConfidence: "Деякі формулювання можуть бути неточними. Перевірте їх.",
+    discard: "Видалити",
   },
   ar: {
     simplify: "تبسيط العبارة",
     retry: "إعادة الترجمة",
     integrityWarning: "قد لا تتطابق معلومة مهمة مع الأصل. يرجى التحقق منها.",
     lowConfidence: "بعض المحتوى غير مؤكد. يرجى التحقق منه.",
+    discard: "تجاهل",
   },
   ur: {
     simplify: "آسان بنائیں",
     retry: "دوبارہ ترجمہ کریں",
     integrityWarning: "کوئی اہم معلومات اصل سے مختلف ہو سکتی ہے۔ براہ کرم جانچ لیں۔",
     lowConfidence: "کچھ مواد غیر یقینی ہے۔ براہ کرم جانچ لیں۔",
+    discard: "ہٹائیں",
   },
   ug: {
     simplify: "ئاددىيلاشتۇرۇش",
     retry: "قايتا تەرجىمە قىلىش",
     integrityWarning: "مۇھىم ئۇچۇر ئەسلى تېكىستكە ماس كەلمەسلىكى مۇمكىن. تەكشۈرۈپ بېقىڭ.",
     lowConfidence: "بەزى مەزمۇن ئېنىق ئەمەس. تەكشۈرۈپ بېقىڭ.",
+    discard: "ئۆچۈرۈش",
   },
   tr: {
     simplify: "Daha basit söyle",
     retry: "Yeniden çevir",
     integrityWarning: "Önemli bir bilgi özgün metinle uyuşmayabilir. Lütfen kontrol edin.",
     lowConfidence: "Bazı ifadeler belirsiz. Lütfen kontrol edin.",
+    discard: "Sil",
   },
   de: {
     simplify: "Einfacher sagen",
     retry: "Erneut übersetzen",
     integrityWarning: "Ein wichtiger Wert stimmt möglicherweise nicht mit dem Original überein. Bitte prüfen.",
     lowConfidence: "Einige Formulierungen sind unsicher. Bitte prüfen.",
+    discard: "Verwerfen",
   },
   pt: {
     simplify: "Dizer mais simples",
     retry: "Traduzir de novo",
     integrityWarning: "Um valor importante pode não corresponder ao original. Por favor, verifique.",
     lowConfidence: "Parte do conteúdo é incerta. Por favor, verifique.",
+    discard: "Descartar",
   },
   fr: {
     simplify: "Dire plus simplement",
     retry: "Traduire à nouveau",
     integrityWarning: "Une information importante peut ne pas correspondre à l’original. Veuillez vérifier.",
     lowConfidence: "Certains éléments sont incertains. Veuillez vérifier.",
+    discard: "Supprimer",
   },
   es: {
     simplify: "Decirlo más simple",
     retry: "Traducir de nuevo",
     integrityWarning: "Un dato importante puede no coincidir con el original. Por favor, verifíquelo.",
     lowConfidence: "Parte del contenido es incierto. Por favor, verifíquelo.",
+    discard: "Descartar",
   },
 };
 
