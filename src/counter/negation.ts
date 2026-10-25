@@ -38,6 +38,12 @@ interface NegationRules {
   substrings?: readonly string[];
   /** Escape hatch for morphology a word list cannot express. */
   patterns?: readonly RegExp[];
+  /**
+   * Removed from the text before any marker is looked for. These are the
+   * places a negation marker appears without negating anything: question
+   * particles, politeness formulae, numbering abbreviations.
+   */
+  exclusions?: readonly RegExp[];
 }
 
 const RULES: Record<string, NegationRules> = {
@@ -47,17 +53,41 @@ const RULES: Record<string, NegationRules> = {
       "unable", "nothing", "nobody", "unless",
     ],
     patterns: [/\b\w+n['’]t\b/i, /\bnon-/i],
+    // "Counter No. 2" is a number, not a refusal.
+    exclusions: [/\bno\.\s*\d/gi],
   },
   ko: {
-    substrings: ["않", "없", "못", "아니", "말고", "불가", "금지", "미납", "안돼", "안 돼", "안 되"],
+    substrings: ["않", "없", "못", "아니", "아닙", "말고", "불가", "금지", "미납", "안돼", "안 돼", "안 되"],
     // Standalone 안 before a verb. Bare substring matching would fire on
     // 안내 (information), which an immigration desk says constantly.
     patterns: [/(?:^|[\s(])안\s/u],
   },
-  zh: { substrings: ["不", "没", "無", "无", "未", "别", "非", "勿", "禁止"] },
-  ja: { substrings: ["ない", "ません", "ぬ", "不", "無", "未", "いいえ", "だめ", "できません"] },
-  vi: { words: ["không", "chưa", "chẳng", "đừng", "chớ", "khỏi"] },
-  th: { substrings: ["ไม่", "ห้าม", "มิ", "ยังไม่"] },
+  zh: {
+    substrings: ["不", "没", "無", "无", "未", "别", "非", "勿", "禁止"],
+    // A-not-A questions ask, they do not negate: 是不是 / 有没有 / 可不可以.
+    // And 不好意思, 不客气, 没关系 are courtesy, which the Korean or English
+    // side renders without any negation at all.
+    exclusions: [
+      /是不是|有没有|有沒有|可不可以|能不能|好不好|对不对|對不對|行不行|要不要|会不会|會不會|用不用|需不需要|去不去|来不来|來不來|想不想|是否/g,
+      /不好意思|不客气|不客氣|不用谢|不用謝|没关系|沒關係|没问题|沒問題|不错|不錯/g,
+    ],
+  },
+  ja: {
+    // 不 and 無 alone fired on 無料 (free of charge) and 不便, both of which a
+    // reception desk says all day; ぬ as a bare syllable fired on 死ぬ and
+    // ぬるい. The surviving markers are the ones that actually negate a verb.
+    substrings: ["ない", "ません", "いいえ", "だめ", "ダメ", "できません", "不可", "禁止", "なし", "無し", "未提出", "未納"],
+    exclusions: [/ませんか|のではないですか|んじゃないですか|じゃないですか/g],
+  },
+  vi: {
+    words: ["không", "chẳng", "đừng", "chớ", "khỏi"],
+    // không / chưa close a yes-no question ("Bạn có hẹn không?") as often as
+    // they negate one. Only a sentence-final particle is excused; a mid-
+    // sentence không is still a negation.
+    exclusions: [/\b(?:không|chưa)(?=\s*(?:[?？!]|$))/giu, /\b(?:phải|đúng|được|hay)\s+không\b/giu],
+    patterns: [/(?<![\p{L}])chưa(?![\p{L}])(?!\s*[?？])/iu],
+  },
+  th: { substrings: ["ไม่", "ห้าม", "ยังไม่"] },
   id: { words: ["tidak", "bukan", "belum", "jangan", "tanpa", "tak"] },
   ru: { words: ["не", "нет", "ни", "без", "нельзя", "никогда", "никакой"] },
   es: {
@@ -117,8 +147,12 @@ export const negationCheckAvailable = (language: string | undefined): boolean =>
 export function hasNegation(text: string, language: string | undefined): boolean | null {
   const rules = RULES[baseTag(language)];
   if (!rules) return null;
-  const value = text.normalize("NFC");
+  let value = text.normalize("NFC");
   if (!value.trim()) return false;
+  for (const exclusion of rules.exclusions ?? []) {
+    exclusion.lastIndex = 0;
+    value = value.replace(exclusion, " ");
+  }
 
   for (const substring of rules.substrings ?? []) {
     if (value.includes(substring)) return true;

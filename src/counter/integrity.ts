@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { isResidenceStatusCode } from "./domain-vocabulary";
 import { compareNegation } from "./negation";
+import { softNumbers } from "./number-words";
 
 interface Candidate extends CriticalValue {
   start: number;
@@ -54,23 +55,128 @@ const LOCAL_MONTHS: Record<string, number> = {
 const localMonth = (raw: string): number | undefined =>
   LOCAL_MONTHS[raw.normalize("NFKC").toLocaleLowerCase("und").replace(/[.'’]/g, "")];
 
+/**
+ * Currency markers, longest first where one is a prefix of another.
+ *
+ * The English words matter as much as the symbols: a faithful rendering of
+ * "50,000원" is "50,000 won" far more often than "₩50,000", and until the word
+ * was here that rendering was reported as a lost amount on every fee a desk
+ * quoted.
+ */
 const CURRENCY: Record<string, string> = {
   "₩": "KRW",
   원: "KRW",
   krw: "KRW",
+  won: "KRW",
   "$": "USD",
   달러: "USD",
   usd: "USD",
+  dollars: "USD",
+  dollar: "USD",
   "€": "EUR",
   eur: "EUR",
+  euros: "EUR",
+  euro: "EUR",
   "£": "GBP",
   gbp: "GBP",
+  pounds: "GBP",
+  pound: "GBP",
   "¥": "JPY",
   엔: "JPY",
   jpy: "JPY",
+  yen: "JPY",
+  円: "JPY",
   위안: "CNY",
   cny: "CNY",
+  yuan: "CNY",
+  rmb: "CNY",
+  元: "CNY",
+  ウォン: "KRW", 韩元: "KRW", 韓元: "KRW", вон: "KRW", von: "KRW", วอน: "KRW", وون: "KRW", वोन: "KRW",
+  ドル: "USD", 美元: "USD", доллар: "USD", долларов: "USD", dollar_: "USD",
+  ユーロ: "EUR", 欧元: "EUR", 歐元: "EUR", евро: "EUR",
+  日元: "JPY",
+  人民币: "CNY", 人民幣: "CNY",
 };
+const CURRENCY_WORDS =
+  "won|dollars?|euros?|pounds?|yen|yuan|rmb|ウォン|韩元|韓元|вон|von|วอน|وون|वोन|ドル|美元|доллар(?:ов|а)?|ユーロ|欧元|歐元|евро|日元|人民币|人民幣";
+
+const DURATION_UNITS: Record<string, string> = {
+  일: "d", day: "d", days: "d", 天: "d", 日間: "d", ngày: "d",
+  주: "w", 주일: "w", week: "w", weeks: "w", 周: "w", 週: "w", tuần: "w",
+  개월: "m", 달: "m", month: "m", months: "m", 个月: "m", 個月: "m", ヶ月: "m", か月: "m", tháng: "m",
+  년: "y", year: "y", years: "y", 年間: "y", năm: "y",
+  시간: "h", hour: "h", hours: "h", 小时: "h", 小時: "h", 時間: "h", giờ: "h",
+  분: "min", minute: "min", minutes: "min", 分钟: "min", 分鐘: "min", phút: "min",
+};
+
+const NAME_STOP_PHRASES = new Set([
+  "thankyou", "goodmorning", "goodafternoon", "goodevening", "excuseme", "pleasewait",
+]);
+
+/**
+ * Words that mark a capitalised run as a term rather than a person.
+ *
+ * The English side of the immigration glossary, weekday and month names, and
+ * the title-case nouns a service desk writes in every other sentence.
+ */
+const ADMINISTRATIVE_TITLE_WORDS = new Set([
+  "alien", "registration", "card", "residence", "immigration", "office", "form",
+  "application", "certificate", "visa", "permit", "status", "period", "stay",
+  "extension", "change", "report", "workplace", "address", "center", "centre",
+  "service", "insurance", "health", "national", "pension", "tax", "bank", "account",
+  "passport", "appointment", "fee", "document", "documents", "deadline", "integrated",
+  "foreigner", "foreign", "resident", "number", "counter", "desk", "please", "thank",
+  "hello", "good", "morning", "afternoon", "evening", "welcome", "sorry", "yes", "no",
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+  "january", "february", "march", "april", "may", "june", "july", "august",
+  "september", "october", "november", "december", "korea", "korean", "seoul",
+  "hikorea", "arc", "ministry", "justice", "department", "online", "website",
+]);
+
+/**
+ * East Asian numeral scales: 6만 원 is 60,000 won, 2천만 is 20,000,000.
+ *
+ * Korean, Japanese and Chinese amounts are spoken and written with these
+ * multipliers; a validator that reads "6만" as the integer 6 reports the
+ * correct "60,000 won" as both a lost amount and an invented one. Each digit
+ * group carries its own full multiplier (3만 5천 = 30,000 + 5,000), which is
+ * how spoken amounts at a counter are actually composed.
+ */
+const SCALE_UNITS: Record<string, number> = {
+  억: 1e8, 億: 1e8, 亿: 1e8,
+  만: 1e4, 万: 1e4, 萬: 1e4,
+  천: 1e3, 千: 1e3,
+  백: 1e2, 百: 1e2,
+};
+const SCALE_CHARS = Object.keys(SCALE_UNITS).join("");
+const SCALED_NUMBER_RE = new RegExp(
+  `(\\d[\\d,.]*)\\s*([${SCALE_CHARS}]+)`,
+  "gu",
+);
+/** A run of scaled groups, an optional plain tail, and an optional currency. */
+const SCALED_AMOUNT_RE = new RegExp(
+  `((?:\\d[\\d,.]*\\s*[${SCALE_CHARS}]+\\s*)+)(\\d[\\d,.]*)?\\s*(원|달러|엔|위안|円|元|₩|ウォン|韩元|韓元|ドル|美元|ユーロ|欧元|歐元|日元|人民币|人民幣)?`,
+  "gu",
+);
+
+function scaledValue(groups: string, tail: string | undefined): number | null {
+  let total = 0;
+  SCALED_NUMBER_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = SCALED_NUMBER_RE.exec(groups)) !== null) {
+    const digits = Number(normalizeNumber(match[1]));
+    if (!Number.isFinite(digits)) return null;
+    let multiplier = 1;
+    for (const unit of match[2]) multiplier *= SCALE_UNITS[unit] ?? 1;
+    total += digits * multiplier;
+  }
+  if (tail) {
+    const plain = Number(normalizeNumber(tail));
+    if (!Number.isFinite(plain)) return null;
+    total += plain;
+  }
+  return total;
+}
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -87,7 +193,7 @@ function partialDateKey(month: number, day: number): string | null {
   return validDate(2000, month, day) ? `--${pad(month)}-${pad(day)}` : null;
 }
 
-function normalizeNumber(raw: string): string {
+function normalizeNumber(raw: string, options: { money?: boolean } = {}): string {
   let value = raw.normalize("NFKC").replace(/\s/g, "");
   const negative = value.startsWith("-");
   value = value.replace(/^[+-]/, "");
@@ -105,7 +211,9 @@ function normalizeNumber(raw: string): string {
       : `${parts[0]}.${parts[1]}`;
   } else if (lastDot >= 0) {
     const parts = value.split(".");
-    if (parts.length > 2) value = parts.join("");
+    // "30.000 won" is thirty thousand in Indonesian, Vietnamese, German and
+    // most of Europe; an amount is never quoted to three decimal places.
+    if (parts.length > 2 || (options.money && parts.at(-1)?.length === 3)) value = parts.join("");
   }
 
   const numeric = Number(value);
@@ -115,25 +223,77 @@ function normalizeNumber(raw: string): string {
 
 function moneyKey(raw: string): string | null {
   const lower = raw.toLocaleLowerCase("en-US");
-  const currency = Object.entries(CURRENCY).find(([token]) => lower.includes(token))?.[1];
+  // Longest marker first: "dollars" before "dollar", "韩元" before "元".
+  const currency = Object.entries(CURRENCY)
+    .sort((a, b) => b[0].length - a[0].length)
+    .find(([token]) => lower.includes(token))?.[1];
   const number = raw.match(/[+-]?\d[\d\s,.]*/)?.[0];
-  return currency && number ? `${currency}:${normalizeNumber(number)}` : null;
+  return currency && number ? `${currency}:${normalizeNumber(number, { money: true })}` : null;
 }
 
+/**
+ * Times normalise to HH:MM. A bare hour with no meridiem — "3시", "3 giờ",
+ * "3時" — is prefixed with "~": it is a genuine ambiguity in the source, and
+ * "3 PM" is a faithful reading of it, not a changed value. "오후 3시" is not
+ * ambiguous and still has to come out as 15:00.
+ */
 function timeKey(raw: string): string | null {
   const normalized = raw.normalize("NFKC").trim();
-  const colon = normalized.match(/(\d{1,2}):(\d{2})\s*([ap]\.?m\.?)?/i);
-  const korean = normalized.match(/(?:(오전|오후)\s*)?(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?/);
-  const match = colon ?? korean;
+  // 15:30, 3:00 PM, 3 PM, 3pm, 3 p.m., 3 o'clock
+  const latin = normalized.match(
+    /(\d{1,2})(?::(\d{2}))?\s*(?:([ap])\.?\s?m\.?|(o['’]clock))?/i,
+  );
+  // 오후 3시 30분 · 3시 반 · 午後3時半 · 下午3点30分 · 3 giờ 30 · 3 giờ rưỡi
+  const asian = normalized.match(
+    /(?:(오전|오후|아침|저녁|밤|午前|午後|上午|下午|晚上|早上|sáng|chiều|tối|trưa)\s*)?(\d{1,2})\s*(?:시|時|时|点|點|giờ)(?:\s*(\d{1,2})\s*(?:분|分|phút)?|\s*(반|半|rưỡi))?/,
+  );
+  // दोपहर 3 बजे · 3:30 बजे · साँझ 5 बजे
+  const indic = normalized.match(
+    /(?:(सुबह|बिहान|दोपहर|दिउँसो|शाम|साँझ|रात|राति)\s*)?(\d{1,2})(?::(\d{2}))?\s*बजे/,
+  );
+  const asianAfter = normalized.match(
+    /(\d{1,2})\s*(?:giờ)(?:\s*(\d{1,2}))?\s*(sáng|chiều|tối|trưa)/,
+  );
+  const latinUsable =
+    latin && (latin[2] !== undefined || latin[3] !== undefined || latin[4] !== undefined);
+  const match = asian ?? indic ?? (latinUsable ? latin : null);
   if (!match) return null;
 
-  let hour = Number(colon ? match[1] : match[2]);
-  const minute = Number(colon ? match[2] : match[3] ?? 0);
-  const meridiem = colon ? match[3]?.toLowerCase().replace(/\./g, "") : match[1];
-  if (meridiem === "pm" || meridiem === "오후") hour = hour % 12 + 12;
-  if ((meridiem === "am" || meridiem === "오전") && hour === 12) hour = 0;
+  let hour: number;
+  let minute: number;
+  let meridiem: string | undefined;
+  if (match === indic) {
+    hour = Number(indic[2]);
+    minute = Number(indic[3] ?? 0);
+    meridiem = indic[1];
+  } else if (match === asian) {
+    hour = Number(asian[2]);
+    minute = asian[4] ? 30 : Number(asian[3] ?? 0);
+    meridiem = asian[1] ?? asianAfter?.[3];
+  } else {
+    hour = Number(latin![1]);
+    minute = Number(latin![2] ?? 0);
+    meridiem = latin![3]?.toLowerCase() === "p" ? "pm" : latin![3] ? "am" : undefined;
+  }
+  const pm = new Set(["pm", "오후", "저녁", "밤", "午後", "下午", "晚上", "chiều", "tối", "दोपहर", "दिउँसो", "शाम", "साँझ", "रात", "राति"]);
+  const am = new Set(["am", "오전", "아침", "午前", "上午", "早上", "sáng", "सुबह", "बिहान"]);
+  if (meridiem && pm.has(meridiem) && hour < 12) hour += 12;
+  if (meridiem && am.has(meridiem) && hour === 12) hour = 0;
   if (hour > 23 || minute > 59) return null;
-  return `${pad(hour)}:${pad(minute)}`;
+  const ambiguous =
+    !meridiem && hour >= 1 && hour <= 12 && (match === asian || match === indic || latin?.[4] !== undefined);
+  return `${ambiguous ? "~" : ""}${pad(hour)}:${pad(minute)}`;
+}
+
+/** Two time keys agree when exact, or when the ambiguous one fits the other's hour. */
+function timesAgree(a: string, b: string): boolean {
+  if (a === b) return true;
+  const strip = (key: string) => key.replace(/^~/, "");
+  const [ha, ma] = strip(a).split(":").map(Number);
+  const [hb, mb] = strip(b).split(":").map(Number);
+  if (ma !== mb) return false;
+  if (!a.startsWith("~") && !b.startsWith("~")) return false;
+  return ha % 12 === hb % 12;
 }
 
 function identityKey(raw: string): string {
@@ -190,16 +350,40 @@ export function extractCriticalValues(text: string, language?: string): Critical
         : null,
   );
 
+  // Scaled East Asian amounts claim their characters before the plain money
+  // and integer collectors can read "6만 원" as the integer 6.
+  SCALED_AMOUNT_RE.lastIndex = 0;
+  let scaled: RegExpExecArray | null;
+  while ((scaled = SCALED_AMOUNT_RE.exec(text)) !== null) {
+    const [whole, groups, tail, currency] = scaled;
+    // A plain number after the scaled groups only belongs to the amount when
+    // a currency follows it: "3만 500원" is one sum, "3만 2장" is not.
+    const consumed = tail && !currency ? groups : whole;
+    if (tail && !currency) SCALED_AMOUNT_RE.lastIndex = scaled.index + groups.length;
+    const value = scaledValue(groups, tail && currency ? tail : undefined);
+    if (value === null) continue;
+    const code = currency ? CURRENCY[currency] : undefined;
+    add(
+      code ? "money" : "integer",
+      consumed,
+      scaled.index,
+      code ? `${code}:${value}` : String(value),
+    );
+  }
+
   collect(
     "money",
-    /(?:[₩$€£¥]\s*[+-]?\d[\d\s,.]*|[+-]?\d[\d\s,.]*\s*(?:(?:원|달러|엔|위안)|(?:KRW|USD|EUR|GBP|JPY|CNY)\b))/giu,
+    new RegExp(
+      `(?:[₩$€£¥]\\s*[+-]?\\d[\\d\\s,.]*|[+-]?\\d[\\d\\s,.]*\\s*(?:(?:원|달러|엔|위안|円|元)|(?:KRW|USD|EUR|GBP|JPY|CNY|RMB|${CURRENCY_WORDS})(?![\\p{L}])))`,
+      "giu",
+    ),
     (raw) => moneyKey(raw),
   );
 
   collect("date", /\b(\d{4})[-./](\d{1,2})[-./](\d{1,2})\b/g, (_raw, match) =>
     dateKey(Number(match[1]), Number(match[2]), Number(match[3])),
   );
-  collect("date", /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g, (_raw, match) =>
+  collect("date", /(\d{4})\s*[년年]\s*(\d{1,2})\s*[월月]\s*(\d{1,2})\s*[일日]/g, (_raw, match) =>
     dateKey(Number(match[1]), Number(match[2]), Number(match[3])),
   );
   collect(
@@ -245,7 +429,17 @@ export function extractCriticalValues(text: string, language?: string): Critical
     /\b(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)[,]?\s+(\d{4})\b/gi,
     (_raw, match) => dateKey(Number(match[3]), MONTHS[match[2].toLowerCase()], Number(match[1])),
   );
-  collect("date", /(\d{1,2})\s*월\s*(\d{1,2})\s*일/g, (_raw, match) =>
+  collect(
+    "date",
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)[,]?\s+(\d{4})\b/gi,
+    (_raw, match) => dateKey(Number(match[3]), MONTHS[match[2].toLowerCase()], Number(match[1])),
+  );
+  collect(
+    "date",
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi,
+    (_raw, match) => partialDateKey(MONTHS[match[2].toLowerCase()], Number(match[1])),
+  );
+  collect("date", /(\d{1,2})\s*[월月]\s*(\d{1,2})\s*[일日]/g, (_raw, match) =>
     partialDateKey(Number(match[1]), Number(match[2])),
   );
   collect(
@@ -264,8 +458,23 @@ export function extractCriticalValues(text: string, language?: string): Critical
 
   collect(
     "time",
-    /\b\d{1,2}:\d{2}\s*(?:[AaPp]\.?[Mm]\.?)?\b|(?<![\d.])(?:오전|오후)?\s*\d{1,2}\s*시(?!간)(?:\s*\d{1,2}\s*분)?/g,
+    /(?<![\d:])\d{1,2}(?::\d{2})?\s*(?:[AaPp]\.?\s?[Mm]\.?(?![A-Za-z])|o['’]clock)|\b\d{1,2}:\d{2}\b|(?<![\d.])(?:오전|오후|아침|저녁|밤|午前|午後|上午|下午|晚上|早上)?\s*\d{1,2}\s*(?:시(?!간)|時(?!間)|时(?!间)|点|點)(?:\s*\d{1,2}\s*(?:분|分)|\s*(?:반|半))?|(?<![\d.])(?:(?:sáng|chiều|tối|trưa)\s*)?\d{1,2}\s*giờ(?:\s*\d{1,2}(?:\s*phút)?|\s*rưỡi)?(?:\s*(?:sáng|chiều|tối|trưa))?|(?<![\d.])(?:(?:सुबह|बिहान|दोपहर|दिउँसो|शाम|साँझ|रात|राति)\s*)?\d{1,2}(?::\d{2})?\s*बजे/gu,
     (raw) => timeKey(raw),
+  );
+
+  // Durations: "15일 이내" and "within 15 weeks" share a number and differ by
+  // the one thing that decides whether a deadline was met. Only languages
+  // with a unit table produce the kind; elsewhere the number stays an
+  // integer and the comparison relaxes to the number alone.
+  collect(
+    "duration",
+    /(?<![\d.,])(\d+)\s*(일(?=\s*(?:이내|내에|동안|후|뒤|안에|간|이상|이하|정도|쯤|까지))|주일|주|개월|달|년|시간|분(?=\s*(?:이내|내에|동안|후|뒤|안에|간|정도|쯤)))|(?<![\d.,])(\d+)\s*(days?|weeks?|months?|years?|hours?|minutes?)(?![\p{L}])|(?<![\d.,])(\d+)\s*(天|日間|周|週|个月|個月|ヶ月|か月|年間|小时|小時|時間|分钟|分鐘)|(?<![\d.,])(\d+)\s*(ngày|tuần|tháng|năm|giờ|phút)(?![\p{L}])/giu,
+    (_raw, match) => {
+      const amount = Number(match[1] ?? match[3] ?? match[5] ?? match[7]);
+      const unit = (match[2] ?? match[4] ?? match[6] ?? match[8]).toLowerCase();
+      const code = DURATION_UNITS[unit];
+      return code ? `${amount}${code}` : null;
+    },
   );
 
   collect("phone", /\+?\d[\d\s().-]{6,}\d/g, (raw) => {
@@ -285,18 +494,24 @@ export function extractCriticalValues(text: string, language?: string): Critical
   );
   collect("identifier", /\b\d{6,}\b/g, (raw) => identityKey(raw));
 
-  const stopNames = new Set(["thankyou", "goodmorning", "goodafternoon", "goodevening", "excuseme", "pleasewait"]);
   collect("name", /\b[A-Z][a-z]{1,24}(?:\s+[A-Z][a-z]{1,24})+\b/g, (raw) => {
     const normalized = nameKey(raw);
-    return stopNames.has(normalized) ? null : normalized;
+    if (NAME_STOP_PHRASES.has(normalized)) return null;
+    // "Alien Registration Card" and "Immigration Office" are title-cased
+    // administrative terms, not people. A Korean rendering of them has no
+    // Latin letters to keep, and reporting each one as a lost name made the
+    // warning fire on the vocabulary this desk uses most.
+    if (raw.split(/\s+/).some((word) => ADMINISTRATIVE_TITLE_WORDS.has(word.toLowerCase()))) {
+      return null;
+    }
+    return normalized;
   });
 
-  collect("decimal", /(?<![\p{L}\p{N}])[+-]?\d+[.,]\d+(?!\d)/gu, (raw) =>
-    normalizeNumber(raw),
-  );
-  collect("integer", /(?<![\p{L}\p{N}.,])[+-]?\d+(?!\d|[.,]\d)/gu, (raw) =>
-    normalizeNumber(raw),
-  );
+  // Adjacency to a LATIN letter hides a digit (A4, COVID19); adjacency to any
+  // other script does not — Korean, Japanese and Chinese write "3番", "10월"
+  // and "下午3点" with nothing between the digit and the word.
+  collect("decimal", /(?<![A-Za-z0-9])[+-]?\d+[.,]\d+(?!\d)/gu, (raw) => normalizeNumber(raw));
+  collect("integer", /(?<![A-Za-z0-9.,])[+-]?\d+(?!\d|[.,]\d)/gu, (raw) => normalizeNumber(raw));
 
   return values
     .sort((left, right) => left.start - right.start)
@@ -307,8 +522,25 @@ const matches = (source: CriticalValue, target: CriticalValue, targetText: strin
   if (source.kind === "name") {
     return nameKey(targetText).includes(source.normalized);
   }
-  return source.kind === target.kind && source.normalized === target.normalized;
+  if (source.kind !== target.kind) return false;
+  if (source.kind === "time") return timesAgree(source.normalized, target.normalized);
+  return source.normalized === target.normalized;
 };
+
+/**
+ * A duration can only be compared with a duration. When the other side's
+ * language produced none — no unit table, or a rendering that spelled the
+ * unit out — the number alone is still worth checking, so the value is
+ * compared as the integer it would otherwise have been.
+ */
+function relaxDurations(own: CriticalValue[], other: CriticalValue[]): CriticalValue[] {
+  if (other.some((value) => value.kind === "duration")) return own;
+  return own.map((value) =>
+    value.kind === "duration"
+      ? { ...value, kind: "integer", normalized: value.normalized.replace(/[a-z]+$/, "") }
+      : value,
+  );
+}
 
 export function validateTranslationIntegrity(
   sourceText: string,
@@ -316,10 +548,30 @@ export function validateTranslationIntegrity(
   sourceLanguage?: string,
   targetLanguage?: string,
 ): TranslationIntegrity {
-  const source = extractCriticalValues(sourceText, sourceLanguage);
-  const target = extractCriticalValues(targetText, targetLanguage);
+  const source = relaxDurations(
+    extractCriticalValues(sourceText, sourceLanguage),
+    extractCriticalValues(targetText, targetLanguage),
+  );
+  const target = relaxDurations(
+    extractCriticalValues(targetText, targetLanguage),
+    extractCriticalValues(sourceText, sourceLanguage),
+  );
   const used = new Set<number>();
   const issues: IntegrityIssue[] = [];
+
+  // Numbers written as words. They can only ever SATISFY a check, never raise
+  // one: "two copies" answers for "2부", but "one moment, please" must not be
+  // reported as an invented quantity when the source said "잠시만요".
+  const sourceWords = softNumbers(sourceText, sourceLanguage);
+  const targetWords = softNumbers(targetText, targetLanguage);
+  const consumeWord = (words: number[], value: string): boolean => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return false;
+    const at = words.indexOf(numeric);
+    if (at === -1) return false;
+    words.splice(at, 1);
+    return true;
+  };
 
   // Checked before the values, because a reversed negation is the finding a
   // reader most needs to see first.
@@ -339,6 +591,8 @@ export function validateTranslationIntegrity(
       continue;
     }
 
+    if (value.kind === "integer" && consumeWord(targetWords, value.normalized)) continue;
+
     const changed = target.findIndex(
       (candidate, index) => !used.has(index) && candidate.kind === value.kind,
     );
@@ -357,6 +611,7 @@ export function validateTranslationIntegrity(
 
   target.forEach((value, index) => {
     if (used.has(index) || value.kind === "name") return;
+    if (value.kind === "integer" && consumeWord(sourceWords, value.normalized)) return;
     issues.push({ kind: value.kind, sourceText: "", targetText: value.text, reason: "added" });
   });
 
