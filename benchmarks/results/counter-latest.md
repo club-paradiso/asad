@@ -1,4 +1,4 @@
-# Counter Mode offline benchmark — 2026-10-25T04:54:49.267Z
+# Counter Mode offline benchmark — 2026-10-25T09:15:52.003Z
 
 Offline benchmark. Validator results are exact over the synthetic corpus. Latency figures are a MODEL over stated parameters (one Redis round trip, one provider response, one poll interval) and the measured round-trip structure of the route; they are not provider or network measurements.
 
