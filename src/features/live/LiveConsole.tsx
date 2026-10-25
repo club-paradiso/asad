@@ -49,6 +49,8 @@ import { DemoRibbon } from "./DemoRibbon";
 import { LiveRescueOverlay } from "./LiveRescueOverlay";
 import { aiStateFrom } from "./AiStatus";
 import type { PrepSheet } from "@/types";
+import type { ReceiverSnapshot } from "@/remote-mic/receiver";
+import { RemoteMicStrip, remoteMicProblem } from "@/features/remote-mic/RemoteMicStrip";
 
 const FONT_SCALE_RANGE = { min: 0.7, max: 1.9 } as const;
 
@@ -59,6 +61,7 @@ export function LiveConsole({
   source,
   session,
   onEnd,
+  remoteMic,
 }: {
   settings: SessionSettings;
   onSettingsChange: (settings: SessionSettings) => void;
@@ -66,6 +69,8 @@ export function LiveConsole({
   source: SttProviderId;
   session: LiveSession;
   onEnd: (session: StoredSession | null) => void;
+  /** Present when the input is the paired iPhone. */
+  remoteMic?: ReceiverSnapshot;
 }) {
   const [frozen, setFrozen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -237,6 +242,8 @@ export function LiveConsole({
 
       {source === "demo" && demoBeat ? (
         <DemoRibbon beat={demoBeat} />
+      ) : remoteMic && remoteMicProblem(remoteMic) ? (
+        <RemoteMicStrip remote={remoteMic} />
       ) : browserTranslatorStatus === "preparing" ? (
         // The download percentage is gone. The session has already started by
         // the time this row can appear, interpretation never waits on the

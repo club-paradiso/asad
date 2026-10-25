@@ -68,6 +68,19 @@ import { sttDisclosureFor, useCloudConsent } from "./useCloudConsent";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
 import { Readiness, type ReadinessRow } from "./Readiness";
 import { SessionSummary } from "@/features/sessions/SessionSummary";
+import { useRemoteMicReceiver } from "@/features/remote-mic/useRemoteMicReceiver";
+import { useStreamLevel } from "@/features/remote-mic/useStreamLevel";
+import {
+  RemoteMicPanel,
+  remotePreflight,
+  type RemotePreflight,
+} from "@/features/remote-mic/RemoteMicPanel";
+
+/** Where a raw-audio session listens. Continuity iPhones are a `device`. */
+type AudioMode = "device" | "remote";
+
+/** Recognisers that accept explicit raw audio — the only ones a remote stream can feed. */
+const RAW_AUDIO_SOURCES: ReadonlySet<SttProviderId> = new Set(["deepgram", "openai"]);
 
 type Screen = "start" | "live" | "review";
 
@@ -153,7 +166,15 @@ export function StartScreen() {
   );
 
   const source = sourceOverride ?? configuredSource;
-  const canChooseAudioInput = source !== "demo" && source !== "webspeech";
+  const [audioMode, setAudioMode] = useState<AudioMode>("device");
+  const [remoteSourceConfirmed, setRemoteSourceConfirmed] = useState(false);
+  const remoteMode = audioMode === "remote" && source !== "demo";
+  const rawAudioSource = RAW_AUDIO_SOURCES.has(source);
+  const remote = useRemoteMicReceiver();
+  // The actual received level, measured only while the launcher shows it.
+  const remoteLevel = useStreamLevel(remote.state.stream, screen === "start" && remoteMode);
+  const remoteCheck = remotePreflight(remote.state, remoteLevel, remoteSourceConfirmed);
+  const canChooseAudioInput = source !== "demo" && source !== "webspeech" && !remoteMode;
   const audioInputs = useBoothAudioInput(canChooseAudioInput);
   const audioDeviceId = audioInputs.deviceId;
   const selectedAudioLabel = audioInputs.selectedLabel;
@@ -190,8 +211,24 @@ export function StartScreen() {
     prep,
     source,
     audioDeviceId: canChooseAudioInput ? audioDeviceId || undefined : undefined,
+    audioSource: remoteMode ? "remote" : "device",
+    remoteStream: remote.currentStream,
     noiseSuppression: settings.noiseSuppression,
   });
+
+  // The phone came back after the session gave up waiting for it (a long
+  // pause, or more than the bounded automatic retries). Someone tapped Start
+  // on the phone, which is intent enough: pick the session back up.
+  const remoteStream = remote.state.stream;
+  const remoteConnected = remote.state.phase === "connected";
+  const sessionPhase = session.phase;
+  const resumeSession = session.resume;
+  useEffect(() => {
+    if (!remoteMode || screen !== "live" || sessionPhase !== "interrupted") return;
+    if (!remoteConnected || !remoteStream) return;
+    const timer = window.setTimeout(() => void resumeSession(), 300);
+    return () => window.clearTimeout(timer);
+  }, [remoteMode, screen, sessionPhase, remoteConnected, remoteStream, resumeSession]);
 
   // Resolved here, before the tap, so pressing Start can never outrun it.
   const consent = useCloudConsent(source);
@@ -216,6 +253,7 @@ export function StartScreen() {
         audioInputSupported: audioInputs.supported,
         audioInputAvailable: audioInputs.selectionAvailable,
         boothPreflightVerified,
+        remote: remoteMode ? remoteCheck : undefined,
       }),
     [
       config,
@@ -228,6 +266,8 @@ export function StartScreen() {
       audioInputs.supported,
       audioInputs.selectionAvailable,
       boothPreflightVerified,
+      remoteMode,
+      remoteCheck,
     ],
   );
 
@@ -239,6 +279,7 @@ export function StartScreen() {
         prep={prep}
         source={source}
         session={session}
+        remoteMic={remoteMode ? remote.state : undefined}
         onEnd={(stored) => {
           setFinished(stored);
           setScreen(stored ? "review" : "start");
@@ -302,7 +343,33 @@ export function StartScreen() {
     consent.mayStart &&
     !pairProblem &&
     !blocked &&
-    !(canChooseAudioInput && !audioInputs.selectionAvailable);
+    !(canChooseAudioInput && !audioInputs.selectionAvailable) &&
+    // A paired phone is not proof of audio: samples must actually be arriving.
+    !(remoteMode && (!rawAudioSource || !remoteCheck.canStart));
+
+  const remoteSttNotice = (
+    <>
+      <p>
+        {source === "webspeech"
+          ? "브라우저 음성 인식은 이 맥의 마이크만 들을 수 있어서 iPhone 원격 마이크의 소리를 받아쓸 수 없습니다."
+          : "선택한 인식 방식은 원격 마이크 소리를 받을 수 없습니다."}{" "}
+        원격 마이크에는 오디오를 직접 받는 음성 인식(Deepgram 또는 OpenAI)이 필요합니다.
+      </p>
+      {config?.stt.cloudAvailable && RAW_AUDIO_SOURCES.has(config.stt.configured as SttProviderId) ? (
+        <button
+          type="button"
+          onClick={() => setSourceOverride(config.stt.configured as SttProviderId)}
+          className="mt-2 min-h-11 rounded-md border border-[var(--line-strong)] px-3 text-xs font-semibold text-[var(--fg)]"
+        >
+          {STT_PROVIDER_INFO[config.stt.configured as SttProviderId].label}(으)로 전환
+        </button>
+      ) : (
+        <p className="mt-1">
+          이 배포에는 그런 음성 인식이 설정되어 있지 않습니다. 배포 관리자에게 설정을 요청하세요. 지금은 iPhone 연결과 소리 점검까지만 할 수 있습니다.
+        </p>
+      )}
+    </>
+  );
 
   /**
    * Start the session.
@@ -456,6 +523,43 @@ export function StartScreen() {
               )}
             </div>
 
+            {/* --- Where the audio comes from -------------------------------- */}
+            {source !== "demo" && (
+              <fieldset className="flex flex-col gap-3">
+                <legend className="mb-2 text-xs font-medium text-[var(--fg-dim)]">오디오 입력 방식</legend>
+                <div role="radiogroup" aria-label="오디오 입력 방식" className="grid gap-2 sm:grid-cols-2">
+                  <AudioModeOption
+                    checked={audioMode === "device"}
+                    onSelect={() => setAudioMode("device")}
+                    title="이 맥의 입력 장치"
+                    detail="내장·외장 마이크, USB 오디오, Continuity로 연결된 iPhone 마이크"
+                  />
+                  <AudioModeOption
+                    checked={audioMode === "remote"}
+                    onSelect={() => setAudioMode("remote")}
+                    title="원격 마이크 (iPhone)"
+                    detail="QR로 페어링한 iPhone의 마이크를 Wi-Fi로 받습니다"
+                  />
+                </div>
+                {audioMode === "device" && (
+                  <p className="text-xs leading-relaxed text-[var(--fg-dim)]">
+                    맥과 같은 Apple ID의 iPhone을 Continuity 마이크로 쓰면 위 입력 장치 목록에 「iPhone 마이크」로 나타납니다. 그것은 ASAD 원격 마이크와 다른 macOS 기능입니다.
+                  </p>
+                )}
+                {remoteMode && (
+                  <RemoteMicPanel
+                    remote={remote}
+                    level={remoteLevel}
+                    preflight={remoteCheck}
+                    onSourceConfirmedChange={setRemoteSourceConfirmed}
+                    sttCompatible={rawAudioSource}
+                    sttNotice={remoteSttNotice}
+                    worship={settings.context === "worship" || settings.context === "auto"}
+                  />
+                )}
+              </fieldset>
+            )}
+
             {/* On a phone the readiness answers must be read before the action
                 they qualify. The desktop copy stays in the sticky side rail. */}
             <div className="lg:hidden">
@@ -556,6 +660,35 @@ export function StartScreen() {
   );
 }
 
+function AudioModeOption({
+  checked,
+  onSelect,
+  title,
+  detail,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      onClick={onSelect}
+      className={
+        checked
+          ? "flex min-h-14 flex-col items-start rounded-lg border-2 border-[var(--accent)] bg-[var(--bg-raised)] px-3 py-2 text-left"
+          : "flex min-h-14 flex-col items-start rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] px-3 py-2 text-left hover:border-[var(--line-strong)]"
+      }
+    >
+      <span className="text-sm font-semibold">{title}</span>
+      <span className="text-xs text-[var(--fg-muted)]">{detail}</span>
+    </button>
+  );
+}
+
 /** A secondary control: one select, labelled in place, no surrounding card. */
 function HintSelect<T extends string>({
   label,
@@ -606,6 +739,8 @@ export function readinessRows(input: {
   audioInputSupported?: boolean;
   audioInputAvailable?: boolean;
   boothPreflightVerified?: boolean;
+  /** Set when the input is the paired iPhone rather than a local device. */
+  remote?: RemotePreflight;
 }): ReadinessRow[] {
   const { config, source } = input;
   const demo = source === "demo";
@@ -615,7 +750,9 @@ export function readinessRows(input: {
 
   const language = languageRow({ demo, source, sourceLanguage, targetLanguage });
 
-  const audio: ReadinessRow = demo
+  const audio: ReadinessRow = input.remote && !demo
+    ? remoteAudioRow(input.remote, RAW_AUDIO_SOURCES.has(source), input.context === "worship")
+    : demo
     ? { label: "입력", value: "녹음된 한국어 설교", level: "ready" }
     : source === "webspeech"
       ? {
@@ -735,6 +872,55 @@ export function readinessRows(input: {
           : { label: "개인정보", value: "외부 전송 없음", level: "ready" };
 
   return [language, audio, recognition, interpretation, privacy];
+}
+
+/**
+ * The input row for a paired iPhone. Blocked until audio samples are actually
+ * arriving — pairing alone is never treated as a working input — and limited
+ * in a worship context, because a phone is a room microphone, not a feed.
+ */
+function remoteAudioRow(remote: RemotePreflight, rawAudio: boolean, worship: boolean): ReadinessRow {
+  if (!rawAudio) {
+    return {
+      label: "입력",
+      value: "원격 마이크 · 선택한 인식 방식과 함께 쓸 수 없음",
+      level: "blocked",
+      detail: "원격 마이크 소리는 Deepgram이나 OpenAI 같은, 오디오를 직접 받는 음성 인식만 받아쓸 수 있습니다.",
+    };
+  }
+  if (!remote.paired) {
+    return {
+      label: "입력",
+      value: "원격 마이크 · iPhone이 연결되지 않음",
+      level: "blocked",
+      detail: "「iPhone 연결」로 QR 페어링을 마친 뒤 시작하세요.",
+    };
+  }
+  if (!remote.samples) {
+    return {
+      label: "입력",
+      value: "원격 마이크 · 소리가 아직 들어오지 않음",
+      level: "blocked",
+      detail: "iPhone에서 「마이크 시작」이 눌려 있는지, 음소거가 아닌지 확인하세요.",
+    };
+  }
+  if (worship) {
+    return {
+      label: "입력",
+      value: remote.verified ? "원격 마이크(iPhone) · 실내 마이크" : "원격 마이크(iPhone) · 점검 미완료",
+      level: "limited",
+      detail:
+        "iPhone은 콘솔 피드가 아니라 방 안의 소리를 듣습니다. 통역사 목소리와 회중 소음이 섞이지 않는 위치인지 원격 마이크 점검에서 확인하세요.",
+    };
+  }
+  return remote.verified
+    ? { label: "입력", value: "원격 마이크(iPhone)", level: "ready" }
+    : {
+        label: "입력",
+        value: "원격 마이크(iPhone) · 점검 미완료",
+        level: "limited",
+        detail: "레벨이 「쓸 만한 신호」까지 올라가는지와 올바른 소리인지 확인하세요.",
+      };
 }
 
 /**
