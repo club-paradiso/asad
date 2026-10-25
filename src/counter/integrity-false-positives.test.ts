@@ -46,6 +46,15 @@ describe("faithful renderings that must verify", () => {
     ["Hai bản sao.", "사본 2부.", "vi-VN", KO],
     ["Две копии.", "2부.", "ru-RU", KO],
     ["Dos copias.", "2부.", "es-ES", KO],
+    // Vietnamese giờ is hours as often as o'clock; only a clock marker makes it a time.
+    ["3시간 기다려 주세요.", "Vui lòng đợi 3 giờ.", KO, "vi-VN"],
+    ["Vui lòng đợi 3 giờ.", "Please wait 3 hours.", "vi-VN", EN],
+    ["Hẹn lúc 3 giờ chiều.", "오후 3시 예약입니다.", "vi-VN", KO],
+    ["오후 3시에 오세요.", "Hãy đến lúc 3 giờ chiều.", KO, "vi-VN"],
+    // Compound numerals are whole values.
+    ["서류 22장을 제출하세요.", "Please submit twenty-two documents.", KO, EN],
+    ["서류 12장을 제출하세요.", "请提交十二份文件。", KO, "zh-CN"],
+    ["Please submit 22 documents.", "서류 스물두 장을 제출하세요.", EN, KO],
   ])("%s → %s", (source, target, sourceLang, targetLang) => {
     const result = validateTranslationIntegrity(source, target, sourceLang, targetLang);
     expect(result.issues, JSON.stringify(result.issues)).toEqual([]);
@@ -70,6 +79,22 @@ describe("corruptions that must still be caught", () => {
     const result = validateTranslationIntegrity("서류 3장을 제출하세요.", "Please submit two documents.", KO, EN);
     expect(result.status).toBe("mismatch");
     expect(result.issues[0]).toMatchObject({ kind: "integer", reason: "missing", sourceText: "3" });
+  });
+
+  it("does not let a compound numeral's parts excuse a wrong quantity", () => {
+    // "twenty-two" used to read as a 20 and a 2, and the 2 satisfied 2장.
+    for (const [target, targetLang] of [
+      ["Please submit twenty-two documents.", EN],
+      ["请提交十二份文件。", "zh-CN"],
+    ] as const) {
+      const result = validateTranslationIntegrity("서류 2장을 제출하세요.", target, KO, targetLang);
+      expect(result.issues, target).toContainEqual(
+        expect.objectContaining({ kind: "integer", reason: "missing", sourceText: "2" }),
+      );
+    }
+    expect(
+      validateTranslationIntegrity("Please submit 2 documents.", "서류 스물두 장을 제출하세요.", EN, KO).status,
+    ).toBe("mismatch");
   });
 
   it("never lets a number word raise an issue on its own", () => {
@@ -130,6 +155,9 @@ describe("extraction details", () => {
     expect(softNumbers("네, 한국에 오세요", KO)).toEqual([]);
     expect(softNumbers("一起去", "zh-CN")).toEqual([]);
     expect(softNumbers("两份", "zh-CN")).toEqual([2]);
+    expect(softNumbers("二十三份", "zh-CN")).toEqual([23]);
+    expect(softNumbers("twenty-two and three", EN)).toEqual([22, 3]);
+    expect(softNumbers("스물두 장, 세 명, 스무 장", KO)).toEqual([22, 3, 20]);
   });
 });
 

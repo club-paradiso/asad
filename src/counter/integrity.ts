@@ -247,6 +247,18 @@ function timeKey(raw: string): string | null {
   const asian = normalized.match(
     /(?:(오전|오후|아침|저녁|밤|午前|午後|上午|下午|晚上|早上|sáng|chiều|tối|trưa)\s*)?(\d{1,2})\s*(?:시|時|时|点|點|giờ)(?:\s*(\d{1,2})\s*(?:분|分|phút)?|\s*(반|半|rưỡi))?/,
   );
+  // Vietnamese "3 giờ" is three hours as often as three o'clock. It is a clock
+  // time only with a clock marker: "lúc"/"vào", minutes, rưỡi, or a part of
+  // the day. Without one the span is left for the duration collector.
+  if (asian && /giờ/.test(asian[0])) {
+    const clockMarked =
+      asian[1] !== undefined ||
+      asian[3] !== undefined ||
+      asian[4] !== undefined ||
+      /(?:lúc|vào)\s*$/.test(normalized.slice(0, asian.index)) ||
+      /giờ\s*(?:sáng|chiều|tối|trưa)/.test(normalized);
+    if (!clockMarked) return null;
+  }
   // दोपहर 3 बजे · 3:30 बजे · साँझ 5 बजे
   const indic = normalized.match(
     /(?:(सुबह|बिहान|दोपहर|दिउँसो|शाम|साँझ|रात|राति)\s*)?(\d{1,2})(?::(\d{2}))?\s*बजे/,
@@ -458,7 +470,7 @@ export function extractCriticalValues(text: string, language?: string): Critical
 
   collect(
     "time",
-    /(?<![\d:])\d{1,2}(?::\d{2})?\s*(?:[AaPp]\.?\s?[Mm]\.?(?![A-Za-z])|o['’]clock)|\b\d{1,2}:\d{2}\b|(?<![\d.])(?:오전|오후|아침|저녁|밤|午前|午後|上午|下午|晚上|早上)?\s*\d{1,2}\s*(?:시(?!간)|時(?!間)|时(?!间)|点|點)(?:\s*\d{1,2}\s*(?:분|分)|\s*(?:반|半))?|(?<![\d.])(?:(?:sáng|chiều|tối|trưa)\s*)?\d{1,2}\s*giờ(?:\s*\d{1,2}(?:\s*phút)?|\s*rưỡi)?(?:\s*(?:sáng|chiều|tối|trưa))?|(?<![\d.])(?:(?:सुबह|बिहान|दोपहर|दिउँसो|शाम|साँझ|रात|राति)\s*)?\d{1,2}(?::\d{2})?\s*बजे/gu,
+    /(?<![\d:])\d{1,2}(?::\d{2})?\s*(?:[AaPp]\.?\s?[Mm]\.?(?![A-Za-z])|o['’]clock)|\b\d{1,2}:\d{2}\b|(?<![\d.])(?:오전|오후|아침|저녁|밤|午前|午後|上午|下午|晚上|早上)?\s*\d{1,2}\s*(?:시(?!간)|時(?!間)|时(?!间)|点|點)(?:\s*\d{1,2}\s*(?:분|分)|\s*(?:반|半))?|(?<![\d.])(?:(?:lúc|vào)\s+)?(?:(?:sáng|chiều|tối|trưa)\s*)?\d{1,2}\s*giờ(?:\s*\d{1,2}(?:\s*phút)?|\s*rưỡi)?(?:\s*(?:sáng|chiều|tối|trưa))?|(?<![\d.])(?:(?:सुबह|बिहान|दोपहर|दिउँसो|शाम|साँझ|रात|राति)\s*)?\d{1,2}(?::\d{2})?\s*बजे/gu,
     (raw) => timeKey(raw),
   );
 

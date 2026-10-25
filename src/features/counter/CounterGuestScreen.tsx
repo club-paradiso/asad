@@ -62,8 +62,15 @@ export function CounterGuestScreen({ code }: { code: string }) {
     setAdoptedToken(stored.token);
     setActive({ lang: stored.lang, token: stored.token });
   }
+  /**
+   * The capability kept while the picker is shown again. "Change language"
+   * before the first message is a correction by the SAME visitor, and the
+   * server only lets the holder of the existing capability make it; a
+   * token-less re-join is refused as a second person.
+   */
+  const [retainedToken, setRetainedToken] = useState<string | null>(null);
   const lang = active?.lang ?? null;
-  const participantToken = active?.token ?? null;
+  const participantToken = active?.token ?? retainedToken;
 
   // Only poll once a language is chosen: before that there is nothing to show
   // and no reason to announce a visitor who has not arrived.
@@ -73,6 +80,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
   // been replaced. Forget it in the same render, and start from the picker.
   if (session.endedBy === "unauthorised" && active && rejectedToken !== active.token) {
     setRejectedToken(active.token);
+    setRetainedToken(null);
     setActive(null);
   }
   useEffect(() => {
@@ -113,6 +121,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
         });
         if ((await microphoneState) === "granted") await sttReady;
         writeGuestResume(code, { token: data.participantToken, lang: chosen });
+        setRetainedToken(null);
         setActive({ lang: chosen, token: data.participantToken });
       } catch {
         setJoinError("Could not reach the server. Check the connection.");
@@ -166,7 +175,12 @@ export function CounterGuestScreen({ code }: { code: string }) {
             <button
               type="button"
               onClick={() => {
-                clearGuestResume(code);
+                if (active) {
+                  setRetainedToken(active.token);
+                  // Not re-adopted from storage while the picker is open; the
+                  // record itself stays so a reload still recovers.
+                  setAdoptedToken(active.token);
+                }
                 setActive(null);
               }}
               className="min-h-11 rounded-lg border border-[var(--line-strong)] px-3 text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
