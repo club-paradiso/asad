@@ -287,6 +287,19 @@ export const RATE_RULES = {
   prep: { limit: 6, windowMs: 60_000 },
   /** A counter exchange is turn-taking at human speed. */
   counter: { limit: 30, windowMs: 60_000 },
+  /**
+   * Joining by desk code. A visitor joins once and may correct a mis-tapped
+   * language a few times; a script guessing four-character codes to sit in a
+   * waiting session before the real visitor does so hundreds of times.
+   */
+  counterJoin: { limit: 20, windowMs: 60_000 },
+  /**
+   * Polling, per participant capability. The client's fastest cadence is two
+   * polls a second; anything well above that is not a browser following a
+   * conversation. Keyed by token, never by address: many visitors share one
+   * carrier NAT address and must not throttle each other.
+   */
+  counterPoll: { limit: 240, windowMs: 60_000 },
   /** Minting recogniser credentials. One per session start. */
   sttToken: { limit: 10, windowMs: 60_000 },
   /** Batch fallback is intentionally scarce: one short Counter utterance. */

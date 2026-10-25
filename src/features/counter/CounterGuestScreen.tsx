@@ -39,18 +39,45 @@ import { ProviderNotice, useCounterDisclosure } from "./ProviderNotice";
 import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { sessionEndCopy } from "./session-end-copy";
 import { scheduleCounterExit } from "./counter-exit";
+import { ConfirmEndButton } from "./ConfirmEndButton";
+import { clearGuestResume, useStoredGuestSession, writeGuestResume } from "./resume";
 import { useClientValue } from "@/hooks/useClientValue";
 import { cn } from "@/lib/cn";
 
 export function CounterGuestScreen({ code }: { code: string }) {
-  const [lang, setLang] = useState<string | null>(null);
-  const [participantToken, setParticipantToken] = useState<string | null>(null);
+  const [active, setActive] = useState<{ lang: string; token: string } | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
+  // A reload — iOS Safari does it to backgrounded tabs on its own — used to
+  // strand the visitor: no token, so their own conversation refused them as a
+  // second person. The capability is kept for this tab only and adopted here
+  // into ordinary state, so the conversation keeps rendering even after the
+  // stored copy is cleared; the server still decides whether it is good.
+  const stored = useStoredGuestSession(code);
+  const [adoptedToken, setAdoptedToken] = useState<string | null>(null);
+  /** A capability the server has refused; never offered again. */
+  const [rejectedToken, setRejectedToken] = useState<string | null>(null);
+  if (!active && stored && stored.token !== adoptedToken && stored.token !== rejectedToken) {
+    setAdoptedToken(stored.token);
+    setActive({ lang: stored.lang, token: stored.token });
+  }
+  const lang = active?.lang ?? null;
+  const participantToken = active?.token ?? null;
+
   // Only poll once a language is chosen: before that there is nothing to show
   // and no reason to announce a visitor who has not arrived.
-  const session = useCounterSession(lang ? code : null, participantToken);
+  const session = useCounterSession(lang ? code : null, participantToken, { role: "guest" });
+
+  // The server refused the capability: the conversation it belonged to has
+  // been replaced. Forget it in the same render, and start from the picker.
+  if (session.endedBy === "unauthorised" && active && rejectedToken !== active.token) {
+    setRejectedToken(active.token);
+    setActive(null);
+  }
+  useEffect(() => {
+    if (rejectedToken || session.endedBy === "remote") clearGuestResume(code);
+  }, [rejectedToken, session.endedBy, code]);
 
   const join = useCallback(
     async (chosen: string) => {
@@ -85,8 +112,8 @@ export function CounterGuestScreen({ code }: { code: string }) {
           token: data.participantToken,
         });
         if ((await microphoneState) === "granted") await sttReady;
-        setParticipantToken(data.participantToken);
-        setLang(chosen);
+        writeGuestResume(code, { token: data.participantToken, lang: chosen });
+        setActive({ lang: chosen, token: data.participantToken });
       } catch {
         setJoinError("Could not reach the server. Check the connection.");
       } finally {
@@ -97,8 +124,9 @@ export function CounterGuestScreen({ code }: { code: string }) {
   );
 
   const finish = useCallback(async () => {
+    clearGuestResume(code);
     await session.end();
-  }, [session]);
+  }, [session, code]);
 
   if (!lang) {
     return (
@@ -106,7 +134,7 @@ export function CounterGuestScreen({ code }: { code: string }) {
     );
   }
 
-  if (session.ended) {
+  if (session.ended && session.endedBy !== "unauthorised") {
     return <GuestSessionClosing lang={lang} />;
   }
 
@@ -137,21 +165,23 @@ export function CounterGuestScreen({ code }: { code: string }) {
           {canChangeLanguage && (
             <button
               type="button"
-              onClick={() => setLang(null)}
+              onClick={() => {
+                clearGuestResume(code);
+                setActive(null);
+              }}
               className="min-h-11 rounded-lg border border-[var(--line-strong)] px-3 text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
             >
               {t.changeLanguage}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => void finish()}
-            aria-label={endCopy.endAction}
+          <ConfirmEndButton
+            label={endCopy.endAction}
+            confirmLabel={endCopy.endConfirm}
+            onConfirm={() => void finish()}
+            icon={<span aria-hidden className="text-lg leading-none">×</span>}
             className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 text-sm font-semibold text-[var(--danger)]"
-          >
-            <span aria-hidden className="text-lg leading-none">×</span>
-            <span>{endCopy.endAction}</span>
-          </button>
+            armedClassName="border-[var(--danger)] bg-[var(--danger)] text-white"
+          />
         </div>
       </header>
 
@@ -177,13 +207,16 @@ export function CounterGuestScreen({ code }: { code: string }) {
             })
           }
           onRetry={(message) =>
-            void session.send({
-              text: message.originalText,
-              source: "text",
-              action: "retry",
-              actionOf: message.id,
-            })
+            void (message.local
+              ? session.resend(message)
+              : session.send({
+                  text: message.originalText,
+                  source: "text",
+                  action: "retry",
+                  actionOf: message.id,
+                }))
           }
+          onDiscard={session.discard}
         />
       </main>
 

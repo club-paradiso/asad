@@ -33,19 +33,42 @@ import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { cn } from "@/lib/cn";
 import { counterPreferencesStore } from "./preferences";
 import { scheduleCounterExit } from "./counter-exit";
+import { ConfirmEndButton } from "./ConfirmEndButton";
+import { clearHostResume, useStoredHostSession, writeHostResume } from "./resume";
 
 export function CounterHostScreen() {
   const router = useRouter();
-  const [code, setCode] = useState<string | null>(null);
-  const [participantToken, setParticipantToken] = useState<string | null>(null);
+  const [started, setStarted] = useState<{ code: string; token: string } | null>(null);
   const [preferences, setPreferences] = useLocalStore(counterPreferencesStore);
   const [editingPreferences, setEditingPreferences] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
 
-  const session = useCounterSession(code, participantToken);
+  // A desk browser that reloads mid-consultation comes back to the same
+  // conversation rather than to a fresh code the visitor's phone knows nothing
+  // about. The server still decides whether the stored capability is good.
+  const stored = useStoredHostSession();
+  const [adoptedToken, setAdoptedToken] = useState<string | null>(null);
+  const [rejectedToken, setRejectedToken] = useState<string | null>(null);
+  if (!started && stored && stored.token !== adoptedToken && stored.token !== rejectedToken) {
+    setAdoptedToken(stored.token);
+    setStarted({ code: stored.code, token: stored.token });
+  }
+  const active = started && started.token !== rejectedToken ? started : null;
+  const code = active?.code ?? null;
+  const participantToken = active?.token ?? null;
+
+  const session = useCounterSession(code, participantToken, { role: "host" });
   const hostLang = preferences.hostLang;
+
+  if (session.endedBy === "unauthorised" && active && rejectedToken !== active.token) {
+    setRejectedToken(active.token);
+    setStarted(null);
+  }
+  useEffect(() => {
+    if (rejectedToken || session.endedBy === "remote") clearHostResume();
+  }, [rejectedToken, session.endedBy]);
   const deskLabel = preferences.deskLabel;
   const t = stringsFor(hostLang);
 
@@ -86,8 +109,8 @@ export function CounterHostScreen() {
         code: data.session.code,
         token: data.participantToken,
       });
-      setParticipantToken(data.participantToken);
-      setCode(data.session.code);
+      writeHostResume({ code: data.session.code, token: data.participantToken });
+      setStarted({ code: data.session.code, token: data.participantToken });
       setEditingPreferences(false);
     } catch {
       setStartError("연결할 수 없습니다. 네트워크를 확인하고 다시 시도해 주세요.");
@@ -98,14 +121,15 @@ export function CounterHostScreen() {
 
   /** End this visitor's conversation and open a fresh one for the next. */
   const next = useCallback(async () => {
+    clearHostResume();
     await session.end();
-    setCode(null);
-    setParticipantToken(null);
+    setStarted(null);
     setShowCode(false);
     void start();
   }, [session, start]);
 
   const finish = useCallback(async () => {
+    clearHostResume();
     await session.end({ leave: true });
   }, [session]);
 
@@ -137,6 +161,7 @@ export function CounterHostScreen() {
         guestLang={view?.guestLang ?? null}
         connected={session.connected}
         ended={session.ended}
+        inConversation={guestJoined && session.messages.length > 0}
         onShowCode={() => setShowCode((value) => !value)}
         showingCode={showCode}
         onNext={next}
@@ -176,13 +201,16 @@ export function CounterHostScreen() {
                 })
               }
               onRetry={(message) =>
-                void session.send({
-                  text: message.originalText,
-                  source: "text",
-                  action: "retry",
-                  actionOf: message.id,
-                })
+                void (message.local
+                  ? session.resend(message)
+                  : session.send({
+                      text: message.originalText,
+                      source: "text",
+                      action: "retry",
+                      actionOf: message.id,
+                    }))
               }
+              onDiscard={session.discard}
             />
           </main>
 
@@ -224,6 +252,7 @@ function HostHeader({
   guestLang,
   connected,
   ended,
+  inConversation,
   onShowCode,
   showingCode,
   onNext,
@@ -234,6 +263,8 @@ function HostHeader({
   guestLang: string | null;
   connected: boolean;
   ended: boolean;
+  /** A visitor has joined and said something: ending now loses a conversation. */
+  inConversation: boolean;
   onShowCode: () => void;
   showingCode: boolean;
   onNext: () => void;
@@ -263,14 +294,45 @@ function HostHeader({
             QR
           </HeaderButton>
         )}
-        <HeaderButton onClick={onNext}>다음 손님</HeaderButton>
-        <HeaderButton onClick={onFinish} tone="danger">
-          종료
-        </HeaderButton>
+        {/* While a conversation is under way both of these take it away from
+            the visitor, so each asks once. Before anyone has said anything,
+            or once it is already over, they act at the first tap. */}
+        {inConversation && !ended ? (
+          <>
+            <ConfirmEndButton
+              label="다음 손님"
+              confirmLabel="다시 누르면 다음 손님"
+              onConfirm={onNext}
+              className={HEADER_BUTTON_CLASS}
+              armedClassName="border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]"
+            />
+            <ConfirmEndButton
+              label="종료"
+              confirmLabel="다시 누르면 종료"
+              onConfirm={onFinish}
+              className={cn(
+                HEADER_BUTTON_CLASS,
+                "border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-[var(--danger)]",
+              )}
+              armedClassName="border-[var(--danger)] bg-[var(--danger)] text-white"
+            />
+          </>
+        ) : (
+          <>
+            <HeaderButton onClick={onNext}>다음 손님</HeaderButton>
+            <HeaderButton onClick={onFinish} tone="danger">
+              종료
+            </HeaderButton>
+          </>
+        )}
       </div>
     </header>
   );
 }
+
+/** Header controls are tapped during service, often without looking: 44px tall. */
+const HEADER_BUTTON_CLASS =
+  "min-h-11 rounded-md border px-3.5 text-sm transition-colors border-[var(--line-strong)] text-[var(--fg-muted)] hover:text-[var(--fg)]";
 
 function HeaderButton({
   children,
@@ -289,7 +351,7 @@ function HeaderButton({
       onClick={onClick}
       aria-pressed={active || undefined}
       className={cn(
-        "rounded-md border px-3 py-1.5 text-xs transition-colors",
+        "min-h-11 rounded-md border px-3.5 text-sm transition-colors",
         tone === "danger"
           ? "border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-[var(--danger)]"
           : active

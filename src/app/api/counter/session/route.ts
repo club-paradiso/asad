@@ -21,7 +21,13 @@ import {
   issueCounterCapability,
   participantForToken,
 } from "@/counter/access";
-import { hasAccess } from "@/lib/guard";
+import { clientAddress, hasAccess, limiterFor } from "@/lib/guard";
+
+const tooMany = (retryAfterSeconds: number) =>
+  NextResponse.json(
+    { error: "Too many requests. Slow down and try again shortly." },
+    { status: 429, headers: { "retry-after": String(retryAfterSeconds) } },
+  );
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +77,9 @@ export async function POST(request: Request) {
 
 /** The guest joining. Refuses a second guest rather than letting them in. */
 export async function PATCH(request: Request) {
+  const join = limiterFor("counterJoin").check(`counterJoin:${clientAddress(request)}`);
+  if (!join.allowed) return tooMany(join.retryAfterSeconds);
+
   const body = await request.json().catch(() => null);
   const parsed = joinCounterSessionSchema.safeParse(body);
   if (!parsed.success) {
@@ -136,12 +145,20 @@ export async function GET(request: Request) {
   if (!code) return NextResponse.json({ error: "Invalid code." }, { status: 400 });
 
   const since = Number(url.searchParams.get("since") ?? "0");
+  const token = counterTokenFrom(request);
+  if (!token) {
+    return NextResponse.json({ error: "Session authorisation required." }, { status: 401 });
+  }
+  // Checked before the store read, so a runaway client costs no Redis traffic.
+  const poll = limiterFor("counterPoll").check(`counterPoll:${code}:${token}`);
+  if (!poll.allowed) return tooMany(poll.retryAfterSeconds);
+
   const session = await counterStore().get(code);
   if (!session) {
     return NextResponse.json({ error: "Session not found or expired." }, { status: 404 });
   }
 
-  const participant = participantForToken(session, counterTokenFrom(request));
+  const participant = participantForToken(session, token);
   if (!participant) {
     return NextResponse.json({ error: "Session authorisation required." }, { status: 401 });
   }

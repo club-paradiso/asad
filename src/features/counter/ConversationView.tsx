@@ -12,11 +12,13 @@
  * worth every pixel.
  */
 import { useEffect, useRef } from "react";
-import type { CounterMessage, Participant, RiskSpan } from "@/counter/types";
+import type { Participant, RiskSpan } from "@/counter/types";
 import { findLanguage } from "@/counter/languages";
 import { actionStringsFor, stringsFor, type CounterStrings } from "@/counter/ui-strings";
 import { BidiText } from "@/lib/bidi";
 import { cn } from "@/lib/cn";
+import type { ClientCounterMessage as CounterMessage } from "./client-message";
+import { voiceStringsFor } from "./voice-strings";
 
 /** Highlight the spans worth reading back, without mangling the text. */
 function withRisksHighlighted(
@@ -76,6 +78,7 @@ export function ConversationView({
   onSimplify,
   onRetry,
   onConfirm,
+  onDiscard,
   emptyMessage,
   strings,
 }: {
@@ -88,6 +91,8 @@ export function ConversationView({
   onRetry?: (message: CounterMessage) => void;
   /** Send just the flagged values back for verbal read-back. */
   onConfirm?: (message: CounterMessage) => void;
+  /** Drop a message this device never managed to send. */
+  onDiscard?: (message: CounterMessage) => void;
   emptyMessage?: string;
   /** Chrome in the viewer's language; defaults to the viewer's language tag. */
   strings?: CounterStrings;
@@ -100,6 +105,7 @@ export function ConversationView({
   const rtl = findLanguage(viewerLang)?.rtl ?? false;
   const t = strings ?? stringsFor(viewerLang);
   const actions = actionStringsFor(viewerLang);
+  const translatingLabel = voiceStringsFor(viewerLang).translating;
 
   if (messages.length === 0) {
     return (
@@ -123,6 +129,7 @@ export function ConversationView({
           const primaryLang = mine ? message.originalLang : message.targetLang;
           const secondaryLang = mine ? message.targetLang : message.originalLang;
           const failed = message.status === "failed";
+          const pending = message.status === "pending";
           // The direction each half is actually rendered in, which is what
           // decides whether its Latin runs need isolating.
           const primaryRtl = findLanguage(primaryLang)?.rtl ?? false;
@@ -135,18 +142,38 @@ export function ConversationView({
               className={cn("flex w-full", mine ? "justify-end" : "justify-start")}
             >
               <div
+                data-status={message.status}
+                aria-busy={pending || undefined}
                 className={cn(
                   "max-w-[88%] rounded-2xl border px-3.5 py-2.5 sm:max-w-[78%]",
                   mine
                     ? "border-[color-mix(in_srgb,var(--accent)_35%,transparent)] bg-[var(--accent-dim)]"
                     : "border-[var(--line)] bg-[var(--bg-raised)]",
                   failed && "border-[color-mix(in_srgb,var(--danger)_50%,transparent)]",
+                  pending && "border-dashed",
                 )}
                 dir={
-                  (failed ? originalRtl : primaryRtl) ? "rtl" : rtl ? "ltr" : undefined
+                  (failed || pending ? originalRtl : primaryRtl) ? "rtl" : rtl ? "ltr" : undefined
                 }
               >
-                {failed ? (
+                {pending ? (
+                  <>
+                    {/* The sender's own words, the moment they pressed Send.
+                        The translation line is a status until the server
+                        answers, so "sent" and "translated" never look alike. */}
+                    <p className="text-lg leading-snug text-[var(--fg)] sm:text-xl">
+                      <BidiText text={message.originalText} rtl={originalRtl} />
+                    </p>
+                    <p
+                      className="mt-1.5 flex items-center gap-1.5 border-t border-[var(--line)] pt-1.5 text-sm text-[var(--fg-dim)]"
+                      dir={rtl ? "rtl" : "ltr"}
+                      role="status"
+                    >
+                      <span aria-hidden className="inline-block size-2 animate-pulse rounded-full bg-[var(--accent)]" />
+                      {translatingLabel}
+                    </p>
+                  </>
+                ) : failed ? (
                   <>
                     <p className="text-base leading-snug text-[var(--fg)]">
                       <BidiText text={message.originalText} rtl={originalRtl} />
@@ -249,7 +276,7 @@ export function ConversationView({
                       {t.confirmNumbers}
                     </button>
                   ) : null}
-                  {mine && message.status === "done" && message.source !== "quick-phrase" && message.source !== "confirm" && (
+                  {mine && message.status === "done" && !pending && message.source !== "quick-phrase" && message.source !== "confirm" && (
                     <button
                       type="button"
                       onClick={() => onSimplify?.(message)}
@@ -261,16 +288,28 @@ export function ConversationView({
                       {actions.simplify}
                     </button>
                   )}
-                  {mine && message.source !== "quick-phrase" && message.source !== "confirm" && (
+                  {mine && !pending && message.source !== "quick-phrase" && message.source !== "confirm" && (
                     <button
                       type="button"
                       onClick={() => onRetry?.(message)}
                       className={cn(
                         "rounded border border-[var(--line-strong)] px-2 py-0.5 hover:text-[var(--fg)]",
                         message.status !== "done" && "ml-auto",
+                        failed && "min-h-9 border-[var(--fg-muted)] px-3 font-semibold text-[var(--fg)]",
                       )}
                     >
                       {actions.retry}
+                    </button>
+                  )}
+                  {mine && failed && message.local && onDiscard && (
+                    <button
+                      type="button"
+                      onClick={() => onDiscard(message)}
+                      aria-label={actions.discard}
+                      title={actions.discard}
+                      className="grid min-h-9 min-w-9 place-items-center rounded border border-[var(--line-strong)] text-base leading-none hover:text-[var(--fg)]"
+                    >
+                      <span aria-hidden>×</span>
                     </button>
                   )}
                 </div>

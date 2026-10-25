@@ -118,9 +118,23 @@ const PRECONNECT_AUDIO_MAX_BYTES = 192_000;
  */
 const MAX_STREAMING_UTTERANCE_MS = 60_000;
 
-function utteranceDelay(language: string, baseDelay: number): number {
-  // Tests and explicit callers may deliberately request an immediate finish.
-  if (baseDelay <= 100) return baseDelay;
+/**
+ * Sentence-final punctuation, as the cloud recognisers write it.
+ *
+ * Deepgram and Whisper punctuate; the browser recogniser mostly does not. A
+ * stable segment that already ends in a full stop or question mark is a
+ * segment the recogniser itself judged complete, which is worth part of the
+ * trailing-silence wait: the wait exists for people who pause mid-sentence,
+ * and a sentence that has ended is not mid-anything.
+ */
+const TERMINAL_PUNCTUATION = /[.?!。？！…؟۔।॥။។](?:["”』」)]*)$/u;
+
+/** How much of the language's trailing-silence wait a finished sentence keeps. */
+const TERMINAL_DELAY_RATIO = 0.6;
+const TERMINAL_DELAY_MIN_MS = 900;
+
+/** Language-specific floor for trailing silence before a turn is finished. */
+export function utteranceDelayFloor(language: string, baseDelay: number): number {
   const base = language.split("-")[0]?.toLowerCase();
   switch (base) {
     case "zh":
@@ -143,6 +157,23 @@ function utteranceDelay(language: string, baseDelay: number): number {
     default:
       return baseDelay;
   }
+}
+
+/**
+ * Trailing silence before a stable transcript is treated as the whole turn.
+ *
+ * `stableText` is what has been recognised so far; when it already ends a
+ * sentence the wait is shortened, never removed — the speaker can still add a
+ * clause, and tapping stop still ends the turn instantly either way.
+ */
+export function utteranceDelay(language: string, baseDelay: number, stableText = ""): number {
+  // Tests and explicit callers may deliberately request an immediate finish.
+  if (baseDelay <= 100) return baseDelay;
+  const floor = utteranceDelayFloor(language, baseDelay);
+  if (stableText.trim().length >= 2 && TERMINAL_PUNCTUATION.test(stableText.trim())) {
+    return Math.max(TERMINAL_DELAY_MIN_MS, Math.round(floor * TERMINAL_DELAY_RATIO));
+  }
+  return floor;
 }
 
 class AttemptError extends Error {
@@ -455,7 +486,7 @@ export class CounterSpeechController {
       if (stableTimer) clearTimeout(stableTimer);
       stableTimer = setTimeout(
         finish,
-        utteranceDelay(this.language, this.dependencies.stableDelayMs),
+        utteranceDelay(this.language, this.dependencies.stableDelayMs, stableText),
       );
     });
     provider.onError(fail);
@@ -539,8 +570,15 @@ export class CounterSpeechController {
       maxTurnTimer = null;
       preconnectFrames.length = 0;
       preconnectBytes = 0;
-      await microphone?.stop().catch(() => {});
-      await provider.disconnect().catch(() => {});
+      // Release the microphone and socket at once, but do not make the
+      // transcript wait for them: closing an AudioContext can take a good
+      // fraction of a second on a phone, and the person is waiting to read
+      // what they said, not for the hardware to confirm it has stopped.
+      const teardown = Promise.all([
+        microphone?.stop().catch(() => {}),
+        provider.disconnect().catch(() => {}),
+      ]);
+      void teardown;
       this.active = null;
     }
   }

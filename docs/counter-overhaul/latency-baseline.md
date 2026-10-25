@@ -1,0 +1,108 @@
+# Counter Mode latency baseline
+
+## 1. Three kinds of evidence, kept apart
+
+| Kind | Source | What it can say |
+| --- | --- | --- |
+| **Structural** | reading the route and the client; asserted by tests with an instrumented store | how many serial round trips a turn makes; how often the recipient asks |
+| **Local measurement** | `npm run e2e:counter` against a production build on this machine, no provider | real two-browser delivery of the no-model path (quick phrases), real pending/failed timings, real reload and end behaviour |
+| **Model** | `benchmarks/counter/latency-model.ts` | the effect of structural change under *stated* Redis/provider/network parameters |
+
+There is **no production evidence** in this branch: no credentials, no Redis,
+no deployment telemetry. The numbers the mission asks for — end of utterance
+→ translation visible, P50/P95 by language pair, provider latency by pair,
+fallback and timeout rates — need a credentialed run and are **NOT VERIFIED**.
+The telemetry stages added here (`counter_admission`, `counter_translation`,
+`counter_persist`, `counter_server_total`) make them collectable from
+`/api/diagnostics` once such a run exists.
+
+## 2. Stage definitions
+
+| Stage | Where measured | Status |
+| --- | --- | --- |
+| Microphone activation, first speech, first partial, final transcript | `VoiceAttemptTrace` marks (client) | existing, not aggregated server-side |
+| Final transcript → composer | `CounterSpeechController.attempt` | changed: no longer waits for teardown |
+| Send → server receipt | network | model only |
+| Server admission (guard, read, authorise, classify) | `counter_admission` | **new** |
+| Translation dispatch → validated translation | `counter_translation` (provider, model) | **new** |
+| Persistence | `counter_persist` | **new** |
+| Server total | `counter_server_total` | **new** |
+| Cross-device delivery | poll cadence + poll round trip | model + E2E (quick phrases) |
+| Client render | React commit | not instrumented |
+
+## 3. Baseline structure on `main` (2e57a0a)
+
+Serial Redis round trips on the sender's path for an ordinary model turn: **7**
+(6 for an unclassified `general` session, whose Learning Vault write is skipped).
+
+| Step | Round trips |
+| --- | --- |
+| shared rate limiter (guard) | 1 |
+| `store.get` | 1 |
+| profile detection write (`store.update`: GET + EVAL) | 2 |
+| persist (`store.update`: GET + EVAL) | 2 |
+| Learning Vault write, awaited before the response | 1 |
+
+Recipient poll: fixed 1 200 ms (8 000 ms hidden) → mean phase delay 600 ms,
+worst 1 200 ms, plus one poll round trip.
+
+Translation: per-provider deadline 6 000 ms, no whole-turn budget, gateway
+recovery with its own 6 000 ms → worst case ≈ 24 s before "failed".
+
+Speech: 1 500–1 900 ms client-side stable wait after the last stable segment,
+on top of provider endpointing; transcript handed over after
+`await microphone.stop(); await provider.disconnect()`.
+
+## 4. Transport alternatives considered
+
+| Option | Verdict | Why |
+| --- | --- | --- |
+| Adaptive short polling (chosen) | **adopted** | halves mean delivery delay while live, fewer requests while idle, no new infrastructure, same auth and ordering, works on Vercel Functions |
+| Long polling (hold GET up to N s, poll Redis every 250 ms) | rejected | each held request polls Redis 4×/s per client → Upstash command budget and Fluid-compute duration cost grow with every open conversation; a 10 s hold is also a 10 s abort problem on iOS |
+| Server-Sent Events | rejected for now | a long-lived response per visitor on serverless; same Redis fan-out problem unless Redis pub/sub is added, which Upstash REST does not offer |
+| WebSocket / managed realtime (Ably, Pusher, Supabase Realtime) | rejected for now | new vendor seeing conversation events, new cost, new credential path for the visitor's phone — a security and privacy review of its own; the delivery gain over 500 ms polling is ~250 ms mean |
+| Conditional requests / ETag | not needed | payload is small; the round trip, not the bytes, is the cost |
+
+## 5. After: structure on this branch
+
+| Step | Round trips |
+| --- | --- |
+| shared rate limiter (guard) | 1 |
+| admission (`store.update` that declines to write unless the profile changed) | 1 (2 when the profile changes) |
+| persist (GET + EVAL) | 2 |
+| Learning Vault | 0 on the response path (`after()`) |
+| **Total** | **4** (asserted by `counter-api.test.ts` and the benchmark) |
+
+Recipient poll: 500 ms while live, 1 200 ms after 20 s quiet, 2 500 ms after
+2 min, 8 000 ms hidden. Mean phase delay while live 250 ms, worst 500 ms.
+
+Translation: whole-turn budget 10 000 ms; attempts under 1 200 ms are not
+started; gateway recovery bounded by the remainder.
+
+Speech: stable wait 0.6× (≥ 900 ms) when the segment ends a sentence;
+transcript handed over before teardown completes.
+
+## 6. Model results (stated parameters, not measurements)
+
+From `benchmarks/results/counter-latest.md` (regenerated by `npm run bench:counter`):
+
+| Scenario (Redis RTT / provider / one-way network) | Recipient p50 before → after | p95 before → after |
+| --- | --- | --- |
+| 15 ms / 1 500 ms / 40 ms | 2 425 → 1 999 ms (−18%) | 4 186 → 3 721 ms (−11%) |
+| 120 ms / 1 500 ms / 60 ms | 3 346 → 2 562 ms (−23%) | 5 152 → 4 283 ms (−17%) |
+| 15 ms / 3 500 ms / 40 ms | 4 412 → 4 005 ms (−9%) | 8 431 → 8 052 ms (−4%) |
+| 120 ms / 3 500 ms / 120 ms | 5 587 → 4 816 ms (−14%) | 9 578 → 8 839 ms (−7%) |
+
+Reading: the structural changes remove roughly 400–800 ms from the recipient's
+median wait. **The 30% P95 reduction objective is not met by structure alone
+and cannot be, because P95 is dominated by provider latency, which this branch
+deliberately does not touch without a quality evaluation.** The model's spread
+factor for provider latency (log-normal, ×1.6) is an assumption.
+
+## 7. Local two-browser measurement (no provider)
+
+See [validation-report.md](validation-report.md) §3 for the run output. The
+quick-phrase path measures transport alone: click on the desk → text visible
+on the phone, through the real route, the in-memory store and the real
+polling client, on one machine. It is a lower bound for production, not an
+estimate of it.

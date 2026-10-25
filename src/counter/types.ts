@@ -34,6 +34,8 @@ export type CriticalValueKind =
    * letter — which changes which visa someone holds — passed as verified.
    */
   | "status-code"
+  /** A length of time with its unit: 15 days is not 15 weeks. */
+  | "duration"
   | "name";
 
 export interface CriticalValue {

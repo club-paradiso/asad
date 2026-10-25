@@ -39,7 +39,16 @@ export type LatencyStage =
   /** Stable event → a contextual result arrived for a stopped/invalidated generation (dropped). */
   | "contextual_result_stale"
   /** Stable event → the on-device lane failed or timed out for a turn. */
-  | "provisional_failed";
+  | "provisional_failed"
+  /* --- Counter Mode. Durations only; a stage name is never content. ------ */
+  /** Request received → session read, authorised and classified. */
+  | "counter_admission"
+  /** Translation dispatch → validated translation (or failure) returned. */
+  | "counter_translation"
+  /** Message persistence round trip. */
+  | "counter_persist"
+  /** Request received → response ready, every stage included. */
+  | "counter_server_total";
 
 export interface LatencySample {
   stage: LatencyStage;
@@ -224,6 +233,10 @@ export class TelemetryRecorder {
         refinement_discarded_committed: this.stage("refinement_discarded_committed"),
         contextual_result_stale: this.stage("contextual_result_stale"),
         provisional_failed: this.stage("provisional_failed"),
+        counter_admission: this.stage("counter_admission"),
+        counter_translation: this.stage("counter_translation"),
+        counter_persist: this.stage("counter_persist"),
+        counter_server_total: this.stage("counter_server_total"),
       },
       slo: this.sloVerdicts(),
       tokens: this.tokenSummary(),

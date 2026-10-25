@@ -1,0 +1,343 @@
+{
+  "generatedAt": "2026-10-25T04:54:49.267Z",
+  "note": "Offline benchmark. Validator results are exact over the synthetic corpus. Latency figures are a MODEL over stated parameters (one Redis round trip, one provider response, one poll interval) and the measured round-trip structure of the route; they are not provider or network measurements.",
+  "quality": {
+    "cases": 44,
+    "faithful": {
+      "total": 67,
+      "verified": 67,
+      "falsePositives": 0
+    },
+    "corrupted": {
+      "total": 62,
+      "caught": 62,
+      "falseNegatives": 0
+    },
+    "byDefect": {
+      "invented-value": {
+        "total": 5,
+        "caught": 5
+      },
+      "negation": {
+        "total": 20,
+        "caught": 20
+      },
+      "date": {
+        "total": 8,
+        "caught": 8
+      },
+      "status-code": {
+        "total": 7,
+        "caught": 7
+      },
+      "number": {
+        "total": 9,
+        "caught": 9
+      },
+      "time": {
+        "total": 5,
+        "caught": 5
+      },
+      "money": {
+        "total": 5,
+        "caught": 5
+      },
+      "identifier": {
+        "total": 3,
+        "caught": 3
+      }
+    },
+    "byPair": {
+      "ko-KR→en-US": {
+        "faithful": 33,
+        "falsePositives": 0,
+        "corrupted": 29,
+        "falseNegatives": 0
+      },
+      "en-US→ko-KR": {
+        "faithful": 8,
+        "falsePositives": 0,
+        "corrupted": 9,
+        "falseNegatives": 0
+      },
+      "ko-KR→vi-VN": {
+        "faithful": 2,
+        "falsePositives": 0,
+        "corrupted": 2,
+        "falseNegatives": 0
+      },
+      "vi-VN→ko-KR": {
+        "faithful": 3,
+        "falsePositives": 0,
+        "corrupted": 2,
+        "falseNegatives": 0
+      },
+      "ko-KR→zh-CN": {
+        "faithful": 2,
+        "falsePositives": 0,
+        "corrupted": 2,
+        "falseNegatives": 0
+      },
+      "zh-CN→ko-KR": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "ko-KR→ja-JP": {
+        "faithful": 3,
+        "falsePositives": 0,
+        "corrupted": 2,
+        "falseNegatives": 0
+      },
+      "ko-KR→ru-RU": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 2,
+        "falseNegatives": 0
+      },
+      "ru-RU→ko-KR": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "ko-KR→ar-SA": {
+        "faithful": 2,
+        "falsePositives": 0,
+        "corrupted": 2,
+        "falseNegatives": 0
+      },
+      "ar-SA→ko-KR": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "ko-KR→th-TH": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "th-TH→ko-KR": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "ko-KR→id-ID": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 2,
+        "falseNegatives": 0
+      },
+      "ko-KR→mn-MN": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "ko-KR→uz-UZ": {
+        "faithful": 2,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "ko-KR→hi-IN": {
+        "faithful": 2,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "hi-IN→ko-KR": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      },
+      "ko-KR→zh-TW": {
+        "faithful": 1,
+        "falsePositives": 0,
+        "corrupted": 1,
+        "falseNegatives": 0
+      }
+    },
+    "negationCoverage": {
+      "covered": [
+        "ar-SA",
+        "en-US",
+        "hi-IN",
+        "id-ID",
+        "ja-JP",
+        "ko-KR",
+        "mn-MN",
+        "ru-RU",
+        "th-TH",
+        "vi-VN",
+        "zh-CN",
+        "zh-TW"
+      ],
+      "uncovered": [
+        "uz-UZ"
+      ]
+    },
+    "findings": []
+  },
+  "roundTripsPerTurn": {
+    "before": 7,
+    "after": 4
+  },
+  "pollIntervalMs": {
+    "before": 1200,
+    "after": 500
+  },
+  "model": [
+    {
+      "name": "same-region Redis, fast free model",
+      "inputs": {
+        "redisRttMs": 15,
+        "providerMs": 1500,
+        "networkOneWayMs": 40,
+        "cpuMs": 6
+      },
+      "before": {
+        "senderVisibleMs": 1691,
+        "recipientMeanMs": 2331,
+        "recipientWorstMs": 2931
+      },
+      "after": {
+        "senderVisibleMs": 1646,
+        "recipientMeanMs": 1936,
+        "recipientWorstMs": 2186
+      }
+    },
+    {
+      "name": "cross-region Redis, fast free model",
+      "inputs": {
+        "redisRttMs": 120,
+        "providerMs": 1500,
+        "networkOneWayMs": 60,
+        "cpuMs": 6
+      },
+      "before": {
+        "senderVisibleMs": 2466,
+        "recipientMeanMs": 3126,
+        "recipientWorstMs": 3726
+      },
+      "after": {
+        "senderVisibleMs": 2106,
+        "recipientMeanMs": 2416,
+        "recipientWorstMs": 2666
+      }
+    },
+    {
+      "name": "same-region Redis, slow model",
+      "inputs": {
+        "redisRttMs": 15,
+        "providerMs": 3500,
+        "networkOneWayMs": 40,
+        "cpuMs": 6
+      },
+      "before": {
+        "senderVisibleMs": 3691,
+        "recipientMeanMs": 4331,
+        "recipientWorstMs": 4931
+      },
+      "after": {
+        "senderVisibleMs": 3646,
+        "recipientMeanMs": 3936,
+        "recipientWorstMs": 4186
+      }
+    },
+    {
+      "name": "cross-region Redis, slow model, mobile data",
+      "inputs": {
+        "redisRttMs": 120,
+        "providerMs": 3500,
+        "networkOneWayMs": 120,
+        "cpuMs": 6
+      },
+      "before": {
+        "senderVisibleMs": 4586,
+        "recipientMeanMs": 5306,
+        "recipientWorstMs": 5906
+      },
+      "after": {
+        "senderVisibleMs": 4226,
+        "recipientMeanMs": 4596,
+        "recipientWorstMs": 4846
+      }
+    }
+  ],
+  "simulation": [
+    {
+      "name": "same-region Redis, fast free model",
+      "before": {
+        "p50": 2425,
+        "p90": 3687,
+        "p95": 4186,
+        "p99": 5452,
+        "mean": 2559
+      },
+      "after": {
+        "p50": 1999,
+        "p90": 3224,
+        "p95": 3721,
+        "p99": 4934,
+        "mean": 2157
+      }
+    },
+    {
+      "name": "cross-region Redis, fast free model",
+      "before": {
+        "p50": 3346,
+        "p90": 4641,
+        "p95": 5152,
+        "p99": 6431,
+        "mean": 3485
+      },
+      "after": {
+        "p50": 2562,
+        "p90": 3787,
+        "p95": 4283,
+        "p99": 5498,
+        "mean": 2718
+      }
+    },
+    {
+      "name": "same-region Redis, slow model",
+      "before": {
+        "p50": 4412,
+        "p90": 7278,
+        "p95": 8431,
+        "p99": 11198,
+        "mean": 4793
+      },
+      "after": {
+        "p50": 4005,
+        "p90": 6865,
+        "p95": 8052,
+        "p99": 10779,
+        "mean": 4390
+      }
+    },
+    {
+      "name": "cross-region Redis, slow model, mobile data",
+      "before": {
+        "p50": 5587,
+        "p90": 8432,
+        "p95": 9578,
+        "p99": 12496,
+        "mean": 5951
+      },
+      "after": {
+        "p50": 4816,
+        "p90": 7669,
+        "p95": 8839,
+        "p99": 11580,
+        "mean": 5185
+      }
+    }
+  ]
+}

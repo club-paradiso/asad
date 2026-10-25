@@ -13,6 +13,7 @@ vi.mock("@/lib/session-client", () => ({
   useSessionToken: vi.fn(),
 }));
 
+import { guardedFetch } from "@/lib/session-client";
 import { retryAfterMs, useCounterSession } from "./useCounterSession";
 
 const originalFetch = globalThis.fetch;
@@ -265,5 +266,186 @@ describe("Counter send retry timing", () => {
 
   it("caps maliciously large retry advice", () => {
     expect(retryAfterMs(new Response(null, { headers: { "retry-after": "999999" } }))).toBe(60_000);
+  });
+});
+
+describe("useCounterSession local messages", () => {
+  const livePolls = () =>
+    vi.fn(async () =>
+      new Response(JSON.stringify({ session: activeSession }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ) as typeof fetch;
+
+  const serverMessage = (requestId: string, text: string) => ({
+    id: "m9",
+    seq: 9,
+    from: "host",
+    source: "text",
+    clientRequestId: requestId,
+    originalText: text,
+    originalLang: "ko-KR",
+    translatedText: "Please wait.",
+    targetLang: "en-US",
+    at: 1,
+    status: "done",
+  });
+
+  it("shows the sender's words at once, then replaces them with the stored message", async () => {
+    globalThis.fetch = livePolls();
+    let release!: (response: Response) => void;
+    let requestId = "";
+    vi.mocked(guardedFetch).mockImplementationOnce(
+      (_input, init) =>
+        new Promise<Response>((resolve) => {
+          requestId = String((init?.headers as Record<string, string>)["x-asad-message-id"]);
+          release = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() => useCounterSession("AC34", "token", { role: "host" }));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+
+    let sent!: Promise<unknown>;
+    act(() => {
+      sent = result.current.send({ text: "잠시만 기다려 주세요.", source: "text" });
+    });
+
+    // Visible immediately, marked as still translating, attributed to this device.
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(result.current.messages[0]).toMatchObject({
+      status: "pending",
+      from: "host",
+      originalText: "잠시만 기다려 주세요.",
+      originalLang: "ko-KR",
+      targetLang: "en-US",
+    });
+    expect(result.current.messages[0].local?.requestId).toBe(requestId);
+
+    release(
+      new Response(JSON.stringify({ message: serverMessage(requestId, "잠시만 기다려 주세요.") }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await act(async () => {
+      await sent;
+    });
+    // One message, the server's; the local placeholder is gone.
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({ id: "m9", status: "done", seq: 9 });
+    expect(result.current.messages[0].local).toBeUndefined();
+  });
+
+  it("keeps a message whose every retry failed on screen as failed, and can resend it", async () => {
+    globalThis.fetch = livePolls();
+    vi.mocked(guardedFetch).mockImplementation(async () =>
+      new Response(JSON.stringify({ error: "Provider outage." }), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const { result } = renderHook(() => useCounterSession("AC34", "token", { role: "guest" }));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+
+    await act(async () => {
+      await result.current.send({ text: "I need help", source: "text" });
+    });
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      status: "failed",
+      from: "guest",
+      originalText: "I need help",
+      error: "Provider outage.",
+    });
+
+    vi.mocked(guardedFetch).mockImplementation(async (_input, init) => {
+      const requestId = String((init?.headers as Record<string, string>)["x-asad-message-id"]);
+      return new Response(
+        JSON.stringify({ message: { ...serverMessage(requestId, "I need help"), from: "guest" } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    await act(async () => {
+      await result.current.resend(result.current.messages[0]);
+    });
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({ id: "m9", status: "done" });
+  });
+
+  it("times out a request stuck in the network and retries it under the same idempotency key", async () => {
+    globalThis.fetch = livePolls();
+    const ids: string[] = [];
+    vi.mocked(guardedFetch).mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((resolve, reject) => {
+          const requestId = String((init?.headers as Record<string, string>)["x-asad-message-id"]);
+          ids.push(requestId);
+          if (ids.length === 1) {
+            init?.signal?.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError")),
+            );
+            return;
+          }
+          resolve(
+            new Response(JSON.stringify({ message: serverMessage(requestId, "x") }), {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            }),
+          );
+        }),
+    );
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { result } = renderHook(() => useCounterSession("AC34", "token", { role: "host" }));
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      let sent!: Promise<unknown>;
+      act(() => {
+        sent = result.current.send({ text: "x", source: "text" });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(21_000);
+      });
+      await act(async () => {
+        await sent;
+      });
+      expect(ids).toHaveLength(2);
+      expect(ids[0]).toBe(ids[1]);
+      expect(result.current.messages[0]).toMatchObject({ id: "m9", status: "done" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats a refused capability as its own terminal state", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ error: "Session authorisation required." }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }),
+    ) as typeof fetch;
+
+    const { result } = renderHook(() => useCounterSession("AC34", "stale-token"));
+    await waitFor(() => expect(result.current.ended).toBe(true));
+    expect(result.current.endedBy).toBe("unauthorised");
+  });
+
+  it("does not re-render the session for a poll that changed nothing", async () => {
+    globalThis.fetch = livePolls();
+    const views: unknown[] = [];
+    const { result } = renderHook(() => {
+      const value = useCounterSession("AC34", "token");
+      views.push(value.session);
+      return value;
+    });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    const first = result.current.session;
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.session).toBe(first);
   });
 });

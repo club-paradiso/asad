@@ -15,11 +15,15 @@ vi.mock("@/counter/translate", () => ({
   translateForCounter,
   COUNTER_DEADLINE_MS: 6000,
 }));
+const recordLearningCandidate = vi.hoisted(() =>
+  vi.fn(async () => ({ stored: true, durable: false })),
+);
+vi.mock("@/learning/vault", () => ({ recordLearningCandidate }));
 
 import { DELETE, GET, PATCH, POST } from "./session/route";
 import { POST as SEND } from "./message/route";
-import { __setCounterStore, createMemoryStore } from "@/counter/store";
-import { SESSION_COOKIE, issueSessionToken } from "@/lib/guard";
+import { __setCounterStore, counterStore, createMemoryStore } from "@/counter/store";
+import { SESSION_COOKIE, __resetGuards, issueSessionToken } from "@/lib/guard";
 import type { SessionView } from "@/counter/types";
 import { COUNTER_TOKEN_HEADER } from "@/counter/access";
 
@@ -116,8 +120,11 @@ async function openSession(guestLang = "en-US"): Promise<string> {
 
 beforeEach(() => {
   __setCounterStore(createMemoryStore());
+  // Every test joins from the same address; the join limiter is per address.
+  __resetGuards();
   participants.clear();
   translateForCounter.mockReset();
+  recordLearningCandidate.mockClear();
   translateForCounter.mockResolvedValue({
     ok: true,
     output: { translation: "Please wait at counter 2 until 3:00.", confidence: "high" },
@@ -519,5 +526,95 @@ describe("POST /api/counter/message", () => {
       await SEND(send({ code, from: "guest", source: "text", text: "Hello" }))
     ).json();
     expect(second.message.seq).toBe(first.message.seq + 1);
+  });
+});
+
+describe("POST /api/counter/message — latency path", () => {
+  /** Count store round trips the way a Redis deployment would pay for them. */
+  function countingStore() {
+    const inner = counterStore();
+    const calls = { get: 0, update: 0, writes: 0 };
+    const store: typeof inner = Object.create(inner);
+    store.get = (code) => {
+      calls.get += 1;
+      return inner.get(code);
+    };
+    store.update = (code, mutate) => {
+      calls.update += 1;
+      return inner.update(code, (session) => {
+        const verdict = mutate(session);
+        if (verdict !== false) calls.writes += 1;
+        return verdict;
+      });
+    };
+    __setCounterStore(store);
+    return calls;
+  }
+
+  it("admits, classifies and persists an ordinary turn in two store calls with one write", async () => {
+    const code = await openSession();
+    const calls = countingStore();
+    const response = await SEND(
+      send({ code, from: "host", source: "text", text: "잠시만 기다려 주세요." }),
+    );
+    expect(response.status).toBe(200);
+    // One admission read (declined write: profile unchanged) + one persist.
+    expect(calls).toEqual({ get: 0, update: 2, writes: 1 });
+  });
+
+  it("writes the profile only when a turn changes it", async () => {
+    const code = await openSession();
+    const calls = countingStore();
+    await SEND(send({ code, from: "host", source: "text", text: "비자 연장 신청하러 오셨나요?" }));
+    expect(calls.writes).toBe(2);
+    const view = ((await (await GET(get(code))).json()) as { session: SessionView }).session;
+    expect(view.profileId).toBe("immigration");
+  });
+
+  it("does not make the sender wait for the Learning Vault write", async () => {
+    let release: (() => void) | null = null;
+    recordLearningCandidate.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ stored: true, durable: false });
+        }),
+    );
+    const { session } = await createSession({ hostLang: "ko-KR", profileId: "immigration" });
+    await joinSession(session!.code, "en-US");
+
+    const response = await SEND(
+      send({ code: session!.code, from: "host", source: "text", text: "여권을 보여 주세요." }),
+    );
+    expect(response.status).toBe(200);
+    expect((await response.json()).message.status).toBe("done");
+    // The response came back while the vault write was still pending.
+    expect(recordLearningCandidate).toHaveBeenCalledOnce();
+    expect(release).not.toBeNull();
+    release!();
+  });
+
+  it("rate-limits joining by desk code per address", async () => {
+    const { session } = await createSession();
+    let status = 200;
+    for (let attempt = 0; attempt < 25 && status !== 429; attempt += 1) {
+      status = (await PATCH(patch({ code: session!.code, guestLang: "en-US" }))).status;
+    }
+    expect(status).toBe(429);
+  });
+
+  it("rate-limits a runaway poller by capability, not by address", async () => {
+    const code = await openSession();
+    let status = 200;
+    for (let attempt = 0; attempt < 260 && status !== 429; attempt += 1) {
+      status = (await GET(get(code))).status;
+    }
+    expect(status).toBe(429);
+    // Another participant on the same address is unaffected.
+    const guestPoll = await GET(
+      new Request(`http://localhost/api/counter/session?code=${code}`, {
+        headers: { [COUNTER_TOKEN_HEADER]: participants.get(code)!.guest! },
+      }),
+    );
+    expect(guestPoll.status).toBe(200);
   });
 });
