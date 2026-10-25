@@ -297,12 +297,13 @@ await guest.route("**/api/counter/message", async (route) => {
 const guestInput = guest.getByPlaceholder("Type your message");
 const guestMic = guest.getByRole("button", { name: "Speak", exact: true });
 await guestMic.click();
-await guest.waitForTimeout(50);
+// Permission check, recogniser construction and its start event sit between
+// the tap and the pressed state. A fixed 50 ms slept through them on a fast
+// machine and not on a loaded runner; wait for the state itself instead.
+const pressed = guest.locator('button[aria-pressed="true"]');
+await pressed.first().waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
 
-check(
-  "one mic tap starts listening",
-  (await guest.locator('button[aria-pressed="true"]').count()) === 1,
-);
+check("one mic tap starts listening", (await pressed.count()) === 1);
 
 await guestInput.fill("typed while listening");
 check(
