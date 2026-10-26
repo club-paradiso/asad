@@ -14,6 +14,16 @@
  *   REMOTE_MIC_TURN_USERNAME    static credential, when the relay has no
  *   REMOTE_MIC_TURN_CREDENTIAL  REST-API secret
  *   REMOTE_MIC_ICE_TRANSPORT_POLICY  "relay" to force TURN (testing only)
+ *   REMOTE_MIC_CLOUDFLARE_TURN_KEY_ID     Cloudflare Realtime TURN key: the
+ *   REMOTE_MIC_CLOUDFLARE_TURN_API_TOKEN  server mints short-lived ICE servers
+ *                               per pairing (1,000 GB/month free at the time
+ *                               of writing; audio is ~30 MB/hour)
+ *   REMOTE_MIC_TRANSPORT        "relay" skips WebRTC and uses the ASAD server
+ *                               relay straight away (networks known to block
+ *                               WebRTC, and testing the fallback)
+ *
+ * With none of these set, pairing still works across networks: when WebRTC
+ * finds no path, the phone falls back to the ASAD server relay by itself.
  *
  * The relay credential is only ever handed to an authenticated pairing role,
  * never to /api/config or a diagnostics page.
@@ -58,7 +68,88 @@ export function remoteMicIceConfig(
     // Forcing relay without a relay would make pairing impossible; ignore it.
     iceTransportPolicy: relayOnly && turnCredential ? "relay" : "all",
     turn: !!(turnUrls.length && turnCredential),
+    forceRelay: env.REMOTE_MIC_TRANSPORT?.trim().toLowerCase() === "relay",
   };
+}
+
+const CLOUDFLARE_TIMEOUT_MS = 2500;
+
+function cloudflareConfigured(env: Readonly<Record<string, string | undefined>>) {
+  const keyId = env.REMOTE_MIC_CLOUDFLARE_TURN_KEY_ID?.trim();
+  const apiToken = env.REMOTE_MIC_CLOUDFLARE_TURN_API_TOKEN?.trim();
+  return keyId && apiToken && /^[A-Za-z0-9_-]{8,128}$/.test(keyId) ? { keyId, apiToken } : null;
+}
+
+/**
+ * The ICE configuration for one pairing role. Adds per-pairing Cloudflare
+ * TURN credentials when that is configured; any Cloudflare failure degrades
+ * to the static configuration (and so to the server relay), never to an error.
+ */
+export async function resolveRemoteMicIceConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  now: number = Date.now(),
+  fetchImpl: typeof fetch = (input, init) => fetch(input, init),
+): Promise<RemoteMicIceConfig> {
+  const base = remoteMicIceConfig(env, now);
+  const cloudflare = cloudflareConfigured(env);
+  if (!cloudflare || base.forceRelay) return base;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CLOUDFLARE_TIMEOUT_MS);
+  try {
+    const response = await fetchImpl(
+      `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(cloudflare.keyId)}/credentials/generate-ice-servers`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${cloudflare.apiToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ ttl: TURN_CREDENTIAL_TTL_S }),
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    );
+    if (!response.ok) return base;
+    const body = (await response.json()) as { iceServers?: unknown };
+    const minted = parseCloudflareIceServers(body.iceServers);
+    if (!minted.length) return base;
+    // Keep the configured STUN servers; add Cloudflare's TURN.
+    const turnServers = minted.filter((server) => server.urls.some((url) => url.startsWith("turn")));
+    if (!turnServers.length) return base;
+    return {
+      ...base,
+      iceServers: [...base.iceServers.filter((server) => !server.username), ...turnServers],
+      turn: true,
+    };
+  } catch {
+    return base;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Cloudflare's response, validated. Port 53 URLs are dropped: browsers block
+ * that port, and without trickle ICE a blocked URL costs a timeout.
+ */
+export function parseCloudflareIceServers(value: unknown): RemoteMicIceServer[] {
+  if (!Array.isArray(value)) return [];
+  const servers: RemoteMicIceServer[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const entry = item as { urls?: unknown; username?: unknown; credential?: unknown };
+    const urls = (Array.isArray(entry.urls) ? entry.urls : [entry.urls])
+      .filter((url): url is string => typeof url === "string")
+      .filter((url) => valid(url, ["stun", "stuns", "turn", "turns"]))
+      .filter((url) => !/:53(\?|$)/.test(url));
+    if (!urls.length) continue;
+    const isTurn = urls.some((url) => url.startsWith("turn"));
+    if (isTurn) {
+      if (typeof entry.username !== "string" || typeof entry.credential !== "string") continue;
+      servers.push({ urls, username: entry.username, credential: entry.credential });
+    } else {
+      servers.push({ urls });
+    }
+  }
+  return servers;
 }
 
 function turnCredentials(env: Readonly<Record<string, string | undefined>>, now: number) {
@@ -77,5 +168,5 @@ function turnCredentials(env: Readonly<Record<string, string | undefined>>, now:
 
 /** Capability flags only — safe for /api/config. */
 export function remoteMicTurnConfigured(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
-  return remoteMicIceConfig(env).turn;
+  return remoteMicIceConfig(env).turn || !!cloudflareConfigured(env);
 }

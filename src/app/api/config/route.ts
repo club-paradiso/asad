@@ -65,7 +65,7 @@ export interface AppConfig {
     openWeightModel: boolean;
   };
   /**
-   * Remote Microphone (iPhone over WebRTC). Flags only — never a relay
+   * Remote Microphone (any phone; WebRTC, else the server relay). Flags only — never a relay
    * credential, which is handed only to an authenticated pairing role.
    */
   remoteMic?: {

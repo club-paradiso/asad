@@ -20,11 +20,11 @@ import type { StreamLevel } from "./useStreamLevel";
 const PHASE_KO: Record<ReceiverPhase, string> = {
   idle: "연결 전",
   creating: "QR 코드 만드는 중…",
-  waiting: "iPhone을 기다리는 중",
+  waiting: "휴대폰을 기다리는 중",
   "awaiting-approval": "승인 대기",
-  connecting: "iPhone과 연결하는 중…",
+  connecting: "휴대폰과 연결하는 중…",
   connected: "연결됨",
-  paused: "iPhone에서 마이크를 멈춤",
+  paused: "휴대폰에서 마이크를 멈춤",
   interrupted: "연결 끊김 · 다시 연결하는 중",
   failed: "연결 실패",
   ended: "연결 종료됨",
@@ -150,9 +150,9 @@ export function RemoteMicPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold">원격 마이크 · iPhone</h2>
+          <h2 className="text-sm font-semibold">원격 마이크 · 휴대폰</h2>
           <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
-            여분의 iPhone을 무선 마이크로 씁니다. 소리는 iPhone에서 이 맥으로 직접(WebRTC, 암호화) 전송되고 ASAD 서버에는 저장되지 않습니다. 앱 설치는 필요 없습니다.
+            남는 휴대폰(iPhone·Android 모두)을 무선 마이크로 씁니다. 앱 설치도, 같은 Wi-Fi도 필요 없습니다. 소리는 가능하면 휴대폰에서 이 컴퓨터로 직접(WebRTC, 암호화) 오고, 직접 연결이 안 되는 네트워크에서는 ASAD 서버를 거쳐 중계됩니다(최대 1분 임시 보관 후 삭제).
           </p>
         </div>
         <span
@@ -179,7 +179,7 @@ export function RemoteMicPanel({
 
       {localhost && canPair && (
         <p className="mt-3 rounded-md border border-[var(--warn)] px-3 py-2 text-xs leading-relaxed text-[var(--warn)]">
-          지금 주소가 localhost라서 iPhone에서 열 수 없습니다. 배포된 HTTPS 주소(또는 맥의 Wi-Fi IP로 연 HTTPS 개발 서버)에서 페어링하세요.
+          지금 주소가 localhost라서 휴대폰에서 열 수 없습니다. 배포된 HTTPS 주소(또는 이 컴퓨터의 IP로 연 HTTPS 개발 서버)에서 페어링하세요.
         </p>
       )}
 
@@ -192,7 +192,7 @@ export function RemoteMicPanel({
       {canPair && (
         <div className="mt-4">
           <Button tone="primary" size="md" onClick={remote.pair}>
-            {state.phase === "idle" ? "iPhone 연결" : "새로 연결"}
+            {state.phase === "idle" ? "휴대폰 연결" : "새로 연결"}
           </Button>
         </div>
       )}
@@ -200,13 +200,12 @@ export function RemoteMicPanel({
       {state.phase === "waiting" && state.pairingUrl && (
         <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,12rem)_1fr] sm:items-start">
           <div className="mx-auto w-full max-w-[12rem] rounded-md border border-[var(--line)] bg-white p-2">
-            <QrCode value={state.pairingUrl} label="iPhone 원격 마이크 연결 QR 코드" />
+            <QrCode value={state.pairingUrl} label="휴대폰 원격 마이크 연결 QR 코드" />
           </div>
           <div className="min-w-0 text-sm">
             <ol className="list-decimal space-y-1.5 pl-5 text-[var(--fg-muted)]">
-              <li>iPhone을 이 맥과 같은 Wi-Fi에 연결합니다.</li>
-              <li>iPhone 카메라로 QR 코드를 비추고 Safari로 엽니다.</li>
-              <li>iPhone에서 「마이크 시작」을 누르고 마이크를 허용합니다.</li>
+              <li>휴대폰 카메라로 QR 코드를 비추고 브라우저(iPhone은 Safari, Android는 Chrome)로 엽니다. Wi-Fi든 모바일 데이터든 인터넷만 되면 됩니다.</li>
+              <li>휴대폰에서 「마이크 시작」을 누르고 마이크를 허용합니다.</li>
               <li>이 화면에 뜨는 번호를 확인하고 「승인」을 누릅니다.</li>
             </ol>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -239,9 +238,9 @@ export function RemoteMicPanel({
 
       {state.phase === "awaiting-approval" && (
         <div className="mt-4 rounded-md border-2 border-[var(--accent)] p-4" aria-live="assertive">
-          <p className="text-sm font-semibold">iPhone이 연결을 요청했습니다.</p>
+          <p className="text-sm font-semibold">휴대폰이 연결을 요청했습니다.</p>
           <p className="mt-1 text-xs text-[var(--fg-muted)]">
-            iPhone 화면의 번호가 아래와 같을 때만 승인하세요. 모르는 기기라면 거부하세요.
+            휴대폰 화면의 번호가 아래와 같을 때만 승인하세요. 모르는 기기라면 거부하세요.
           </p>
           <p className="mt-3 font-mono text-4xl font-semibold tracking-[0.25em]" data-testid="remote-mic-confirm-code">
             {state.confirmCode}
@@ -261,26 +260,26 @@ export function RemoteMicPanel({
         <div className="mt-4">
           {state.phase === "paused" && (
             <p className="mb-2 text-xs text-[var(--warn)]">
-              iPhone에서 마이크를 멈췄습니다. iPhone에서 「마이크 시작」을 누르면 다시 연결됩니다.
+              휴대폰에서 마이크를 멈췄습니다. 휴대폰에서 「마이크 시작」을 누르면 다시 연결됩니다.
             </p>
           )}
           {state.phase === "interrupted" && (
             <p className="mb-2 text-xs text-[var(--danger)]">
-              iPhone과의 연결이 끊겼습니다. iPhone이 자동으로 다시 연결하는 중입니다. 지금까지의 받아쓰기는 그대로 남습니다.
+              휴대폰과의 연결이 끊겼습니다. 휴대폰이 자동으로 다시 연결하는 중입니다. 지금까지의 받아쓰기는 그대로 남습니다.
             </p>
           )}
           {state.sender?.muted && (
-            <p className="mb-2 text-xs font-semibold text-[var(--warn)]">iPhone이 음소거되어 있습니다.</p>
+            <p className="mb-2 text-xs font-semibold text-[var(--warn)]">휴대폰이 음소거되어 있습니다.</p>
           )}
           {state.sender?.interrupted && (
             <p className="mb-2 text-xs text-[var(--warn)]">
-              iPhone의 마이크가 전화·Siri 등으로 잠시 중단되었습니다.
+              휴대폰 마이크가 전화·음성 비서 등으로 잠시 중단되었습니다.
             </p>
           )}
 
           <div className="rounded-md border border-[var(--line)] bg-[var(--bg-overlay)] p-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium">받는 소리 (iPhone → 이 맥)</span>
+              <span className="font-medium">받는 소리 (휴대폰 → 이 컴퓨터)</span>
               <span aria-live="polite" data-testid="remote-mic-level-label">
                 {showLevel && state.liveTracks > 0 ? level.reading.label : "소리 없음"}
               </span>
@@ -306,7 +305,7 @@ export function RemoteMicPanel({
           </div>
 
           <ul className="mt-3 space-y-1.5 text-xs" aria-label="원격 마이크 점검">
-            <Check ok={preflight.paired} label="1. iPhone 연결됨" />
+            <Check ok={preflight.paired} label="1. 휴대폰 연결됨" />
             <Check ok={preflight.samples} label="2. 실제 오디오가 들어옴" />
             <Check ok={preflight.usable} label="3. 쓸 만한 크기의 신호를 확인함" />
             <li className="flex gap-2" data-testid="remote-mic-check-4">
@@ -316,11 +315,11 @@ export function RemoteMicPanel({
               <span>
                 4.{" "}
                 {preflight.problem === "clipping"
-                  ? "소리가 너무 커서 찌그러집니다. iPhone을 스피커에서 조금 떨어뜨리세요."
+                  ? "소리가 너무 커서 찌그러집니다. 휴대폰을 스피커에서 조금 떨어뜨리세요."
                   : preflight.problem === "silent"
-                    ? "12초 이상 소리가 없습니다. iPhone 음소거, 위치, 연결 상태를 확인하세요."
+                    ? "12초 이상 소리가 없습니다. 휴대폰 음소거, 위치, 연결 상태를 확인하세요."
                     : preflight.problem === "weak"
-                      ? "신호가 약합니다. iPhone을 말하는 사람이나 스피커 쪽으로 더 가까이 두세요."
+                      ? "신호가 약합니다. 휴대폰을 말하는 사람이나 스피커 쪽으로 더 가까이 두세요."
                       : "찌그러짐·약한 신호 없음"}
               </span>
             </li>
@@ -341,15 +340,19 @@ export function RemoteMicPanel({
 
           {worship && (
             <p className="mt-3 rounded-md border border-[var(--line)] px-3 py-2 text-xs leading-relaxed text-[var(--fg-muted)]">
-              iPhone 마이크는 콘솔 피드가 아니라 <strong className="text-[var(--fg)]">방 안의 소리</strong>를 듣습니다. 회중 소음·반향·통역사 목소리가 섞일 수 있으니, 가능하면 강단 스피커 가까이에 두고 통역사 자리에서 멀리 두세요. 깨끗한 믹서 피드가 있다면 그쪽이 더 정확합니다.
+              휴대폰 마이크는 콘솔 피드가 아니라 <strong className="text-[var(--fg)]">방 안의 소리</strong>를 듣습니다. 회중 소음·반향·통역사 목소리가 섞일 수 있으니, 가능하면 강단 스피커 가까이에 두고 통역사 자리에서 멀리 두세요. 깨끗한 믹서 피드가 있다면 그쪽이 더 정확합니다.
             </p>
           )}
 
           {state.phase === "connected" && (
             <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-[0.7rem] text-[var(--fg-dim)] sm:grid-cols-4" data-testid="remote-mic-stats">
               <dt>연결 방식</dt>
-              <dd className="text-[var(--fg-muted)]">
-                {state.stats.localCandidateType ? CANDIDATE_KO[state.stats.localCandidateType] : "확인 중"}
+              <dd className="text-[var(--fg-muted)]" data-testid="remote-mic-transport" data-transport={state.transport ?? ""}>
+                {state.transport === "relay"
+                  ? "ASAD 서버 중계 (같은 Wi-Fi 불필요)"
+                  : state.stats.localCandidateType
+                    ? CANDIDATE_KO[state.stats.localCandidateType]
+                    : "확인 중"}
               </dd>
               <dt>왕복 지연</dt>
               <dd className="text-[var(--fg-muted)]" data-testid="remote-mic-rtt">{formatMs(state.stats.rttMs)}</dd>
@@ -363,11 +366,11 @@ export function RemoteMicPanel({
               </dd>
               <dt>페어링</dt>
               <dd className="text-[var(--fg-muted)]">{formatMs(state.metrics.pairingMs)}</dd>
-              <dt>WebRTC 연결</dt>
+              <dt>{state.transport === "relay" ? "연결까지" : "WebRTC 연결"}</dt>
               <dd className="text-[var(--fg-muted)]" data-testid="remote-mic-connect-ms">{formatMs(state.metrics.connectMs)}</dd>
               <dt>재연결</dt>
               <dd className="text-[var(--fg-muted)]">{state.metrics.reconnects}회</dd>
-              <dt>지터 버퍼</dt>
+              <dt>{state.transport === "relay" ? "재생 버퍼" : "지터 버퍼"}</dt>
               <dd className="text-[var(--fg-muted)]">{formatMs(state.stats.jitterBufferMs)}</dd>
             </dl>
           )}

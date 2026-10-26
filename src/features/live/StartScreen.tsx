@@ -379,7 +379,7 @@ export function StartScreen() {
     <>
       <p>
         {source === "webspeech"
-          ? "브라우저 음성 인식은 이 맥의 마이크만 들을 수 있어서 iPhone 원격 마이크의 소리를 받아쓸 수 없습니다."
+          ? "브라우저 음성 인식은 이 맥의 마이크만 들을 수 있어서 휴대폰 원격 마이크의 소리를 받아쓸 수 없습니다."
           : "선택한 인식 방식은 원격 마이크 소리를 받을 수 없습니다."}{" "}
         원격 마이크에는 오디오를 직접 받는 음성 인식(Deepgram 또는 OpenAI)이 필요합니다.
       </p>
@@ -393,7 +393,7 @@ export function StartScreen() {
         </button>
       ) : (
         <p className="mt-1">
-          이 배포에는 그런 음성 인식이 설정되어 있지 않습니다. 배포 관리자에게 설정을 요청하세요. 지금은 iPhone 연결과 소리 점검까지만 할 수 있습니다.
+          이 배포에는 그런 음성 인식이 설정되어 있지 않습니다. 배포 관리자에게 설정을 요청하세요. 지금은 휴대폰 연결과 소리 점검까지만 할 수 있습니다.
         </p>
       )}
     </>
@@ -565,8 +565,8 @@ export function StartScreen() {
                   <AudioModeOption
                     checked={audioMode === "remote"}
                     onSelect={() => setAudioMode("remote")}
-                    title="원격 마이크 (iPhone)"
-                    detail="QR로 페어링한 iPhone의 마이크를 Wi-Fi로 받습니다"
+                    title="원격 마이크 (휴대폰)"
+                    detail="QR로 페어링한 iPhone·Android의 마이크를 받습니다. 같은 Wi-Fi가 아니어도 됩니다"
                   />
                 </div>
                 {audioMode === "device" && (
@@ -767,7 +767,7 @@ export function readinessRows(input: {
   audioInputSupported?: boolean;
   audioInputAvailable?: boolean;
   boothPreflightVerified?: boolean;
-  /** Set when the input is the paired iPhone rather than a local device. */
+  /** Set when the input is the paired phone rather than a local device. */
   remote?: RemotePreflight;
 }): ReadinessRow[] {
   const { config, source } = input;
@@ -903,7 +903,7 @@ export function readinessRows(input: {
 }
 
 /**
- * The input row for a paired iPhone. Blocked until audio samples are actually
+ * The input row for a paired phone. Blocked until audio samples are actually
  * arriving — pairing alone is never treated as a working input — and limited
  * in a worship context, because a phone is a room microphone, not a feed.
  */
@@ -919,9 +919,9 @@ function remoteAudioRow(remote: RemotePreflight, rawAudio: boolean, worship: boo
   if (!remote.paired) {
     return {
       label: "입력",
-      value: "원격 마이크 · iPhone이 연결되지 않음",
+      value: "원격 마이크 · 휴대폰이 연결되지 않음",
       level: "blocked",
-      detail: "「iPhone 연결」로 QR 페어링을 마친 뒤 시작하세요.",
+      detail: "「휴대폰 연결」로 QR 페어링을 마친 뒤 시작하세요.",
     };
   }
   if (!remote.samples) {
@@ -929,23 +929,23 @@ function remoteAudioRow(remote: RemotePreflight, rawAudio: boolean, worship: boo
       label: "입력",
       value: "원격 마이크 · 소리가 아직 들어오지 않음",
       level: "blocked",
-      detail: "iPhone에서 「마이크 시작」이 눌려 있는지, 음소거가 아닌지 확인하세요.",
+      detail: "휴대폰에서 「마이크 시작」이 눌려 있는지, 음소거가 아닌지 확인하세요.",
     };
   }
   if (worship) {
     return {
       label: "입력",
-      value: remote.verified ? "원격 마이크(iPhone) · 실내 마이크" : "원격 마이크(iPhone) · 점검 미완료",
+      value: remote.verified ? "원격 마이크(휴대폰) · 실내 마이크" : "원격 마이크(휴대폰) · 점검 미완료",
       level: "limited",
       detail:
-        "iPhone은 콘솔 피드가 아니라 방 안의 소리를 듣습니다. 통역사 목소리와 회중 소음이 섞이지 않는 위치인지 원격 마이크 점검에서 확인하세요.",
+        "휴대폰은 콘솔 피드가 아니라 방 안의 소리를 듣습니다. 통역사 목소리와 회중 소음이 섞이지 않는 위치인지 원격 마이크 점검에서 확인하세요.",
     };
   }
   return remote.verified
-    ? { label: "입력", value: "원격 마이크(iPhone)", level: "ready" }
+    ? { label: "입력", value: "원격 마이크(휴대폰)", level: "ready" }
     : {
         label: "입력",
-        value: "원격 마이크(iPhone) · 점검 미완료",
+        value: "원격 마이크(휴대폰) · 점검 미완료",
         level: "limited",
         detail: "레벨이 「쓸 만한 신호」까지 올라가는지와 올바른 소리인지 확인하세요.",
       };

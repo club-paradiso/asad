@@ -1,17 +1,21 @@
 "use client";
 
 /**
- * The iPhone page: a microphone with one job.
+ * The phone page: a microphone with one job. Any phone — iPhone, Android or
+ * anything else with a modern browser.
  *
- * Opened from the QR code on the MacBook. Minimal and dark by default, large
+ * Opened from the QR code on the computer. Minimal and dark by default, large
  * touch targets, one meter, one status line. Everything that matters to a
  * volunteer holding the phone is said in plain words: is the microphone on, is
- * the MacBook receiving, what to do if it is not.
+ * the computer receiving, what to do if it is not.
  *
- * What this page deliberately does not claim: that audio continues with Safari
- * in the background or the phone locked. iOS suspends capture for background
- * web pages, so the page asks the person to keep it open and holds a screen
- * wake lock where Safari supports one.
+ * The phone and the computer do NOT need to share a Wi-Fi network: when no
+ * direct WebRTC path exists, the sender falls back to the ASAD server relay.
+ *
+ * What this page deliberately does not claim: that audio continues with the
+ * browser in the background or the phone locked. iOS and Android both suspend
+ * capture for background web pages, so the page asks the person to keep it
+ * open and holds a screen wake lock where the browser supports one.
  */
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createRemoteMicApi } from "@/remote-mic/client";
@@ -25,7 +29,9 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { useCapability } from "@/hooks/useCapability";
 import { getMicrophonePermissionState, type MicrophonePermissionState } from "@/providers/stt";
 import { useStreamLevel } from "./useStreamLevel";
+import { detectPhoneEnvironment, externalBrowserUrl, type PhoneEnvironment } from "./platform";
 import {
+  PLATFORM_TEXT,
   SENDER_ERROR_TEXT,
   SENDER_PHASE_TEXT,
   SENDER_TEXT,
@@ -44,7 +50,10 @@ const INITIAL: SenderSnapshot = {
   error: null,
   endedReason: null,
   reconnectAttempts: 0,
+  transport: null,
 };
+
+const DEFAULT_ENV: PhoneEnvironment = { platform: "other", inAppBrowser: null };
 
 function readCredential(): StoredSenderCredential | null {
   try {
@@ -86,10 +95,27 @@ export function RemoteMicSenderScreen() {
   const t = SENDER_TEXT[lang];
 
   const secure = useCapability(() => window.isSecureContext, true);
-  const webRtc = useCapability(
-    () => typeof RTCPeerConnection === "function" && !!navigator.mediaDevices?.getUserMedia,
-    true,
-  );
+  // A microphone plus EITHER transport: WebRTC, or Web Audio for the relay.
+  const capable = useCapability(() => {
+    const w = window as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown };
+    return (
+      !!navigator.mediaDevices?.getUserMedia &&
+      (typeof RTCPeerConnection === "function" ||
+        typeof w.AudioContext === "function" ||
+        typeof w.webkitAudioContext === "function")
+    );
+  }, true);
+  const [env, setEnv] = useState<PhoneEnvironment>(DEFAULT_ENV);
+  const [externalUrl, setExternalUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const detected = detectPhoneEnvironment(navigator.userAgent, navigator.maxTouchPoints ?? 0);
+      setEnv(detected);
+      setExternalUrl(externalBrowserUrl(detected, window.location.href));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const platformText = PLATFORM_TEXT[lang][env.platform];
 
   // Build the sender from the URL fragment. No side effects happen here: the
   // microphone opens only from the Start button's click.
@@ -110,7 +136,7 @@ export function RemoteMicSenderScreen() {
     (window as unknown as { __asadRemoteMicSender?: unknown }).__asadRemoteMicSender = {
       snapshot: () => {
         const s = instance.snapshot();
-        return { phase: s.phase, error: s.error, muted: s.muted, live: !!s.stream };
+        return { phase: s.phase, error: s.error, muted: s.muted, live: !!s.stream, transport: s.transport };
       },
       simulateNetworkDrop: () => instance.simulateNetworkDrop(),
     };
@@ -168,10 +194,14 @@ export function RemoteMicSenderScreen() {
   }, [micOn]);
 
   const meter = Math.round(level.reading.meter * 100);
-  const errorText = state.error ? SENDER_ERROR_TEXT[lang][state.error] : null;
+  const errorText = state.error
+    ? state.error === "PERMISSION_DENIED"
+      ? `${SENDER_ERROR_TEXT[lang].PERMISSION_DENIED} ${platformText.permission}`
+      : SENDER_ERROR_TEXT[lang][state.error]
+    : null;
   const capabilityError = !secure
     ? SENDER_ERROR_TEXT[lang].INSECURE_CONTEXT
-    : !webRtc
+    : !capable
       ? SENDER_ERROR_TEXT[lang].UNSUPPORTED
       : null;
 
@@ -260,6 +290,14 @@ export function RemoteMicSenderScreen() {
         <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <dt className="text-[var(--fg-dim)]">{t.permission}</dt>
           <dd className="text-right">{permissionText}</dd>
+          {state.transport && micOn ? (
+            <>
+              <dt className="text-[var(--fg-dim)]">{t.transport}</dt>
+              <dd className="text-right" data-testid="sender-transport" data-transport={state.transport}>
+                {state.transport === "relay" ? t.transportRelay : t.transportDirect}
+              </dd>
+            </>
+          ) : null}
           {state.trackLabel && micOn ? (
             <>
               <dt className="text-[var(--fg-dim)]">{t.usingInput}</dt>
@@ -279,6 +317,17 @@ export function RemoteMicSenderScreen() {
         </section>
       )}
 
+      {env.inAppBrowser && !micOn && !ended && (
+        <div role="alert" className="rounded-lg border border-[var(--warn)] px-3 py-2.5 text-sm leading-relaxed text-[var(--warn)]">
+          <p>{t.inApp(env.inAppBrowser)}</p>
+          {externalUrl && (
+            <a href={externalUrl} className="mt-2 inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
+              {t.openExternal}
+            </a>
+          )}
+        </div>
+      )}
+
       {(capabilityError || errorText || (!hasPairing && !ended)) && (
         <p role="alert" className="rounded-lg border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2.5 text-sm leading-relaxed text-[var(--danger)]">
           {capabilityError ?? errorText ?? t.noPairing}
@@ -286,6 +335,9 @@ export function RemoteMicSenderScreen() {
       )}
       {ended && !errorText && <p role="status" className="text-sm text-[var(--fg-muted)]">{t.ended}</p>}
       {state.interrupted && micOn && <p role="status" className="text-sm text-[var(--warn)]">{t.interrupted}</p>}
+      {state.transport === "relay" && micOn && (
+        <p role="status" className="text-sm text-[var(--fg-muted)]" data-testid="sender-relay-note">{t.relayNote}</p>
+      )}
       {routeChanged && <p role="status" className="text-sm text-[var(--warn)]">{t.routeChanged}</p>}
       {wasHidden && micOn && (
         <p role="status" className="text-sm text-[var(--warn)]">
@@ -296,7 +348,7 @@ export function RemoteMicSenderScreen() {
         </p>
       )}
 
-      {/* Controls. Start must be a direct tap: iOS requires it for the mic. */}
+      {/* Controls. Start must be a direct tap: browsers require it for the mic and Web Audio. */}
       <div className="flex flex-col gap-3">
         {micOn ? (
           <>
@@ -350,7 +402,7 @@ export function RemoteMicSenderScreen() {
       <section className="rounded-xl border border-[var(--line)] p-4 text-sm leading-relaxed text-[var(--fg-muted)]">
         <p>{t.keepOpen}</p>
         <p className="mt-2 text-xs">
-          {!wakeLock.supported ? t.wakeLockUnsupported : wakeLock.held ? t.wakeLockHeld : micOn ? t.wakeLockPending : null}
+          {!wakeLock.supported ? platformText.autoLock : wakeLock.held ? t.wakeLockHeld : micOn ? t.wakeLockPending : null}
         </p>
         <p className="mt-2 text-xs text-[var(--fg-dim)]">{t.privacy}</p>
       </section>

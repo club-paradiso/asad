@@ -9,7 +9,7 @@
  */
 import { clientAddress } from "@/lib/guard";
 import { claimSchema } from "@/remote-mic/protocol";
-import { remoteMicIceConfig } from "@/remote-mic/ice";
+import { resolveRemoteMicIceConfig } from "@/remote-mic/ice";
 import { applyClaim } from "@/remote-mic/session";
 import {
   availableStore,
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       senderToken: result.value.senderToken,
       confirmCode: result.value.confirmCode,
       expiresAt,
-      ice: remoteMicIceConfig(),
+      ice: await resolveRemoteMicIceConfig(),
     });
   } catch {
     return storeUnavailable();

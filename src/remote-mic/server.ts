@@ -46,7 +46,13 @@ export function tokenFrom(request: Request): string | undefined {
   return value && value.length <= 128 ? value : undefined;
 }
 
-type RemoteMicRule = "remoteMicCreate" | "remoteMicClaim" | "remoteMicSignal" | "remoteMicSignalAddress";
+type RemoteMicRule =
+  | "remoteMicCreate"
+  | "remoteMicClaim"
+  | "remoteMicSignal"
+  | "remoteMicSignalAddress"
+  | "remoteMicRelay"
+  | "remoteMicRelayAddress";
 
 /** Same-origin, then rate limits (local floor + shared), then an optional bounded body. */
 export async function guardRemoteMic(
@@ -54,6 +60,8 @@ export async function guardRemoteMic(
   options: {
     limits: Array<{ rule: RemoteMicRule; key: string }>;
     maxBodyBytes?: number;
+    /** Also check the shared (store-backed) counters. Off for relay audio frames. */
+    shared?: boolean;
   },
 ): Promise<{ ok: true; body: unknown } | { ok: false; response: NextResponse }> {
   if (!isSameOrigin(request)) {
@@ -73,7 +81,7 @@ export async function guardRemoteMic(
     }
     shared.push({ name: limit.rule, key: limit.key, rule: RATE_RULES[limit.rule] });
   }
-  const verdicts = await checkSharedRateLimits(shared);
+  const verdicts = options.shared === false ? null : await checkSharedRateLimits(shared);
   const refused = verdicts?.find((verdict) => !verdict.allowed);
   if (refused) {
     return {
@@ -94,6 +102,11 @@ export async function guardRemoteMic(
 export const signalLimits = (request: Request, token: string | undefined) => [
   { rule: "remoteMicSignal" as const, key: token ?? `addr:${clientAddress(request)}` },
   { rule: "remoteMicSignalAddress" as const, key: clientAddress(request) },
+];
+
+export const relayLimits = (request: Request, token: string | undefined) => [
+  { rule: "remoteMicRelay" as const, key: token ?? `addr:${clientAddress(request)}` },
+  { rule: "remoteMicRelayAddress" as const, key: clientAddress(request) },
 ];
 
 /**

@@ -19,6 +19,11 @@
  *
  *   node scripts/e2e-remote-mic.mjs http://localhost:3000 ./e2e-out/remote-mic
  *
+ * Variants (environment):
+ *   E2E_PHONE=android            emulate an Android phone (Pixel 7) instead of an iPhone
+ *   E2E_EXPECT_TRANSPORT=relay   the server runs with REMOTE_MIC_TRANSPORT=relay: assert
+ *                                the audio took the ASAD server relay, not WebRTC
+ *
  * Exits non-zero if any check fails.
  */
 import { chromium, devices } from "playwright";
@@ -99,6 +104,9 @@ const browser = await chromium.launch(
   }),
 );
 
+const PHONE_DEVICE = process.env.E2E_PHONE === "android" ? "Pixel 7" : "iPhone 13";
+const RELAY = process.env.E2E_EXPECT_TRANSPORT === "relay";
+
 const KOREAN = "안녕하세요. 지금 아이폰 마이크를 이용해서 실시간 한국어 받아쓰기 기능을 테스트하고 있습니다.";
 
 /* --- Mock Deepgram: measures what the existing capture pipeline sends --------- */
@@ -167,7 +175,7 @@ async function desktopContext() {
 }
 
 async function phoneContext(extraInit) {
-  const context = await browser.newContext({ ...devices["iPhone 13"], colorScheme: "dark" });
+  const context = await browser.newContext({ ...devices[PHONE_DEVICE], colorScheme: "dark" });
   if (extraInit) await context.addInitScript(extraInit);
   const page = await context.newPage();
   const problems = [];
@@ -193,13 +201,13 @@ check(
   (await desk.page.getByRole("radio", { name: /이 맥의 입력 장치/ }).count()) === 1,
 );
 check(
-  "Start is blocked before an iPhone is paired",
+  "Start is blocked before a phone is paired",
   await desk.page.getByRole("button", { name: /통역 시작/ }).isDisabled(),
 );
 await desk.page.screenshot({ path: join(outDir, "desktop-1440-idle.png") });
 
 const pairClickedAt = Date.now();
-await desk.page.getByRole("button", { name: "iPhone 연결" }).click();
+await desk.page.getByRole("button", { name: "휴대폰 연결" }).click();
 const linkInput = desk.page.getByTestId("remote-mic-link");
 await linkInput.waitFor({ timeout: 10_000 });
 const pairingLink = await linkInput.inputValue();
@@ -252,7 +260,16 @@ const connected = await until(async () => {
   return d?.phase === "connected" && p?.phase === "connected" ? d : null;
 }, 20_000);
 metrics.approveToConnectedMs = Date.now() - approvedAt;
-check("WebRTC negotiation completes in real Chromium", !!connected, connected ? `${metrics.approveToConnectedMs} ms` : "timed out");
+check(
+  RELAY ? "server relay connects in real Chromium (no WebRTC)" : "WebRTC negotiation completes in real Chromium",
+  !!connected,
+  connected ? `${metrics.approveToConnectedMs} ms` : "timed out",
+);
+check(
+  `audio takes the expected transport (${RELAY ? "relay" : "direct"})`,
+  connected?.transport === (RELAY ? "relay" : "direct") && (await senderState(phone.page))?.transport === (RELAY ? "relay" : "direct"),
+  `desktop=${connected?.transport} phone=${(await senderState(phone.page))?.transport}`,
+);
 check("receiver holds exactly one live remote audio track", connected?.liveTracks === 1);
 
 /* --- Actual audio samples ----------------------------------------------------- */
@@ -263,9 +280,9 @@ const meterValue = await until(async () => {
 check("desktop meter shows the ACTUAL received level", !!meterValue, `aria-valuenow=${meterValue}`);
 const stats = await until(async () => {
   const s = await remoteState(desk.page);
-  return s?.stats?.packetsReceived > 50 && s.stats.rttMs !== null ? s.stats : null;
+  return s?.stats?.packetsReceived > (RELAY ? 10 : 50) && s.stats.rttMs !== null ? s.stats : null;
 }, 15_000);
-check("RTP packets are arriving (getStats)", !!stats, stats ? `${stats.packetsReceived} packets, ${stats.bytesReceived} bytes` : "");
+check(RELAY ? "relay frames are arriving" : "RTP packets are arriving (getStats)", !!stats, stats ? `${stats.packetsReceived} packets, ${stats.bytesReceived} bytes` : "");
 Object.assign(metrics, {
   webrtcConnectMs: (await remoteState(desk.page))?.metrics?.connectMs ?? null,
   rttMs: stats?.rttMs ?? null,
@@ -318,7 +335,8 @@ const stripShown = await until(async () => {
 check("console reports the phone stopped, never a healthy status", /stopped|not connected|reconnect/i.test(stripShown ?? ""), stripShown ?? "");
 const nonSilentAtStop = stt.nonSilent;
 await sleep(2500);
-check("no audio reaches STT after the phone stops", stt.nonSilent - nonSilentAtStop <= 2, `${stt.nonSilent - nonSilentAtStop} non-silent frames after stop`);
+// The relay's playout queue (~0.35 s ≈ 7 STT frames) still drains after the stop.
+check("no audio reaches STT after the phone stops", stt.nonSilent - nonSilentAtStop <= (RELAY ? 10 : 2), `${stt.nonSilent - nonSilentAtStop} non-silent frames after stop`);
 check("transcript is preserved after the phone stops", /받아쓰기/.test(await desk.page.locator("body").innerText()));
 
 /* --- Restart does not duplicate the stream ----------------------------------- */
@@ -400,7 +418,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-ended-dark.png") });
   const d = await desktopContext();
   await d.page.goto(`${base}/live`, { waitUntil: "networkidle" });
   await d.page.getByRole("radio", { name: /원격 마이크/ }).click();
-  await d.page.getByRole("button", { name: "iPhone 연결" }).click();
+  await d.page.getByRole("button", { name: "휴대폰 연결" }).click();
   await d.page.getByTestId("remote-mic-link").waitFor();
   const link = await d.page.getByTestId("remote-mic-link").inputValue();
   await d.page.getByRole("button", { name: "취소" }).click();
@@ -413,7 +431,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-ended-dark.png") });
   });
   check("revoked (cancelled) pairing cannot be joined", /만료/.test(revoked ?? ""), revoked ?? "");
   await d.page.setViewportSize({ width: 1280, height: 800 });
-  await d.page.getByRole("button", { name: /새로 연결|iPhone 연결/ }).click();
+  await d.page.getByRole("button", { name: /새로 연결|휴대폰 연결/ }).click();
   await d.page.getByTestId("remote-mic-link").waitFor();
   check("MacBook Air 1280×800: no horizontal scroll", await noHorizontalScroll(d.page));
   await d.page.screenshot({ path: join(outDir, "desktop-1280-qr.png"), fullPage: true });
@@ -429,7 +447,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-ended-dark.png") });
   const d = await desktopContext();
   await d.page.goto(`${base}/live`, { waitUntil: "networkidle" });
   await d.page.getByRole("radio", { name: /원격 마이크/ }).click();
-  await d.page.getByRole("button", { name: "iPhone 연결" }).click();
+  await d.page.getByRole("button", { name: "휴대폰 연결" }).click();
   await d.page.getByTestId("remote-mic-link").waitFor();
   const link = await d.page.getByTestId("remote-mic-link").inputValue();
   const p = await phoneContext(() => {
@@ -477,7 +495,8 @@ check("no uncaught page exceptions", problems.length === 0, problems.slice(0, 3)
 metrics.stt = { connections: stt.connections, frames: stt.frames, nonSilent: stt.nonSilent };
 const report = {
   base,
-  browser: `Chromium ${browser.version()} (iPhone 13 viewport emulation for the phone — NOT iOS Safari)`,
+  browser: `Chromium ${browser.version()} (${PHONE_DEVICE} emulation for the phone — NOT a real phone browser)`,
+  transport: RELAY ? "relay" : "direct",
   at: new Date().toISOString(),
   metrics,
   results,

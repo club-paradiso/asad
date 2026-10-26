@@ -43,6 +43,11 @@ export interface RemoteMicRecord {
   nextSeq: number;
   status: { sender: PeerStatus | null; receiver: PeerStatus | null };
   endedReason: RemoteMicEndReason | null;
+  /**
+   * The phone switched to the ASAD server relay. Optional so records written
+   * before the relay existed still parse; absent means direct.
+   */
+  relay?: boolean;
 }
 
 export type Outcome<T> =
@@ -58,6 +63,11 @@ export const fail = <T = never>(
 /* -------------------------------------------------------------------------- */
 /* Credentials                                                                 */
 /* -------------------------------------------------------------------------- */
+
+/** Relay access: the presented token must be THIS role's token. */
+export function tokenIsRole(record: RemoteMicRecord, role: RemoteMicRole, token: string | undefined): boolean {
+  return roleForToken(record, token) === role;
+}
 
 export function hashSecret(kind: "receiver" | "sender" | "pairing", secret: string): string {
   return createHash("sha256").update(`asad/remote-mic/${kind}/v1:${secret}`).digest("base64url");
@@ -107,6 +117,7 @@ export function newPairing(now: number): {
     nextSeq: 1,
     status: { sender: null, receiver: null },
     endedReason: null,
+    relay: false,
   };
   return { record, receiverToken, pairingSecret };
 }
@@ -132,6 +143,7 @@ export function endPairing(record: RemoteMicRecord, reason: RemoteMicEndReason, 
   record.state = "ended";
   record.endedReason = reason;
   record.pairingSecretHash = null;
+  record.relay = false;
   clearNegotiation(record);
   record.expiresAt = now + ENDED_RETENTION_MS;
 }
@@ -225,6 +237,8 @@ export function applySignal(
       }
       record.generation = request.generation;
       clearNegotiation(record);
+      // An offer is a direct attempt: the relay stops being the transport.
+      record.relay = false;
       record.offer = {
         type: "offer",
         sdp: request.sdp,
@@ -269,6 +283,16 @@ export function applySignal(
         list.push({ ...item, generation: request.generation, seq: record.nextSeq });
         record.nextSeq += 1;
       }
+      touch(record, now);
+      return { ok: true, value: null };
+    }
+
+    case "transport": {
+      if (role !== "sender") return fail(403, "FORBIDDEN_ROLE", "Only the phone chooses its transport.");
+      if (record.state !== "approved") return fail(409, "NOT_APPROVED", "This pairing is not approved.");
+      record.relay = request.mode === "relay";
+      // Network addresses are no longer needed once audio goes via the relay.
+      if (record.relay) clearNegotiation(record);
       touch(record, now);
       return { ok: true, value: null };
     }
@@ -323,5 +347,6 @@ export function viewFor(record: RemoteMicRecord, role: RemoteMicRole, since: num
     cursor,
     peer: record.status[other],
     endedReason: record.endedReason,
+    transport: record.relay ? "relay" : "direct",
   };
 }
