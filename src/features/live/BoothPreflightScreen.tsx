@@ -184,13 +184,13 @@ export function BoothPreflightScreen() {
         </details>
 
         <section className="rounded-lg border border-[var(--line)] px-4 py-4 text-sm leading-relaxed text-[var(--fg-muted)]">
-          <h2 className="font-semibold text-[var(--fg)]">iPhone을 무선 마이크로 쓰나요?</h2>
+          <h2 className="font-semibold text-[var(--fg)]">휴대폰을 무선 마이크로 쓰나요?</h2>
           <p className="mt-2">
-            원격 마이크(iPhone)는 페어링이 통역 화면에 붙어 있어서, 점검도 그곳에서 합니다.{" "}
+            원격 마이크(휴대폰)는 페어링이 통역 화면에 붙어 있어서, 점검도 그곳에서 합니다.{" "}
             <Link href="/live" className="text-[var(--accent)] underline-offset-4 hover:underline">
               통역 화면
             </Link>
-            에서 「원격 마이크 (iPhone)」를 고르면 연결 · 실제 오디오 수신 · 레벨 · 찌그러짐 · 올바른 소리를 차례로 확인합니다. iPhone은 콘솔 피드가 아니라 방 안의 소리를 듣는다는 점을 기억하세요.
+            에서 「원격 마이크 (휴대폰)」를 고르면 연결 · 실제 오디오 수신 · 레벨 · 찌그러짐 · 올바른 소리를 차례로 확인합니다. 휴대폰은 콘솔 피드가 아니라 방 안의 소리를 듣는다는 점을 기억하세요.
           </p>
         </section>
 

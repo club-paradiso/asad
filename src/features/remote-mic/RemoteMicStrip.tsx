@@ -3,7 +3,7 @@
 import type { ReceiverSnapshot } from "@/remote-mic/receiver";
 
 /**
- * One line in the live console when the input is the paired iPhone and it is
+ * One line in the live console when the input is the paired phone and it is
  * NOT healthy. Silent when everything is fine — the console's own input meter
  * already says so — and never green while the phone is gone, muted or
  * delivering nothing.
@@ -11,22 +11,22 @@ import type { ReceiverSnapshot } from "@/remote-mic/receiver";
 export function remoteMicProblem(remote: ReceiverSnapshot): string | null {
   switch (remote.phase) {
     case "connected":
-      if (remote.sender?.muted) return "iPhone microphone is muted on the phone.";
-      if (remote.sender?.interrupted) return "iPhone microphone was interrupted by a call or another app.";
-      if (remote.trackMuted) return "No audio is arriving from the iPhone.";
+      if (remote.sender?.muted) return "Phone microphone is muted on the phone.";
+      if (remote.sender?.interrupted) return "Phone microphone was interrupted by a call or another app.";
+      if (remote.trackMuted) return "No audio is arriving from the phone.";
       return null;
     case "interrupted":
-      return "iPhone connection lost — it is reconnecting. The transcript is kept.";
+      return "Phone connection lost — it is reconnecting. The transcript is kept.";
     case "paused":
-      return "iPhone microphone stopped on the phone. Tap Start Microphone on the iPhone to continue.";
+      return "Phone microphone stopped. Tap Start Microphone on the phone to continue.";
     case "failed":
-      return "iPhone connection could not be restored. Check Wi-Fi, then reconnect from the phone.";
+      return "Phone connection could not be restored. Check both devices' internet, then reconnect from the phone.";
     case "ended":
     case "error":
     case "idle":
-      return "iPhone remote microphone is not connected.";
+      return "Phone remote microphone is not connected.";
     default:
-      return "iPhone remote microphone is connecting…";
+      return "Phone remote microphone is connecting…";
   }
 }
 

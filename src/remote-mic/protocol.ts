@@ -5,10 +5,16 @@
  * capture device: it negotiates one WebRTC audio track with the MacBook and
  * never sees the recogniser, its credentials, or the transcript.
  *
- * What travels through ASAD's servers is signalling only — an SDP offer and
- * answer, ICE candidates and a handful of status flags — and only for as long
- * as the pairing needs them. Audio never does: it travels peer to peer over
- * WebRTC's mandatory DTLS-SRTP encryption.
+ * Two transports, tried in this order:
+ *
+ *  1. "direct" — WebRTC. Audio travels peer to peer (or through a configured
+ *     TURN relay) over DTLS-SRTP. Only signalling touches ASAD's servers.
+ *  2. "relay"  — when no WebRTC path exists (phone on LTE, guest Wi-Fi with
+ *     client isolation, no TURN configured), the phone posts short compressed
+ *     audio frames over HTTPS and the computer reads them back. Frames sit in
+ *     the shared store only briefly (bounded length, short TTL) and are deleted
+ *     when the pairing ends. Higher delay than direct, but it works on any
+ *     network that can reach the ASAD site.
  */
 import { z } from "zod";
 
@@ -33,6 +39,25 @@ export const MAX_CANDIDATE_LENGTH = 1_024;
 export const MAX_SIGNAL_BODY_BYTES = 24 * 1024;
 
 export type RemoteMicRole = "receiver" | "sender";
+
+export type RemoteMicTransport = "direct" | "relay";
+
+/* --- Server relay (fallback transport) ------------------------------------ */
+/** Relay audio: 16 kHz mono G.711 µ-law, one frame per this many ms. */
+export const RELAY_SAMPLE_RATE = 16_000;
+export const RELAY_FRAME_MS = 300;
+export const RELAY_FRAME_BYTES = (RELAY_SAMPLE_RATE * RELAY_FRAME_MS) / 1000;
+/** base64 of one frame, with headroom for a slightly long frame. */
+export const MAX_RELAY_FRAME_B64 = Math.ceil((RELAY_FRAME_BYTES * 2) / 3) * 4;
+/** Frames per POST: a phone catching up after a slow request sends a batch. */
+export const MAX_RELAY_FRAMES_PER_POST = 10;
+export const MAX_RELAY_BODY_BYTES = 96 * 1024;
+/** Frames kept in the store (~12 s). Older audio is useless for live work. */
+export const RELAY_MAX_STORED_FRAMES = 40;
+/** Frames vanish this long after the last write, whatever happens to the pairing. */
+export const RELAY_TTL_MS = 60_000;
+/** Frames returned per read. */
+export const RELAY_READ_COUNT = 20;
 
 export type RemoteMicState =
   /** QR shown on the Mac; no phone yet. */
@@ -103,6 +128,12 @@ export interface RemoteMicIceConfig {
   iceTransportPolicy: "all" | "relay";
   /** Whether a TURN relay is configured. Shown in diagnostics; never the credential. */
   turn: boolean;
+  /**
+   * Skip WebRTC and use the ASAD server relay straight away. A deployment
+   * switch (REMOTE_MIC_TRANSPORT=relay), used for networks known to block
+   * WebRTC and for testing the fallback.
+   */
+  forceRelay?: boolean;
 }
 
 /** What one role may see of a pairing. */
@@ -122,6 +153,22 @@ export interface RemoteMicView {
   cursor: number;
   peer: PeerStatus | null;
   endedReason: RemoteMicEndReason | null;
+  /** Which transport the phone is using. "relay" means: read /api/remote-mic/relay. */
+  transport: RemoteMicTransport;
+}
+
+export interface RelayFrame {
+  /** Store-assigned, increasing. The next read's `after`. */
+  id: string;
+  /** Sender's frame counter: a gap means frames were dropped. */
+  n: number;
+  /** base64 µ-law audio. */
+  a: string;
+}
+
+export interface RelayReadResponse {
+  frames: RelayFrame[];
+  cursor: string;
 }
 
 export interface CreatePairingResponse {
@@ -190,6 +237,7 @@ export const signalSchema = z.discriminatedUnion("action", [
       candidates: z.array(candidate).min(1).max(16),
     })
     .strict(),
+  z.object({ action: z.literal("transport"), id: pairingId, mode: z.enum(["direct", "relay"]) }).strict(),
   z
     .object({
       action: z.literal("status"),
@@ -202,6 +250,31 @@ export const signalSchema = z.discriminatedUnion("action", [
 ]);
 
 export type SignalRequest = z.infer<typeof signalSchema>;
+
+const base64 = z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/);
+
+export const relayPostSchema = z
+  .object({
+    id: pairingId,
+    frames: z
+      .array(
+        z
+          .object({
+            n: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+            a: base64.min(4).max(MAX_RELAY_FRAME_B64),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(MAX_RELAY_FRAMES_PER_POST),
+  })
+  .strict();
+
+export type RelayPostRequest = z.infer<typeof relayPostSchema>;
+
+/** A store cursor: "" (from the start) or a Redis stream id. */
+export const isRelayCursor = (value: unknown): value is string =>
+  typeof value === "string" && (value === "" || /^\d{1,16}-\d{1,10}$/.test(value));
 
 /* -------------------------------------------------------------------------- */
 /* Pairing link                                                                */

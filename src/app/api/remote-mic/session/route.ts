@@ -12,7 +12,7 @@
  */
 import { guardInferenceRoute } from "@/lib/guard";
 import { isPairingId } from "@/remote-mic/protocol";
-import { remoteMicIceConfig } from "@/remote-mic/ice";
+import { resolveRemoteMicIceConfig } from "@/remote-mic/ice";
 import { endPairing, isExpired, newPairing, roleForToken, viewFor } from "@/remote-mic/session";
 import {
   availableStore,
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       receiverToken,
       pairingSecret,
       expiresAt: record.expiresAt,
-      ice: remoteMicIceConfig(),
+      ice: await resolveRemoteMicIceConfig(),
     },
     201,
   );
@@ -117,6 +117,8 @@ export async function DELETE(request: Request) {
     if (outcome.result === "unauthorized") {
       return remoteMicError(401, "UNAUTHORIZED", "Pairing authorisation required.");
     }
+    // Relay audio has no reason to outlive the pairing, even for its TTL.
+    await available.store.relayClear(id).catch(() => {});
     return remoteMicJson({ ended: true });
   } catch {
     return storeUnavailable();

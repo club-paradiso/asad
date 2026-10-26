@@ -113,7 +113,7 @@ twelve silent seconds the strip reads **No signal**, sustained clipping reads
 The launcher and the preflight say in words when the selected input is the
 laptop's own microphone or a phone rather than a console feed.
 
-### Remote Microphone (iPhone over Wi-Fi)
+### Remote Microphone (any phone, any network)
 
 When no cable can reach the laptop, a spare iPhone can be paired as a wireless
 microphone ([`remote-microphone.md`](./remote-microphone.md)). It is a **room

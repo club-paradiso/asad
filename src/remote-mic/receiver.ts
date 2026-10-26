@@ -2,8 +2,9 @@
  * Remote Microphone receiver — the MacBook end.
  *
  * Opens a pairing, waits for a phone, lets the operator approve it, then
- * answers the phone's WebRTC offer and exposes the ONE incoming audio track as
- * a MediaStream. That stream is handed to ASAD's existing `MicrophoneCapture`
+ * answers the phone's WebRTC offer — or, when the phone could not reach this
+ * computer directly and switched to the ASAD server relay, reads its audio
+ * frames — and exposes the ONE incoming audio track as a MediaStream. That stream is handed to ASAD's existing `MicrophoneCapture`
  * unchanged; nothing downstream knows the audio came from a phone.
  *
  * Framework-free and dependency-injected, like the interpretation engine and
@@ -19,13 +20,17 @@
  */
 import { RemoteMicApiError, type RemoteMicApi } from "./client";
 import {
+  RELAY_FRAME_MS,
   pairingUrl,
   type RemoteMicEndReason,
   type RemoteMicIceConfig,
+  type RemoteMicTransport,
   type RemoteMicView,
   type SignalCandidate,
   type SignalDescription,
 } from "./protocol";
+import { createBrowserRelayPlayout, type RelayPlayout, type RelayPlayoutSink } from "./relay-audio";
+import { base64ToBytes, decodeMulaw } from "./relay-codec";
 import {
   EMPTY_STATS,
   parseControl,
@@ -97,6 +102,8 @@ export interface ReceiverSnapshot {
   error: { code: ReceiverErrorCode; message: string } | null;
   endedReason: RemoteMicEndReason | null;
   turn: boolean;
+  /** How the phone's audio is arriving, once it is. */
+  transport: RemoteMicTransport | null;
   stats: TransportStats;
   metrics: ReceiverMetrics;
 }
@@ -113,6 +120,12 @@ export interface ReceiverDeps extends PeerDeps {
   attachSink?: (stream: MediaStream) => () => void;
   /** How long an interruption may last before it is reported as a failure. */
   interruptionGraceMs?: number;
+  /**
+   * Builds the relay's audio playout. Called from the Pair/Approve clicks:
+   * Safari only starts Web Audio from a user gesture. Null disables relay
+   * reception (the phone's relay then never connects).
+   */
+  createRelayPlayout?: (() => RelayPlayout | null) | null;
 }
 
 const POLL_MS = {
@@ -125,6 +138,13 @@ const HEARTBEAT_MS = 15_000;
 const STATS_MS = 2000;
 const DEFAULT_INTERRUPTION_GRACE_MS = 45_000;
 const MAX_POLL_FAILURES_BEFORE_REPORT = 4;
+/** Relay frames older than this many in one read are skipped: live beats complete. */
+const RELAY_MAX_BACKLOG_FRAMES = 4;
+/** No relay frame for this long while the phone says it is sending: "no audio arriving". */
+const RELAY_STALL_MS = 2500;
+/** A phone that reported "closed" and sent nothing for this long has stopped its mic. */
+const RELAY_PAUSE_QUIET_MS = 1500;
+const RELAY_FAILURES_BEFORE_REPORT = 4;
 
 function defaultAttachSink(stream: MediaStream): () => void {
   if (typeof document === "undefined") return () => {};
@@ -152,6 +172,7 @@ export const IDLE_RECEIVER_SNAPSHOT: ReceiverSnapshot = {
   error: null,
   endedReason: null,
   turn: false,
+  transport: null,
   stats: EMPTY_STATS,
   metrics: {
     createdAt: null,
@@ -180,6 +201,7 @@ export class RemoteMicReceiver {
     error: null,
     endedReason: null,
     turn: false,
+    transport: null,
     stats: EMPTY_STATS,
     metrics: {
       createdAt: null,
@@ -222,6 +244,17 @@ export class RemoteMicReceiver {
   /** An answer created locally whose POST has not yet succeeded. */
   private pendingAnswer: { sdp: string; generation: number; peerId: string } | null = null;
 
+  /* Relay reception. */
+  private relayPlayout: RelayPlayout | null = null;
+  private relaySink: RelayPlayoutSink | null = null;
+  private relayReading = false;
+  private relayTimer: ReturnType<typeof setTimeout> | null = null;
+  private relayCursor = "";
+  private relayLastN = -1;
+  private relayLastFrameAt = 0;
+  private relayFailures = 0;
+  private relayStats = { frames: 0, lost: 0, bytes: 0, windowFrames: 0, windowLost: 0, rttMs: null as number | null };
+
   constructor(private readonly options: ReceiverDeps) {
     this.deps = resolvePeerDeps(options);
   }
@@ -258,6 +291,7 @@ export class RemoteMicReceiver {
   async pair(): Promise<void> {
     if (this.disposed) return;
     if (this.state.phase === "creating") return;
+    this.prepareRelay();
     await this.teardownPairing(true);
     this.set({
       phase: "creating",
@@ -266,6 +300,7 @@ export class RemoteMicReceiver {
       confirmCode: null,
       pairingUrl: null,
       sender: null,
+      transport: null,
       stats: EMPTY_STATS,
       metrics: {
         createdAt: null,
@@ -304,6 +339,7 @@ export class RemoteMicReceiver {
 
   async approve(): Promise<void> {
     if (!this.id || !this.token || this.state.phase !== "awaiting-approval") return;
+    this.prepareRelay();
     try {
       await this.options.api.signal(this.token, { action: "approve", id: this.id });
       this.set({ phase: "connecting" });
@@ -331,6 +367,8 @@ export class RemoteMicReceiver {
     if (this.disposed) return;
     void this.finish("receiver-ended", true);
     this.disposed = true;
+    this.relayPlayout?.close();
+    this.relayPlayout = null;
     this.listeners.clear();
   }
 
@@ -439,6 +477,16 @@ export class RemoteMicReceiver {
     if (view.state !== "approved") return;
     if (this.state.phase === "awaiting-approval") this.set({ phase: "connecting" });
 
+    if (view.transport === "relay") {
+      this.handleRelayView(view);
+      return;
+    }
+    if (this.relayReading) {
+      // The phone went back to a direct attempt; its offer follows.
+      this.stopRelay();
+      this.set({ phase: "connecting", transport: null });
+    }
+
     if (view.description && view.description.generation > this.answeredGeneration) {
       await this.handleOffer(view.description);
     }
@@ -498,7 +546,7 @@ export class RemoteMicReceiver {
       this.set({
         error: {
           code: "NEGOTIATION_FAILED",
-          message: "iPhone과 연결 조건을 맞추지 못했습니다. iPhone에서 「다시 연결」을 눌러 주세요.",
+          message: "휴대폰과 연결 조건을 맞추지 못했습니다. 휴대폰에서 「다시 연결」을 눌러 주세요.",
         },
       });
     }
@@ -608,6 +656,8 @@ export class RemoteMicReceiver {
   private releaseTrack() {
     this.detachSink?.();
     this.detachSink = null;
+    this.relaySink?.close();
+    this.relaySink = null;
     if (this.track) {
       const track = this.track;
       track.onmute = null;
@@ -662,7 +712,7 @@ export class RemoteMicReceiver {
       } else if (this.state.phase === "interrupted") {
         this.setMetrics({ reconnects: this.state.metrics.reconnects + 1 });
       }
-      this.set({ phase: "connected", error: null });
+      this.set({ phase: "connected", error: null, transport: "direct" });
       this.postStatus("connected");
       this.startStats();
     } else if (state === "disconnected" || state === "failed") {
@@ -684,9 +734,8 @@ export class RemoteMicReceiver {
         phase: "failed",
         error: {
           code: "ICE_FAILED",
-          message: this.state.turn
-            ? "iPhone과의 연결이 복구되지 않았습니다. 두 기기의 네트워크를 확인하고 iPhone에서 「다시 연결」을 누르세요."
-            : "iPhone과의 연결이 복구되지 않았습니다. 두 기기를 같은 Wi-Fi에 연결하세요. 게스트 Wi-Fi처럼 기기끼리 통신을 막는 네트워크라면 TURN 중계 서버 설정이 필요합니다.",
+          message:
+            "휴대폰과의 연결이 복구되지 않았습니다. 두 기기의 인터넷 연결을 확인하고 휴대폰에서 「다시 연결」을 누르세요.",
         },
       });
     }, this.options.interruptionGraceMs ?? DEFAULT_INTERRUPTION_GRACE_MS);
@@ -717,7 +766,7 @@ export class RemoteMicReceiver {
     this.heartbeatTimer = this.deps.setTimer(() => {
       this.heartbeatTimer = null;
       if (!this.id || this.state.phase === "ended" || this.state.phase === "error") return;
-      this.postStatus(this.pc?.connectionState ?? "new");
+      this.postStatus(this.relayReading ? (this.relaySink ? "connected" : "connecting") : (this.pc?.connectionState ?? "new"));
       this.startHeartbeat();
     }, HEARTBEAT_MS);
   }
@@ -740,6 +789,194 @@ export class RemoteMicReceiver {
       if (this.pc === pc) this.statsTimer = this.deps.setTimer(() => void sample(), STATS_MS);
     };
     this.statsTimer = this.deps.setTimer(() => void sample(), 500);
+  }
+
+  /* --- Server relay reception ----------------------------------------------- */
+
+  private prepareRelay() {
+    if (this.relayPlayout || this.disposed) return;
+    const factory = this.options.createRelayPlayout === undefined ? createBrowserRelayPlayout : this.options.createRelayPlayout;
+    if (!factory) return;
+    try {
+      this.relayPlayout = factory();
+    } catch {
+      this.relayPlayout = null;
+    }
+  }
+
+  private handleRelayView(view: RemoteMicView) {
+    if (this.pc) this.closePeer();
+    this.negotiating = false;
+    if (this.state.transport !== "relay") this.set({ transport: "relay" });
+    if (!this.relayPlayout) {
+      this.set({
+        phase: "failed",
+        error: { code: "UNSUPPORTED", message: "이 브라우저는 서버 중계 오디오를 재생할 수 없습니다. 최신 Chrome·Safari·Edge로 여세요." },
+      });
+      return;
+    }
+    const quiet = this.deps.now() - this.relayLastFrameAt > RELAY_PAUSE_QUIET_MS;
+    if (view.peer?.connection === "closed" && quiet) {
+      // The phone stopped its microphone: end the track so the live capture
+      // sees a clean end, exactly as with a direct connection.
+      if (this.relaySink) this.releaseTrack();
+      if (this.state.phase !== "paused" && this.state.phase !== "connecting") {
+        this.set({ phase: "paused", sender: { micActive: false, muted: false, interrupted: false } });
+      }
+    }
+    this.startRelayReader();
+  }
+
+  private startRelayReader() {
+    if (this.relayReading) return;
+    this.relayReading = true;
+    this.relayFailures = 0;
+    this.scheduleRelayRead(0);
+  }
+
+  private scheduleRelayRead(ms: number) {
+    if (this.relayTimer) this.deps.clearTimer(this.relayTimer);
+    this.relayTimer = this.deps.setTimer(() => {
+      this.relayTimer = null;
+      void this.readRelayOnce();
+    }, ms);
+  }
+
+  private stopRelay() {
+    this.relayReading = false;
+    if (this.relayTimer) this.deps.clearTimer(this.relayTimer);
+    this.relayTimer = null;
+    if (this.relaySink) this.releaseTrack();
+  }
+
+  private async readRelayOnce() {
+    const { id, token } = this;
+    if (!id || !token || !this.relayReading || this.disposed) return;
+    const startedAt = this.deps.now();
+    let delay = RELAY_FRAME_MS;
+    try {
+      const response = await this.options.api.relayRead(id, token, this.relayCursor);
+      if (this.id !== id || !this.relayReading) return;
+      this.relayStats.rttMs = this.deps.now() - startedAt;
+      this.relayCursor = response.cursor || this.relayCursor;
+      if (this.relayFailures >= RELAY_FAILURES_BEFORE_REPORT && this.state.phase === "interrupted") {
+        this.clearInterruptionTimer();
+        this.setMetrics({ reconnects: this.state.metrics.reconnects + 1 });
+        this.set({ phase: this.relaySink ? "connected" : "connecting", error: null });
+      }
+      this.relayFailures = 0;
+      this.acceptRelayFrames(response.frames);
+    } catch (error) {
+      if (this.id !== id) return;
+      if (error instanceof RemoteMicApiError && (error.status === 404 || error.status === 410)) {
+        await this.finish("expired", false);
+        return;
+      }
+      if (!(error instanceof RemoteMicApiError && error.status === 409)) {
+        this.relayFailures += 1;
+        if (this.relayFailures === RELAY_FAILURES_BEFORE_REPORT && this.state.phase === "connected") {
+          this.setMetrics({ interruptions: this.state.metrics.interruptions + 1 });
+          this.set({ phase: "interrupted" });
+          this.armInterruptionTimer();
+        }
+        delay = Math.min(4000, RELAY_FRAME_MS * 2 ** Math.min(4, this.relayFailures));
+      }
+    }
+    this.updateRelayStats();
+    if (this.relayReading && this.id === id && !this.disposed) this.scheduleRelayRead(delay);
+  }
+
+  private acceptRelayFrames(frames: Array<{ n: number; a: string }>) {
+    if (frames.length === 0) return;
+    // A backlog (slow network, a tab that was throttled) is skipped: an
+    // interpreter needs what is being said now.
+    const skipped = Math.max(0, frames.length - RELAY_MAX_BACKLOG_FRAMES);
+    const live = skipped ? frames.slice(skipped) : frames;
+    if (!this.relaySink && !this.openRelaySink()) return;
+    const sink = this.relaySink!;
+    for (const frame of live) {
+      let samples: Float32Array;
+      try {
+        const bytes = base64ToBytes(frame.a);
+        samples = decodeMulaw(bytes);
+        this.relayStats.bytes += bytes.length;
+      } catch {
+        continue;
+      }
+      const gap = this.relayLastN >= 0 && frame.n > this.relayLastN + 1 ? frame.n - this.relayLastN - 1 : 0;
+      this.relayStats.lost += gap;
+      this.relayStats.windowLost += gap;
+      this.relayLastN = Math.max(this.relayLastN, frame.n);
+      this.relayStats.frames += 1;
+      this.relayStats.windowFrames += 1;
+      sink.push(samples);
+    }
+    this.relayStats.lost += skipped;
+    this.relayStats.windowLost += skipped;
+    this.relayLastFrameAt = this.deps.now();
+    if (this.state.trackMuted) this.set({ trackMuted: false });
+    if (this.state.phase !== "connected" && this.state.phase !== "interrupted") this.markRelayConnected();
+  }
+
+  private openRelaySink(): boolean {
+    const sink = this.relayPlayout?.open() ?? null;
+    const track = sink?.stream.getAudioTracks()[0];
+    if (!sink || !track) {
+      sink?.close();
+      return false;
+    }
+    this.adoptTrack(track);
+    this.relaySink = sink;
+    return true;
+  }
+
+  private markRelayConnected() {
+    const now = this.deps.now();
+    if (!this.everConnected) {
+      this.everConnected = true;
+      const approvedAt = this.state.metrics.approvedAt;
+      this.setMetrics({ connectedAt: now, connectMs: approvedAt ? now - approvedAt : null });
+    }
+    this.set({
+      phase: "connected",
+      error: null,
+      transport: "relay",
+      sender: { micActive: true, muted: this.state.sender?.muted ?? false, interrupted: false },
+    });
+    this.postStatus("connected");
+  }
+
+  private updateRelayStats() {
+    if (!this.relayReading) return;
+    const stall = !!this.relaySink && this.deps.now() - this.relayLastFrameAt > RELAY_STALL_MS;
+    if (stall !== this.state.trackMuted && this.relaySink) this.set({ trackMuted: stall });
+    const { frames, lost, bytes, windowFrames, windowLost, rttMs } = this.relayStats;
+    // A loss figure per ~2 s window, like the WebRTC path's.
+    const windowTotal = windowFrames + windowLost;
+    const recentLossPct = windowTotal >= 6 ? Math.round((windowLost / windowTotal) * 1000) / 10 : this.state.stats.recentLossPct;
+    if (windowTotal >= 6) {
+      this.relayStats.windowFrames = 0;
+      this.relayStats.windowLost = 0;
+    }
+    const buffered = this.relaySink?.bufferedMs() ?? null;
+    this.set({
+      stats: {
+        rttMs,
+        jitterMs: null,
+        jitterBufferMs: buffered,
+        packetsReceived: frames,
+        packetsLost: lost,
+        recentLossPct,
+        bytesReceived: bytes,
+        flowing: !stall && frames > 0,
+        localCandidateType: null,
+        remoteCandidateType: null,
+        // Frame length + half a poll + one request + the playout queue: an
+        // estimate of the relay's share of the delay, labelled as one.
+        estimatedTransportMs:
+          rttMs === null ? null : Math.round(RELAY_FRAME_MS + RELAY_FRAME_MS / 2 + rttMs + (buffered ?? 0)),
+      },
+    });
   }
 
   /* --- Teardown ------------------------------------------------------------- */
@@ -781,6 +1018,9 @@ export class RemoteMicReceiver {
     this.pollTimer = null;
     this.heartbeatTimer = null;
     sendControl(this.channel, { t: "end" });
+    this.stopRelay();
+    this.relayCursor = "";
+    this.relayLastN = -1;
     this.closePeer();
     this.id = null;
     this.token = null;
@@ -803,7 +1043,7 @@ export class RemoteMicReceiver {
       confirmCode: null,
       sender: null,
       error: expiredBeforeUse
-        ? { code: "PAIRING_EXPIRED", message: "연결 링크가 만료되었습니다. 「iPhone 연결」을 다시 눌러 새 QR을 만드세요." }
+        ? { code: "PAIRING_EXPIRED", message: "연결 링크가 만료되었습니다. 「휴대폰 연결」을 다시 눌러 새 QR을 만드세요." }
         : null,
     });
   }

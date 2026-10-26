@@ -44,20 +44,27 @@ and is covered [below](#counter-mode).
 The microphone is only opened by a provider that needs it. Demo mode never
 requests permission at all.
 
-### Remote Microphone (iPhone)
+### Remote Microphone (any phone)
 
-When the input is a paired iPhone ([`remote-microphone.md`](./remote-microphone.md)):
+When the input is a paired phone ([`remote-microphone.md`](./remote-microphone.md)):
 
-- Audio travels **peer to peer** from the iPhone to the MacBook over WebRTC
-  (DTLS-SRTP encrypted). It never passes through or is stored on ASAD's
-  servers; with an optional TURN relay, the relay forwards encrypted packets.
+- By default audio travels **peer to peer** from the phone to the computer
+  over WebRTC (DTLS-SRTP encrypted) and never passes through ASAD's servers;
+  with an optional TURN relay, the relay forwards encrypted packets.
+- **Fallback:** when the two devices cannot connect directly (e.g. the phone is
+  on mobile data), the phone sends audio through ASAD's **server relay** over
+  HTTPS. Relay frames are held in the shared store only briefly — at most ~12 s
+  of audio per pairing, expiring 60 s after the last write and deleted when the
+  pairing ends — readable only by the computer that opened the pairing, and
+  never logged.
 - ASAD's server holds only short-lived **signalling**: an SDP offer/answer and
   ICE candidates (which contain network addresses) until the connection is
   established — then they are deleted — plus hashed pairing credentials and a
-  few status flags, all under a TTL. No audio, no transcript.
+  few status flags, all under a TTL. No transcript; audio only as described
+  for the relay fallback above.
 - Nothing about signalling is logged. Pairing links carry their one-time secret
   in the URL fragment, which browsers do not send to servers.
-- The iPhone never receives STT credentials and never contacts the STT vendor.
+- The phone never receives STT credentials and never contacts the STT vendor.
   The MacBook streams the received audio to the configured recogniser exactly
   as it would a local microphone, behind the same consent disclosure.
 - Optional public STUN servers see the devices' public IP addresses (not

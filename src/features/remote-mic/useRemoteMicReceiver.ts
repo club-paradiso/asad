@@ -6,7 +6,7 @@ import { createRemoteMicApi } from "@/remote-mic/client";
 import { IDLE_RECEIVER_SNAPSHOT as IDLE, RemoteMicReceiver } from "@/remote-mic/receiver";
 
 /**
- * React binding for the MacBook end of a Remote Microphone pairing.
+ * React binding for the computer end of a Remote Microphone pairing.
  *
  * The receiver is created lazily from the operator's "Pair iPhone" click —
  * never during render or in a mount effect — so React's StrictMode remounts
@@ -61,6 +61,7 @@ export function useRemoteMicReceiver() {
       trackMuted: snapshot.trackMuted,
       stats: snapshot.stats,
       metrics: snapshot.metrics,
+      transport: snapshot.transport,
     };
   }, [snapshot]);
 

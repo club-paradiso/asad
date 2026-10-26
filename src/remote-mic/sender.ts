@@ -1,10 +1,18 @@
 /**
- * Remote Microphone sender — the iPhone end.
+ * Remote Microphone sender — the phone end (iPhone, Android, any browser with
+ * a microphone).
  *
  * Captures the phone's microphone (and nothing else), claims the pairing,
- * waits for the MacBook's approval and sends one Opus audio track over
- * WebRTC. It never sees the recogniser, the transcript or any ASAD credential
- * beyond its own pairing-scoped token.
+ * waits for the computer's approval and sends the audio:
+ *
+ *  - direct first: one Opus track over WebRTC (peer to peer, or via TURN);
+ *  - if no direct path connects within a few seconds, or a dropped one cannot
+ *    be recovered, the ASAD server relay: 300 ms µ-law frames over HTTPS. That
+ *    works on any network that can open the ASAD site — the phone on mobile
+ *    data and the computer on office Wi-Fi included.
+ *
+ * It never sees the recogniser, the transcript or any ASAD credential beyond
+ * its own pairing-scoped token.
  *
  * Invariants:
  *  - `getUserMedia` runs only from `start()`, which the page calls from the
@@ -16,7 +24,16 @@
  *    clear failure the person can act on.
  */
 import { RemoteMicApiError, type RemoteMicApi } from "./client";
-import type { RemoteMicEndReason, RemoteMicIceConfig, RemoteMicView, SignalCandidate } from "./protocol";
+import {
+  MAX_RELAY_FRAMES_PER_POST,
+  type RemoteMicEndReason,
+  type RemoteMicIceConfig,
+  type RemoteMicTransport,
+  type RemoteMicView,
+  type SignalCandidate,
+} from "./protocol";
+import { createBrowserRelayCapture, type RelayCapture } from "./relay-audio";
+import { bytesToBase64 } from "./relay-codec";
 import {
   randomPeerId,
   resolvePeerDeps,
@@ -64,6 +81,8 @@ export interface SenderSnapshot {
   error: SenderErrorCode | null;
   endedReason: RemoteMicEndReason | null;
   reconnectAttempts: number;
+  /** How audio is leaving the phone, once it is. */
+  transport: RemoteMicTransport | null;
 }
 
 export interface StoredSenderCredential {
@@ -81,12 +100,26 @@ export interface SenderDeps extends PeerDeps {
   getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   /** Browser voice processing. Off by default: it can remove soft consonants. */
   voiceProcessing?: boolean;
+  /**
+   * Builds the relay's audio capture. Called from `start()` — a tap — because
+   * iOS only lets a page start Web Audio from a user gesture. Null disables
+   * the relay fallback.
+   */
+  createRelayCapture?: (() => RelayCapture | null) | null;
+  /** How long a first direct connection may take before falling back to the relay. */
+  relayFallbackMs?: number;
 }
 
 const POLL_MS = { approval: 800, negotiating: 350, steady: 4000 } as const;
 const HEARTBEAT_MS = 15_000;
 /** Delay before each ICE restart attempt within one outage. */
 const ICE_RESTART_DELAYS_MS = [2000, 5000, 10_000] as const;
+/** First direct connection budget. A LAN connects in well under a second. */
+const DEFAULT_RELAY_FALLBACK_MS = 8000;
+/** Frames queued while a relay POST is slow; older audio is dropped first. */
+const MAX_PENDING_FRAMES = MAX_RELAY_FRAMES_PER_POST;
+/** Consecutive relay failures before the phone says it is reconnecting. */
+const RELAY_FAILURES_BEFORE_REPORT = 3;
 
 export function senderAudioConstraints(voiceProcessing: boolean): MediaTrackConstraints {
   return {
@@ -112,6 +145,7 @@ export class RemoteMicSender {
     error: null,
     endedReason: null,
     reconnectAttempts: 0,
+    transport: null,
   };
 
   private id: string | null;
@@ -133,6 +167,17 @@ export class RemoteMicSender {
   private busy: Promise<void> = Promise.resolve();
   private disposed = false;
   private wantsMedia = false;
+
+  /* Relay fallback. */
+  private relayCapture: RelayCapture | null = null;
+  private relayActive = false;
+  private relayCapturing = false;
+  private relayPending: Array<{ n: number; a: string }> = [];
+  private relayInFlight = false;
+  private relayFailures = 0;
+  private relayRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private frameCounter = 0;
+  private directTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly options: SenderDeps) {
     this.deps = resolvePeerDeps(options);
@@ -164,6 +209,8 @@ export class RemoteMicSender {
   /** Start (or restart) the microphone. Call from a click handler. */
   start(): Promise<void> {
     if (this.starting) return this.starting;
+    // Synchronously, inside the tap: Web Audio must be unlocked by a gesture.
+    this.prepareRelay();
     this.starting = this.doStart().finally(() => {
       this.starting = null;
     });
@@ -185,7 +232,7 @@ export class RemoteMicSender {
         (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia
           ? (constraints: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(constraints)
           : null);
-      if (!getUserMedia || (!this.options.createPeerConnection && typeof RTCPeerConnection === "undefined")) {
+      if (!getUserMedia || (!this.directAvailable() && !this.relayCapture)) {
         this.set({ phase: "failed", error: "UNSUPPORTED" });
         return;
       }
@@ -245,6 +292,8 @@ export class RemoteMicSender {
   async stop(reason: "user" | "interrupted" = "user"): Promise<void> {
     this.wantsMedia = false;
     sendControl(this.channel, { t: "stop", reason });
+    this.cancelDirectDeadline();
+    this.stopRelayCapture();
     this.closePeer();
     this.releaseStream();
     this.cancelRestart();
@@ -259,11 +308,15 @@ export class RemoteMicSender {
     if (track) track.enabled = !muted;
     this.set({ muted });
     this.sendStatus();
+    if (this.relayActive) this.postStatus(this.transportState());
   }
 
   /** A person-initiated reconnect: fresh peer, same microphone if still live. */
   async reconnect(): Promise<void> {
     this.set({ reconnectAttempts: 0, error: null });
+    // A person asking to reconnect gets a fresh try at the direct path; the
+    // relay takes over again by itself if that still cannot connect.
+    this.leaveRelay();
     this.closePeer();
     await this.start();
   }
@@ -281,6 +334,10 @@ export class RemoteMicSender {
     this.disposed = true;
     this.wantsMedia = false;
     sendControl(this.channel, { t: "stop", reason: "user" });
+    this.cancelDirectDeadline();
+    this.leaveRelay();
+    this.relayCapture?.close();
+    this.relayCapture = null;
     this.closePeer();
     this.releaseStream();
     this.cancelRestart();
@@ -400,7 +457,19 @@ export class RemoteMicSender {
     if (view.state !== "approved") return;
 
     this.generation = Math.max(this.generation, view.generation);
+
+    if (this.relayActive) {
+      // A reload or an earlier relay session left the pairing direct: say relay again.
+      if (view.transport !== "relay" && !this.relayInFlight) void this.announceRelay();
+      if (this.wantsMedia && this.liveTrack() && !this.relayCapturing) this.startRelayCapture();
+      return;
+    }
     if (this.wantsMedia && this.liveTrack() && !this.pc) {
+      if (this.ice?.forceRelay || !this.directAvailable()) {
+        await this.engageRelay();
+        return;
+      }
+      this.armDirectDeadline();
       await this.negotiate(true);
       return;
     }
@@ -547,7 +616,8 @@ export class RemoteMicSender {
   private onConnectionState(state: RTCPeerConnectionState) {
     if (state === "connected") {
       this.cancelRestart();
-      this.set({ phase: "connected", reconnectAttempts: 0, error: null });
+      this.cancelDirectDeadline();
+      this.set({ phase: "connected", reconnectAttempts: 0, error: null, transport: "direct" });
       this.postStatus("connected");
       this.sendStatus();
     } else if (state === "disconnected" || state === "failed") {
@@ -567,7 +637,8 @@ export class RemoteMicSender {
     if (this.restartTimer || !this.wantsMedia) return;
     const attempt = this.state.reconnectAttempts;
     if (attempt > ICE_RESTART_DELAYS_MS.length) {
-      this.set({ phase: "failed", error: "ICE_FAILED" });
+      if (this.relayCapture) void this.serial(() => this.engageRelay());
+      else this.set({ phase: "failed", error: "ICE_FAILED" });
       return;
     }
     const delay = immediate ? 250 : ICE_RESTART_DELAYS_MS[Math.min(attempt, ICE_RESTART_DELAYS_MS.length - 1)];
@@ -620,9 +691,160 @@ export class RemoteMicSender {
     this.heartbeatTimer = this.deps.setTimer(() => {
       this.heartbeatTimer = null;
       if (this.disposed || this.state.phase === "ended") return;
-      this.postStatus(this.pc?.connectionState ?? "new");
+      this.postStatus(this.transportState());
       this.startHeartbeat();
     }, HEARTBEAT_MS);
+  }
+
+  /* --- Server relay fallback ------------------------------------------------ */
+
+  private directAvailable(): boolean {
+    return !!this.options.createPeerConnection || typeof RTCPeerConnection === "function";
+  }
+
+  private prepareRelay() {
+    if (this.relayCapture || this.disposed) return;
+    const factory = this.options.createRelayCapture === undefined ? createBrowserRelayCapture : this.options.createRelayCapture;
+    if (!factory) return;
+    try {
+      this.relayCapture = factory();
+    } catch {
+      this.relayCapture = null;
+    }
+  }
+
+  private transportState(): RTCPeerConnectionState {
+    if (this.relayActive) {
+      // A stopped microphone must keep reading "closed": the computer pauses on it.
+      if (!this.wantsMedia) return "closed";
+      return this.relayCapturing && this.state.phase === "connected" ? "connected" : "connecting";
+    }
+    return this.pc?.connectionState ?? "new";
+  }
+
+  private armDirectDeadline() {
+    if (this.directTimer || !this.relayCapture) return;
+    this.directTimer = this.deps.setTimer(() => {
+      this.directTimer = null;
+      if (!this.wantsMedia || this.disposed || this.pc?.connectionState === "connected") return;
+      void this.serial(() => this.engageRelay());
+    }, this.options.relayFallbackMs ?? DEFAULT_RELAY_FALLBACK_MS);
+  }
+
+  private cancelDirectDeadline() {
+    if (this.directTimer) this.deps.clearTimer(this.directTimer);
+    this.directTimer = null;
+  }
+
+  /** No direct path: send audio through the ASAD server instead. */
+  private async engageRelay() {
+    if (this.relayActive || !this.wantsMedia || this.disposed || !this.id || !this.token) return;
+    if (this.pc?.connectionState === "connected") return;
+    if (!this.relayCapture) {
+      this.set({ phase: "failed", error: "ICE_FAILED" });
+      return;
+    }
+    this.cancelDirectDeadline();
+    this.cancelRestart();
+    this.closePeer();
+    this.relayActive = true;
+    this.relayFailures = 0;
+    this.set({ phase: "connecting", transport: "relay", reconnectAttempts: 0 });
+    await this.announceRelay();
+    if (this.relayActive && this.wantsMedia && this.liveTrack()) this.startRelayCapture();
+  }
+
+  private async announceRelay() {
+    if (!this.id || !this.token) return;
+    try {
+      await this.options.api.signal(this.token, { action: "transport", id: this.id, mode: "relay" });
+    } catch (error) {
+      if (error instanceof RemoteMicApiError && (error.status === 404 || error.status === 410)) this.finish("expired");
+      // Otherwise the next poll sees transport !== "relay" and announces again.
+    }
+  }
+
+  private startRelayCapture() {
+    const stream = this.state.stream;
+    if (!this.relayCapture || !stream || this.relayCapturing) return;
+    this.relayCapturing = true;
+    this.relayPending = [];
+    this.relayCapture.start(stream, (frame) => this.queueRelayFrame(frame));
+  }
+
+  private stopRelayCapture() {
+    if (!this.relayCapturing) return;
+    this.relayCapturing = false;
+    this.relayCapture?.stop();
+    this.relayPending = [];
+    if (this.relayRetryTimer) this.deps.clearTimer(this.relayRetryTimer);
+    this.relayRetryTimer = null;
+  }
+
+  /** Back to direct (a person pressed Reconnect, or the pairing ended). */
+  private leaveRelay() {
+    this.stopRelayCapture();
+    this.relayActive = false;
+    this.relayInFlight = false;
+    this.relayFailures = 0;
+  }
+
+  private queueRelayFrame(frame: Uint8Array) {
+    if (!this.relayCapturing) return;
+    this.relayPending.push({ n: this.frameCounter, a: bytesToBase64(frame) });
+    this.frameCounter += 1;
+    if (this.relayPending.length > MAX_PENDING_FRAMES) {
+      this.relayPending.splice(0, this.relayPending.length - MAX_PENDING_FRAMES);
+    }
+    if (!this.relayInFlight && !this.relayRetryTimer) void this.flushRelay();
+  }
+
+  private async flushRelay(): Promise<void> {
+    const { id, token } = this;
+    if (!id || !token || !this.relayCapturing || this.relayInFlight) return;
+    const batch = this.relayPending.splice(0, MAX_RELAY_FRAMES_PER_POST);
+    if (batch.length === 0) return;
+    this.relayInFlight = true;
+    try {
+      await this.options.api.relaySend(id, token, batch);
+      this.relayInFlight = false;
+      this.relayFailures = 0;
+      if (this.relayCapturing && this.state.phase !== "connected") {
+        this.set({ phase: "connected", error: null, reconnectAttempts: 0, transport: "relay" });
+        this.postStatus("connected");
+      }
+    } catch (error) {
+      this.relayInFlight = false;
+      if (error instanceof RemoteMicApiError && (error.status === 404 || error.status === 410)) {
+        this.finish("expired");
+        return;
+      }
+      if (error instanceof RemoteMicApiError && error.status === 401) {
+        this.options.saveCredential?.(null);
+        this.finish("expired");
+        return;
+      }
+      if (error instanceof RemoteMicApiError && error.status === 409) {
+        // The pairing is not (yet) in relay mode on the server; say so again.
+        void this.announceRelay();
+      }
+      this.relayFailures += 1;
+      if (this.relayFailures >= RELAY_FAILURES_BEFORE_REPORT && this.state.phase === "connected") {
+        this.set({ phase: "reconnecting" });
+      }
+      // Keep the newest audio for the retry; the queue cap drops the oldest.
+      this.relayPending.unshift(...batch.slice(-MAX_PENDING_FRAMES));
+      if (this.relayPending.length > MAX_PENDING_FRAMES) {
+        this.relayPending.splice(0, this.relayPending.length - MAX_PENDING_FRAMES);
+      }
+      const delay = Math.min(4000, 500 * 2 ** Math.min(3, this.relayFailures - 1));
+      this.relayRetryTimer = this.deps.setTimer(() => {
+        this.relayRetryTimer = null;
+        void this.flushRelay();
+      }, delay);
+      return;
+    }
+    if (this.relayPending.length) void this.flushRelay();
   }
 
   /** Test/diagnostic hook: lose the peer abruptly, as a dropped network would. */
@@ -667,6 +889,10 @@ export class RemoteMicSender {
   private finish(reason: RemoteMicEndReason) {
     if (this.state.phase === "ended") return;
     this.wantsMedia = false;
+    this.cancelDirectDeadline();
+    this.leaveRelay();
+    this.relayCapture?.close();
+    this.relayCapture = null;
     this.closePeer();
     this.releaseStream();
     this.cancelRestart();

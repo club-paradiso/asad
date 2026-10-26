@@ -319,6 +319,14 @@ export const RATE_RULES = {
   remoteMicSignal: { limit: 300, windowMs: 60_000 },
   /** The same, per source address — a church Wi-Fi may carry two pairings. */
   remoteMicSignalAddress: { limit: 900, windowMs: 60_000 },
+  /**
+   * Server-relay audio: one POST (phone) or GET (computer) per ~300 ms frame,
+   * per pairing token, with headroom for catch-up bursts. Process-local only —
+   * a shared counter would double the store traffic of every audio frame; the
+   * relay script's token check already makes each request pairing-scoped.
+   */
+  remoteMicRelay: { limit: 600, windowMs: 60_000 },
+  remoteMicRelayAddress: { limit: 2400, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 const limiters = new Map<string, RequestRateLimiter>();

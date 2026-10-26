@@ -12,6 +12,7 @@ import {
   type RemoteMicErrorCode,
   type RemoteMicState,
   type RemoteMicView,
+  type RelayReadResponse,
   type SignalRequest,
 } from "./protocol";
 
@@ -34,6 +35,10 @@ export interface RemoteMicApi {
   poll(id: string, token: string, since: number): Promise<RemoteMicView>;
   signal(token: string, request: SignalRequest): Promise<{ state: RemoteMicState; expiresAt: number }>;
   end(id: string, token: string): Promise<void>;
+  /** Server relay: phone → store. */
+  relaySend(id: string, token: string, frames: Array<{ n: number; a: string }>): Promise<void>;
+  /** Server relay: store → computer. */
+  relayRead(id: string, token: string, after: string): Promise<RelayReadResponse>;
 }
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -103,5 +108,18 @@ export function createRemoteMicApi(deps: {
         keepalive: true,
       });
     },
+    relaySend: async (id, token, frames) => {
+      await call(plain, "/api/remote-mic/relay", {
+        method: "POST",
+        headers: json(token),
+        body: JSON.stringify({ id, frames }),
+      });
+    },
+    relayRead: (id, token, after) =>
+      call<RelayReadResponse>(
+        plain,
+        `/api/remote-mic/relay?id=${encodeURIComponent(id)}&after=${encodeURIComponent(after)}`,
+        { method: "GET", headers: { [REMOTE_MIC_TOKEN_HEADER]: token } },
+      ),
   };
 }
