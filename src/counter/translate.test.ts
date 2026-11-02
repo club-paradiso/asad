@@ -76,14 +76,14 @@ beforeEach(() => {
   general.complete.mockReset();
   general.wouldReach.mockReset().mockReturnValue("openrouter");
   sensitiveRouter.complete.mockReset();
-  delete process.env.COUNTER_TRANSLATION_ROUTE;
+  process.env.COUNTER_TRANSLATION_ROUTE = "gateway-first";
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("gateway-first counter translation", () => {
+describe("counter translation routing", () => {
   it("answers from the Gateway without touching the free router when it is fast", async () => {
     gateway.complete.mockResolvedValue({ text: json("Please wait a moment."), latencyMs: 400 });
 
@@ -155,8 +155,8 @@ describe("gateway-first counter translation", () => {
     expect(general.complete).not.toHaveBeenCalled();
   });
 
-  it("keeps the old order when router-first is configured", async () => {
-    process.env.COUNTER_TRANSLATION_ROUTE = "router-first";
+  it("defaults to router-first, so the billed Gateway is never the first call", async () => {
+    delete process.env.COUNTER_TRANSLATION_ROUTE;
     general.complete.mockResolvedValue({
       provider: "openrouter",
       model: "free-model",

@@ -67,16 +67,19 @@ export const counterGatewayModel = (): string =>
   process.env.VERCEL_AI_GATEWAY_COUNTER_MODEL?.trim() || VERCEL_GATEWAY_MODEL;
 
 /**
- * `gateway-first` (default): a fast, strong, ZDR-only Gateway model answers
- * ordinary turns, and the configured router chain is the hedge and fallback.
- * `router-first`: the previous behaviour — router chain first, Gateway only as
- * recovery. Sensitive profiles ignore this entirely; they are pinned.
+ * `router-first` (default): the configured router chain (the free pool on the
+ * public deployment) answers, with the Gateway only as recovery — exactly the
+ * cost exposure this deployment already had.
+ * `gateway-first` (opt-in): a fast, strong, ZDR-only Gateway model answers
+ * ordinary turns and the router chain is the hedge and fallback. Gateway use
+ * is billed against the team's AI Gateway credit, so it is never the default.
+ * Sensitive profiles ignore this entirely; they are pinned.
  */
 export type CounterRoute = "gateway-first" | "router-first";
 export const counterRoute = (): CounterRoute =>
-  process.env.COUNTER_TRANSLATION_ROUTE?.trim().toLowerCase() === "router-first"
-    ? "router-first"
-    : "gateway-first";
+  process.env.COUNTER_TRANSLATION_ROUTE?.trim().toLowerCase() === "gateway-first"
+    ? "gateway-first"
+    : "router-first";
 
 let gatewayCooldownUntil = 0;
 
