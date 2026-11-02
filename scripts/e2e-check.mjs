@@ -20,6 +20,16 @@ const outDir = process.argv[3] ?? "./e2e-out";
 mkdirSync(outDir, { recursive: true });
 
 const results = [];
+
+/**
+ * Make sure the staff quick-phrase bar is open. It starts open on desk-sized
+ * screens and collapsed on phones, so clicking the toggle blindly would close
+ * it on a desk.
+ */
+const openQuickPhrases = async (page) => {
+  const toggle = page.getByRole("button", { name: /자주 쓰는 문구/ });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+};
 const check = (name, passed, detail = "") => {
   results.push({ name, passed, detail });
   console.log(`${passed ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
@@ -222,7 +232,7 @@ check(
   await host.getByRole("button", { name: /자주 쓰는 문구/ }).isVisible(),
 );
 
-await host.getByRole("button", { name: /자주 쓰는 문구/ }).click();
+await openQuickPhrases(host);
 await host.getByRole("button", { name: "안녕하세요. 무엇을 도와드릴까요?" }).click();
 await host.waitForTimeout(2000);
 await guest.waitForTimeout(2000);
@@ -412,7 +422,7 @@ check(
 // A quick phrase needs no model, so this works on a CI runner with no keys and
 // still produces a real bilingual bubble.
 await rtlHost.waitForTimeout(2000);
-await rtlHost.getByRole("button", { name: /자주 쓰는 문구/ }).click();
+await openQuickPhrases(rtlHost);
 await rtlHost.getByRole("button", { name: "안녕하세요. 무엇을 도와드릴까요?" }).click();
 await rtlGuest.waitForTimeout(2500);
 check(
