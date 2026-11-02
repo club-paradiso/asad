@@ -13,6 +13,7 @@ const general = vi.hoisted(() => ({
   wouldReach: vi.fn<(prefer?: unknown) => string | null>(() => "openrouter"),
   complete: vi.fn(),
 }));
+const llmEnv = vi.hoisted(() => ({ counterProvider: null as string | null }));
 const sensitiveRouter = vi.hoisted(() => ({
   wouldReach: vi.fn<(prefer?: unknown) => string | null>(() => "openrouter"),
   complete: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("@/lib/env", () => ({
   appEnv: () => ({
     llm: {
       counterPreferOpen: true,
+      counterProvider: llmEnv.counterProvider,
       providers: { openrouter: { configured: true } },
       openrouter: { policy: { dataCollection: "deny" } },
     },
@@ -77,6 +79,7 @@ beforeEach(() => {
   general.wouldReach.mockReset().mockReturnValue("openrouter");
   sensitiveRouter.complete.mockReset();
   process.env.COUNTER_TRANSLATION_ROUTE = "gateway-first";
+  llmEnv.counterProvider = null;
 });
 
 afterEach(() => {
@@ -167,6 +170,27 @@ describe("counter translation routing", () => {
 
     expect(result.provider).toBe("openrouter");
     expect(gateway.complete).not.toHaveBeenCalled();
+  });
+});
+
+describe("named counter provider", () => {
+  it("puts LLM_COUNTER_PROVIDER ahead of the open-weight preference", async () => {
+    delete process.env.COUNTER_TRANSLATION_ROUTE;
+    llmEnv.counterProvider = "gemini";
+    general.complete.mockResolvedValue({
+      provider: "gemini",
+      model: "gemini-flash-lite",
+      response: { text: json("Hello."), latencyMs: 300 },
+    });
+
+    const result = await translateForCounter({ ...base, text: "안녕하세요." });
+
+    expect(result.provider).toBe("gemini");
+    const options = general.complete.mock.calls[0][1] as {
+      prefer: (id: string, model: string) => boolean;
+    };
+    expect(options.prefer("gemini", "gemini-flash-lite")).toBe(true);
+    expect(options.prefer("openrouter", "nex-agi/nex-n2.5-mini:free")).toBe(false);
   });
 });
 

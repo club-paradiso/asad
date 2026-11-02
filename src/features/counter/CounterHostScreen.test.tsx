@@ -5,7 +5,7 @@
  * the staff screen back to the app on its own, while "다음 손님" — which ends the
  * same session — must leave the staff member exactly where they are.
  */
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const replace = vi.hoisted(() => vi.fn());
@@ -39,6 +39,7 @@ vi.mock("./useVoiceInput", () => ({
 }));
 
 import { CounterHostScreen } from "./CounterHostScreen";
+import { clearHostResume } from "./resume";
 
 const originalFetch = globalThis.fetch;
 
@@ -85,9 +86,14 @@ const openSession = async () => {
 beforeEach(() => {
   replace.mockReset();
   window.localStorage.clear();
+  window.sessionStorage.clear();
+  // The resume store caches its snapshot; clear it through its own API so a
+  // session opened by an earlier test is not adopted by the next render.
+  clearHostResume();
 });
 
 afterEach(() => {
+  cleanup();
   globalThis.fetch = originalFetch;
 });
 
@@ -115,5 +121,45 @@ describe("Counter Mode, staff side, when the conversation ends", () => {
     });
 
     expect(replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("Counter Mode, staff side, on a private deployment", () => {
+  it("asks for the access key once, then opens the session", async () => {
+    let unlocked = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/config")) return json({ counter: { provider: "Test" } });
+      if (url === "/api/session" && init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as { accessKey?: string };
+        unlocked = body.accessKey === "desk-key-1234";
+        return json({ ok: unlocked }, unlocked ? 200 : 401);
+      }
+      if (url === "/api/counter/session" && init?.method === "POST") {
+        return unlocked
+          ? json({ session: sessionView(), participantToken: "host-token" }, 201)
+          : json({ error: "This deployment is private." }, 401);
+      }
+      return json({ session: sessionView() });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await openSession();
+    const input = await screen.findByLabelText("접근 키를 입력해 주세요");
+
+    // A wrong key says so and keeps the prompt.
+    fireEvent.change(input, { target: { value: "wrong-key" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    });
+    await screen.findByText("키가 맞지 않습니다. 관리자에게 확인해 주세요.");
+
+    fireEvent.change(input, { target: { value: "desk-key-1234" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    });
+
+    await screen.findByText("QR 코드를 스캔해 주세요");
+    expect(screen.queryByLabelText("접근 키를 입력해 주세요")).toBeNull();
   });
 });

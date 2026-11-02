@@ -10,7 +10,7 @@
  *
  * Three states, and no more: set up once, show the code, talk.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { COUNTER_LANGUAGES, findLanguage } from "@/counter/languages";
@@ -31,6 +31,7 @@ import { QrCode } from "./QrCode";
 import { useCounterDisclosure } from "./ProviderNotice";
 import { VoiceReadinessButton } from "./VoiceReadinessButton";
 import { cn } from "@/lib/cn";
+import { openSession } from "@/lib/session-client";
 import { counterPreferencesStore } from "./preferences";
 import { scheduleCounterExit } from "./counter-exit";
 import { ConfirmEndButton } from "./ConfirmEndButton";
@@ -44,6 +45,10 @@ export function CounterHostScreen() {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
+  // A private deployment (APP_ACCESS_KEY set) refuses to open a Counter
+  // session until this browser has presented the key once. Visitors never
+  // need it: they enter with the QR code's session capability.
+  const [needsAccessKey, setNeedsAccessKey] = useState(false);
 
   // A desk browser that reloads mid-consultation comes back to the same
   // conversation rather than to a fresh code the visitor's phone knows nothing
@@ -99,10 +104,16 @@ export function CounterHostScreen() {
         participantToken?: string;
         error?: string;
       };
+      if (response.status === 401) {
+        setNeedsAccessKey(true);
+        setStartError(null);
+        return;
+      }
       if (!response.ok || !data.session || !data.participantToken) {
         setStartError("현장응대를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
+      setNeedsAccessKey(false);
       // Credential prewarming opens no media device. It is safe to do even for
       // text-only staff while microphone permission stays an explicit choice.
       void prefetchSttCredentials(hostLang, {
@@ -146,6 +157,16 @@ export function CounterHostScreen() {
         configured={preferences.configured}
         editing={editingPreferences}
         onEdit={() => setEditingPreferences(true)}
+        accessPrompt={
+          needsAccessKey ? (
+            <AccessKeyPrompt
+              onUnlocked={() => {
+                setNeedsAccessKey(false);
+                void start();
+              }}
+            />
+          ) : null
+        }
       />
     );
   }
@@ -483,6 +504,7 @@ function SetupScreen({
   configured,
   editing,
   onEdit,
+  accessPrompt,
 }: {
   hostLang: string;
   onHostLang: (code: string) => void;
@@ -494,6 +516,7 @@ function SetupScreen({
   configured: boolean;
   editing: boolean;
   onEdit: () => void;
+  accessPrompt?: ReactNode;
 }) {
   const disclosure = useCounterDisclosure();
   const languages = useMemo(
@@ -527,6 +550,8 @@ function SetupScreen({
             설정 변경
           </button>
         </section>
+
+        {accessPrompt}
 
         {error && (
           <p className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -606,6 +631,8 @@ function SetupScreen({
         </p>
       </section>
 
+      {accessPrompt}
+
       {error && (
         <p className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-3 py-2 text-sm text-[var(--danger)]">
           {error}
@@ -653,6 +680,64 @@ function SetupScreen({
       </footer>
     </div>
     </div>
+  );
+}
+
+/**
+ * One-time access key entry for a private deployment.
+ *
+ * Shown only after the server has said the deployment is private. The key is
+ * exchanged for an HttpOnly cookie by /api/session and never stored here.
+ */
+function AccessKeyPrompt({ onUnlocked }: { onUnlocked: () => void }) {
+  const [value, setValue] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [refused, setRefused] = useState(false);
+
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-xl border border-[var(--accent)] bg-[var(--bg-raised)] p-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!value.trim() || checking) return;
+        setChecking(true);
+        setRefused(false);
+        void openSession(value.trim()).then((ok) => {
+          setChecking(false);
+          if (ok) onUnlocked();
+          else setRefused(true);
+        });
+      }}
+    >
+      <label htmlFor="counter-access-key" className="text-sm font-semibold text-[var(--fg)]">
+        접근 키를 입력해 주세요
+      </label>
+      <p className="text-xs leading-relaxed text-[var(--fg-dim)]">
+        이 기기에서 한 번만 입력하면 됩니다. 손님은 QR로 들어오므로 키가 필요 없습니다.
+      </p>
+      <div className="flex gap-2">
+        <input
+          id="counter-access-key"
+          type="password"
+          autoComplete="current-password"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          className="min-h-12 min-w-0 flex-1 rounded-md border border-[var(--line-strong)] bg-[var(--bg)] px-3.5 text-base text-[var(--fg)] focus:border-[var(--accent)] focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={checking || !value.trim()}
+          className="min-h-12 shrink-0 rounded-md border border-[var(--accent)] bg-[var(--accent)] px-4 text-base font-semibold text-[var(--accent-contrast)] disabled:pointer-events-none disabled:opacity-40"
+        >
+          {checking ? "확인 중…" : "확인"}
+        </button>
+      </div>
+      {refused && (
+        <p role="alert" className="text-sm text-[var(--danger)]">
+          키가 맞지 않습니다. 관리자에게 확인해 주세요.
+        </p>
+      )}
+    </form>
   );
 }
 

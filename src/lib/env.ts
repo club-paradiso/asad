@@ -93,6 +93,7 @@ const rawEnvSchema = z.object({
   LLM_ALLOW_PAID_FALLBACK: z.string().trim().toLowerCase().optional(),
   LLM_LIVE_REQUIRE_SUSTAINABLE: z.string().trim().toLowerCase().optional(),
   LLM_COUNTER_PREFER_OPEN: z.string().trim().toLowerCase().optional(),
+  LLM_COUNTER_PROVIDER: z.string().trim().toLowerCase().optional(),
   LLM_PAID_TIER: z.string().trim().toLowerCase().optional(),
 
   // Phase 1 compatibility.
@@ -180,6 +181,12 @@ export interface AppEnv {
      * weights also happen to have the better data-use posture on a free tier.
      */
     counterPreferOpen: boolean;
+    /**
+     * A provider Counter Mode tries first, ahead of the open-weight
+     * preference. A preference, not a filter: when it is not configured or not
+     * eligible the ordinary chain answers. Sensitive profiles ignore it.
+     */
+    counterProvider: LlmProviderId | null;
     /**
      * Providers the deployer declares are on a billed plan.
      *
@@ -376,6 +383,18 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   // Defaults ON, unlike the other flags: the counter is the one surface where
   // open weights were asked for by name.
   const counterPreferOpen = !BOOLEAN_FALSE.has(raw.LLM_COUNTER_PREFER_OPEN ?? "");
+  let counterProvider: LlmProviderId | null = null;
+  if (raw.LLM_COUNTER_PROVIDER) {
+    const id = normaliseProviderId(raw.LLM_COUNTER_PROVIDER);
+    if (id && id !== "local") counterProvider = id;
+    else {
+      problems.push({
+        level: "warning",
+        field: "LLM_COUNTER_PROVIDER",
+        message: `Unknown provider "${raw.LLM_COUNTER_PROVIDER}". Counter Mode keeps its default order.`,
+      });
+    }
+  }
 
   const paidTier = new Set<LlmProviderId>();
   for (const entry of (raw.LLM_PAID_TIER ?? "").split(",")) {
@@ -569,6 +588,7 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       allowPaidFallback,
       requireSustainableLive,
       counterPreferOpen,
+      counterProvider,
       paidTier,
       pinned,
       providers,

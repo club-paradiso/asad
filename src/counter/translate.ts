@@ -8,7 +8,7 @@
  */
 import "server-only";
 import { llmRouter } from "@/providers/llm";
-import { LlmRouter, OPEN_WEIGHT } from "@/providers/llm/router";
+import { LlmRouter, OPEN_WEIGHT, type ProviderFilter } from "@/providers/llm/router";
 import { appEnv, type AppEnv } from "@/lib/env";
 import { parseCounterOutput, type CounterOutput } from "@/lib/schema";
 import { toLlmError } from "@/providers/llm/errors";
@@ -82,6 +82,19 @@ export const counterRoute = (): CounterRoute =>
     : "router-first";
 
 let gatewayCooldownUntil = 0;
+
+/**
+ * Which providers an ordinary Counter turn tries first.
+ *
+ * An explicitly named Counter provider (LLM_COUNTER_PROVIDER, e.g. a Gemini
+ * key chosen for translation quality) outranks the open-weight preference.
+ * Either is an ordering only; the rest of the chain still follows.
+ */
+function counterPreference(): ProviderFilter | undefined {
+  const { counterProvider, counterPreferOpen } = appEnv().llm;
+  if (counterProvider) return (id) => id === counterProvider;
+  return counterPreferOpen ? OPEN_WEIGHT : undefined;
+}
 
 // Sensitive turns need the same circuit-breaker and quota memory as ordinary
 // turns. Recreating this router per request repeatedly probes an unavailable
@@ -343,7 +356,7 @@ async function translateViaRouter(
 ): Promise<TranslationResult> {
   const recover = () =>
     options.gatewayRecovery && !sensitive && vercelGatewayAvailable(input.gatewayToken);
-  const prefer = sensitive ? undefined : appEnv().llm.counterPreferOpen ? OPEN_WEIGHT : undefined;
+  const prefer = sensitive ? undefined : counterPreference();
 
   try {
     const result = await router.complete(
@@ -528,10 +541,9 @@ export async function translateForCounter(
     };
   }
 
-  // Open weights first when asked for, but only as an ordering for general
-  // sessions. The sensitive router is already hard-pinned to OpenRouter.
-  const prefer = appEnv().llm.counterPreferOpen ? OPEN_WEIGHT : undefined;
-  const routedCloud = router.wouldReach(sensitive ? undefined : prefer);
+  // The preference is only an ordering for general sessions. The sensitive
+  // router is already hard-pinned to OpenRouter.
+  const routedCloud = router.wouldReach(sensitive ? undefined : counterPreference());
   const gatewayReady =
     !sensitive &&
     vercelGatewayAvailable(input.gatewayToken) &&
