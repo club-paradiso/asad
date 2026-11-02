@@ -11,7 +11,7 @@
  * do that when one phone shows one language. It costs vertical space and is
  * worth every pixel.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Participant, RiskSpan } from "@/counter/types";
 import { findLanguage } from "@/counter/languages";
 import { actionStringsFor, stringsFor, type CounterStrings } from "@/counter/ui-strings";
@@ -69,6 +69,38 @@ function withRisksHighlighted(
         </mark>
       ),
     );
+}
+
+/**
+ * "Translating…" plus the seconds it has taken, once it has taken a while.
+ *
+ * A bare pulsing dot looks identical at one second and at eight. Two people
+ * staring at a counter need to see that it is still alive, so after the first
+ * couple of seconds a plain counter appears. Numerals and "s" read the same in
+ * every supported language, so no new strings are needed.
+ */
+function PendingStatus({ since, label, rtl }: { since: number; label: string; rtl: boolean }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - since) / 1000));
+  return (
+    <p
+      className="mt-1.5 flex items-center gap-1.5 border-t border-[var(--line)] pt-1.5 text-sm text-[var(--fg-dim)]"
+      dir={rtl ? "rtl" : "ltr"}
+      role="status"
+    >
+      <span aria-hidden className="inline-block size-2 animate-pulse rounded-full bg-[var(--accent)]" />
+      {label}
+      {seconds >= 2 && (
+        <span aria-hidden className="tabular-nums" dir="ltr">
+          {seconds}s
+        </span>
+      )}
+    </p>
+  );
 }
 
 export function ConversationView({
@@ -164,14 +196,7 @@ export function ConversationView({
                     <p className="text-lg leading-snug text-[var(--fg)] sm:text-xl">
                       <BidiText text={message.originalText} rtl={originalRtl} />
                     </p>
-                    <p
-                      className="mt-1.5 flex items-center gap-1.5 border-t border-[var(--line)] pt-1.5 text-sm text-[var(--fg-dim)]"
-                      dir={rtl ? "rtl" : "ltr"}
-                      role="status"
-                    >
-                      <span aria-hidden className="inline-block size-2 animate-pulse rounded-full bg-[var(--accent)]" />
-                      {translatingLabel}
-                    </p>
+                    <PendingStatus since={message.at} label={translatingLabel} rtl={rtl} />
                   </>
                 ) : failed ? (
                   <>
@@ -257,7 +282,7 @@ export function ConversationView({
                 {/* Metadata row: only what is actionable. */}
                 <div
                   dir={rtl ? "rtl" : "ltr"}
-                  className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-[var(--fg-dim)]"
+                  className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[var(--fg-dim)]"
                 >
                   {message.source === "quick-phrase" && (
                     <span className="text-[var(--ok)]">{t.fixedPhrase}</span>
@@ -271,7 +296,7 @@ export function ConversationView({
                     <button
                       type="button"
                       onClick={() => onConfirm?.(message)}
-                      className="ml-auto rounded border border-[var(--line-strong)] px-2 py-0.5 hover:text-[var(--fg)]"
+                      className="ml-auto min-h-9 rounded-lg border border-[var(--line-strong)] px-3 hover:text-[var(--fg)]"
                     >
                       {t.confirmNumbers}
                     </button>
@@ -281,7 +306,7 @@ export function ConversationView({
                       type="button"
                       onClick={() => onSimplify?.(message)}
                       className={cn(
-                        "rounded border border-[var(--line-strong)] px-2 py-0.5 hover:text-[var(--fg)]",
+                        "min-h-9 rounded-lg border border-[var(--line-strong)] px-3 hover:text-[var(--fg)]",
                         !message.criticalValues?.length && !message.risks?.length && "ml-auto",
                       )}
                     >
@@ -293,9 +318,9 @@ export function ConversationView({
                       type="button"
                       onClick={() => onRetry?.(message)}
                       className={cn(
-                        "rounded border border-[var(--line-strong)] px-2 py-0.5 hover:text-[var(--fg)]",
+                        "min-h-9 rounded-lg border border-[var(--line-strong)] px-3 hover:text-[var(--fg)]",
                         message.status !== "done" && "ml-auto",
-                        failed && "min-h-9 border-[var(--fg-muted)] px-3 font-semibold text-[var(--fg)]",
+                        failed && "border-[var(--fg-muted)] font-semibold text-[var(--fg)]",
                       )}
                     >
                       {actions.retry}

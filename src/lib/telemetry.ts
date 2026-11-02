@@ -45,6 +45,8 @@ export type LatencyStage =
   | "counter_admission"
   /** Translation dispatch → validated translation (or failure) returned. */
   | "counter_translation"
+  /** A repeated staff phrase answered from translation memory. */
+  | "counter_memory_hit"
   /** Message persistence round trip. */
   | "counter_persist"
   /** Request received → response ready, every stage included. */
@@ -235,6 +237,7 @@ export class TelemetryRecorder {
         provisional_failed: this.stage("provisional_failed"),
         counter_admission: this.stage("counter_admission"),
         counter_translation: this.stage("counter_translation"),
+        counter_memory_hit: this.stage("counter_memory_hit"),
         counter_persist: this.stage("counter_persist"),
         counter_server_total: this.stage("counter_server_total"),
       },
