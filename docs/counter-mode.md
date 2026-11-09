@@ -271,6 +271,15 @@ ends or the server refuses the token.
 
 ---
 
+## Administrative interpretation layer
+
+Terminology normalisation, procedural-ambiguity detection with suggested
+clarification questions, meaning-level integrity checks (must/may,
+application/approval, status/card, conditions, completion, certainty, actor),
+visible corrections and explicit staff review. It runs beside the translation
+and never rewrites it. Details, benchmark results and limitations:
+[counter-admin/README.md](./counter-admin/README.md).
+
 ## Privacy
 
 A counter conversation is more sensitive than a sermon, and the design reflects
@@ -291,6 +300,9 @@ that:
   With Groq — the recommended configuration — no training happens on either
   tier.
 - Ending the session clears it immediately on the server, not just on screen.
+- The administrative layer's terminology notes, ambiguity findings and staff
+  decisions are staff-only and stripped from every visitor response. See
+  [counter-admin/README.md](./counter-admin/README.md).
 
 ---
 

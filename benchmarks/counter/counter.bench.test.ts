@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AFTER, BEFORE, estimateTurn, simulateRecipientDelivery, type LatencyInputs } from "./latency-model";
 import { renderQualityMarkdown, runQualityBenchmark } from "./quality";
+import { renderAdminMarkdown, runAdminBenchmark } from "./admin-quality";
 
 const translateForCounter = vi.hoisted(() => vi.fn());
 vi.mock("@/counter/translate", () => ({ translateForCounter, COUNTER_DEADLINE_MS: 6000 }));
@@ -77,6 +78,7 @@ describe("Counter Mode offline benchmark", () => {
   it("measures the validators over the corpus and the route's store round trips, then writes the report", async () => {
     /* --- Quality --------------------------------------------------------- */
     const quality = runQualityBenchmark();
+    const admin = runAdminBenchmark();
 
     /* --- Store round trips on the real route ----------------------------- */
     const created = await POST(
@@ -151,6 +153,7 @@ describe("Counter Mode offline benchmark", () => {
       note:
         "Offline benchmark. Validator results are exact over the synthetic corpus. Latency figures are a MODEL over stated parameters (one Redis round trip, one provider response, one poll interval) and the measured round-trip structure of the route; they are not provider or network measurements.",
       quality,
+      admin,
       roundTripsPerTurn: { before: BEFORE.storeRoundTrips, after: AFTER.storeRoundTrips },
       pollIntervalMs: { before: BEFORE.pollIntervalMs, after: AFTER.pollIntervalMs },
       model,
@@ -160,6 +163,7 @@ describe("Counter Mode offline benchmark", () => {
     const md: string[] = [];
     md.push(`# Counter Mode offline benchmark — ${report.generatedAt}`, "", report.note, "");
     md.push("## Translation-quality validators", "", renderQualityMarkdown(quality), "");
+    md.push(renderAdminMarkdown(admin), "");
     md.push("## Server round trips per ordinary turn", "");
     md.push(`| | Redis round trips | Recipient poll interval |`, `| --- | --- | --- |`);
     md.push(`| Before (main 2e57a0a) | ${BEFORE.storeRoundTrips} | ${BEFORE.pollIntervalMs} ms |`);
@@ -191,5 +195,16 @@ describe("Counter Mode offline benchmark", () => {
     // catch every corruption in the corpus. A new false positive or negative
     // fails this benchmark rather than silently moving a number in a report.
     expect(quality.findings).toEqual([]);
+
+    // Administrative layer gates. Pinned to the CURRENT known result, so a
+    // regression fails loudly and an improvement must be recorded on purpose.
+    // The known failures are listed in docs/counter-admin/benchmark.md.
+    expect(admin.semantic.criticalBlocked.hits).toBe(admin.semantic.criticalBlocked.total);
+    expect(admin.semantic.materialDetected.hits).toBe(admin.semantic.materialDetected.total);
+    expect(admin.semantic.faithfulFalseAlarm.hits).toBeLessThanOrEqual(1);
+    expect(admin.development.faithfulFalseAlarm.hits).toBe(0);
+    expect(admin.ambiguity.falsePositive.hits).toBe(0);
+    expect(admin.ambiguity.recall.hits).toBeGreaterThanOrEqual(19);
+    expect(admin.terminology.exact.hits).toBeGreaterThanOrEqual(36);
   });
 });

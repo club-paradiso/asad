@@ -1,4 +1,4 @@
-# Counter Mode offline benchmark — 2026-10-25T09:15:52.003Z
+# Counter Mode offline benchmark — 2026-11-09T15:52:36.422Z
 
 Offline benchmark. Validator results are exact over the synthetic corpus. Latency figures are a MODEL over stated parameters (one Redis round trip, one provider response, one poll interval) and the measured round-trip structure of the route; they are not provider or network measurements.
 
@@ -45,6 +45,52 @@ Offline benchmark. Validator results are exact over the synthetic corpus. Latenc
 
 Negation check available: ar-SA, en-US, hi-IN, id-ID, ja-JP, ko-KR, mn-MN, ru-RU, th-TH, vi-VN, zh-CN, zh-TW.
 Negation check knowingly absent: uz-UZ.
+
+## Administrative meaning layer (synthetic, offline)
+
+Deterministic components only. These numbers describe the matcher, the ambiguity rules and the semantic validator on a small synthetic corpus written by the same author as the rules. They are NOT a measure of translation quality and NOT external validation.
+
+| Component | Metric | Result |
+| --- | --- | --- |
+| Terminology | exact concept+kind match | 36/38 = 94.7% (95% CI 82.7–98.5%) |
+| Ambiguity | recall on ambiguous utterances | 19/20 = 95.0% (95% CI 76.4–99.1%) |
+| Ambiguity | false-positive rate on clear utterances | 0/15 = 0.0% (95% CI 0.0–20.4%) |
+| Semantic | critical corruptions blocked | 21/21 = 100.0% (95% CI 84.5–100.0%) |
+| Semantic | all corruptions flagged as mismatch | 28/28 = 100.0% (95% CI 87.9–100.0%) |
+| Semantic | expected check named | 28/28 = 100.0% (95% CI 87.9–100.0%) |
+| Semantic | faithful renderings flagged (false alarm) | 1/51 = 2.0% (95% CI 0.3–10.3%) |
+| Semantic (development set, tuned against) | faithful renderings flagged | 0/55 = 0.0% (95% CI 0.0–6.5%); 12 renderings in unsupported pairs skipped |
+
+| Language | Terminology exact |
+| --- | --- |
+| en-US | 6/6 = 100.0% (95% CI 61.0–100.0%) |
+| id-ID | 2/3 = 66.7% (95% CI 20.8–93.9%) |
+| ko-KR | 8/8 = 100.0% (95% CI 67.6–100.0%) |
+| mn-MN | 2/2 = 100.0% (95% CI 34.2–100.0%) |
+| ru-RU | 3/3 = 100.0% (95% CI 43.8–100.0%) |
+| th-TH | 2/2 = 100.0% (95% CI 34.2–100.0%) |
+| uz-UZ | 2/2 = 100.0% (95% CI 34.2–100.0%) |
+| vi-VN | 3/4 = 75.0% (95% CI 30.1–95.4%) |
+| zh-CN | 6/6 = 100.0% (95% CI 61.0–100.0%) |
+| zh-TW | 2/2 = 100.0% (95% CI 34.2–100.0%) |
+
+| Pair | Faithful flagged | Corrupted caught |
+| --- | --- | --- |
+| en-US→ko-KR | 0/6 | 3/3 |
+| ko-KR→en-US | 0/20 | 12/12 |
+| ko-KR→id-ID | 0/4 | 2/2 |
+| ko-KR→ru-RU | 1/4 | 2/2 |
+| ko-KR→th-TH | 0/2 | 1/1 |
+| ko-KR→vi-VN | 0/6 | 3/3 |
+| ko-KR→zh-CN | 0/5 | 3/3 |
+| vi-VN→ko-KR | 0/2 | 1/1 |
+| zh-CN→ko-KR | 0/2 | 1/1 |
+
+Failures:
+- t-id-3: expected [card-reissuance:colloquial] got [residence-card:colloquial]
+- t-mix-1: expected [card-reissuance:colloquial] got [residence-card:term]
+- a-en-6: expected [deadline-type] got []
+- s-ko-ru-2 faithful flagged (blocked): "Ваше заявление принято к рассмотрению, решение ещё не принято." — negation:added
 
 ## Server round trips per ordinary turn
 
