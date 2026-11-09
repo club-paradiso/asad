@@ -20,6 +20,8 @@ export interface LocalMessageState {
     rephraseOf?: string;
     action?: "simplify" | "retry";
     actionOf?: string;
+    correctionOf?: string;
+    clarifies?: string;
   };
 }
 

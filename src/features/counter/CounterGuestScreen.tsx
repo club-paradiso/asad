@@ -231,6 +231,9 @@ export function CounterGuestScreen({ code }: { code: string }) {
                 }))
           }
           onDiscard={session.discard}
+          onCorrect={(message, text) =>
+            void session.send({ text, source: "text", correctionOf: message.id })
+          }
         />
       </main>
 

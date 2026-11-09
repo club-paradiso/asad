@@ -19,6 +19,70 @@ import { BidiText } from "@/lib/bidi";
 import { cn } from "@/lib/cn";
 import type { ClientCounterMessage as CounterMessage } from "./client-message";
 import { voiceStringsFor } from "./voice-strings";
+import { AdminAssist } from "./AdminAssist";
+import { correctionStringsFor } from "./admin-strings";
+import type { StaffDecision } from "./useCounterSession";
+
+/** Inline editor for correcting one's own message. Sends a NEW message; the original stays visible. */
+function CorrectionEditor({
+  initial,
+  lang,
+  rtl,
+  onSend,
+  onCancel,
+}: {
+  initial: string;
+  lang: string;
+  rtl: boolean;
+  onSend: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState(initial);
+  const c = correctionStringsFor(lang);
+  const trimmed = text.trim();
+  return (
+    <form
+      className="mt-2 space-y-1.5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (trimmed && trimmed !== initial.trim()) onSend(trimmed);
+      }}
+    >
+      <label className="sr-only" htmlFor="counter-correction">
+        {c.correct}
+      </label>
+      <textarea
+        id="counter-correction"
+        dir={rtl ? "rtl" : "ltr"}
+        value={text}
+        rows={2}
+        maxLength={2000}
+        autoFocus
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onCancel();
+        }}
+        className="w-full resize-y rounded-lg border border-[var(--line-strong)] bg-[var(--bg)] p-2 text-base text-[var(--fg)]"
+      />
+      <div className="flex flex-wrap justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="min-h-9 rounded-lg border border-[var(--line-strong)] px-3 text-xs hover:text-[var(--fg)]"
+        >
+          {c.cancel}
+        </button>
+        <button
+          type="submit"
+          disabled={!trimmed || trimmed === initial.trim()}
+          className="min-h-9 rounded-lg border border-[var(--accent)] px-3 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
+        >
+          {c.send}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 /** Highlight the spans worth reading back, without mangling the text. */
 function withRisksHighlighted(
@@ -113,6 +177,9 @@ export function ConversationView({
   onDiscard,
   emptyMessage,
   strings,
+  onReview,
+  onCorrect,
+  onAskClarification,
 }: {
   messages: CounterMessage[];
   viewerRole: Participant;
@@ -128,7 +195,14 @@ export function ConversationView({
   emptyMessage?: string;
   /** Chrome in the viewer's language; defaults to the viewer's language tag. */
   strings?: CounterStrings;
+  /** Staff only: record an explicit human decision on a turn. */
+  onReview?: (messageId: string, decision: StaffDecision, conceptId?: string) => Promise<string | null>;
+  /** Send a corrected version of an own message as a new, labelled message. */
+  onCorrect?: (message: CounterMessage, text: string) => void;
+  /** Staff only: send a suggested clarification question as the staff member's own words. */
+  onAskClarification?: (message: CounterMessage, question: string) => void;
 }) {
+  const [editing, setEditing] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -138,6 +212,10 @@ export function ConversationView({
   const t = strings ?? stringsFor(viewerLang);
   const actions = actionStringsFor(viewerLang);
   const translatingLabel = voiceStringsFor(viewerLang).translating;
+  const c = correctionStringsFor(viewerLang);
+  const correctedIds = new Set(
+    messages.map((message) => message.correctionOf).filter((id): id is string => !!id),
+  );
 
   if (messages.length === 0) {
     return (
@@ -183,11 +261,24 @@ export function ConversationView({
                     : "border-[var(--line)] bg-[var(--bg-raised)]",
                   failed && "border-[color-mix(in_srgb,var(--danger)_50%,transparent)]",
                   pending && "border-dashed",
+                  correctedIds.has(message.id) && "opacity-60",
                 )}
                 dir={
                   (failed || pending ? originalRtl : primaryRtl) ? "rtl" : rtl ? "ltr" : undefined
                 }
               >
+                {(message.correctionOf || message.clarifies || correctedIds.has(message.id)) && (
+                  <p
+                    dir={rtl ? "rtl" : "ltr"}
+                    className="mb-1 text-xs font-semibold text-[var(--fg-muted)]"
+                  >
+                    {correctedIds.has(message.id)
+                      ? c.replaced
+                      : message.correctionOf
+                        ? c.correctedVersion
+                        : c.clarifying}
+                  </p>
+                )}
                 {pending ? (
                   <>
                     {/* The sender's own words, the moment they pressed Send.
@@ -261,6 +352,28 @@ export function ConversationView({
                   </div>
                 )}
 
+                {viewerRole === "host" && !pending && !message.local && (
+                  <AdminAssist
+                    message={message}
+                    staffLang={viewerLang}
+                    onReview={onReview}
+                    onAskClarification={onAskClarification}
+                  />
+                )}
+
+                {editing === message.id && onCorrect && (
+                  <CorrectionEditor
+                    initial={message.originalText}
+                    lang={viewerLang}
+                    rtl={originalRtl}
+                    onCancel={() => setEditing(null)}
+                    onSend={(text) => {
+                      setEditing(null);
+                      onCorrect(message, text);
+                    }}
+                  />
+                )}
+
                 {viewerRole === "host" && message.reviewFlags?.length ? (
                   <div
                     role="alert"
@@ -326,6 +439,21 @@ export function ConversationView({
                       {actions.retry}
                     </button>
                   )}
+                  {mine &&
+                    onCorrect &&
+                    !pending &&
+                    !message.local &&
+                    editing !== message.id &&
+                    !correctedIds.has(message.id) &&
+                    (message.source === "voice" || message.source === "text") && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(message.id)}
+                        className="min-h-9 rounded-lg border border-[var(--line-strong)] px-3 hover:text-[var(--fg)]"
+                      >
+                        {c.correct}
+                      </button>
+                    )}
                   {mine && failed && message.local && onDiscard && (
                     <button
                       type="button"
