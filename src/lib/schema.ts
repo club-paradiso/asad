@@ -331,4 +331,20 @@ export const counterMessageSchema = z.object({
   rephraseOf: z.string().max(64).optional(),
   action: z.enum(["simplify", "retry"]).optional(),
   actionOf: z.string().max(64).optional(),
+  /** The sender's own earlier message this text corrects. */
+  correctionOf: z.string().max(64).optional(),
+  /** Staff only: the visitor message whose suggested clarification this asks. */
+  clarifies: z.string().max(64).optional(),
+});
+
+/** Staff decision on one turn. Host capability only. */
+export const counterReviewSchema = z.object({
+  code: z.string().trim().min(1).max(16),
+  messageId: z.string().trim().min(1).max(96),
+  decision: z.enum(["confirmed", "rejected", "cleared"]),
+  conceptId: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z-]{1,47}$/)
+    .optional(),
 });

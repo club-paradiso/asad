@@ -2,6 +2,7 @@ import {
   isSensitiveCounterProfile,
   type CounterProfileId,
 } from "./profiles";
+import { sensitiveDataClassIn } from "./admin/matcher";
 
 interface ProfileDetectionInput {
   text: string;
@@ -176,6 +177,16 @@ export function detectCounterProfile({
     (candidate) => candidate.score > 0 && isSensitiveCounterProfile(candidate.profileId),
   );
   if (sensitiveMatch) return sensitiveMatch.profileId;
+
+  // Second net: every surface form of a refugee or enforcement concept in the
+  // administrative registry, in every registry language. The keyword list
+  // above missed, for example, "인도적 체류" and "humanitarian stay" — which
+  // sent humanitarian-stay conversations down the ordinary provider chain.
+  const registryClass =
+    sensitiveDataClassIn(text) ??
+    sensitiveDataClassIn(deskLabel ?? "") ??
+    sensitiveDataClassIn(recent.map((item) => item.text).join("\n"));
+  if (registryClass) return registryClass;
 
   // Once a session has entered a sensitive path, ambiguous later turns such as
   // "네" must remain there for the rest of that conversation.

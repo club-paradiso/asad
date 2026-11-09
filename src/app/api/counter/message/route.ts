@@ -13,7 +13,9 @@ import { appendMessage, counterStore, sourceLangFor, targetLangFor } from "@/cou
 import { normaliseCode } from "@/counter/codes";
 import { resolveQuickPhrase } from "@/counter/quick-phrases";
 import { detectRisks } from "@/counter/risks";
-import { extractCriticalValues, validateTranslationIntegrity } from "@/counter/integrity";
+import { extractCriticalValues } from "@/counter/integrity";
+import { assessTranslation, semanticChecksEnabled } from "@/counter/admin/assess";
+import { adminLayerEnabled, analyzeUtterance } from "@/counter/admin/meaning";
 import { translateForCounter } from "@/counter/translate";
 import { detectCounterProfile } from "@/counter/profile-detection";
 import type { CounterMessage } from "@/counter/types";
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
   // compare-and-set. Profile detection still runs against the newest copy of
   // the session, so a concurrent sensitive turn that just upgraded the
   // conversation is honoured exactly as before.
-  const { source, rephraseOf, action, actionOf } = parsed.data;
+  const { source, rephraseOf, action, actionOf, correctionOf, clarifies } = parsed.data;
   let text = parsed.data.text;
   let from: Participant | null = null;
   let rejection: NextResponse | null = null;
@@ -114,6 +116,26 @@ export async function POST(request: Request) {
       }
       text = original.originalText;
     }
+    // A correction must point at the sender's own earlier turn; a
+    // clarification question is staff-only and must point at a visitor turn.
+    // Anything else is refused rather than silently dropped, so a client can
+    // never attach a "corrected"/"clarifies" label to someone else's words.
+    if (correctionOf && !s.messages.some((m) => m.id === correctionOf && m.from === sender)) {
+      rejection = NextResponse.json({ error: "Invalid correction target." }, { status: 400 });
+      return false;
+    }
+    if (
+      clarifies &&
+      (sender !== "host" || !s.messages.some((m) => m.id === clarifies && m.from === "guest"))
+    ) {
+      rejection = NextResponse.json({ error: "Invalid clarification target." }, { status: 400 });
+      return false;
+    }
+    if ((correctionOf || clarifies) && (source === "quick-phrase" || source === "confirm" || action)) {
+      rejection = NextResponse.json({ error: "Invalid message action." }, { status: 400 });
+      return false;
+    }
+
     if (source === "quick-phrase" || source === "confirm") return false;
 
     // An exact keyword match can promote a session into a specialised profile.
@@ -301,7 +323,15 @@ export async function POST(request: Request) {
     rephraseOf,
     action,
     actionOf,
+    ...(correctionOf ? { correctionOf } : {}),
+    ...(clarifies ? { clarifies } : {}),
   };
+
+  const integrity = result.ok
+    ? assessTranslation(text, result.output!.translation, originalLang, targetLang, {
+        semantic: semanticChecksEnabled(),
+      })
+    : undefined;
 
   const message: Omit<CounterMessage, "seq"> = result.ok
     ? {
@@ -312,12 +342,7 @@ export async function POST(request: Request) {
         note: result.output!.note,
         risks: detectRisks(result.output!.translation),
         criticalValues: extractCriticalValues(text, originalLang),
-        integrity: validateTranslationIntegrity(
-          text,
-          result.output!.translation,
-          originalLang,
-          targetLang,
-        ),
+        integrity,
       }
     : {
         ...base,
@@ -328,6 +353,24 @@ export async function POST(request: Request) {
 
   if (message.status === "done" && message.integrity?.status === "mismatch") {
     message.confidence = "low";
+  }
+
+  // The Administrative Meaning Layer runs beside the translation, never
+  // inside it: its output is a separate staff-only field. It also runs when
+  // translation failed, because "which procedure does the visitor mean?" is
+  // still worth knowing while the turn is retried.
+  if (adminLayerEnabled(effectiveProfileId)) {
+    const analysis = analyzeUtterance({
+      text,
+      lang: originalLang,
+      otherLang: targetLang,
+      recent: recentMessages.map((m) => ({ text: m.originalText, lang: m.originalLang })),
+      inputMode: source === "voice" ? "voice" : "text",
+      modelConfidence: message.status === "done" ? message.confidence : undefined,
+      checks: message.integrity?.assessment,
+      detectAmbiguity: from === "guest",
+    });
+    if (analysis.terms.length || analysis.ambiguities.length) message.analysis = analysis;
   }
 
   if (message.status === "done") {

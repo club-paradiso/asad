@@ -60,10 +60,19 @@ export function buildHumanReviewFlags(input: {
   const flags: HumanReviewFlag[] = [];
 
   if (input.integrity?.status === "mismatch") {
+    const valueIssues = input.integrity.issues.length > 0;
+    const meaningIssues = !!input.integrity.semantic?.issues.some(
+      (issue) => issue.severity === "critical" || issue.severity === "high",
+    );
     flags.push({
       kind: "translation-integrity",
       severity: "review",
-      reason: "숫자·날짜·이름 등 핵심 값이 번역 과정에서 달라졌을 수 있습니다.",
+      reason:
+        valueIssues && meaningIssues
+          ? "핵심 값과 행정적 의미(의무·허가·절차 단계 등)가 번역 과정에서 달라졌을 수 있습니다."
+          : meaningIssues
+            ? "행정적 의미(의무·허가·절차 단계·조건 등)가 번역 과정에서 달라졌을 수 있습니다."
+            : "숫자·날짜·이름 등 핵심 값이 번역 과정에서 달라졌을 수 있습니다.",
     });
   }
 

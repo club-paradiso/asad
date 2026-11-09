@@ -63,8 +63,30 @@ export interface IntegrityIssue {
 }
 
 export interface TranslationIntegrity {
+  /**
+   * `verified` means only that no automatic check objected. It never means a
+   * person reviewed the translation.
+   */
   status: "verified" | "mismatch";
+  /** Structured-value findings (numbers, dates, codes, negation, names). */
   issues: IntegrityIssue[];
+  /** Administrative meaning checks; absent on turns stored before they existed. */
+  semantic?: import("./admin/semantic").SemanticIntegrity;
+  /** One verdict across all automatic checks, including what could not be checked. */
+  assessment?: import("./admin/assess").IntegrityAssessment;
+}
+
+/**
+ * A staff member's explicit decision about one turn.
+ *
+ * The only place in the system where a human judgement is recorded. Nothing
+ * else may imply that a person reviewed a translation.
+ */
+export interface StaffReview {
+  decision: "confirmed" | "rejected";
+  /** For an ambiguity: the procedure the staff member confirmed with the visitor. */
+  conceptId?: string;
+  at: number;
 }
 
 /**
@@ -120,6 +142,18 @@ export interface CounterMessage {
   integrity?: TranslationIntegrity;
   /** Session-scoped cues requiring a human to inspect this turn. Never a person-level risk label. */
   reviewFlags?: HumanReviewFlag[];
+  /**
+   * Administrative Meaning Layer output — terminology, ambiguities, suggested
+   * clarification. Staff-only. Separate from, and never merged into,
+   * `translatedText`.
+   */
+  analysis?: import("./admin/types").AdministrativeAnalysis;
+  /** Explicit staff decision; staff-only. */
+  staffReview?: StaffReview;
+  /** This message is the sender's corrected version of an earlier own message. */
+  correctionOf?: string;
+  /** This staff message asks the clarification suggested for that message. */
+  clarifies?: string;
   /** Present when translation failed, so the UI can say why. */
   error?: string;
 }
@@ -180,12 +214,24 @@ export const toView = (
   guestPresent: session.guestJoinedAt !== undefined,
 });
 
-/** Human-review metadata is staff-only and must not leak to a visitor device. */
+/** Human-review metadata and administrative analysis are staff-only and must not leak to a visitor device. */
 export function toParticipantMessage(
   message: CounterMessage,
   viewer: Participant,
 ): CounterMessage {
-  if (viewer === "host" || message.reviewFlags === undefined) return message;
-  const { reviewFlags: _reviewFlags, ...publicMessage } = message;
+  if (viewer === "host") return message;
+  if (
+    message.reviewFlags === undefined &&
+    message.analysis === undefined &&
+    message.staffReview === undefined
+  ) {
+    return message;
+  }
+  const {
+    reviewFlags: _reviewFlags,
+    analysis: _analysis,
+    staffReview: _staffReview,
+    ...publicMessage
+  } = message;
   return publicMessage;
 }
