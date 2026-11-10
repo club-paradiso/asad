@@ -44,7 +44,13 @@ export interface SendInput {
   rephraseOf?: string;
   action?: CounterMessageAction;
   actionOf?: string;
+  /** The sender's own earlier message this corrects. */
+  correctionOf?: string;
+  /** Staff: the visitor message whose suggested clarification this asks. */
+  clarifies?: string;
 }
+
+export type StaffDecision = "confirmed" | "rejected" | "cleared";
 
 export interface EndOptions {
   /** Leave Counter Mode after the server session has been discarded. */
@@ -331,6 +337,8 @@ export function useCounterSession(
           status: "pending",
           action: input.action,
           actionOf: input.actionOf,
+          ...(input.correctionOf ? { correctionOf: input.correctionOf } : {}),
+          ...(input.clarifies ? { clarifies: input.clarifies } : {}),
           local: { requestId, input: { ...input, text } } satisfies LocalMessageState,
         };
         setMessages((current) => [...current, local]);
@@ -437,6 +445,38 @@ export function useCounterSession(
     [removeLocal, send],
   );
 
+  /**
+   * Record the staff member's explicit decision on one turn. Returns the
+   * error text on failure so the caller can show it next to the control.
+   */
+  const review = useCallback(
+    async (messageId: string, decision: StaffDecision, conceptId?: string): Promise<string | null> => {
+      if (!code || !participantToken || role !== "host") return "Staff authorisation required.";
+      try {
+        const response = await guardedFetch("/api/counter/review", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            [COUNTER_TOKEN_HEADER]: participantToken,
+          },
+          body: JSON.stringify({ code, messageId, decision, ...(conceptId ? { conceptId } : {}) }),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          message?: CounterMessage;
+          error?: string;
+        };
+        if (response.ok && data.message) {
+          merge([data.message]);
+          return null;
+        }
+        return data.error ?? `Could not save that (${response.status}).`;
+      } catch {
+        return "Network problem — check the connection and try again.";
+      }
+    },
+    [code, participantToken, role, merge],
+  );
+
   /** Drop a failed local message the user no longer wants to send. */
   const discard = useCallback(
     (message: ClientCounterMessage) => {
@@ -475,6 +515,7 @@ export function useCounterSession(
     send,
     resend,
     discard,
+    review,
     end,
     refresh: poll,
     dismissError: useCallback(() => setError(null), []),

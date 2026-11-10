@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T09:15:52.003Z",
+  "generatedAt": "2026-11-09T15:52:36.422Z",
   "note": "Offline benchmark. Validator results are exact over the synthetic corpus. Latency figures are a MODEL over stated parameters (one Redis round trip, one provider response, one poll interval) and the measured round-trip structure of the route; they are not provider or network measurements.",
   "quality": {
     "cases": 44,
@@ -183,6 +183,374 @@
       ]
     },
     "findings": []
+  },
+  "admin": {
+    "terminology": {
+      "exact": {
+        "hits": 36,
+        "total": 38,
+        "rate": 0.9473684210526315,
+        "ci": [
+          0.8271423311893115,
+          0.9854460975514631
+        ]
+      },
+      "byLang": {
+        "ko-KR": {
+          "hits": 8,
+          "total": 8,
+          "rate": 1,
+          "ci": [
+            0.6755843804891231,
+            1
+          ]
+        },
+        "en-US": {
+          "hits": 6,
+          "total": 6,
+          "rate": 1,
+          "ci": [
+            0.6096569663469354,
+            0.9999999999999999
+          ]
+        },
+        "zh-CN": {
+          "hits": 6,
+          "total": 6,
+          "rate": 1,
+          "ci": [
+            0.6096569663469354,
+            0.9999999999999999
+          ]
+        },
+        "zh-TW": {
+          "hits": 2,
+          "total": 2,
+          "rate": 1,
+          "ci": [
+            0.34237195288961925,
+            1
+          ]
+        },
+        "vi-VN": {
+          "hits": 3,
+          "total": 4,
+          "rate": 0.75,
+          "ci": [
+            0.3006360524426366,
+            0.9544139373553637
+          ]
+        },
+        "id-ID": {
+          "hits": 2,
+          "total": 3,
+          "rate": 0.6666666666666666,
+          "ci": [
+            0.2076549551264879,
+            0.9385096847238394
+          ]
+        },
+        "ru-RU": {
+          "hits": 3,
+          "total": 3,
+          "rate": 1,
+          "ci": [
+            0.43849391955098227,
+            1
+          ]
+        },
+        "th-TH": {
+          "hits": 2,
+          "total": 2,
+          "rate": 1,
+          "ci": [
+            0.34237195288961925,
+            1
+          ]
+        },
+        "mn-MN": {
+          "hits": 2,
+          "total": 2,
+          "rate": 1,
+          "ci": [
+            0.34237195288961925,
+            1
+          ]
+        },
+        "uz-UZ": {
+          "hits": 2,
+          "total": 2,
+          "rate": 1,
+          "ci": [
+            0.34237195288961925,
+            1
+          ]
+        }
+      },
+      "failures": [
+        "t-id-3: expected [card-reissuance:colloquial] got [residence-card:colloquial]",
+        "t-mix-1: expected [card-reissuance:colloquial] got [residence-card:term]"
+      ]
+    },
+    "ambiguity": {
+      "recall": {
+        "hits": 19,
+        "total": 20,
+        "rate": 0.95,
+        "ci": [
+          0.7638641064874331,
+          0.9911187805671268
+        ]
+      },
+      "falsePositive": {
+        "hits": 0,
+        "total": 15,
+        "rate": 0,
+        "ci": [
+          0,
+          0.20388926630434784
+        ]
+      },
+      "failures": [
+        "a-en-6: expected [deadline-type] got []"
+      ]
+    },
+    "semantic": {
+      "criticalBlocked": {
+        "hits": 21,
+        "total": 21,
+        "rate": 1,
+        "ci": [
+          0.8453561767357979,
+          0.9999999999999999
+        ]
+      },
+      "materialDetected": {
+        "hits": 28,
+        "total": 28,
+        "rate": 1,
+        "ci": [
+          0.8793527963418923,
+          1
+        ]
+      },
+      "expectedCheckFound": {
+        "hits": 28,
+        "total": 28,
+        "rate": 1,
+        "ci": [
+          0.8793527963418923,
+          1
+        ]
+      },
+      "faithfulFalseAlarm": {
+        "hits": 1,
+        "total": 51,
+        "rate": 0.0196078431372549,
+        "ci": [
+          0.003469603253442241,
+          0.10304807675589372
+        ]
+      },
+      "byPair": {
+        "ko-KR→en-US": {
+          "faithful": {
+            "hits": 0,
+            "total": 20,
+            "rate": 0,
+            "ci": [
+              0,
+              0.16113012549493322
+            ]
+          },
+          "corrupted": {
+            "hits": 12,
+            "total": 12,
+            "rate": 1,
+            "ci": [
+              0.7574992425007574,
+              1
+            ]
+          }
+        },
+        "ko-KR→zh-CN": {
+          "faithful": {
+            "hits": 0,
+            "total": 5,
+            "rate": 0,
+            "ci": [
+              0,
+              0.43449149475208104
+            ]
+          },
+          "corrupted": {
+            "hits": 3,
+            "total": 3,
+            "rate": 1,
+            "ci": [
+              0.43849391955098227,
+              1
+            ]
+          }
+        },
+        "ko-KR→vi-VN": {
+          "faithful": {
+            "hits": 0,
+            "total": 6,
+            "rate": 0,
+            "ci": [
+              0,
+              0.3903430336530645
+            ]
+          },
+          "corrupted": {
+            "hits": 3,
+            "total": 3,
+            "rate": 1,
+            "ci": [
+              0.43849391955098227,
+              1
+            ]
+          }
+        },
+        "ko-KR→id-ID": {
+          "faithful": {
+            "hits": 0,
+            "total": 4,
+            "rate": 0,
+            "ci": [
+              0,
+              0.48990002040399916
+            ]
+          },
+          "corrupted": {
+            "hits": 2,
+            "total": 2,
+            "rate": 1,
+            "ci": [
+              0.34237195288961925,
+              1
+            ]
+          }
+        },
+        "ko-KR→ru-RU": {
+          "faithful": {
+            "hits": 1,
+            "total": 4,
+            "rate": 0.25,
+            "ci": [
+              0.045586062644636216,
+              0.6993639475573634
+            ]
+          },
+          "corrupted": {
+            "hits": 2,
+            "total": 2,
+            "rate": 1,
+            "ci": [
+              0.34237195288961925,
+              1
+            ]
+          }
+        },
+        "ko-KR→th-TH": {
+          "faithful": {
+            "hits": 0,
+            "total": 2,
+            "rate": 0,
+            "ci": [
+              0,
+              0.6576280471103807
+            ]
+          },
+          "corrupted": {
+            "hits": 1,
+            "total": 1,
+            "rate": 1,
+            "ci": [
+              0.20654329147389294,
+              1
+            ]
+          }
+        },
+        "en-US→ko-KR": {
+          "faithful": {
+            "hits": 0,
+            "total": 6,
+            "rate": 0,
+            "ci": [
+              0,
+              0.3903430336530645
+            ]
+          },
+          "corrupted": {
+            "hits": 3,
+            "total": 3,
+            "rate": 1,
+            "ci": [
+              0.43849391955098227,
+              1
+            ]
+          }
+        },
+        "zh-CN→ko-KR": {
+          "faithful": {
+            "hits": 0,
+            "total": 2,
+            "rate": 0,
+            "ci": [
+              0,
+              0.6576280471103807
+            ]
+          },
+          "corrupted": {
+            "hits": 1,
+            "total": 1,
+            "rate": 1,
+            "ci": [
+              0.20654329147389294,
+              1
+            ]
+          }
+        },
+        "vi-VN→ko-KR": {
+          "faithful": {
+            "hits": 0,
+            "total": 2,
+            "rate": 0,
+            "ci": [
+              0,
+              0.6576280471103807
+            ]
+          },
+          "corrupted": {
+            "hits": 1,
+            "total": 1,
+            "rate": 1,
+            "ci": [
+              0.20654329147389294,
+              1
+            ]
+          }
+        }
+      },
+      "failures": [
+        "s-ko-ru-2 faithful flagged (blocked): \"Ваше заявление принято к рассмотрению, решение ещё не принято.\" — negation:added"
+      ]
+    },
+    "development": {
+      "faithfulFalseAlarm": {
+        "hits": 0,
+        "total": 55,
+        "rate": 0,
+        "ci": [
+          0,
+          0.06528714378942788
+        ]
+      },
+      "unsupported": 12,
+      "failures": []
+    }
   },
   "roundTripsPerTurn": {
     "before": 7,

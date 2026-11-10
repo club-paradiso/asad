@@ -1,12 +1,8 @@
 /** Counter translation prompt: one face-to-face utterance in, one faithful utterance out. */
 import { languageName } from "./languages";
-import {
-  IMMIGRATION_GLOSSARY,
-  RESIDENCE_STATUS_CODES,
-  hasVerifiedGlossary,
-  type GlossaryEntry,
-} from "./domain-vocabulary";
+import { RESIDENCE_STATUS_CODES, hasVerifiedGlossary } from "./domain-vocabulary";
 import { findCounterProfile, type CounterProfileId } from "./profiles";
+import { promptTerminology } from "./admin/prompt-terms";
 
 export const COUNTER_SYSTEM_PROMPT = `You translate a face-to-face conversation at a service counter — a clinic reception, a government office, a help desk. Two people are standing in front of each other and do not share a language.
 
@@ -129,24 +125,20 @@ function targetLanguageGuidance(targetLang: string): string | null {
 /**
  * Terminology the model must not improvise.
  *
- * Only the entries the conversation is actually using are sent. A twenty-line
- * glossary on every turn costs latency for nothing when the turn is "one
- * moment please", and the point is consistency within a conversation, not
- * teaching the model a dictionary.
+ * Retrieved from the concept registry by deterministic matching over this
+ * utterance and the recent turns — only what the conversation is actually
+ * using, never the whole registry. Administrative desks only.
  */
-function relevantGlossary(input: CounterPromptInput): GlossaryEntry[] {
-  if (input.profileId !== "immigration") return [];
-  const pair = [input.sourceLang, input.targetLang].map((tag) =>
-    tag.split("-")[0].toLowerCase(),
-  );
-  if (!pair.includes("ko") && !pair.includes("en")) return [];
+const TERMINOLOGY_PROFILES = new Set<CounterProfileId>(["immigration", "refugee", "judicial", "public-office"]);
 
-  const haystack = [input.text, ...(input.recent ?? []).map((turn) => turn.text)]
-    .join(" ")
-    .toLowerCase();
-  return IMMIGRATION_GLOSSARY.filter(
-    (entry) => haystack.includes(entry.ko.toLowerCase()) || haystack.includes(entry.en.toLowerCase()),
-  ).slice(0, 8);
+function relevantTerminology(input: CounterPromptInput): string[] {
+  if (!TERMINOLOGY_PROFILES.has(input.profileId ?? "general")) return [];
+  return promptTerminology({
+    text: input.text,
+    sourceLang: input.sourceLang,
+    targetLang: input.targetLang,
+    recent: input.recent,
+  });
 }
 
 /**
@@ -248,14 +240,7 @@ export function buildCounterPrompt(input: CounterPromptInput): string {
   const register = registerGuidance(input.from);
   if (register) lines.push(register);
 
-  const glossary = relevantGlossary(input);
-  if (glossary.length) {
-    lines.push(
-      `ADMINISTRATIVE TERMS IN USE (keep these renderings consistent for the whole conversation):\n${glossary
-        .map((entry) => `  ${entry.ko} = ${entry.en}`)
-        .join("\n")}`,
-    );
-  }
+  lines.push(...relevantTerminology(input));
 
   if (!hasVerifiedGlossary(input.targetLang)) {
     lines.push(

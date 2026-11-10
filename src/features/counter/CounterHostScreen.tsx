@@ -232,6 +232,13 @@ export function CounterHostScreen() {
                     }))
               }
               onDiscard={session.discard}
+              onReview={session.review}
+              onCorrect={(message, text) =>
+                void session.send({ text, source: "text", correctionOf: message.id })
+              }
+              onAskClarification={(message, question) =>
+                void session.send({ text: question, source: "text", clarifies: message.id })
+              }
             />
           </main>
 

@@ -19,6 +19,7 @@
  * English. They are not invented here and are not a style preference.
  */
 import type { CounterProfileId } from "./profiles";
+import { ADMIN_CONCEPTS, registryLanguage } from "./admin/registry";
 
 export interface GlossaryEntry {
   ko: string;
@@ -53,30 +54,24 @@ export function isResidenceStatusCode(letter: string, digits: string): boolean {
 /**
  * Administrative terms whose translation must not drift mid-conversation.
  *
- * English side is the published term, not a paraphrase: "change of workplace"
- * is a specific permission with a specific form, and "job change" is not.
+ * A Korean/English view of the concept registry (`./admin/registry.ts`), which
+ * is now the single source of truth for every language. Kept as an export for
+ * callers that only need the pairs.
+ *
+ * Correction carried by the registry: the old list called 근무처 변경·추가 a
+ * "report". Under 출입국관리법 제21조 it is in principle a prior PERMISSION,
+ * and only some professionals file a report afterwards — so the pairing is now
+ * "change or addition of workplace", which does not decide that for anyone.
  */
 export const IMMIGRATION_GLOSSARY: readonly GlossaryEntry[] = [
-  { ko: "체류기간 연장허가", en: "extension of period of stay" },
-  { ko: "체류자격 변경허가", en: "change of status of stay" },
-  { ko: "체류자격 외 활동허가", en: "permission for activities outside status" },
-  { ko: "근무처 변경·추가 신고", en: "report of change or addition of workplace" },
-  { ko: "외국인등록", en: "foreigner registration" },
-  { ko: "외국인등록증", en: "residence card (foreigner registration card)" },
-  { ko: "체류지 변경신고", en: "report of change of residence" },
-  { ko: "체류기간 만료일", en: "expiration date of the period of stay" },
-  { ko: "체류자격", en: "residence status" },
-  { ko: "체류기간", en: "period of stay" },
-  { ko: "신고기한", en: "reporting deadline" },
-  { ko: "출국기한", en: "departure deadline" },
-  { ko: "재입국허가", en: "re-entry permit" },
-  { ko: "사증", en: "visa" },
+  ...ADMIN_CONCEPTS.filter((concept) => concept.terms.ko && concept.terms.en).map((concept) => ({
+    ko: concept.terms.ko!.term,
+    en: concept.terms.en!.term,
+  })),
   { ko: "여권", en: "passport" },
-  { ko: "예약", en: "appointment" },
   { ko: "하이코리아", en: "HiKorea" },
   { ko: "출입국·외국인청", en: "immigration office" },
   { ko: "통합신청서", en: "integrated application form" },
-  { ko: "수수료", en: "fee" },
 ];
 
 /**
@@ -156,6 +151,41 @@ const ENGLISH_KEYTERMS: readonly string[] = [
   "re-entry permit",
 ];
 
+/** Concepts a visitor is most likely to name in their own language. */
+const HINT_CONCEPTS = [
+  "residence-card",
+  "stay-extension",
+  "status-change",
+  "workplace-change",
+  "residence-change",
+  "reentry-permit",
+  "foreigner-registration",
+  "appointment",
+];
+
+/**
+ * Hints for a visitor language from the registry: the term and the commonest
+ * colloquial wording for each high-frequency concept.
+ *
+ * These are PROVISIONAL terms. As recogniser hints that is acceptable — a hint
+ * only biases recognition toward words that were actually said — but they are
+ * not presented anywhere as official vocabulary.
+ */
+function registryKeyterms(language: string | undefined): string[] {
+  const lang = registryLanguage(language);
+  if (!lang || lang === "ko" || lang === "en") return [];
+  const terms: string[] = [];
+  for (const id of HINT_CONCEPTS) {
+    const concept = ADMIN_CONCEPTS.find((candidate) => candidate.id === id);
+    if (!concept) continue;
+    const term = concept.terms[lang];
+    if (term && term.matchTerm !== false) terms.push(term.term);
+    const colloquial = concept.variants.find((variant) => variant.lang === lang && variant.kind === "colloquial");
+    if (colloquial) terms.push(colloquial.text);
+  }
+  return terms;
+}
+
 /** Keyterms are only worth their query-string cost for the desks that use them. */
 const VOCABULARY_PROFILES = new Set<CounterProfileId>(["immigration", "public-office", "refugee"]);
 
@@ -173,7 +203,8 @@ export function sttKeyterms(
 ): string[] {
   if (!VOCABULARY_PROFILES.has(profileId ?? "general")) return [];
   const base = (language ?? "").split("-")[0].toLowerCase();
-  const spoken = base === "ko" ? KOREAN_KEYTERMS : base === "en" ? ENGLISH_KEYTERMS : [];
+  const spoken =
+    base === "ko" ? KOREAN_KEYTERMS : base === "en" ? ENGLISH_KEYTERMS : registryKeyterms(language);
   // Latin codes are said in Latin whatever the surrounding language is: a
   // Vietnamese speaker still says "E seven", not a translation of it.
   const terms = [...spoken, ...UNIVERSAL_KEYTERMS];
