@@ -7,7 +7,18 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-describe("HomeScreen default language", () => {
+describe("HomeScreen", () => {
+  it("shows working entry points without presenting the demo as live audio", () => {
+    render(<HomeScreen />);
+
+    expect(screen.getByRole("heading", { name: /말을 듣는 동안/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /라이브 통역 시작/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /현장 응대 시작/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /베타 살펴보기/ })).toBeTruthy();
+    expect(screen.getByText("DEMO / NOT LIVE")).toBeTruthy();
+    expect(screen.getByText(/반드시 사람이 확인하세요/)).toBeTruthy();
+  });
+
   it("persists the selected language for Counter Mode", () => {
     render(<HomeScreen />);
 

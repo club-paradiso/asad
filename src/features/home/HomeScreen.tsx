@@ -6,87 +6,224 @@ import { COUNTER_LANGUAGES, findLanguage } from "@/counter/languages";
 import { counterPreferencesStore } from "@/features/counter/preferences";
 import { useLocalStore } from "@/lib/local-store";
 import { BRAND } from "@/lib/brand";
+import styles from "./home.module.css";
+
+const waveHeights = [30, 45, 27, 66, 42, 81, 57, 34, 71, 49, 90, 54, 36, 74, 55, 28, 61, 42, 76, 37, 52, 32, 64, 40];
+
+const modeLinks = [
+  {
+    number: "01",
+    category: "FOR THE INTERPRETER",
+    title: "라이브 통역",
+    english: "Live interpretation",
+    description: "한국어 설교·강연·회의를 듣고 영어 통역에 필요한 문맥과 표현을 확인하세요.",
+    meta: "한국어 → 영어 · 사람 통역자용",
+    href: "/live",
+    action: "라이브 통역 시작",
+    featured: true,
+  },
+  {
+    number: "02",
+    category: "FACE TO FACE",
+    title: "현장 응대",
+    english: "Counter interpretation",
+    description: "직원과 방문객이 서로 다른 언어를 쓸 때, 한 화면에서 대화를 주고받으세요.",
+    meta: "다국어 · QR 참여",
+    href: "/counter",
+    action: "현장 응대 시작",
+    featured: false,
+  },
+  {
+    number: "03",
+    category: "EXPERIMENTAL",
+    title: "이어폰 통역",
+    english: "Earbud mode",
+    description: "외국어를 한국어 음성으로 들을 수 있도록 준비한 실험적 모드입니다.",
+    meta: "베타 · 실제 기기 검증 필요",
+    href: "/listen",
+    action: "베타 살펴보기",
+    featured: false,
+  },
+] as const;
+
+const tools = [
+  { number: "01", href: "/prep", title: "준비 시트", subtitle: "본문과 용어, 문맥을 미리 정리", mark: "PREP" },
+  { number: "02", href: "/booth-preflight", title: "부스 사전 점검", subtitle: "마이크·믹서 입력과 신호 확인", mark: "CHECK" },
+  { number: "03", href: "/sessions", title: "지난 세션", subtitle: "통역 기록 복기와 내보내기", mark: "REVIEW" },
+] as const;
 
 export function HomeScreen() {
   return (
-    <div data-surface="launcher" className="min-h-[100dvh] w-full">
-      <div
-        className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col px-5 sm:px-8 lg:px-10"
-        style={{
-          paddingTop: "calc(1.5rem + var(--safe-top))",
-          paddingBottom: "calc(1.5rem + var(--safe-bottom))",
-        }}
-      >
-        <main className="grid flex-1 items-center gap-10 py-8 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:gap-14 lg:py-12">
-          <section className="flex max-w-xl flex-col gap-6 lg:pr-4">
-            <Wordmark className="text-[2.15rem] sm:text-[2.8rem] lg:text-[3.25rem]" />
+    <div data-surface="launcher" className={styles.page}>
+      <div className={styles.ambientGrid} aria-hidden="true" />
+      <header className={styles.header}>
+        <Link href="/" aria-label="ASAD 홈" className={styles.logo}>
+          <Wordmark variant="compact" />
+          <span className={styles.logoDescriptor}>INTERPRETATION COPILOT</span>
+        </Link>
 
-            <p className="max-w-lg text-lg font-medium leading-relaxed tracking-[-0.018em] text-[var(--fg)] sm:text-xl">
-              <span className="brand-struck text-[var(--fg-muted)]">정확한 번역</span>{" "}
-              아무튼 알아들었으면 된 거 아닌가요.
+        <nav aria-label="주 메뉴" className={styles.nav}>
+          <a href="#workflows">사용 모드</a>
+          <a href="#toolkit">시작 전 준비</a>
+          <Link href="/booth-preflight">장비 점검</Link>
+        </nav>
+        <Link href="/live" className={styles.headerAction}>
+          통역 시작 <ArrowIcon />
+        </Link>
+      </header>
+
+      <main id="main-content" className={styles.main}>
+        <section className={styles.hero} aria-labelledby="hero-title">
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}><span className={styles.eyebrowDot} aria-hidden="true" /> HUMAN FIRST. AI ASSISTED.</p>
+            <h1 id="hero-title" className={styles.heroTitle}>
+              말을 듣는 동안,<br />
+              <span className={styles.heroHighlight}>다음 문장</span>을<br />
+              준비합니다<span className={styles.period}>.</span>
+            </h1>
+            <p className={styles.heroSubcopy}>
+              실시간 통역은 사람이 합니다. ASAD는 흘러가는 말을 붙잡고,
+              문맥과 표현을 한눈에 확인할 수 있게 돕습니다.
             </p>
-
-            <div className="hidden items-center gap-3 text-xs text-[var(--fg-dim)] lg:flex">
-              <span className="font-semibold text-[var(--fg)]">{BRAND.shortName}</span>
-              <span aria-hidden className="h-3 w-px bg-[var(--line-strong)]" />
-              <span>{BRAND.descriptor}</span>
+            <p className={styles.heroTagline}>{BRAND.tagline}</p>
+            <div className={styles.heroActions}>
+              <Link href="/live" className={styles.primaryButton}>
+                라이브 통역 시작 <ArrowIcon />
+              </Link>
+              <Link href="/counter" className={styles.secondaryButton}>
+                현장 응대 열기 <ArrowIcon />
+              </Link>
             </div>
-          </section>
+            <div className={styles.heroMeta}>
+              <span>설치 없이 브라우저에서</span>
+              <span className={styles.metaDivider} aria-hidden="true" />
+              <span>통역자가 최종 확인</span>
+            </div>
+          </div>
 
-          <section className="flex min-w-0 flex-col gap-7">
+          <div className={styles.previewWrap}>
+            <div className={styles.previewFloat} aria-hidden="true">ASAD <span>↗</span></div>
+            <div className={styles.preview} role="img" aria-label="ASAD 라이브 통역 화면의 설명용 예시. 실제 음성 인식이 진행 중인 화면은 아닙니다.">
+              <div className={styles.previewTop}>
+                <span className={styles.previewApp}><span className={styles.previewDot} aria-hidden="true" /> ASAD / CONSOLE</span>
+                <span className={styles.previewDemo}>화면 예시</span>
+              </div>
+              <div className={styles.previewBody}>
+                <div className={styles.previewLabelRow}>
+                  <span>01 / ORIGINAL</span>
+                  <span>KO</span>
+                </div>
+                <p className={styles.previewKorean}>오늘 우리는 서로의 이야기를 듣는 것에서 시작합니다.</p>
+                <div className={styles.previewRule} />
+                <div className={styles.previewLabelRow}>
+                  <span>02 / INTERPRETATION HINT</span>
+                  <span>EN</span>
+                </div>
+                <p className={styles.previewEnglish}>
+                  We begin today by <span>listening to one another.</span>
+                </p>
+              </div>
+              <div className={styles.previewFoot}>
+                <div className={styles.wave} aria-hidden="true">
+                  {waveHeights.map((height, index) => (
+                    <i key={index} style={{ height: String(height) + "%" }} />
+                  ))}
+                </div>
+                <div className={styles.previewFootText}>
+                  <span>사람이 듣고, 판단하고, 말합니다.</span>
+                  <span>DEMO / NOT LIVE</span>
+                </div>
+              </div>
+            </div>
+            <p className={styles.previewCaption}>FIG. 01 <span>사람을 중심에 둔 통역 도구</span></p>
+          </div>
+        </section>
+
+        <section className={styles.modesSection} id="workflows" aria-labelledby="workflows-heading">
+          <div className={styles.sectionHeading}>
+            <div>
+              <p className={styles.sectionKicker}>01 / CHOOSE YOUR FLOW</p>
+              <h2 id="workflows-heading">지금, 어떤 통역이 필요한가요?</h2>
+            </div>
+            <p>사용하는 장소와 상황에 맞는 모드를 선택하세요.<br />상황에 따라 필요한 도구가 달라집니다.</p>
+          </div>
+          <div className={styles.modeGrid}>
+            {modeLinks.map((mode) => (
+              <Link
+                href={mode.href}
+                key={mode.href}
+                className={[styles.modeCard, mode.featured ? styles.modeCardFeatured : ""].join(" ")}
+              >
+                <div className={styles.modeTop}>
+                  <span>{mode.number} / {mode.category}</span>
+                  <span className={styles.modeArrow}><ArrowIcon /></span>
+                </div>
+                <div>
+                  <p className={styles.modeEnglish}>{mode.english}</p>
+                  <h3>{mode.title}</h3>
+                  <p className={styles.modeDescription}>{mode.description}</p>
+                </div>
+                <div className={styles.modeBottom}>
+                  <span>{mode.meta}</span>
+                  <span className={styles.modeCta}>{mode.action}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.toolkitSection} id="toolkit" aria-labelledby="toolkit-heading">
+          <div className={styles.sectionHeading}>
+            <div>
+              <p className={styles.sectionKicker}>02 / GET READY</p>
+              <h2 id="toolkit-heading">시작하기 전에, 필요한 것만.</h2>
+            </div>
+            <p>통역 중에 헤매지 않도록<br />준비와 확인을 미리 끝내세요.</p>
+          </div>
+          <div className={styles.toolkitGrid}>
+            <div className={styles.toolsPanel}>
+              {tools.map((tool) => (
+                <Link href={tool.href} key={tool.href} className={styles.toolRow}>
+                  <span className={styles.toolNumber}>{tool.number}</span>
+                  <span className={styles.toolText}>
+                    <strong>{tool.title}</strong>
+                    <small>{tool.subtitle}</small>
+                  </span>
+                  <span className={styles.toolMark}>{tool.mark}</span>
+                  <ArrowIcon />
+                </Link>
+              ))}
+            </div>
             <DefaultLanguageSetting />
+          </div>
+        </section>
 
-            <div>
-              <p className="brand-caption mb-3">지금 할 일</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <ModeCard
-                  href="/live"
-                  title="라이브 통역"
-                  who="한 사람이 말하고, 당신이 옮깁니다"
-                  detail="설교 · 강연 · 회의 · 한국어 → 영어"
-                  primary
-                />
-                <ModeCard
-                  href="/counter"
-                  title="현장 응대"
-                  who="창구에서 마주 앉아 주고받습니다"
-                  detail="선택한 기본 언어 · QR · 설치 없음"
-                />
-                <ModeCard
-                  href="/listen"
-                  title="이어폰 통역 · BETA"
-                  who="상대방의 말을 한국어 음성으로 듣습니다"
-                  detail="한쪽 에어팟 · 외국어 → 한국어 · 실기기 검증 필요"
-                />
-              </div>
-            </div>
+        <aside className={styles.endnote} aria-label="사용 전 안내">
+          <span className={styles.endnoteSymbol} aria-hidden="true">?</span>
+          <p>AI의 제안은 참고 자료입니다. 숫자, 이름, 부정 표현, 중요한 사실은 <strong>반드시 사람이 확인하세요.</strong></p>
+          <span className={styles.endnoteIndex}>HUMAN IN THE LOOP / ALWAYS</span>
+        </aside>
+      </main>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <p className="brand-caption">도구</p>
-                <span className="text-xs text-[var(--fg-dim)]">시작 전 준비와 기록</span>
-              </div>
-              <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] shadow-sm">
-                <QuietRow href="/prep" title="준비 시트" detail="설교자 · 본문 · 용어 미리 넣기" />
-                <QuietRow
-                  href="/booth-preflight"
-                  title="부스 사전 점검"
-                  detail="믹서 입력 · 신호 레벨 · mix-minus 확인"
-                />
-                <QuietRow href="/sessions" title="지난 세션" detail="복기 · 내보내기" last />
-              </div>
-            </div>
-          </section>
-        </main>
-
-        <footer className="flex flex-col gap-2 border-t border-[var(--line)] pt-4 text-xs leading-relaxed text-[var(--fg-dim)] sm:flex-row sm:items-center sm:justify-between">
-          <span className="lg:hidden">
-            {BRAND.shortName} · {BRAND.descriptor}
-          </span>
-          <span>현장 응대 기록은 세션 동안만 임시 보관됩니다</span>
-        </footer>
-      </div>
+      <footer className={styles.footer}>
+        <div className={styles.footerBrand}>
+          <span>ASAD<span className={styles.footerDot}>.</span></span>
+          <small>{BRAND.secondaryMark}</small>
+        </div>
+        <div className={styles.footerInfo}>
+          <span>현장 응대 기록은 세션 동안만 임시 보관됩니다.</span>
+          <span>AI 통역 보조 · 최종 판단은 사용자에게</span>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" width="20" height="20">
+      <path d="M4 10h11m-4.5-4.5L15 10l-4.5 4.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -95,164 +232,26 @@ function DefaultLanguageSetting() {
   const selected = findLanguage(preferences.hostLang) ?? COUNTER_LANGUAGES[0];
 
   return (
-    <section
-      aria-labelledby="default-language-label"
-      className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-4 shadow-sm sm:p-5"
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
-        <div className="min-w-0">
-          <p id="default-language-label" className="brand-caption">
-            기본 언어
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-[var(--fg-muted)]">
-            현장 응대에서 직원 언어로 사용합니다.
-          </p>
-        </div>
-
-        <label className="relative block shrink-0 sm:w-56">
-          <span className="sr-only">기본 언어 선택</span>
-          <select
-            value={selected.code}
-            onChange={(event) =>
-              setPreferences({ ...preferences, hostLang: event.target.value })
-            }
-            className="min-h-11 w-full appearance-none rounded-xl border border-[var(--line-strong)] bg-[var(--bg)] py-2.5 pl-3.5 pr-10 text-sm font-semibold text-[var(--fg)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-dim)]"
-          >
-            {COUNTER_LANGUAGES.map((language) => (
-              <option key={language.code} value={language.code}>
-                {language.ko} · {language.endonym}
-              </option>
-            ))}
-          </select>
-          <svg
-            aria-hidden
-            viewBox="0 0 20 20"
-            fill="none"
-            className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[var(--fg-dim)]"
-          >
-            <path
-              d="m6.5 8 3.5 3.5L13.5 8"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </label>
+    <section aria-labelledby="default-language-label" className={styles.languagePanel}>
+      <div className={styles.languageHeader}>
+        <span className={styles.languageIcon} aria-hidden="true">文</span>
+        <span>SETTING / COUNTER MODE</span>
       </div>
-
-      <p className="mt-3 border-t border-[var(--line)] pt-3 text-xs leading-relaxed text-[var(--fg-dim)]">
-        현재 {selected.ko}로 설정됨 · 라이브 통역은 현재 한국어 → 영어 고정
-      </p>
+      <h3 id="default-language-label">기본 언어 설정</h3>
+      <p className={styles.languageDescription}>현장 응대에서 직원이 사용하는 언어를 지정하세요.</p>
+      <label className={styles.languageField}>
+        <span className="sr-only">기본 언어 선택</span>
+        <select
+          value={selected.code}
+          onChange={(event) => setPreferences({ ...preferences, hostLang: event.target.value })}
+        >
+          {COUNTER_LANGUAGES.map((language) => (
+            <option key={language.code} value={language.code}>{language.ko} · {language.endonym}</option>
+          ))}
+        </select>
+        <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" width="18" height="18"><path d="m5 7.5 5 5 5-5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </label>
+      <p className={styles.languageStatus}>현재 {selected.ko}로 설정됨 · 라이브 통역은 현재 한국어 → 영어 고정</p>
     </section>
-  );
-}
-
-function ModeCard({
-  href,
-  title,
-  who,
-  detail,
-  primary = false,
-}: {
-  href: string;
-  title: string;
-  who: string;
-  detail: string;
-  primary?: boolean;
-}) {
-  const palette = primary
-    ? "border-[var(--brand-ink)] bg-[var(--brand-ink)] text-[var(--brand-paper)] shadow-md"
-    : "border-[var(--line)] bg-[var(--bg-raised)] text-[var(--fg)] shadow-sm";
-
-  return (
-    <Link
-      href={href}
-      className={`group flex min-h-[10.5rem] flex-col justify-between rounded-[1.35rem] border p-5 transition-[transform,box-shadow,border-color,background-color] active:scale-[0.985] sm:min-h-[11.5rem] ${palette} hover:-translate-y-0.5 hover:shadow-lg`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <span
-          className={
-            primary
-              ? "text-xs font-semibold tracking-wide text-[color-mix(in_srgb,var(--brand-paper)_70%,transparent)]"
-              : "text-xs font-semibold tracking-wide text-[var(--fg-dim)]"
-          }
-        >
-          {detail}
-        </span>
-        <span
-          className={
-            primary
-              ? "grid size-9 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--brand-paper)_12%,transparent)] text-[var(--brand-paper)] transition-transform group-hover:translate-x-0.5"
-              : "grid size-9 shrink-0 place-items-center rounded-full bg-[var(--bg-overlay)] text-[var(--fg)] transition-transform group-hover:translate-x-0.5"
-          }
-        >
-          <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
-            <path
-              d="M5 10h9M10.5 6.5 14 10l-3.5 3.5"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="type-display text-[1.7rem] leading-none sm:text-[1.9rem]">
-          {title}
-        </span>
-        <span
-          className={
-            primary
-              ? "text-sm leading-relaxed text-[color-mix(in_srgb,var(--brand-paper)_72%,transparent)]"
-              : "text-sm leading-relaxed text-[var(--fg-muted)]"
-          }
-        >
-          {who}
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-function QuietRow({
-  href,
-  title,
-  detail,
-  last = false,
-}: {
-  href: string;
-  title: string;
-  detail: string;
-  last?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`group flex min-h-16 items-center gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--accent-dim)] sm:px-5 ${last ? "" : "border-b border-[var(--line)]"}`}
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-[var(--fg)]">{title}</span>
-        <span className="mt-0.5 block truncate text-xs text-[var(--fg-dim)] sm:text-sm">
-          {detail}
-        </span>
-      </span>
-      <svg
-        aria-hidden
-        viewBox="0 0 20 20"
-        className="size-4 shrink-0 text-[var(--fg-dim)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--fg)]"
-        fill="none"
-      >
-        <path
-          d="m7.5 4.5 5.5 5.5-5.5 5.5"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </Link>
   );
 }
