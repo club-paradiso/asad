@@ -37,7 +37,7 @@ describe("HomeScreen", () => {
 
     expect(earbud.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("The meeting will begin in five minutes.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /이어폰 베타 열기/ }).getAttribute("href")).toBe("/listen");
+    expect(screen.getAllByRole("link", { name: /이어폰 베타 열기/ }).every((link) => link.getAttribute("href") === "/listen")).toBe(true);
     expect(within(scenePicker).getByRole("button", { name: /이어폰 청취/ }).getAttribute("aria-pressed")).toBe("true");
   });
 
