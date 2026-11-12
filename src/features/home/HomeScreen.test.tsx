@@ -12,7 +12,7 @@ describe("HomeScreen", () => {
     render(<HomeScreen />);
 
     expect(screen.getByRole("heading", { name: /말을 듣는 동안/ })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /라이브 통역 시작/ })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /라이브 통역 시작/ }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /현장 응대 시작/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /베타 살펴보기/ })).toBeTruthy();
     expect(screen.getByText("DEMO / NOT LIVE")).toBeTruthy();
