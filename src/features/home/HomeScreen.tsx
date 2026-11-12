@@ -1,12 +1,75 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { COUNTER_LANGUAGES, findLanguage } from "@/counter/languages";
 import { counterPreferencesStore } from "@/features/counter/preferences";
 import { useLocalStore } from "@/lib/local-store";
 import { BRAND } from "@/lib/brand";
 import styles from "./home.module.css";
+
+const scenes = [
+  {
+    id: "live",
+    number: "01",
+    name: "예배·행사 통역",
+    short: "여러 사람 앞에서",
+    channel: "INTERPRETER / LIVE",
+    sourceLabel: "KO / ORIGINAL",
+    targetLabel: "EN / SUGGESTION",
+    source: "오늘 우리는 서로의 이야기를 듣는 것에서 시작합니다.",
+    translated: "We begin today by ",
+    emphasis: "listening to one another.",
+    question: "내 목소리로 통역하고, ASAD의 도움을 받고 싶다면.",
+    description: "통역자가 직접 말하는 동안 원문 흐름과 영어 표현 제안을 함께 확인하는 방식입니다.",
+    steps: ["마이크·입력 경로 확인", "본문과 용어 사전 준비", "라이브 통역 시작"],
+    href: "/live",
+    preparation: "/booth-preflight",
+    preparationLabel: "장비 먼저 점검",
+    action: "라이브 통역 시작",
+  },
+  {
+    id: "counter",
+    number: "02",
+    name: "일대일 현장 응대",
+    short: "마주 보고 대화할 때",
+    channel: "COUNTER / FACE TO FACE",
+    sourceLabel: "KO / ORIGINAL",
+    targetLabel: "EN / EXAMPLE",
+    source: "예약 내역을 함께 확인해 볼게요.",
+    translated: "Let's check ",
+    emphasis: "your reservation together.",
+    question: "서로 다른 언어로, 같은 자리에서 대화해야 한다면.",
+    description: "직원은 자신의 기기를 사용하고, 방문자는 QR로 참여하는 대면 대화 흐름입니다.",
+    steps: ["직원 기본 언어 선택", "방문자에게 QR 코드 공유", "대화 내용 함께 확인"],
+    href: "/counter",
+    preparation: "/counter",
+    preparationLabel: "현장 응대 설정",
+    action: "현장 응대 시작",
+  },
+  {
+    id: "listen",
+    number: "03",
+    name: "이어폰 청취",
+    short: "내 귀로 듣고 싶을 때",
+    channel: "EARBUD / EXPERIMENTAL",
+    sourceLabel: "EN / ORIGINAL",
+    targetLabel: "KO / EXAMPLE",
+    source: "The meeting will begin in five minutes.",
+    translated: "회의는 ",
+    emphasis: "5분 후에 시작합니다.",
+    question: "외국어 발화를 한국어로 듣는 방식을 시험해 보고 싶다면.",
+    description: "한국어 자막과 이어폰 출력을 사용하는 실험 기능입니다. 실제 기기에서 확인이 필요합니다.",
+    steps: ["이어폰과 출력 장치 확인", "권한 및 지원 환경 확인", "베타 기능 시험"],
+    href: "/listen",
+    preparation: "/listen",
+    preparationLabel: "베타 안내 보기",
+    action: "이어폰 베타 열기",
+  },
+] as const;
+
+type SceneId = (typeof scenes)[number]["id"];
 
 const waveHeights = [30, 45, 27, 66, 42, 81, 57, 34, 71, 49, 90, 54, 36, 74, 55, 28, 61, 42, 76, 37, 52, 32, 64, 40];
 
@@ -53,6 +116,9 @@ const tools = [
 ] as const;
 
 export function HomeScreen() {
+  const [sceneId, setSceneId] = useState<SceneId>("live");
+  const scene = scenes.find((entry) => entry.id === sceneId) ?? scenes[0];
+
   return (
     <div data-surface="launcher" className={styles.page}>
       <div className={styles.ambientGrid} aria-hidden="true" />
@@ -63,7 +129,7 @@ export function HomeScreen() {
         </Link>
 
         <nav aria-label="주 메뉴" className={styles.nav}>
-          <a href="#workflows">사용 모드</a>
+          <a href="#finder">시작점 찾기</a>
           <a href="#toolkit">시작 전 준비</a>
           <Link href="/booth-preflight">장비 점검</Link>
         </nav>
@@ -75,15 +141,14 @@ export function HomeScreen() {
       <main id="main-content" className={styles.main}>
         <section className={styles.hero} aria-labelledby="hero-title">
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}><span className={styles.eyebrowDot} aria-hidden="true" /> HUMAN FIRST. AI ASSISTED.</p>
+            <p className={styles.eyebrow}><span className={styles.eyebrowDot} aria-hidden="true" /> MADE FOR PEOPLE, NOT REPLACEMENT.</p>
             <h1 id="hero-title" className={styles.heroTitle}>
-              말을 듣는 동안,<br />
-              <span className={styles.heroHighlight}>다음 문장</span>을<br />
-              준비합니다<span className={styles.period}>.</span>
+              말은 흘러가도,<br />
+              <span className={styles.heroHighlight}>의미는 이어지게</span><span className={styles.period}>.</span>
             </h1>
             <p className={styles.heroSubcopy}>
-              실시간 통역은 사람이 합니다. ASAD는 흘러가는 말을 붙잡고,
-              문맥과 표현을 한눈에 확인할 수 있게 돕습니다.
+              말을 알아듣는 순간부터, 다른 언어로 전하는 순간까지.
+              사람의 판단을 중심에 두고, ASAD가 그 사이를 돕습니다.
             </p>
             <p className={styles.heroTagline}>{BRAND.tagline}</p>
             <div className={styles.heroActions}>
@@ -101,27 +166,48 @@ export function HomeScreen() {
             </div>
           </div>
 
-          <div className={styles.previewWrap}>
-            <div className={styles.previewFloat} aria-hidden="true">ASAD <span>↗</span></div>
-            <div className={styles.preview} role="img" aria-label="ASAD 라이브 통역 화면의 설명용 예시. 실제 음성 인식이 진행 중인 화면은 아닙니다.">
+          <div className={styles.previewWrap} data-scene={scene.id}>
+            <div className={styles.sceneOverline}>
+              <span>THE TRANSLATION SPACE</span>
+              <span>INTERACTIVE PREVIEW / 03</span>
+            </div>
+            <div className={styles.preview}>
               <div className={styles.previewTop}>
-                <span className={styles.previewApp}><span className={styles.previewDot} aria-hidden="true" /> ASAD / CONSOLE</span>
-                <span className={styles.previewDemo}>화면 예시</span>
+                <span className={styles.previewApp}><span className={styles.previewDot} aria-hidden="true" /> ASAD / SIGNAL STUDIO</span>
+                <span className={styles.previewDemo}>시뮬레이션 · 실제 통역 아님</span>
               </div>
-              <div className={styles.previewBody}>
+              <div className={styles.sceneTabs} role="group" aria-label="통역 시나리오 미리보기">
+                {scenes.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className={styles.sceneTab}
+                    aria-pressed={sceneId === entry.id}
+                    onClick={() => setSceneId(entry.id)}
+                  >
+                    <span>{entry.number}</span>
+                    {entry.name}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.previewBody} aria-live="polite" aria-atomic="true">
                 <div className={styles.previewLabelRow}>
-                  <span>01 / ORIGINAL</span>
-                  <span>KO</span>
+                  <span>{scene.channel}</span>
+                  <span>SIMULATED</span>
                 </div>
-                <p className={styles.previewKorean}>오늘 우리는 서로의 이야기를 듣는 것에서 시작합니다.</p>
-                <div className={styles.previewRule} />
-                <div className={styles.previewLabelRow}>
-                  <span>02 / INTERPRETATION HINT</span>
-                  <span>EN</span>
+                <div className={styles.previewSpeech}>
+                  <span className={styles.previewField}>{scene.sourceLabel}</span>
+                  <p className={styles.previewKorean}>{scene.source}</p>
                 </div>
-                <p className={styles.previewEnglish}>
-                  We begin today by <span>listening to one another.</span>
-                </p>
+                <div className={styles.signalDivider} aria-hidden="true">
+                  <span className={styles.signalDot} />
+                  <span className={styles.signalTrack} />
+                  <span className={styles.signalCaption}>HUMAN IN CONTROL</span>
+                </div>
+                <div className={styles.previewSpeech}>
+                  <span className={styles.previewField}>{scene.targetLabel}</span>
+                  <p className={styles.previewEnglish}>{scene.translated}<span>{scene.emphasis}</span></p>
+                </div>
               </div>
               <div className={styles.previewFoot}>
                 <div className={styles.wave} aria-hidden="true">
@@ -130,12 +216,60 @@ export function HomeScreen() {
                   ))}
                 </div>
                 <div className={styles.previewFootText}>
-                  <span>사람이 듣고, 판단하고, 말합니다.</span>
+                  <span>장면 전환은 예시만 변경합니다. 마이크는 켜지지 않습니다.</span>
                   <span>DEMO / NOT LIVE</span>
                 </div>
               </div>
             </div>
-            <p className={styles.previewCaption}>FIG. 01 <span>사람을 중심에 둔 통역 도구</span></p>
+            <div className={styles.previewUnder}>
+              <span><span className={styles.previewUnderDot} aria-hidden="true" /> VOICES CONNECTED BY PEOPLE</span>
+              <Link href={scene.href} className={styles.previewLaunch}>
+                {scene.action} <ArrowIcon />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.finder} id="finder" aria-labelledby="finder-title">
+          <div className={styles.finderIntro}>
+            <span className={styles.sectionKicker}>00 / FIND YOUR FLOW</span>
+            <h2 id="finder-title">지금 당신의 상황은?</h2>
+            <p>기능 이름을 외울 필요 없습니다. 현재 필요한 일을 선택하면 출발점을 알려드립니다.</p>
+          </div>
+          <div className={styles.finderShell}>
+            <div className={styles.finderOptions} role="group" aria-label="사용 상황 선택">
+              {scenes.map((entry) => (
+                <button
+                  type="button"
+                  key={entry.id}
+                  className={styles.finderOption}
+                  aria-pressed={scene.id === entry.id}
+                  onClick={() => setSceneId(entry.id)}
+                >
+                  <span className={styles.finderNumber}>{entry.number}</span>
+                  <span><strong>{entry.short}</strong><small>{entry.name}</small></span>
+                  <span className={styles.finderOptionArrow} aria-hidden="true">↗</span>
+                </button>
+              ))}
+            </div>
+            <div className={styles.finderResult} aria-live="polite" aria-atomic="true">
+              <p className={styles.finderResultEyebrow}>RECOMMENDED / {scene.channel}</p>
+              <h3>{scene.question}</h3>
+              <p className={styles.finderResultCopy}>{scene.description}</p>
+              <ol className={styles.finderSteps}>
+                {scene.steps.map((step, index) => (
+                  <li key={step}><span>0{index + 1}</span>{step}</li>
+                ))}
+              </ol>
+              <div className={styles.finderResultActions}>
+                <Link href={scene.href} className={styles.finderPrimary}>
+                  {scene.action} <ArrowIcon />
+                </Link>
+                <Link href={scene.preparation} className={styles.finderSecondary}>
+                  {scene.preparationLabel}
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
 
