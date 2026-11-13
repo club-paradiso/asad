@@ -193,16 +193,16 @@ const noHorizontalScroll = (page) =>
  * ========================================================================== */
 const desk = await desktopContext();
 await desk.page.goto(`${base}/live`, { waitUntil: "networkidle" });
-await desk.page.getByRole("radio", { name: /원격 마이크/ }).click();
+await desk.page.getByRole("radio", { name: /휴대폰 마이크 연결/ }).click();
 const panel = desk.page.getByTestId("remote-mic-panel");
 check("desktop shows the Remote Microphone panel", await panel.isVisible());
 check(
   "desktop offers Remote Microphone separately from device inputs (Continuity stays a device)",
-  (await desk.page.getByRole("radio", { name: /이 맥의 입력 장치/ }).count()) === 1,
+  (await desk.page.getByRole("radio", { name: /이 기기의 마이크/ }).count()) === 1,
 );
 check(
   "Start is blocked before a phone is paired",
-  await desk.page.getByRole("button", { name: /통역 시작/ }).isDisabled(),
+  await desk.page.getByRole("button", { name: /통역 보조 시작/ }).isDisabled(),
 );
 await desk.page.screenshot({ path: join(outDir, "desktop-1440-idle.png") });
 
@@ -304,7 +304,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-connected-dark.png")
 /* =============================================================================
  * 3. Real transcription session through the EXISTING pipeline
  * ========================================================================== */
-const startButton = desk.page.getByRole("button", { name: /통역 시작/ });
+const startButton = desk.page.getByRole("button", { name: /통역 보조 시작/ });
 check("Start is enabled once samples are verified", await startButton.isEnabled());
 const startedAt = Date.now();
 await startButton.click();
@@ -417,7 +417,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-ended-dark.png") });
   // Revoked pairing: the Mac cancels the QR before the phone uses it.
   const d = await desktopContext();
   await d.page.goto(`${base}/live`, { waitUntil: "networkidle" });
-  await d.page.getByRole("radio", { name: /원격 마이크/ }).click();
+  await d.page.getByRole("radio", { name: /휴대폰 마이크 연결/ }).click();
   await d.page.getByRole("button", { name: "휴대폰 연결" }).click();
   await d.page.getByTestId("remote-mic-link").waitFor();
   const link = await d.page.getByTestId("remote-mic-link").inputValue();
@@ -446,7 +446,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-ended-dark.png") });
   // Microphone permission denied.
   const d = await desktopContext();
   await d.page.goto(`${base}/live`, { waitUntil: "networkidle" });
-  await d.page.getByRole("radio", { name: /원격 마이크/ }).click();
+  await d.page.getByRole("radio", { name: /휴대폰 마이크 연결/ }).click();
   await d.page.getByRole("button", { name: "휴대폰 연결" }).click();
   await d.page.getByTestId("remote-mic-link").waitFor();
   const link = await d.page.getByTestId("remote-mic-link").inputValue();
@@ -479,7 +479,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-ended-dark.png") });
   });
   const page = await context.newPage();
   await page.goto(`${base}/live`, { waitUntil: "networkidle" });
-  await page.getByRole("radio", { name: /원격 마이크/ }).click();
+  await page.getByRole("radio", { name: /휴대폰 마이크 연결/ }).click();
   const notice = await page.getByTestId("remote-mic-panel").innerText();
   check(
     "with only browser STT, the incompatibility is explained (no silent substitution)",
