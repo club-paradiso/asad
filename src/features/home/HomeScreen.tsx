@@ -13,7 +13,7 @@ const workflows = [
     index: "01",
     context: "민원 창구 · 안내 데스크 · 매장 · 상담",
     problem: "외국어가 달라도, 마주 보고 대화하세요.",
-    title: "방문객 대화 통역",
+    title: "1:1 대화 통역",
     detail: "직원이 QR을 보여주면 방문객이 자기 휴대폰으로 참여합니다. 서로 자기 언어로 말하거나 입력하고, 원문과 번역을 함께 확인합니다.",
     href: "/counter",
     action: "방문객과 대화 시작",
@@ -118,7 +118,7 @@ export function HomeScreen() {
         <section className={styles.counterFeature} id="counter-feature" aria-labelledby="counter-feature-heading">
           <div className={styles.counterFeatureIntro}>
             <div>
-              <p className={styles.sectionNumber}>01 / 대표 기능 · 방문객 대화 통역</p>
+              <p className={styles.sectionNumber}>01 / 대표 기능 · 1:1 대화 통역</p>
               <h2 id="counter-feature-heading">각자 자기 언어로,<br />같은 대화를.</h2>
             </div>
             <div className={styles.counterFeatureDetail}>
@@ -126,7 +126,7 @@ export function HomeScreen() {
               <Link href="/counter" className={styles.counterFeatureAction}>방문객과 대화 시작 <ArrowIcon /></Link>
             </div>
           </div>
-          <ol className={styles.counterSteps} aria-label="방문객 대화 통역 시작 순서">
+          <ol className={styles.counterSteps} aria-label="1:1 대화 통역 시작 순서">
             <li><span>01</span><strong>직원이 대화 시작</strong><p>직원 화면에서 언어를 확인하고 QR을 만듭니다.</p></li>
             <li><span>02</span><strong>방문객이 QR 스캔</strong><p>방문객이 자신의 휴대폰으로 참여합니다. 앱 설치는 필요 없습니다.</p></li>
             <li><span>03</span><strong>서로 말하거나 입력</strong><p>각자의 언어로 주고받고, 중요한 정보는 원문과 번역을 대조합니다.</p></li>
@@ -166,7 +166,7 @@ export function HomeScreen() {
               <p className={styles.sectionNumber}>03 / 시작 전 준비</p>
               <h2 id="toolkit-heading">시작 전에 챙길 것.</h2>
             </div>
-            <p>실시간 통역 보조를 쓰기 전에는 내용을 준비하고, 방문객 대화 통역에서는 직원 언어를 미리 설정할 수 있습니다.</p>
+            <p>실시간 통역 보조를 쓰기 전에는 내용을 준비하고, 1:1 대화 통역에서는 직원 언어를 미리 설정할 수 있습니다.</p>
           </div>
           <div className={styles.toolkitGrid}>
             <div className={styles.toolList}>
@@ -213,7 +213,7 @@ function DefaultLanguageSetting() {
 
   return (
     <section className={styles.language} aria-labelledby="default-language-label">
-      <p className={styles.languageNote}>방문객 대화 통역 설정</p>
+      <p className={styles.languageNote}>1:1 대화 통역 설정</p>
       <h3 id="default-language-label">직원이 사용하는 언어</h3>
       <p className={styles.languageHelp}>기본 언어는 여기서 미리 지정할 수 있습니다.</p>
       <label className={styles.languageField}>
@@ -228,7 +228,7 @@ function DefaultLanguageSetting() {
         </select>
         <span aria-hidden="true">⌄</span>
       </label>
-      <p className={styles.languageStatus}>방문객 대화 통역의 직원 언어: {selected.ko} · 발표 통역 언어는 통역 보조 화면에서 선택</p>
+      <p className={styles.languageStatus}>1:1 대화 통역의 직원 언어: {selected.ko} · 발표 통역 언어는 통역 보조 화면에서 선택</p>
     </section>
   );
 }
