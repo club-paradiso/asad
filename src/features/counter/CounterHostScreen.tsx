@@ -110,7 +110,7 @@ export function CounterHostScreen() {
         return;
       }
       if (!response.ok || !data.session || !data.participantToken) {
-        setStartError("현장응대를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        setStartError("대화 통역을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
       setNeedsAccessKey(false);
@@ -307,7 +307,7 @@ function HostHeader({
     >
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-[var(--fg)]">
-          {deskLabel || "현장 응대"}
+          {deskLabel || "실시간 대화 통역"}
         </p>
         <p className="truncate text-xs text-[var(--fg-dim)]">
           <span className="font-mono">{formatCode(code)}</span>
@@ -542,7 +542,7 @@ function SetupScreen({
         />
 
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-5">
-          <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "현장 응대"}</p>
+          <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "실시간 대화 통역"}</p>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             {language?.ko ?? hostLang} · {language?.endonym ?? hostLang}
           </p>
@@ -592,7 +592,7 @@ function SetupScreen({
     <div data-surface="launcher" className="min-h-[100dvh] w-full">
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-7 px-5 py-8 sm:py-12">
       <PageHeader
-        title="현장 응대"
+        title="실시간 대화 통역"
         detail="직원 언어만 고르면 바로 시작합니다. 현장 맥락은 대화에 맞춰 자동으로 적용됩니다."
       />
 
