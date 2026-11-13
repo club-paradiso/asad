@@ -68,8 +68,8 @@ await page.screenshot({ path: join(outDir, "prep.png") });
 await page.goto(base, { waitUntil: "networkidle" });
 const homeText = await page.locator("body").innerText();
 check(
-  "home offers both modes as peers",
-  /라이브 통역/.test(homeText) && /현장 응대/.test(homeText),
+  "home prioritizes conversation translation and preserves interpreter assistance",
+  /실시간 대화 통역/.test(homeText) && /발표·강연 통역 보조/.test(homeText),
 );
 await page.screenshot({ path: join(outDir, "home.png") });
 
