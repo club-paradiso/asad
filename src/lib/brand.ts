@@ -35,7 +35,7 @@ export const BRAND = {
   descriptor: "AI 통역 보조",
   englishDescriptor: "AI-assisted interpretation",
   description:
-    "정확한지는 모르겠고, 아무튼 알아들었어요. 라이브 통역과 현장 응대를 위한 AI 통역 보조 서비스.",
+    "정확한지는 모르겠고, 아무튼 알아들었어요. 실시간 대화 통역과 발표·강연 통역 보조를 위한 AI 서비스.",
   liveDescription:
     "일단 말해보세요. 어떻게든 알아듣게 해보겠습니다. 설교·강연·회의를 위한 ASAD 라이브 통역.",
   /**
