@@ -53,5 +53,5 @@ export async function choosePair(page, source, target) {
 
 /** Press Start, whichever label it currently carries. */
 export async function start(page) {
-  await page.getByRole("button", { name: /데모 실행|통역 시작/ }).click();
+  await page.getByRole("button", { name: /데모 실행|통역 보조 시작/ }).click();
 }
