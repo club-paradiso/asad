@@ -103,7 +103,7 @@ describe("Counter Mode, staff side, when the conversation ends", () => {
 
     await openSession();
 
-    await screen.findByText("민원인과의 대화가 종료되었습니다");
+    await screen.findByText("방문객과의 대화가 종료되었습니다");
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
   });
 
