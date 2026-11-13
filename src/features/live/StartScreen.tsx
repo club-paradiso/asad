@@ -50,6 +50,7 @@ import { openSession, readSessionState } from "@/lib/session-client";
 import type { AppConfig } from "@/app/api/config/route";
 import { BRAND } from "@/lib/brand";
 import { Wordmark } from "@/components/brand/Wordmark";
+import styles from "./StartScreen.module.css";
 import {
   findLanguage,
   languageName,
@@ -119,7 +120,7 @@ const SOURCE_LABEL_KO: Partial<Record<SttProviderId, string>> = {
 };
 
 const PAIR_PROBLEM_KO: Record<LanguagePairProblem, string> = {
-  "unknown-source": "이 언어는 라이브 통역의 입력으로 지원되지 않습니다.",
+  "unknown-source": "선택한 언어는 음성 입력을 지원하지 않습니다.",
   "unknown-target": "이 언어는 통역 결과 언어로 지원되지 않습니다.",
   "same-language": "같은 언어끼리는 통역할 수 없습니다. 한쪽을 바꿔주세요.",
 };
@@ -415,53 +416,39 @@ export function StartScreen() {
   };
 
   return (
-    <div data-surface="launcher" className="min-h-[100dvh] w-full">
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[80rem] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
-        <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)] pb-6">
-          <div className="min-w-0">
-            <h1 className="max-w-3xl break-all text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
-              <Wordmark variant="compact" />
-              <span className="text-[var(--line-strong)]">/</span>
-              <span>라이브 통역</span>
-            </h1>
-            <p className="mt-1 text-sm text-[var(--fg-muted)]">{BRAND.liveTagline}</p>
-          </div>
-          <Link
-            href="/"
-            className="ms-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-sm text-[var(--fg-muted)] underline-offset-4 hover:text-[var(--fg)] hover:underline"
-          >
-            <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
-              <path
-                d="M12.5 4.5 7 10l5.5 5.5"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            홈
+    <div data-surface="launcher" className={styles.screen}>
+      <div className={styles.shell}>
+        <header className={styles.topbar}>
+          <Link href="/" className={styles.brand} aria-label="ASAD 홈">
+            <Wordmark variant="compact" />
+            <span className={styles.brandDivider} aria-hidden="true" />
+            <span className={styles.brandLabel}>발표·강연 통역 보조</span>
           </Link>
-          <Link
-            href="/diagnostics"
-            className="inline-flex min-h-11 shrink-0 items-center gap-2 px-2 text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
-          >
-            진단
-            <svg aria-hidden viewBox="0 0 20 20" className="size-4" fill="none">
-              <path
-                d="m7.5 4.5 5.5 5.5-5.5 5.5"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Link>
+          <nav className={styles.navigation} aria-label="페이지 이동">
+            <Link href="/counter">대화 통역</Link>
+            <Link href="/diagnostics">기기 진단</Link>
+            <Link href="/">홈</Link>
+          </nav>
         </header>
 
-        <main className="grid flex-1 gap-8 py-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(22rem,1fr)] lg:gap-10 lg:py-0">
-          <div className="flex min-w-0 flex-col gap-5 lg:py-8">
-            {/* --- The one question ------------------------------------------ */}
-            <LanguagePair
+        <main className={styles.layout}>
+          <div className={styles.workspace}>
+            <div className={styles.intro}>
+              <p className={styles.eyebrow}>INTERPRETER WORKSPACE <span aria-hidden="true">/</span> ASAD 02</p>
+              <h1>말을 옮기는 일에<br />집중하세요.</h1>
+              <p>설교·발표·회의를 직접 통역하는 사람을 위한 작업 공간입니다.
+                ASAD가 원문 흐름과 표현 제안을 정리하고, 최종 통역은 사람이 합니다.</p>
+            </div>
+
+            <section className={styles.primaryPanel} aria-labelledby="language-setup-heading">
+              <div className={styles.panelHeading}>
+                <span className={styles.stepNumber}>01</span>
+                <div>
+                  <h2 id="language-setup-heading">통역 언어 선택</h2>
+                  <p>어떤 언어를 듣고, 어떤 언어로 옮기시나요?</p>
+                </div>
+              </div>
+              <LanguagePair
               source={sourceLanguage}
               target={targetLanguage}
               onSourceChange={(value) =>
@@ -493,7 +480,7 @@ export function StartScreen() {
               size="lg"
               disabled={!mayStart}
               onClick={beginSession}
-              className="w-full"
+              className={styles.startButton}
             >
               {consent.phase === "checking"
                 ? "개인정보 설정 확인 중…"
@@ -501,11 +488,22 @@ export function StartScreen() {
                   ? "개인정보 확인하고 시작"
                   : source === "demo"
                     ? "데모 실행"
-                    : "통역 시작"}
+                    : "통역 보조 시작"}
             </Button>
+            <p className={styles.consentFootnote}>마이크는 시작할 때 활성화됩니다. AI가 제안한 문장은 실제 통역 전에 확인하세요.</p>
+            </section>
+
+            <section className={styles.settingsPanel} aria-labelledby="audio-setup-heading">
+              <div className={styles.panelHeading}>
+                <span className={styles.stepNumber}>02</span>
+                <div>
+                  <h2 id="audio-setup-heading">오디오 및 통역 설정</h2>
+                  <p>기본 설정으로 시작하거나, 사용하는 장비에 맞게 조정하세요.</p>
+                </div>
+              </div>
 
             {/* --- Optional hints, never prerequisites ----------------------- */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className={styles.quickSettings}>
               <HintSelect
                 label="상황"
                 value={settings.context}
@@ -553,20 +551,20 @@ export function StartScreen() {
 
             {/* --- Where the audio comes from -------------------------------- */}
             {source !== "demo" && (
-              <fieldset className="flex flex-col gap-3">
-                <legend className="mb-2 text-xs font-medium text-[var(--fg-dim)]">오디오 입력 방식</legend>
-                <div role="radiogroup" aria-label="오디오 입력 방식" className="grid gap-2 sm:grid-cols-2">
+              <fieldset className={styles.audioSection}>
+                <legend>소리를 받을 기기</legend>
+                <div role="radiogroup" aria-label="오디오 입력 방식" className={styles.audioChoices}>
                   <AudioModeOption
                     checked={audioMode === "device"}
                     onSelect={() => setAudioMode("device")}
-                    title="이 맥의 입력 장치"
-                    detail="내장·외장 마이크, USB 오디오, Continuity로 연결된 iPhone 마이크"
+                    title="이 기기의 마이크"
+                    detail="내장 마이크 또는 연결된 USB·오디오 인터페이스"
                   />
                   <AudioModeOption
                     checked={audioMode === "remote"}
                     onSelect={() => setAudioMode("remote")}
-                    title="원격 마이크 (휴대폰)"
-                    detail="QR로 페어링한 iPhone·Android의 마이크를 받습니다. 같은 Wi-Fi가 아니어도 됩니다"
+                    title="휴대폰 마이크 연결"
+                    detail="QR코드로 휴대폰을 연결해 소리를 입력합니다."
                   />
                 </div>
                 {audioMode === "device" && (
@@ -588,17 +586,12 @@ export function StartScreen() {
               </fieldset>
             )}
 
-            {/* On a phone the readiness answers must be read before the action
-                they qualify. The desktop copy stays in the sticky side rail. */}
-            <div className="lg:hidden">
-              <Readiness rows={rows} demo={source === "demo"} />
-            </div>
+            {/* Advanced settings are optional, and never block the simple path. */}
 
-            {/* --- Everything else ------------------------------------------- */}
             <details
               open={advanced}
               onToggle={(event) => setAdvanced((event.target as HTMLDetailsElement).open)}
-              className="rounded-lg border border-[var(--line)] bg-[var(--bg-raised)]"
+              className={styles.advanced}
             >
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium marker:content-none">
                 <span>
@@ -647,8 +640,14 @@ export function StartScreen() {
                 </Link>
               </div>
             </details>
+            </section>
 
-            <p className="mt-auto border-t border-[var(--line)] pt-5 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
+            {/* On smaller screens show checks below setup, never in a hidden side rail. */}
+            <div className={styles.mobileReadiness}>
+              <Readiness rows={rows} demo={source === "demo"} />
+            </div>
+
+            <p className={styles.keyboardHelp}>
               통역 중 단축키 ·{" "}
               <strong className="font-semibold text-[var(--fg)]">Space</strong> 멈춤 ·{" "}
               <strong className="font-semibold text-[var(--fg)]">T</strong> 프롬프터 ·{" "}
@@ -658,8 +657,20 @@ export function StartScreen() {
             </p>
           </div>
 
-          <aside className="hidden min-w-0 lg:block lg:py-8">
+          <aside className={styles.aside}>
+            <div className={styles.asideIntro}>
+              <span className={styles.stepNumber}>03</span>
+              <div>
+                <h2>시작 전 확인</h2>
+                <p>연결 상태와 제한 사항을 한눈에 확인하세요.</p>
+              </div>
+            </div>
             <Readiness rows={rows} demo={source === "demo"} />
+            <div className={styles.asideLinks}>
+              <span>다른 기능이 필요하신가요?</span>
+              <Link href="/counter">외국인과 직접 대화하기 →</Link>
+              <Link href="/booth-preflight">마이크 및 음향 사전 점검 →</Link>
+            </div>
           </aside>
         </main>
 
@@ -705,11 +716,7 @@ function AudioModeOption({
       role="radio"
       aria-checked={checked}
       onClick={onSelect}
-      className={
-        checked
-          ? "flex min-h-14 flex-col items-start rounded-lg border-2 border-[var(--accent)] bg-[var(--bg-raised)] px-3 py-2 text-left"
-          : "flex min-h-14 flex-col items-start rounded-lg border border-[var(--line)] bg-[var(--bg-raised)] px-3 py-2 text-left hover:border-[var(--line-strong)]"
-      }
+      className={checked ? styles.audioOptionSelected : styles.audioOption}
     >
       <span className="text-sm font-semibold">{title}</span>
       <span className="text-xs text-[var(--fg-muted)]">{detail}</span>
