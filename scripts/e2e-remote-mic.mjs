@@ -485,7 +485,7 @@ await phone.page.screenshot({ path: join(outDir, "phone-390-ended-dark.png") });
     "with only browser STT, the incompatibility is explained (no silent substitution)",
     /Deepgram 또는 OpenAI/.test(notice),
   );
-  check("…and Start is blocked", await page.getByRole("button", { name: /통역 시작|개인정보/ }).isDisabled());
+  check("…and Start is blocked", await page.getByRole("button", { name: /통역 보조 시작|개인정보/ }).isDisabled());
   await context.close();
 }
 
