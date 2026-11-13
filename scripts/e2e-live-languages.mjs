@@ -161,7 +161,7 @@ async function newPage() {
   await chooseRecogniser(page, "webspeech");
   await choosePair(page, "ko-KR", "ko-KR");
 
-  const startButton = page.getByRole("button", { name: /데모 실행|통역 시작/ });
+  const startButton = page.getByRole("button", { name: /데모 실행|통역 보조 시작/ });
   check("Start is disabled on a pair that cannot be interpreted", await startButton.isDisabled());
   check(
     "the launcher says why, rather than failing after the tap",
