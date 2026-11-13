@@ -428,3 +428,20 @@
   .primaryLink, .secondaryLink, .workflow, .asideItem svg { transition: none; }
   .workflow:hover, .asideItem:hover svg { transform: none; }
 }
+
+/* Give the two-way conversation route a clear first-place visual hierarchy. */
+.featuredWorkflow {
+  background: #e9ebe4;
+  border-left: 4px solid var(--ink);
+  padding-left: 18px;
+}
+.featuredWorkflow:hover {
+  background: #e0e4db;
+  padding-left: 24px;
+}
+.featuredWorkflow .workflowContext { color: #465b49; font-weight: 800; }
+.featuredWorkflow .workflowAction > span:first-child { font-size: 15px; }
+@media (max-width: 520px) {
+  .featuredWorkflow { padding-left: 12px; }
+  .featuredWorkflow:hover { padding-left: 12px; background: #e0e4db; }
+}
