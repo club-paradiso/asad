@@ -110,7 +110,7 @@ export function CounterHostScreen() {
         return;
       }
       if (!response.ok || !data.session || !data.participantToken) {
-        setStartError("방문객 대화 통역을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        setStartError("1:1 대화 통역을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
       setNeedsAccessKey(false);
@@ -307,7 +307,7 @@ function HostHeader({
     >
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-[var(--fg)]">
-          {deskLabel || "방문객 대화 통역"}
+          {deskLabel || "1:1 대화 통역"}
         </p>
         <p className="truncate text-xs text-[var(--fg-dim)]">
           <span className="font-mono">{formatCode(code)}</span>
@@ -542,7 +542,7 @@ function SetupScreen({
         />
 
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-5">
-          <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "방문객 대화 통역"}</p>
+          <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "1:1 대화 통역"}</p>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             {language?.ko ?? hostLang} · {language?.endonym ?? hostLang}
           </p>
