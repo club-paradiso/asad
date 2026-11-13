@@ -69,7 +69,7 @@ await page.goto(base, { waitUntil: "networkidle" });
 const homeText = await page.locator("body").innerText();
 check(
   "home prioritizes visitor conversation and retains interpreter assist",
-  /방문객 대화 통역/.test(homeText) &&
+  /1:1 대화 통역/.test(homeText) &&
     /실시간 통역 보조/.test(homeText) &&
     (await page.locator("#modes a").first().getAttribute("href")) === "/counter",
 );
