@@ -3,9 +3,9 @@ import { CounterHostScreen } from "@/features/counter/CounterHostScreen";
 import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: `현장 응대 · ${BRAND.name}`,
+  title: `실시간 대화 통역 · ${BRAND.name}`,
   description:
-    "QR 코드를 보여주면 손님이 자기 휴대폰으로 참여하는 현장 응대 통역. 설치가 필요 없습니다.",
+    "직원과 방문자가 각자의 언어로 대화할 수 있는 실시간 대화 통역. QR코드로 참여하며 앱 설치가 필요 없습니다.",
 };
 
 export default function CounterPage() {
