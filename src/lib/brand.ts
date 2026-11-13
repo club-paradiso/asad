@@ -35,9 +35,9 @@ export const BRAND = {
   descriptor: "AI 통역 보조",
   englishDescriptor: "AI-assisted interpretation",
   description:
-    "정확한지는 모르겠고, 아무튼 알아들었어요. 라이브 통역과 현장 응대를 위한 AI 통역 보조 서비스.",
+    "방문객과는 QR로 대화하고, 설교·강연에서는 통역사를 돕습니다. ASAD 현장 대화 통역 및 실시간 통역 보조.",
   liveDescription:
-    "일단 말해보세요. 어떻게든 알아듣게 해보겠습니다. 설교·강연·회의를 위한 ASAD 라이브 통역.",
+    "설교·강연·회의에서 사람이 직접 통역할 때, 원문 흐름과 표현 제안을 화면에 보여주는 실시간 통역 보조.",
   /**
    * The identity colour, for anywhere a platform asks for one value: a
    * manifest, a store listing, an embed host's `primaryColor`. It is the
