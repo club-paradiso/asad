@@ -3,7 +3,7 @@ import { StartScreen } from "@/features/live/StartScreen";
 import { BRAND } from "@/lib/brand";
 import styles from "./live-page.module.css";
 
-const title = `라이브 통역 · ${BRAND.name}`;
+const title = `발표·강연 통역 보조 · ${BRAND.name}`;
 
 export const metadata: Metadata = {
   title,
