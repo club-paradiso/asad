@@ -449,29 +449,34 @@ export function StartScreen() {
                 </div>
               </div>
               <LanguagePair
-              source={sourceLanguage}
-              target={targetLanguage}
-              onSourceChange={(value) =>
-                updateSettings({ ...settings, sourceLanguage: value })
-              }
-              onTargetChange={(value) =>
-                updateSettings({ ...settings, targetLanguage: value })
-              }
-              onSwap={
-                source === "demo"
-                  ? undefined
-                  : () =>
-                      updateSettings({
-                        ...settings,
-                        sourceLanguage: targetLanguage,
-                        targetLanguage: sourceLanguage,
-                      })
-              }
-            />
+                source={sourceLanguage}
+                target={targetLanguage}
+                onSourceChange={(value) =>
+                  updateSettings({ ...settings, sourceLanguage: value })
+                }
+                onTargetChange={(value) =>
+                  updateSettings({ ...settings, targetLanguage: value })
+                }
+                onSwap={
+                  source === "demo"
+                    ? undefined
+                    : () =>
+                        updateSettings({
+                          ...settings,
+                          sourceLanguage: targetLanguage,
+                          targetLanguage: sourceLanguage,
+                        })
+                }
+              />
 
             {pairProblem && (
               <p role="alert" className="text-sm font-medium text-[var(--danger)]">
                 {PAIR_PROBLEM_KO[pairProblem]}
+              </p>
+            )}
+            {blocked && (
+              <p role="alert" className="mt-3 text-sm font-medium text-[var(--danger)]">
+                세션을 시작하기 전에 아래 준비 상태에서 연결 문제를 확인하세요.
               </p>
             )}
 
@@ -569,7 +574,7 @@ export function StartScreen() {
                 </div>
                 {audioMode === "device" && (
                   <p className="text-xs leading-relaxed text-[var(--fg-dim)]">
-                    맥과 같은 Apple ID의 iPhone을 Continuity 마이크로 쓰면 위 입력 장치 목록에 「iPhone 마이크」로 나타납니다. 그것은 ASAD 원격 마이크와 다른 macOS 기능입니다.
+                    기본적으로 이 기기의 입력을 사용합니다. macOS에서는 연속성 카메라로 연결한 iPhone 마이크를 시스템 입력 장치에서 선택할 수도 있습니다.
                   </p>
                 )}
                 {remoteMode && (
