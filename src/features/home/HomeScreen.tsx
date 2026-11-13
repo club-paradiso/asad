@@ -11,29 +11,29 @@ import styles from "./home.module.css";
 const workflows = [
   {
     index: "01",
-    context: "예배 · 강연 · 회의",
-    problem: "말이 빠를 때, 통역할 다음 문장이 필요해요.",
-    title: "라이브 통역",
-    detail: "통역자가 직접 말합니다. ASAD는 원문 흐름과 문맥, 표현 제안을 화면에 정리합니다.",
-    href: "/live",
-    action: "통역 화면 열기",
-    aside: "내가 직접 통역할 때",
+    context: "안내 데스크 · 민원창구 · 상담",
+    problem: "외국어를 몰라도 서로 대화할 수 있게.",
+    title: "실시간 대화 통역",
+    detail: "각자의 언어로 이야기하세요. 방문자는 QR코드로 자기 휴대폰에서 참여할 수 있습니다.",
+    href: "/counter",
+    action: "대화 통역 시작",
+    aside: "외국인과 직접 대화할 때",
   },
   {
     index: "02",
-    context: "안내 데스크 · 상담 · 대화",
-    problem: "서로 쓰는 언어가 달라서 대화가 막혀요.",
-    title: "현장 응대",
-    detail: "직원 화면에서 QR을 보여주면 방문자가 자기 기기로 참여할 수 있습니다.",
-    href: "/counter",
-    action: "현장 응대 열기",
-    aside: "마주 보고 대화할 때",
+    context: "예배 · 강연 · 회의",
+    problem: "사람이 통역할 때, AI가 옆에서 도와줘요.",
+    title: "발표·강연 통역 보조",
+    detail: "통역자가 직접 말하고, ASAD는 원문과 문맥, 표현 제안을 화면에 정리합니다.",
+    href: "/live",
+    action: "통역 보조 화면 열기",
+    aside: "설교·강연을 직접 통역할 때",
   },
   {
     index: "03",
     context: "실험 기능 · 실제 기기 점검 필요",
     problem: "외국어를 한국어로 듣고 싶어요.",
-    title: "이어폰 통역",
+    title: "이어폰으로 통역 듣기",
     detail: "자막과 이어폰 출력을 시험하는 베타 기능입니다. 실제 사용 환경에서 성능을 확인하세요.",
     href: "/listen",
     action: "베타 살펴보기",
@@ -60,15 +60,15 @@ export function HomeScreen() {
           <a href="#toolkit">준비 도구</a>
           <Link href="/sessions">지난 세션</Link>
         </nav>
-        <Link href="/live" className={styles.headerAction}>
-          통역 시작 <ArrowIcon />
+        <Link href="/counter" className={styles.headerAction}>
+          대화 통역 시작 <ArrowIcon />
         </Link>
       </header>
 
       <main id="main-content" className={styles.main}>
         <section className={styles.hero} aria-labelledby="hero-title">
           <div className={styles.heroMain}>
-            <p className={styles.heroKicker}>조금은 긴 이름의, 통역자를 위한 도구.</p>
+            <p className={styles.heroKicker}>언어가 달라도 대화는 계속되어야 하니까.</p>
             <h1 id="hero-title" className={styles.heroTitle}>
               <span className={styles.heroTitleLead}>{BRAND.nameLead}</span>
               <span className={styles.heroTitleTail}>
@@ -76,15 +76,16 @@ export function HomeScreen() {
               </span>
             </h1>
             <div className={styles.heroExplainer}>
-              <span className={styles.annotation}>여기서 중요한 건</span>
+              <span className={styles.annotation}>가장 먼저 할 일</span>
               <p>
-                통역은 <strong>사람이</strong> 합니다.<br />
-                ASAD는 그 옆에서 듣고, 정리하고, 표현을 제안합니다.
+                <strong>지금 바로 대화해야 하나요?</strong><br />
+                두 사람이 각자의 언어로 말할 수 있도록 ASAD가 통역을 도와줍니다.
+                발표나 설교를 직접 통역한다면 통역 보조 기능을 이용하세요.
               </p>
             </div>
             <div className={styles.heroActions}>
-              <Link href="/live" className={styles.primaryLink}>라이브 통역 시작 <ArrowIcon /></Link>
-              <Link href="/counter" className={styles.secondaryLink}>현장 응대 시작 <ArrowIcon /></Link>
+              <Link href="/counter" className={styles.primaryLink}>실시간 대화 통역 시작 <ArrowIcon /></Link>
+              <Link href="/live" className={styles.secondaryLink}>발표·강연 통역 보조 <ArrowIcon /></Link>
             </div>
           </div>
 
@@ -120,14 +121,14 @@ export function HomeScreen() {
               <p className={styles.sectionNumber}>01 / 사용 방법</p>
               <h2 id="modes-heading">할 일부터 고르세요.</h2>
             </div>
-            <p>기능을 많이 보여드리는 대신, 지금 필요한 세 가지만 남겼습니다.</p>
+            <p>가장 자주 쓰는 대화 통역부터, 전문 통역 보조와 베타 기능까지.</p>
           </div>
           <div className={styles.workflowList}>
             {workflows.map((workflow) => (
-              <Link href={workflow.href} key={workflow.href} className={styles.workflow}>
+              <Link href={workflow.href} key={workflow.href} className={`${styles.workflow} ${workflow.href === "/counter" ? styles.featuredWorkflow : ""}`}>
                 <span className={styles.workflowIndex}>{workflow.index}</span>
                 <div className={styles.workflowBody}>
-                  <span className={styles.workflowContext}>{workflow.context}</span>
+                  <span className={styles.workflowContext}>{workflow.href === "/counter" ? "대표 기능 · " : ""}{workflow.context}</span>
                   <h3>{workflow.problem}</h3>
                   <p>{workflow.detail}</p>
                 </div>
@@ -209,7 +210,7 @@ function DefaultLanguageSetting() {
         </select>
         <span aria-hidden="true">⌄</span>
       </label>
-      <p className={styles.languageStatus}>현재 {selected.ko}로 설정됨 · 라이브 통역은 현재 한국어 → 영어 고정</p>
+      <p className={styles.languageStatus}>현재 {selected.ko}로 설정됨 · 발표·강연 통역 보조는 현재 한국어 → 영어 고정</p>
     </section>
   );
 }
