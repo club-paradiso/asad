@@ -31,13 +31,13 @@ export const BRAND = {
   tagline: "정확한지는 모르겠고, 아무튼 알아들었어요.",
   /** English support line. Used under the Latin lockup, never on its own. */
   taglineEn: "Communication successful. Accuracy unconfirmed.",
-  liveTagline: "일단 말해보세요. 어떻게든 알아듣게 해보겠습니다.",
+  liveTagline: "통역자가 말하는 동안 원문과 표현 제안을 정리합니다.",
   descriptor: "AI 통역 보조",
   englishDescriptor: "AI-assisted interpretation",
   description:
     "정확한지는 모르겠고, 아무튼 알아들었어요. 실시간 대화 통역과 발표·강연 통역 보조를 위한 AI 서비스.",
   liveDescription:
-    "일단 말해보세요. 어떻게든 알아듣게 해보겠습니다. 설교·강연·회의를 위한 ASAD 라이브 통역.",
+    "설교·강연·회의에서 통역자가 직접 말할 수 있도록 원문 흐름과 표현을 정리하는 ASAD 통역 보조 도구.",
   /**
    * The identity colour, for anywhere a platform asks for one value: a
    * manifest, a store listing, an embed host's `primaryColor`. It is the
