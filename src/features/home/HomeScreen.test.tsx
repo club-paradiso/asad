@@ -12,8 +12,10 @@ describe("HomeScreen", () => {
     render(<HomeScreen />);
 
     expect(screen.getByRole("heading", { level: 1, name: /아무튼서로알아들었으면/ })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "라이브 통역 시작" }).getAttribute("href")).toBe("/live");
-    expect(screen.getByRole("link", { name: "현장 응대 시작" }).getAttribute("href")).toBe("/counter");
+    expect(screen.getAllByRole("link", { name: "방문객과 대화 시작" })[0].getAttribute("href")).toBe("/counter");
+    expect(screen.getByRole("link", { name: "실시간 통역 보조" }).getAttribute("href")).toBe("/live");
+    expect(document.querySelector("#modes a")?.getAttribute("href")).toBe("/counter");
+    expect(screen.getByRole("heading", { level: 2, name: /각자 자기 언어로/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /이어폰으로 듣고 싶을 때/ }).getAttribute("href")).toBe("/listen");
     expect(screen.getByText(/반드시 사람이 확인하세요/)).toBeTruthy();
     expect(screen.queryByText("SIGNAL STUDIO")).toBeNull();
@@ -40,7 +42,7 @@ describe("HomeScreen", () => {
 
     expect(picker.value).toBe("fr-FR");
     expect(
-      screen.getByText("현재 프랑스어로 설정됨 · 라이브 통역은 현재 한국어 → 영어 고정"),
+      screen.getByText("1:1 대화 통역의 직원 언어: 프랑스어 · 발표 통역 언어는 통역 보조 화면에서 선택"),
     ).toBeTruthy();
 
     expect(JSON.parse(window.localStorage.getItem(COUNTER_PREFERENCES_STORAGE_KEY) ?? "{}"))

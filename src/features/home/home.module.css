@@ -67,7 +67,7 @@
   display: grid;
   grid-template-columns: minmax(0,1.48fr) minmax(275px,.52fr);
   gap: clamp(38px,5vw,95px);
-  padding: clamp(85px, 9vw, 145px) 0 clamp(105px, 9vw, 155px);
+  padding: clamp(70px, 7vw, 112px) 0 clamp(78px, 7vw, 112px);
   align-items: end;
 }
 .heroMain { min-width: 0; }
@@ -243,7 +243,59 @@
   white-space: nowrap;
 }
 
-.modes { padding-top: 119px; padding-bottom: 130px; scroll-margin-top: 25px; }
+.counterFeature { padding: 105px 0 108px; scroll-margin-top: 24px; }
+.counterFeatureIntro {
+  display: grid;
+  grid-template-columns: minmax(0,1.2fr) minmax(260px,.8fr);
+  gap: clamp(30px, 6vw, 100px);
+  align-items: end;
+  padding-bottom: 40px;
+  border-bottom: 2px solid var(--ink);
+}
+.counterFeatureIntro h2 {
+  font-size: clamp(36px, 5.2vw, 70px);
+  font-weight: 800;
+  line-height: 1.16;
+  letter-spacing: -.075em;
+  word-break: keep-all;
+}
+.counterFeatureDetail p {
+  color: #575b53;
+  font-size: 15px;
+  line-height: 1.85;
+  word-break: keep-all;
+}
+.counterFeatureAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 50px;
+  margin-top: 25px;
+  padding: 0 18px;
+  background: var(--ink);
+  color: white;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 750;
+}
+.counterFeatureAction:hover { background: #464a45; }
+.counterFeatureAction svg { width: 18px; }
+.counterSteps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--rule);
+}
+.counterSteps li { padding: 30px 22px 32px 0; min-width: 0; }
+.counterSteps li + li { padding-left: 24px; border-left: 1px solid var(--rule); }
+.counterSteps li > span { display: block; font: 500 12px var(--font-mono); color: #a13d35; margin-bottom: 21px; }
+.counterSteps strong { display: block; font-size: clamp(17px, 1.9vw, 22px); font-weight: 800; letter-spacing: -.04em; }
+.counterSteps p { margin-top: 11px; color: #686c64; font-size: 13px; line-height: 1.7; word-break: keep-all; }
+
+.modes { padding-top: 82px; padding-bottom: 120px; scroll-margin-top: 25px; }
 .toolkit { padding-top: 103px; padding-bottom: 88px; border-top: 1px solid var(--ink); scroll-margin-top: 25px; }
 .sectionIntro {
   display: flex;
@@ -273,7 +325,8 @@
   text-decoration: none;
   transition: background .16s, padding .16s;
 }
-.workflow:hover { background: #eeede6; padding-left: 12px; }
+.workflowFeatured { background: #eeede6; border-left: 3px solid var(--brand-red); padding-left: 15px; }
+.workflow:hover { background: #e8e6de; padding-left: 15px; }
 .workflowIndex { color: #92968d; font: 500 14px var(--font-mono); align-self: start; padding-top: 8px; }
 .workflowContext { display: block; color: #83877f; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
 .workflowBody h3 {
@@ -379,7 +432,11 @@
   .asideItem { display: flex; gap: 10px; flex-direction: column; align-items: flex-start; padding: 18px 8px; min-height: 110px; }
   .asideIndex { padding-top: 0; }
   .asideItem svg { margin-top: auto; }
-  .modes { padding-block: 80px 97px; }
+  .counterFeature { padding-block: 83px 84px; }
+  .counterFeatureIntro { grid-template-columns: 1fr; gap: 22px; padding-bottom: 32px; }
+  .counterSteps li { padding-right: 15px; }
+  .counterSteps li + li { padding-left: 15px; }
+  .modes { padding-block: 74px 97px; }
   .toolkit { padding-top: 78px; }
   .workflow { grid-template-columns: 45px minmax(0,1fr) 120px; gap: 14px; }
   .workflowAction { padding-left: 18px; }
@@ -401,6 +458,18 @@
   .primaryLink { width: 100%; justify-content: space-between; min-height: 54px; }
   .secondaryLink { min-height: 47px; }
   .asideQuestion { font-size: 23px; }
+  .counterFeature { padding-block: 69px 75px; }
+  .counterFeatureIntro h2 { font-size: clamp(33px, 9vw, 46px); }
+  .counterFeatureDetail p { font-size: 14px; }
+  .counterFeatureAction { width: 100%; }
+  .counterSteps { grid-template-columns: 1fr; }
+  .counterSteps li, .counterSteps li + li {
+    border-left: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 23px 0 24px;
+  }
+  .counterSteps li:last-child { border-bottom: 0; }
+  .counterSteps li > span { margin-bottom: 10px; }
   .asideList { display: block; }
   .asideList li:not(:last-child) { border-right: 0; }
   .asideItem { flex-direction: row; min-height: 66px; align-items: center; padding: 9px 0; }
@@ -413,7 +482,9 @@
   .sectionNumber { margin-bottom: 15px; }
   .sectionIntro h2 { font-size: 34px; }
   .workflow { grid-template-columns: 32px minmax(0,1fr); padding: 26px 0; }
-  .workflow:hover { padding-left: 0; background: transparent; }
+  .workflowFeatured { padding-left: 10px; padding-right: 10px; }
+  .workflow:hover { padding-left: 10px; background: #e8e6de; }
+  .workflow:not(.workflowFeatured):hover { padding-left: 0; background: transparent; }
   .workflowBody h3 { font-size: 21px; }
   .workflowAction { grid-column: 2; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; min-height: auto; padding: 0; gap: 13px; border-left: 0; }
   .workflowAction small { display: none; }
@@ -425,6 +496,6 @@
   .footerRight { text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .primaryLink, .secondaryLink, .workflow, .asideItem svg { transition: none; }
+  .primaryLink, .secondaryLink, .counterFeatureAction, .workflow, .asideItem svg { transition: none; }
   .workflow:hover, .asideItem:hover svg { transform: none; }
 }

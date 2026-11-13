@@ -110,7 +110,7 @@ export function CounterHostScreen() {
         return;
       }
       if (!response.ok || !data.session || !data.participantToken) {
-        setStartError("현장응대를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        setStartError("1:1 대화 통역을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
       setNeedsAccessKey(false);
@@ -307,7 +307,7 @@ function HostHeader({
     >
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-[var(--fg)]">
-          {deskLabel || "현장 응대"}
+          {deskLabel || "1:1 대화 통역"}
         </p>
         <p className="truncate text-xs text-[var(--fg-dim)]">
           <span className="font-mono">{formatCode(code)}</span>
@@ -404,7 +404,7 @@ function HostEndedPanel({ onNext }: { onNext: () => void }) {
           ✓
         </div>
         <h2 className="mt-5 text-2xl font-semibold text-[var(--fg)]">
-          민원인과의 대화가 종료되었습니다
+          방문객과의 대화가 종료되었습니다
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-[var(--fg-muted)]">
           이 대화 화면은 닫혔습니다. 잠시 후 처음 화면으로 돌아갑니다. 돌아가지 않으면
@@ -542,7 +542,7 @@ function SetupScreen({
         />
 
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--bg-raised)] p-5">
-          <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "현장 응대"}</p>
+          <p className="text-lg font-semibold text-[var(--fg)]">{deskLabel || "1:1 대화 통역"}</p>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             {language?.ko ?? hostLang} · {language?.endonym ?? hostLang}
           </p>
