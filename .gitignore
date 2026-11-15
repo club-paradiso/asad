@@ -34,3 +34,9 @@ shot.png
 
 # Compiled native probe (build with tools/audio-probe/build.sh)
 tools/audio-probe/audio-probe
+
+# Generated, version-matched offline inference runtime
+/public/offline-v1/transformers.min.js
+/public/offline-v1/ort-wasm-*
+
+/public/offline-v1/TRANSFORMERS-LICENSE.txt

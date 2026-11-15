@@ -1,0 +1,103 @@
+{
+  "model": "Xenova/whisper-tiny",
+  "environment": "linux x64 AMD EPYC 9V74 80-Core Processor · Node v24.22.1 · ONNX CPU one thread",
+  "loadMs": 1044,
+  "p50Ms": 1314,
+  "p95Ms": 2561,
+  "memory": {
+    "initialMiB": 71,
+    "peakMiB": 574
+  },
+  "rows": [
+    {
+      "round": 0,
+      "label": "clean",
+      "ms": 2561,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다. 확실히 공평하지 않았어요."
+    },
+    {
+      "round": 0,
+      "label": "leading-pause",
+      "ms": 1225,
+      "output": " 이게 저에게 말이 안 되는 것 같았습니다 확실히 공평하지 않았어요"
+    },
+    {
+      "round": 0,
+      "label": "light-noise",
+      "ms": 1418,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다 확실히 공평하지 않았어요"
+    },
+    {
+      "round": 0,
+      "label": "sped-up",
+      "ms": 1326,
+      "output": " 그게 저에게는 많이 안 되는 것 같았습니다. 확실히 공평하지 않았어요."
+    },
+    {
+      "round": 0,
+      "label": "truncated",
+      "ms": 1350,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다. 확실히 공평하지 않아."
+    },
+    {
+      "round": 1,
+      "label": "clean",
+      "ms": 1558,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다. 확실히 공평하지 않았어요."
+    },
+    {
+      "round": 1,
+      "label": "leading-pause",
+      "ms": 1345,
+      "output": " 이게 저에게 말이 안 되는 것 같았습니다 확실히 공평하지 않았어요"
+    },
+    {
+      "round": 1,
+      "label": "light-noise",
+      "ms": 1145,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다 확실히 공평하지 않았어요"
+    },
+    {
+      "round": 1,
+      "label": "sped-up",
+      "ms": 1314,
+      "output": " 그게 저에게는 많이 안 되는 것 같았습니다. 확실히 공평하지 않았어요."
+    },
+    {
+      "round": 1,
+      "label": "truncated",
+      "ms": 1281,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다. 확실히 공평하지 않아."
+    },
+    {
+      "round": 2,
+      "label": "clean",
+      "ms": 1285,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다. 확실히 공평하지 않았어요."
+    },
+    {
+      "round": 2,
+      "label": "leading-pause",
+      "ms": 1262,
+      "output": " 이게 저에게 말이 안 되는 것 같았습니다 확실히 공평하지 않았어요"
+    },
+    {
+      "round": 2,
+      "label": "light-noise",
+      "ms": 1262,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다 확실히 공평하지 않았어요"
+    },
+    {
+      "round": 2,
+      "label": "sped-up",
+      "ms": 1492,
+      "output": " 그게 저에게는 많이 안 되는 것 같았습니다. 확실히 공평하지 않았어요."
+    },
+    {
+      "round": 2,
+      "label": "truncated",
+      "ms": 1288,
+      "output": " 그게 저에게 말이 안 되는 것 같았습니다. 확실히 공평하지 않아."
+    }
+  ]
+}

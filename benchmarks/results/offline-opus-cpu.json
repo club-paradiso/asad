@@ -1,0 +1,193 @@
+{
+  "model": "Xenova/opus-mt-ko-en",
+  "environment": "linux x64 AMD EPYC 9V74 80-Core Processor · Node v24.22.1 · ONNX CPU one thread",
+  "loadMs": 1179,
+  "p50Ms": 819,
+  "p95Ms": 1746,
+  "memory": {
+    "initialMiB": 71,
+    "peakMiB": 469
+  },
+  "rows": [
+    {
+      "round": 0,
+      "label": "conversation",
+      "ms": 460,
+      "output": "It's a good day."
+    },
+    {
+      "round": 0,
+      "label": "negation",
+      "ms": 627,
+      "output": "We didn't cancel the meeting, but time changed."
+    },
+    {
+      "round": 0,
+      "label": "date",
+      "ms": 774,
+      "output": "The meeting starts on November 28, 2026 at 9:30 a.m."
+    },
+    {
+      "round": 0,
+      "label": "money",
+      "ms": 900,
+      "output": "I bought three apples and two boats, and I paid a total of $15.00."
+    },
+    {
+      "round": 0,
+      "label": "scripture",
+      "ms": 470,
+      "output": "I'll read John chapter 3, verse 16."
+    },
+    {
+      "round": 0,
+      "label": "names",
+      "ms": 372,
+      "output": "Moses left Egypt with the Israelites."
+    },
+    {
+      "round": 0,
+      "label": "reference",
+      "ms": 651,
+      "output": "He handed her a book. She didn't read it."
+    },
+    {
+      "round": 0,
+      "label": "politeness",
+      "ms": 845,
+      "output": "I'm sorry, but can you send back the meeting data?"
+    },
+    {
+      "round": 0,
+      "label": "mixed",
+      "ms": 1073,
+      "output": "I'll meet with next week, and I'll share it with Smu."
+    },
+    {
+      "round": 0,
+      "label": "coalesced",
+      "ms": 1179,
+      "output": "I started in Jerusalem, and then I went to Bethlehem, and I came back at 10 o'clock."
+    },
+    {
+      "round": 1,
+      "label": "conversation",
+      "ms": 495,
+      "output": "It's a good day."
+    },
+    {
+      "round": 1,
+      "label": "negation",
+      "ms": 689,
+      "output": "We didn't cancel the meeting, but time changed."
+    },
+    {
+      "round": 1,
+      "label": "date",
+      "ms": 819,
+      "output": "The meeting starts on November 28, 2026 at 9:30 a.m."
+    },
+    {
+      "round": 1,
+      "label": "money",
+      "ms": 962,
+      "output": "I bought three apples and two boats, and I paid a total of $15.00."
+    },
+    {
+      "round": 1,
+      "label": "scripture",
+      "ms": 544,
+      "output": "I'll read John chapter 3, verse 16."
+    },
+    {
+      "round": 1,
+      "label": "names",
+      "ms": 405,
+      "output": "Moses left Egypt with the Israelites."
+    },
+    {
+      "round": 1,
+      "label": "reference",
+      "ms": 715,
+      "output": "He handed her a book. She didn't read it."
+    },
+    {
+      "round": 1,
+      "label": "politeness",
+      "ms": 1228,
+      "output": "I'm sorry, but can you send back the meeting data?"
+    },
+    {
+      "round": 1,
+      "label": "mixed",
+      "ms": 1488,
+      "output": "I'll meet with next week, and I'll share it with Smu."
+    },
+    {
+      "round": 1,
+      "label": "coalesced",
+      "ms": 1632,
+      "output": "I started in Jerusalem, and then I went to Bethlehem, and I came back at 10 o'clock."
+    },
+    {
+      "round": 2,
+      "label": "conversation",
+      "ms": 597,
+      "output": "It's a good day."
+    },
+    {
+      "round": 2,
+      "label": "negation",
+      "ms": 938,
+      "output": "We didn't cancel the meeting, but time changed."
+    },
+    {
+      "round": 2,
+      "label": "date",
+      "ms": 1182,
+      "output": "The meeting starts on November 28, 2026 at 9:30 a.m."
+    },
+    {
+      "round": 2,
+      "label": "money",
+      "ms": 1250,
+      "output": "I bought three apples and two boats, and I paid a total of $15.00."
+    },
+    {
+      "round": 2,
+      "label": "scripture",
+      "ms": 814,
+      "output": "I'll read John chapter 3, verse 16."
+    },
+    {
+      "round": 2,
+      "label": "names",
+      "ms": 566,
+      "output": "Moses left Egypt with the Israelites."
+    },
+    {
+      "round": 2,
+      "label": "reference",
+      "ms": 852,
+      "output": "He handed her a book. She didn't read it."
+    },
+    {
+      "round": 2,
+      "label": "politeness",
+      "ms": 1377,
+      "output": "I'm sorry, but can you send back the meeting data?"
+    },
+    {
+      "round": 2,
+      "label": "mixed",
+      "ms": 1816,
+      "output": "I'll meet with next week, and I'll share it with Smu."
+    },
+    {
+      "round": 2,
+      "label": "coalesced",
+      "ms": 1746,
+      "output": "I started in Jerusalem, and then I went to Bethlehem, and I came back at 10 o'clock."
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "model": "onnx-community/Qwen3-0.6B-ONNX",
+  "environment": "linux x64 AMD EPYC 9V74 80-Core Processor · Node v24.22.1 · ONNX CPU one thread",
+  "loadMs": 2617,
+  "p50Ms": 4699,
+  "p95Ms": 10027,
+  "memory": {
+    "initialMiB": 71,
+    "peakMiB": 1256
+  },
+  "rows": [
+    {
+      "round": 0,
+      "label": "conversation",
+      "ms": 2267,
+      "output": "The weather is good today."
+    },
+    {
+      "round": 0,
+      "label": "negation",
+      "ms": 4527,
+      "output": "We did not abandon the meeting, but we did increase the time."
+    },
+    {
+      "round": 0,
+      "label": "date",
+      "ms": 10027,
+      "output": "The meeting will start on October 28, 2026, at 9:30 a.m."
+    },
+    {
+      "round": 0,
+      "label": "money",
+      "ms": 10172,
+      "output": "3 people and 2 students passed, and the total amount was 15,000 won."
+    },
+    {
+      "round": 0,
+      "label": "scripture",
+      "ms": 3491,
+      "output": "John 3:16."
+    },
+    {
+      "round": 0,
+      "label": "names",
+      "ms": 5401,
+      "output": "The house is Israel, and the city is not Israel."
+    },
+    {
+      "round": 0,
+      "label": "reference",
+      "ms": 9181,
+      "output": "The English translation is: \"Miyu sent a book to Eui, and Eui did not read it.\""
+    },
+    {
+      "round": 0,
+      "label": "politeness",
+      "ms": 5108,
+      "output": "I'm sorry, but could you please send the board members again?"
+    },
+    {
+      "round": 0,
+      "label": "mixed",
+      "ms": 4438,
+      "output": "Please proceed with the Zoom meeting and share the Slack discussion."
+    },
+    {
+      "round": 0,
+      "label": "coalesced",
+      "ms": 6153,
+      "output": "The start was at Jerusalem, and they visited Bellevue at 10."
+    },
+    {
+      "round": 1,
+      "label": "conversation",
+      "ms": 2951,
+      "output": "The weather is good today."
+    },
+    {
+      "round": 1,
+      "label": "negation",
+      "ms": 4699,
+      "output": "We did not abandon the meeting, but we did increase the time."
+    },
+    {
+      "round": 1,
+      "label": "date",
+      "ms": 7725,
+      "output": "The meeting will start on October 28, 2026, at 9:30 a.m."
+    },
+    {
+      "round": 1,
+      "label": "money",
+      "ms": 7313,
+      "output": "3 people and 2 students passed, and the total amount was 15,000 won."
+    },
+    {
+      "round": 1,
+      "label": "scripture",
+      "ms": 2795,
+      "output": "John 3:16."
+    },
+    {
+      "round": 1,
+      "label": "names",
+      "ms": 3925,
+      "output": "The house is Israel, and the city is not Israel."
+    },
+    {
+      "round": 1,
+      "label": "reference",
+      "ms": 7450,
+      "output": "The English translation is: \"Miyu sent a book to Eui, and Eui did not read it.\""
+    },
+    {
+      "round": 1,
+      "label": "politeness",
+      "ms": 4625,
+      "output": "I'm sorry, but could you please send the board members again?"
+    },
+    {
+      "round": 1,
+      "label": "mixed",
+      "ms": 4022,
+      "output": "Please proceed with the Zoom meeting and share the Slack discussion."
+    },
+    {
+      "round": 1,
+      "label": "coalesced",
+      "ms": 5568,
+      "output": "The start was at Jerusalem, and they visited Bellevue at 10."
+    },
+    {
+      "round": 2,
+      "label": "conversation",
+      "ms": 2424,
+      "output": "The weather is good today."
+    },
+    {
+      "round": 2,
+      "label": "negation",
+      "ms": 4646,
+      "output": "We did not abandon the meeting, but we did increase the time."
+    },
+    {
+      "round": 2,
+      "label": "date",
+      "ms": 7595,
+      "output": "The meeting will start on October 28, 2026, at 9:30 a.m."
+    },
+    {
+      "round": 2,
+      "label": "money",
+      "ms": 7455,
+      "output": "3 people and 2 students passed, and the total amount was 15,000 won."
+    },
+    {
+      "round": 2,
+      "label": "scripture",
+      "ms": 3305,
+      "output": "John 3:16."
+    },
+    {
+      "round": 2,
+      "label": "names",
+      "ms": 4024,
+      "output": "The house is Israel, and the city is not Israel."
+    },
+    {
+      "round": 2,
+      "label": "reference",
+      "ms": 7517,
+      "output": "The English translation is: \"Miyu sent a book to Eui, and Eui did not read it.\""
+    },
+    {
+      "round": 2,
+      "label": "politeness",
+      "ms": 4919,
+      "output": "I'm sorry, but could you please send the board members again?"
+    },
+    {
+      "round": 2,
+      "label": "mixed",
+      "ms": 4036,
+      "output": "Please proceed with the Zoom meeting and share the Slack discussion."
+    },
+    {
+      "round": 2,
+      "label": "coalesced",
+      "ms": 5414,
+      "output": "The start was at Jerusalem, and they visited Bellevue at 10."
+    }
+  ]
+}

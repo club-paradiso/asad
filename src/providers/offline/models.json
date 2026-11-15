@@ -1,0 +1,79 @@
+{
+  "translation": {
+    "repo": "Xenova/opus-mt-ko-en",
+    "revision": "d9fa1ac6008242100fecb4fff9b0a5917a1be81f",
+    "files": [
+      {
+        "path": "config.json",
+        "bytes": 1389,
+        "sha256": "8260080db48141328ae198ede2b25483fa4a6f46dc2859784d6e21c188865e43"
+      },
+      {
+        "path": "generation_config.json",
+        "bytes": 293,
+        "sha256": "8dc29fef0fe82109f94ef3c2e6ea6bded3215d357b226c34cf7b4630726766c9"
+      },
+      {
+        "path": "tokenizer.json",
+        "bytes": 6487044,
+        "sha256": "147a41edd62b08c79be8cfe6d3102ad19d8a964ac061b4bd6840ac45d0112011"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "bytes": 282,
+        "sha256": "3df327b013e1fd1a7c7423a3c521d325cb0e641044f5ced6d2ec44ab811b4f0e"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "bytes": 52899741,
+        "sha256": "210e1d2cb5b457cdeeffe288099cc9d1df9f13c35dc3d39fde4ba252af877380"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "bytes": 60212803,
+        "sha256": "e131732653a6d3cec42a8b65f8844980042b036bdaca931446bc4b3530bc3506"
+      }
+    ]
+  },
+  "speech": {
+    "repo": "Xenova/whisper-tiny",
+    "revision": "5332fcc35e32a33b86612b9a57a89be7906102b1",
+    "files": [
+      {
+        "path": "config.json",
+        "bytes": 2248,
+        "sha256": "2b2e4e519084e0ea028b19b153f95202735a971870d6844aa26e559edd292e94"
+      },
+      {
+        "path": "generation_config.json",
+        "bytes": 3716,
+        "sha256": "68ac791fcb4999461a313472125042934656240ba1cba7d1c2627fcbb19ac24c"
+      },
+      {
+        "path": "tokenizer.json",
+        "bytes": 2480466,
+        "sha256": "27fc476bfe7f17299480be2273fc0608e4d5a99aba2ab5dec5374b4482d1a566"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "bytes": 282683,
+        "sha256": "2a4c4281cf9f51ac6ccc406fdc711a087afe6530f671fa7b80953edc498275ce"
+      },
+      {
+        "path": "preprocessor_config.json",
+        "bytes": 339,
+        "sha256": "a6a76d28c93edb273669eb9e0b0636a2bddbb1272c3261e47b7ca6dfdbac1b8d"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "bytes": 10124910,
+        "sha256": "fd9d995b9dcb0520f0dbf6cf68651af639fc385f594d9d876e69ca2802dc438e"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "bytes": 30727765,
+        "sha256": "6c0c125986b007d2e3734bec84c18bda0152071b90b87fadac6d7764499927a0"
+      }
+    ]
+  }
+}

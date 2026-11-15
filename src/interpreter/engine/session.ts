@@ -385,6 +385,11 @@ export class InterpretationEngine {
     if (this.context.observe(observation)) this.emit();
   }
 
+  /** Requeue uncovered turns when the active network policy changes. */
+  refreshTranslationRoute(): void {
+    this.invalidateOutstanding({ restore: !this.stopped });
+  }
+
   /** Transcript-free lane counters, for diagnostics and the soak harness. */
   laneStats(): LaneStats {
     return { ...this.stats };

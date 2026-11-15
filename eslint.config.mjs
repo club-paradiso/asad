@@ -8,6 +8,8 @@ const config = [
       ".next/**",
       "node_modules/**",
       "next-env.d.ts",
+      "public/offline-v1/ort-wasm-*",
+      "public/offline-v1/transformers.min.js",
       "public/sw.js",
       "coverage/**",
     ],

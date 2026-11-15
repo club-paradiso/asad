@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Button, Label, StatusDot } from "@/components/ui/primitives";
 import { useCapability } from "@/hooks/useCapability";
 import { cn } from "@/lib/cn";
+import { OfflineSettings } from "@/features/live/OfflineSettings";
 import { LiveReadiness } from "./LiveReadiness";
 
 /**
@@ -378,6 +379,7 @@ export function DiagnosticsScreen() {
       {/* First, because it is the question a volunteer in a booth actually
           has. Everything below is the evidence; this is the verdict. */}
       <Section title="Live readiness">
+        <OfflineSettings diagnostics />
         <LiveReadiness
           stt={{
             provider: data.stt.provider,

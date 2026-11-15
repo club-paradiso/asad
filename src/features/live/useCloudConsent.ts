@@ -56,6 +56,7 @@ interface ConfigShape {
 /** Every non-demo recogniser may send microphone audio outside the device. */
 export function sttDisclosureFor(source: SttProviderId): DisclosureProvider[] {
   switch (source) {
+    case "offline":
     case "demo":
       return [];
     case "webspeech":
@@ -103,7 +104,7 @@ export function resolvePhase(input: {
 export const phasePermitsStart = (phase: ConsentPhase): boolean =>
   phase === "clear" || phase === "granted";
 
-export function useCloudConsent(source: SttProviderId): CloudConsent {
+export function useCloudConsent(source: SttProviderId, offline = false, localTranslation = false): CloudConsent {
   // DERIVED, never latched.
   //
   // Both of these were previously seeded from `source` on first render, and
@@ -139,7 +140,7 @@ export function useCloudConsent(source: SttProviderId): CloudConsent {
   useEffect(() => {
     // Demo mode touches nothing, so it needs neither a session nor a check.
     // `resolvePhase` returns "clear" for it regardless of `disclosure`.
-    if (source === "demo") return;
+    if (source === "demo" || offline || navigator.onLine === false || (source === "offline" && localTranslation)) return;
 
     let cancelled = false;
 
@@ -191,7 +192,7 @@ export function useCloudConsent(source: SttProviderId): CloudConsent {
     return () => {
       cancelled = true;
     };
-  }, [source, acknowledged]);
+  }, [source, acknowledged, offline, localTranslation]);
 
   const disclosure =
     resolvedDisclosure?.source === source ? resolvedDisclosure.providers : undefined;
@@ -199,11 +200,16 @@ export function useCloudConsent(source: SttProviderId): CloudConsent {
   const phase: ConsentPhase =
     decision ?? resolvePhase({ source, acknowledged, disclosure });
 
+  const grant = useCallback(() => setDecision("granted"), []);
+  const decline = useCallback(() => setDecision("declined"), []);
+  if (offline || (source === "offline" && localTranslation)) {
+    return { phase: "clear", providers: [], mayStart: true, grant, decline };
+  }
   return {
     phase,
     providers: disclosure ?? [],
     mayStart: phasePermitsStart(phase),
-    grant: useCallback(() => setDecision("granted"), []),
-    decline: useCallback(() => setDecision("declined"), []),
+    grant,
+    decline,
   };
 }

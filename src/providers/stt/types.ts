@@ -6,7 +6,7 @@
  * callbacks — unstable partials and finalised text. Swapping provider is a
  * config change, not a rewrite.
  */
-export type SttProviderId = "demo" | "webspeech" | "deepgram" | "openai";
+export type SttProviderId = "demo" | "webspeech" | "deepgram" | "openai" | "offline";
 
 export type SttStatus =
   | "idle"

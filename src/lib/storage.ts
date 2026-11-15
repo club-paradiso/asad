@@ -60,6 +60,11 @@ export function migrateSettings(stored: Record<string, unknown>): SessionSetting
   return {
     ...defaults,
     ...carried,
+    translationEngine: carried.translationEngine === "cloud" || carried.translationEngine === "local"
+      ? carried.translationEngine : "auto",
+    speechEngine: carried.speechEngine === "browser" || carried.speechEngine === "local"
+      ? carried.speechEngine : "auto",
+    offlineMode: carried.offlineMode === true,
     context: isContextMode(carried.context)
       ? carried.context
       : mode === "sermon"

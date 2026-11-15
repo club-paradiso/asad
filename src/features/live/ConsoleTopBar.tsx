@@ -158,12 +158,29 @@ export function consoleStatus(input: {
   // That is the single most important thing the console can tell an
   // interpreter, because it changes how far they can trust what they are
   // reading — most of all on names and numbers.
+  if (!scripted && ai === "unavailable") {
+    return {
+      state: "degraded",
+      label: "Interpretation Unavailable",
+      detail: "Check the on-device translation model in Settings.",
+      problem: true,
+    };
+  }
   if (!scripted && (health.llm === "down" || ai === "local")) {
     return {
       state: "degraded",
       label: "Rule-based",
       detail: "No AI translation right now. Check names and numbers before saying them.",
       problem: true,
+    };
+  }
+
+  if (!scripted && (ai === "device" || ai === "offline-device")) {
+    return {
+      state: "live",
+      label: ai === "offline-device" ? "Offline · Local" : "Live · Local",
+      detail: "On-device Korean-to-English translation. Check names, numbers and context.",
+      problem: false,
     };
   }
 
