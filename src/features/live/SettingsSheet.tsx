@@ -20,6 +20,7 @@ import { LAG_PROFILES } from "@/interpreter/engine/lag";
 import { CONTEXT_LABEL_EN, CONTEXT_MODES } from "@/interpreter/context/context-mode";
 import { romaniseName } from "@/lib/romanise";
 import { STT_PROVIDER_INFO, type SttProviderId } from "@/providers/stt";
+import { OfflineSettings } from "./OfflineSettings";
 import type { InputHealth } from "./input-health";
 import {
   Button,
@@ -134,6 +135,7 @@ export function SettingsSheet({
           />
         </Field>
 
+        <OfflineSettings settings={settings} active />
         <Field label="Lag" hint={LAG_PROFILES[settings.lag].description}>
           <Segmented<LagProfile>
             label="Interpreter lag"

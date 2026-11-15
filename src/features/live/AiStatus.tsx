@@ -13,16 +13,18 @@
  * /diagnostics, where someone has time to read them.
  */
 import { RECOVERY_PROVIDER } from "@/providers/llm/recovery-id";
-export type AiState = "live" | "recovered" | "degraded" | "local" | "connecting";
+export type AiState = "live" | "recovered" | "degraded" | "local" | "device" | "offline-device" | "unavailable" | "connecting";
 
 /** Derive the AI state from what the last interpretation turn reported. */
 export function aiStateFrom(input: {
   llmHealth: "ok" | "degraded" | "down";
   lastProvider?: string;
   started: boolean;
+  offline?: boolean;
 }): AiState {
   if (!input.started) return "connecting";
-  if (input.lastProvider === "local") return "local";
+  if (input.lastProvider === "local-onnx") return input.offline ? "offline-device" : "device";
+  if (input.lastProvider === "local") return input.offline ? "unavailable" : "local";
   // A recovery route IS a real cloud translation, so this is not the same
   // warning as "rule-based". It is worth one line anyway, and only one: a
   // different model chose the wording, so a term settled ten minutes ago may

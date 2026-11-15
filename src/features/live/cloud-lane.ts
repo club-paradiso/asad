@@ -22,6 +22,8 @@ import {
   translateWithBrowserTranslator,
   type BrowserTranslatorSession,
 } from "@/providers/llm/browser-translator";
+import { isEnglishTranslation, isKoEn } from "@/providers/offline/runtime";
+import { LOCAL_TRANSLATION_MODEL, LOCAL_TRANSLATION_PROVIDER } from "@/providers/offline/translation";
 import type { ClientLatencyQueue } from "./client-latency";
 import { cloudBypassMsForFailure } from "./cloud-degradation";
 
@@ -131,6 +133,9 @@ export interface CloudLaneDeps {
   endpoint?: string;
   /** The already-prepared on-device translator, or null. Never awaits a download. */
   browserTranslator: () => BrowserTranslatorSession | null;
+  localTranslation?: (request: InterpretRequest, signal: AbortSignal) => Promise<InterpreterOutput | null>;
+  localReady?: (request: InterpretRequest) => boolean;
+  mode?: () => "auto" | "cloud" | "local";
   /** Deterministic helper for the no-translation floor. */
   local: (request: InterpretRequest) => InterpreterOutput;
   telemetry: ClientLatencyQueue;
@@ -156,6 +161,8 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
     signal: AbortSignal,
     turn?: ContextualTurnInfo,
   ): Promise<InterpretResult> => {
+    const mode = deps.mode?.() ?? "auto";
+    const backupReady = () => mode !== "cloud" && !!(deps.localReady?.(request) || deps.browserTranslator());
     let firstClientDispatchedAt: number | undefined;
     const turnStartedAt = now();
     const turnBudgetMs = clientTurnBudgetMs(request.lag);
@@ -187,13 +194,30 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
     const localFallback = async (reason: string): Promise<InterpretResult> => {
       // Wait for the fast lane's verdict rather than racing it: it is either
       // about to render this Korean or about to say it cannot.
-      if (turn && (await turn.provisionalSettled())) return provisionalStands(reason);
+      if (mode === "auto" && turn && (await turn.provisionalSettled())) return provisionalStands(reason);
       if (signal.aborted) throw new DOMException("aborted", "AbortError");
 
-      const browserTranslator = deps.browserTranslator();
+      const offline = mode === "local";
+      if (mode !== "cloud" && deps.localReady?.(request)) {
+        const output = await deps.localTranslation?.(request, signal);
+        if (output?.safeChunks.length) {
+          deps.onProvider?.(LOCAL_TRANSLATION_PROVIDER);
+          return {
+            output,
+            degraded: !offline,
+            reason: offline ? undefined : "Cloud translation is unavailable. On-device translation is active.",
+            clientDispatchedAt: firstClientDispatchedAt,
+            provider: LOCAL_TRANSLATION_PROVIDER,
+            model: LOCAL_TRANSLATION_MODEL,
+          };
+        }
+      }
+      if (signal.aborted) throw new DOMException("aborted", "AbortError");
+      const browserTranslator = mode === "auto" ? deps.browserTranslator() : null;
       if (browserTranslator) {
         const output = await translateWithBrowserTranslator(browserTranslator, request.pending, signal);
-        if (output) {
+        if (output && (!deps.localReady || !isKoEn(request.source, request.target) ||
+            isEnglishTranslation(request.pending, output.safeChunks.map((chunk) => chunk.text).join(" ")))) {
           deps.onProvider?.(BROWSER_TRANSLATOR_PROVIDER);
           return {
             output,
@@ -208,10 +232,12 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
 
       // Never strand a browser on the deterministic helper. If the on-device
       // translator is unavailable, cloud remains worth retrying next turn.
-      cloudBypassUntil = 0;
+      if (!deps.localReady) cloudBypassUntil = 0;
       deps.onProvider?.("local");
       return {
-        output: deps.local(request),
+        output: offline
+          ? { safeChunks: [], confidence: "low" }
+          : deps.localReady ? { ...deps.local(request), safeChunks: [] } : deps.local(request),
         degraded: true,
         reason,
         clientDispatchedAt: firstClientDispatchedAt,
@@ -220,7 +246,8 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
       };
     };
 
-    if (deps.browserTranslator() && cloudBypassUntil > now()) {
+    if (mode === "local") return localFallback("On-device translation is unavailable. Check the local model in Settings.");
+    if (cloudBypassUntil > now()) {
       return localFallback("Cloud interpretation is cooling down after a quota or rate-limit failure.");
     }
 
@@ -264,6 +291,7 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
             degraded?: boolean;
             reason?: string;
           };
+          if (signal.aborted) throw new DOMException("aborted", "AbortError");
           const parsed = interpreterOutputSchema.safeParse(data.output);
           if (!parsed.success) {
             return localFallback(
@@ -277,13 +305,19 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
           // its deterministic Korean-only answer with on-device English when
           // Chrome has already prepared the translator.
           if (data.provider === "local") {
-            const bypassMs = cloudBypassMsForFailure({ reason: data.reason });
-            if (deps.browserTranslator() && bypassMs > 0) {
+            const bypassMs = cloudBypassMsForFailure({ reason: data.reason }) ||
+              (deps.localReady && data.reason?.startsWith("No cloud interpretation provider") ? 60_000 : 0);
+            if ((deps.localReady || backupReady()) && bypassMs > 0) {
               cloudBypassUntil = now() + bypassMs;
             }
             return localFallback(data.reason ?? "The cloud interpretation provider was unavailable.");
           }
 
+          const rendered = parsed.data.safeChunks.map((chunk) => chunk.text).join(" ").trim();
+          if (!rendered || (deps.localReady && isKoEn(request.source, request.target) &&
+              !isEnglishTranslation(request.pending, rendered))) {
+            return localFallback("The cloud response contained no translated text.");
+          }
           cloudBypassUntil = 0;
           deps.onProvider?.(data.provider);
           return {
@@ -304,7 +338,7 @@ export function createCloudLane(deps: CloudLaneDeps): CloudLane {
         // Once Chrome's translator is ready, retrying a 429 in 350ms merely
         // buys another 429. Fall back immediately and try cloud after the
         // cooldown instead of adding dead air to this sentence.
-        if (response.status === 429 && deps.browserTranslator()) {
+        if (response.status === 429 && (deps.localReady || backupReady())) {
           cloudBypassUntil = now() + cloudBypassMsForFailure({ status: response.status });
           return localFallback(`${lastFailure} Using the on-device backup immediately.`);
         }

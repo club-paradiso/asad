@@ -84,6 +84,8 @@ export function LiveConsole({
     demoBeat,
     startedAt,
     lastProvider,
+    offlineSession,
+    activeSpeech,
     browserTranslatorStatus,
     inputHealth,
     inputLabel,
@@ -227,6 +229,7 @@ export function LiveConsole({
         aiState={aiStateFrom({
           llmHealth: snapshot.health.llm,
           lastProvider,
+          offline: offlineSession,
           started: phase === "running",
         })}
         fault={fault}
@@ -404,7 +407,7 @@ export function LiveConsole({
         degradedReason={snapshot.degradedReason}
         inputHealth={inputHealth}
         inputLabel={inputLabel}
-        source={source}
+        source={activeSpeech ?? source}
       />
     </div>
   );

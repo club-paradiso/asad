@@ -14,6 +14,7 @@ import type {
   ContextMode,
   LagProfile,
   PrepSheet,
+  SessionSettings,
 } from "@/types";
 import { emptyPrepSheet } from "@/types";
 import type { InterpretRequest } from "@/lib/schema";
@@ -48,6 +49,8 @@ import {
 } from "@/providers/stt";
 import type { DemoBeat, DemoScript } from "@/demo/types";
 import { demoScriptFor } from "@/demo/sermon-script";
+import { isEnglishTranslation, isKoEn, localRuntime } from "@/providers/offline/runtime";
+import { translateLocally } from "@/providers/offline/translation";
 import { guardedFetch } from "@/lib/session-client";
 import { ClientLatencyQueue } from "./client-latency";
 import {
@@ -150,6 +153,8 @@ export interface LiveSessionOptions {
   interpretEndpoint?: string;
   /** Demo playback rate; 1 is real time. */
   demoSpeed?: number;
+  translationEngine?: SessionSettings["translationEngine"];
+  offlineMode?: boolean;
   /** Look up Scripture text. Skipped entirely in demo mode. */
   resolveScripture?: boolean;
 }
@@ -181,6 +186,11 @@ export function useLiveSession(options: LiveSessionOptions) {
    * when it is the deterministic local interpreter, because that is the case
    * where the English is not a translation and has to be read differently.
    */
+  const offlineSessionRef = useRef(false);
+  const startedOnRemoteRef = useRef(false);
+  const releaseLocalRef = useRef<(() => void) | null>(null);
+  const [offlineSession, setOfflineSession] = useState(false);
+  const [activeSpeech, setActiveSpeech] = useState<SttProviderId | undefined>(undefined);
   const [lastProvider, setLastProvider] = useState<string | undefined>(undefined);
   const [browserTranslatorStatus, setBrowserTranslatorStatus] =
     useState<BrowserTranslatorStatus>("unsupported");
@@ -257,7 +267,7 @@ export function useLiveSession(options: LiveSessionOptions) {
   }, [snapshot.chunks]);
 
   const flushClientTelemetry = useCallback(() => {
-    if (optionsRef.current.source === "demo") return;
+    if (optionsRef.current.source === "demo" || offlineSessionRef.current || navigator.onLine === false) return;
     const samples = clientLatencyRef.current.batch();
     if (samples.length === 0) return;
     const ids = samples.map((sample) => sample.id);
@@ -336,6 +346,13 @@ export function useLiveSession(options: LiveSessionOptions) {
       endpoint: optionsRef.current.interpretEndpoint,
       fetchImpl: (input, init) => guardedFetch(input, init),
       browserTranslator: () => browserTranslatorRef.current,
+      ...(optionsRef.current.interpretEndpoint ? {} : {
+        localReady: (request: InterpretRequest) => isKoEn(request.source, request.target) &&
+          localRuntime.snapshot().translation.status === "ready",
+        localTranslation: (request: InterpretRequest, signal: AbortSignal) => translateLocally(request.pending, signal),
+        mode: () => offlineSessionRef.current || navigator.onLine === false
+          ? "local" as const : optionsRef.current.translationEngine ?? "auto",
+      }),
       local: (request) =>
         interpretLocally({
           pending: request.pending,
@@ -343,7 +360,10 @@ export function useLiveSession(options: LiveSessionOptions) {
           allowAnticipation: request.allowAnticipation,
         }),
       telemetry: clientLatencyRef.current,
-      onProvider: (provider) => setLastProvider(provider),
+      onProvider: (provider) => {
+        setLastProvider(provider);
+        if (!optionsRef.current.interpretEndpoint) localRuntime.setRoute("translationRoute", provider);
+      },
     });
     return cloudLaneRef.current;
   }, []);
@@ -383,11 +403,17 @@ export function useLiveSession(options: LiveSessionOptions) {
    */
   const provisionalLane = useMemo<ProvisionalLane>(
     () => ({
-      isReady: () => optionsRef.current.source !== "demo" && browserTranslatorRef.current !== null,
-      translate: (text, signal) => {
+      isReady: () => optionsRef.current.source !== "demo" && !offlineSessionRef.current &&
+        optionsRef.current.translationEngine !== "local" && optionsRef.current.translationEngine !== "cloud" &&
+        navigator.onLine !== false && browserTranslatorRef.current !== null,
+      translate: async (text, signal) => {
         const translator = browserTranslatorRef.current;
-        if (!translator) return Promise.resolve(null);
-        return translateWithBrowserTranslator(translator, text, signal);
+        if (!translator) return null;
+        const output = await translateWithBrowserTranslator(translator, text, signal);
+        const { sourceLanguage, targetLanguage } = optionsRef.current;
+        if (output && isKoEn(sourceLanguage, targetLanguage) &&
+            !isEnglishTranslation(text, output.safeChunks.map((chunk) => chunk.text).join(" "))) return null;
+        return output;
       },
       provider: BROWSER_TRANSLATOR_PROVIDER,
       model: BROWSER_TRANSLATOR_MODEL,
@@ -462,6 +488,7 @@ export function useLiveSession(options: LiveSessionOptions) {
   }, []);
 
   const resolveBible = useCallback(async (reference: BibleReference) => {
+    if (offlineSessionRef.current || navigator.onLine === false) return reference;
     const response = await fetch(`/api/bible?ref=${encodeURIComponent(reference.display)}`);
     if (!response.ok) return reference;
     const data = (await response.json()) as { reference?: BibleReference };
@@ -500,6 +527,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     // may emit one last stable transcript as capture closes; stopping the engine
     // first used to throw that final sentence away.
     await teardown();
+    releaseLocalRef.current?.();
+    releaseLocalRef.current = null;
     if (!engine) {
       const finalSnapshot = emptySnapshot(optionsRef.current.context);
       setSnapshot(finalSnapshot);
@@ -541,6 +570,13 @@ export function useLiveSession(options: LiveSessionOptions) {
   const openTransport = useCallback(
     async (engine: InterpretationEngine, supervisor: TransportSupervisor) => {
       const current = optionsRef.current;
+      const source = offlineSessionRef.current ? "offline" : current.source;
+      if (source === "offline" && startedOnRemoteRef.current) {
+        throw new TransportError("unsupported", "Offline recognition needs a local microphone. End this session and choose a device input.");
+      }
+      if (source === "offline" && !isKoEn(current.sourceLanguage, current.targetLanguage)) {
+        throw new TransportError("unsupported", "Local interpretation supports Korean speech and English output.");
+      }
 
       // The recogniser gets only the highest-value terms. In a worship context
       // this includes community-glossary terms that occur in today's prep, and
@@ -555,7 +591,7 @@ export function useLiveSession(options: LiveSessionOptions) {
       );
 
       const credentials =
-        current.source === "demo" || current.source === "webspeech"
+        source === "demo" || source === "webspeech" || source === "offline"
           ? undefined
           : ((await fetchSttCredentials(
               current.sourceLanguage,
@@ -569,14 +605,15 @@ export function useLiveSession(options: LiveSessionOptions) {
       // looked like a successful session while listening to nothing the speaker
       // actually said. The launcher normally prevents this state; if deployment
       // configuration changes underneath an open page, fail visibly instead.
-      if (current.source !== "demo" && current.source !== "webspeech" && !credentials) {
+      if (source !== "demo" && source !== "webspeech" && source !== "offline" && !credentials) {
         throw new TransportError(
           "unsupported",
           `${STT_PROVIDER_INFO[current.source]?.label ?? current.source} speech recognition is not set up on this deployment. Go back and choose Browser input.`,
         );
       }
 
-      const effectiveSource: SttProviderId = credentials?.provider ?? current.source;
+      if (offlineSessionRef.current && source !== "offline") return false;
+      const effectiveSource: SttProviderId = credentials?.provider ?? source;
       const remote = current.audioSource === "remote";
 
       // A remote microphone is raw audio, and only a raw-audio recogniser can
@@ -590,7 +627,7 @@ export function useLiveSession(options: LiveSessionOptions) {
         );
       }
 
-      if (effectiveSource !== current.source) {
+      if (effectiveSource !== source) {
         // Not a fault, but not silent either: the interpreter agreed to send
         // audio to one provider and it is going to a different one.
         setError(
@@ -661,7 +698,14 @@ export function useLiveSession(options: LiveSessionOptions) {
         throw new TransportError("transport", REMOTE_MIC_NOT_CONNECTED);
       }
 
-      await provider.connect();
+      try {
+        await provider.connect();
+      } finally {
+        if (providerRef.current !== provider) await provider.disconnect();
+      }
+      if (providerRef.current !== provider) return false;
+      setActiveSpeech(effectiveSource);
+      if (!current.interpretEndpoint && effectiveSource !== "demo") localRuntime.setRoute("speechRoute", effectiveSource);
 
       if (provider.needsAudio) {
         if (!MicrophoneCapture.isSupported()) {
@@ -743,7 +787,17 @@ export function useLiveSession(options: LiveSessionOptions) {
     // This function is called synchronously from the launcher's Start click.
     // Kick off Translator.create() before the first await so Chrome can use the
     // user's activation to download/instantiate the local language pack.
-    if (current.source !== "demo") prepareBrowserTranslator();
+    const offline = !current.interpretEndpoint && current.source !== "demo" && (current.offlineMode || navigator.onLine === false);
+    offlineSessionRef.current = offline;
+    startedOnRemoteRef.current = current.audioSource === "remote";
+    setOfflineSession(offline);
+    setActiveSpeech(undefined);
+    if (!current.interpretEndpoint && current.source !== "demo") {
+      releaseLocalRef.current?.();
+      releaseLocalRef.current = localRuntime.retain();
+    }
+    if (!offline && current.source !== "demo" &&
+        (!current.translationEngine || current.translationEngine === "auto")) prepareBrowserTranslator();
 
     setError(null);
     setFault(null);
@@ -785,6 +839,10 @@ export function useLiveSession(options: LiveSessionOptions) {
         const mapped = PHASE_FOR[transportPhase];
         if (mapped) setPhase(mapped);
         setFault(nextFault);
+        if (transportPhase === "failed-to-start") {
+          releaseLocalRef.current?.();
+          releaseLocalRef.current = null;
+        }
         if (nextFault) {
           setError(nextFault.message);
           engine.setConnection(nextFault.recovering ? "reconnecting" : "error");
@@ -810,6 +868,28 @@ export function useLiveSession(options: LiveSessionOptions) {
     resolveBible,
     teardown,
   ]);
+
+  useEffect(() => {
+    const onOffline = () => {
+      if (optionsRef.current.source === "demo" || optionsRef.current.interpretEndpoint ||
+          !supervisorRef.current || offlineSessionRef.current) return;
+      offlineSessionRef.current = true;
+      setOfflineSession(true);
+      engineRef.current?.refreshTranslationRoute();
+      supervisorRef.current.report("transport", "Connection lost. Switching to on-device speech recognition.");
+    };
+    const onVisibility = () => {
+      if (document.hidden && providerRef.current?.id === "offline") {
+        supervisorRef.current?.report("device", "Local microphone paused when ASAD went into the background. Tap Resume to continue.");
+      }
+    };
+    window.addEventListener("offline", onOffline);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   // Push setting changes into the running engine rather than restarting it.
   useEffect(() => {
@@ -842,6 +922,8 @@ export function useLiveSession(options: LiveSessionOptions) {
       mountedRef.current = false;
       supervisorRef.current?.dispose();
       supervisorRef.current = null;
+      releaseLocalRef.current?.();
+      releaseLocalRef.current = null;
       browserTranslatorRef.current?.destroy();
       browserTranslatorRef.current = null;
       browserTranslatorPreparationRef.current = null;
@@ -861,6 +943,8 @@ export function useLiveSession(options: LiveSessionOptions) {
     fault,
     demoBeat,
     lastProvider,
+    offlineSession,
+    activeSpeech,
     browserTranslatorStatus,
     inputHealth,
     inputLabel,

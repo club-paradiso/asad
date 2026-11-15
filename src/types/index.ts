@@ -284,6 +284,9 @@ export interface SessionSettings {
    * own recogniser, which owns its microphone.
    */
   noiseSuppression: boolean;
+  translationEngine: "auto" | "cloud" | "local";
+  speechEngine: "auto" | "browser" | "local";
+  offlineMode: boolean;
 }
 
 export const defaultSettings = (): SessionSettings => ({
@@ -298,6 +301,9 @@ export const defaultSettings = (): SessionSettings => ({
   fontScale: 1,
   saveHistory: false,
   noiseSuppression: false,
+  translationEngine: "auto",
+  speechEngine: "auto",
+  offlineMode: false,
 });
 
 /** A user-issued correction, remembered for the rest of the session. */

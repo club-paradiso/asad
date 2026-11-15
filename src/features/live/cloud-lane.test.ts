@@ -254,3 +254,42 @@ describe("the turn budget", () => {
     expect(clientTurnBudgetMs("balanced")).toBeGreaterThan(clientTurnBudgetMs("fast"));
   });
 });
+
+describe("independent local inference", () => {
+  function independent(mode: "auto" | "local", available = true) {
+    const fetchImpl = vi.fn(async () => quotaDead());
+    const localTranslation = vi.fn(async () => ({
+      safeChunks: [{ text: "We should love each other today.", confidence: "low" as const }],
+      confidence: "low" as const,
+    }));
+    return {
+      fetchImpl, localTranslation,
+      lane: createCloudLane({
+        fetchImpl, localTranslation, localReady: () => available, mode: () => mode,
+        browserTranslator: () => null,
+        telemetry: new ClientLatencyQueue(),
+        local: () => ({ safeChunks: [{ text: request.pending, confidence: "low" }], confidence: "low" }),
+      }),
+    };
+  }
+
+  it("replaces a 200 quota response with real local output and bypasses cloud on the next turn", async () => {
+    const { lane, fetchImpl, localTranslation } = independent("auto");
+    const first = await lane.interpret(request, new AbortController().signal);
+    const next = await lane.interpret(request, new AbortController().signal);
+    expect(first.provider).toBe("local-onnx");
+    expect(first.output.safeChunks[0].text).toBe("We should love each other today.");
+    expect(next.provider).toBe("local-onnx");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(localTranslation).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not attempt the API or report a successful translation when local-only has no model", async () => {
+    const { lane, fetchImpl, localTranslation } = independent("local", false);
+    const result = await lane.interpret(request, new AbortController().signal);
+    expect(result.degraded).toBe(true);
+    expect(result.output.safeChunks).toHaveLength(0);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(localTranslation).not.toHaveBeenCalled();
+  });
+});

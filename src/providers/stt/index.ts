@@ -4,6 +4,7 @@
  * The engine asks for a provider by id and receives something that satisfies
  * `SpeechProvider`. Nothing downstream knows or cares which vendor answered.
  */
+import { LocalSpeechProvider } from "@/providers/offline/speech";
 import type { DemoScript } from "@/demo/types";
 import { DemoSpeechProvider, type DemoSpeechOptions } from "./demo";
 import { DeepgramSpeechProvider } from "./deepgram";
@@ -49,6 +50,8 @@ export function createSpeechProvider(options: CreateSttOptions): SpeechProvider 
     }
     case "webspeech":
       return new WebSpeechProvider(options);
+    case "offline":
+      return new LocalSpeechProvider();
     case "deepgram":
       return new DeepgramSpeechProvider(options);
     case "openai":
@@ -70,6 +73,12 @@ export const STT_PROVIDER_INFO: Record<
     detail: "Scripted session — no microphone, no key, works offline",
     needsKey: false,
     needsMic: false,
+  },
+  offline: {
+    label: "Local Whisper",
+    detail: "Korean speech recognition on this device in short audio segments",
+    needsKey: false,
+    needsMic: true,
   },
   webspeech: {
     label: "Browser",

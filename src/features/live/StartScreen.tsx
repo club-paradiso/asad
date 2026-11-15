@@ -35,7 +35,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ContextMode, ResolvedContext, StoredSession } from "@/types";
-import { prepStore, settingsStore } from "@/lib/storage";
+import { loadSettings, prepStore, settingsStore } from "@/lib/storage";
 import { useLocalStore } from "@/lib/local-store";
 import { useCapability } from "@/hooks/useCapability";
 import {
@@ -58,6 +58,8 @@ import {
   type LanguagePairProblem,
 } from "@/lib/languages";
 import { CONTEXT_LABEL_KO } from "@/interpreter/context/context-mode";
+import { OfflineSettings, useOfflineRuntime, useOnline } from "./OfflineSettings";
+import { isKoEn, localRuntime } from "@/providers/offline/runtime";
 import { LiveConsole } from "./LiveConsole";
 import { LanguagePair } from "./LanguagePair";
 import {
@@ -136,6 +138,11 @@ export function StartScreen() {
   const [screen, setScreen] = useState<Screen>("start");
   const [settings, updateSettings] = useLocalStore(settingsStore);
   const [prep] = useLocalStore(prepStore);
+  const online = useOnline();
+  const local = useOfflineRuntime();
+  const offlineMode = settings.offlineMode || !online;
+  const offlineReady = local.shell && local.translation.status === "ready" && local.speech.status === "ready";
+  useEffect(() => { void localRuntime.prepare(["translation", "speech"], false); }, []);
   const [sourceOverride, setSourceOverride] = useState<SttProviderId | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [finished, setFinished] = useState<StoredSession | null>(null);
@@ -152,6 +159,7 @@ export function StartScreen() {
   // Ask the server once what it can actually do, so the launcher never offers
   // a cloud provider that will fail the moment the interpreter presses Start.
   useEffect(() => {
+    if (offlineMode || navigator.onLine === false || loadSettings().offlineMode) return;
     let cancelled = false;
     fetch("/api/config")
       .then((response) => (response.ok ? response.json() : null))
@@ -166,7 +174,7 @@ export function StartScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [offlineMode]);
 
   const configuredSource = useMemo<SttProviderId>(
     () =>
@@ -178,10 +186,11 @@ export function StartScreen() {
     [browserSttAvailable, config],
   );
 
-  const source = sourceOverride ?? configuredSource;
+  const source = offlineMode ? "offline" : settings.speechEngine === "local" ? "offline"
+    : settings.speechEngine === "browser" ? "webspeech" : sourceOverride ?? configuredSource;
   const [audioMode, setAudioMode] = useState<AudioMode>("device");
   const [remoteSourceConfirmed, setRemoteSourceConfirmed] = useState(false);
-  const remoteMode = audioMode === "remote" && source !== "demo";
+  const remoteMode = audioMode === "remote" && source !== "demo" && source !== "offline";
   const rawAudioSource = RAW_AUDIO_SOURCES.has(source);
   const remote = useRemoteMicReceiver();
   // The actual received level, measured only while the launcher shows it.
@@ -227,6 +236,8 @@ export function StartScreen() {
     audioSource: remoteMode ? "remote" : "device",
     remoteStream: remote.currentStream,
     noiseSuppression: settings.noiseSuppression,
+    translationEngine: settings.translationEngine,
+    offlineMode,
   });
 
   // The phone came back after the session gave up waiting for it (a long
@@ -260,7 +271,7 @@ export function StartScreen() {
   }, [remoteMode, screen, sessionPhase, faultMessage, remoteConnected, remoteStream, resumeSession]);
 
   // Resolved here, before the tap, so pressing Start can never outrun it.
-  const consent = useCloudConsent(source);
+  const consent = useCloudConsent(source, offlineMode, settings.translationEngine === "local");
 
   const sources = useMemo(() => {
     const list: SttProviderId[] = ["demo"];
@@ -278,6 +289,8 @@ export function StartScreen() {
         sourceLanguage,
         targetLanguage,
         consent: consent.phase,
+        offlineMode,
+        localTranslationReady: local.translation.status === "ready" && isKoEn(sourceLanguage, targetLanguage),
         audioInputLabel: selectedAudioLabel,
         audioInputSupported: audioInputs.supported,
         audioInputAvailable: audioInputs.selectionAvailable,
@@ -291,6 +304,8 @@ export function StartScreen() {
       sourceLanguage,
       targetLanguage,
       consent.phase,
+      offlineMode,
+      local.translation.status,
       selectedAudioLabel,
       audioInputs.supported,
       audioInputs.selectionAvailable,
@@ -322,7 +337,7 @@ export function StartScreen() {
   }
 
   /* --- Private deployment gate ------------------------------------------ */
-  if (gate?.gated && !gate.authorised) {
+  if (!offlineMode && gate?.gated && !gate.authorised) {
     return (
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-sm flex-col justify-center gap-5 px-5 py-10">
         <header>
@@ -372,6 +387,9 @@ export function StartScreen() {
     consent.mayStart &&
     !pairProblem &&
     !blocked &&
+    (!offlineMode || offlineReady) &&
+    (source !== "offline" || local.speech.status === "ready") &&
+    (settings.translationEngine !== "local" || local.translation.status === "ready" && isKoEn(sourceLanguage, targetLanguage)) &&
     !(canChooseAudioInput && !audioInputs.selectionAvailable) &&
     // A paired phone is not proof of audio: samples must actually be arriving.
     !(remoteMode && (!rawAudioSource || !remoteCheck.canStart));
@@ -616,7 +634,8 @@ export function StartScreen() {
                 </svg>
               </summary>
               <div className="flex flex-col gap-4 border-t border-[var(--line)] px-4 py-3.5">
-                <HintSelect
+                <OfflineSettings settings={settings} onChange={updateSettings} />
+                {!offlineMode && settings.speechEngine === "auto" && <HintSelect
                   label="인식"
                   value={source}
                   onChange={(value) => setSourceOverride(value)}
@@ -625,7 +644,7 @@ export function StartScreen() {
                     label: `인식: ${SOURCE_LABEL_KO[id] ?? STT_PROVIDER_INFO[id].label}`,
                   }))}
                   title="음성 인식을 어디서 할지 고릅니다."
-                />
+                />}
                 <HintSelect
                   label="지연"
                   value={settings.lag}
@@ -775,6 +794,8 @@ export function readinessRows(input: {
   sourceLanguage?: string;
   targetLanguage?: string;
   consent?: string;
+  offlineMode?: boolean;
+  localTranslationReady?: boolean;
   audioInputLabel?: string;
   audioInputSupported?: boolean;
   audioInputAvailable?: boolean;
@@ -844,7 +865,9 @@ export function readinessRows(input: {
                   "부스에서는 실내 마이크보다 교회 믹서나 USB 오디오 인터페이스 피드를 쓰는 편이 낫습니다.",
               };
 
-  const recognition: ReadinessRow = demo
+  const recognition: ReadinessRow = source === "offline"
+    ? { label: "인식", value: "기기 내 한국어 인식", level: "limited", detail: "짧은 음성 단위로 한 문장씩 표시합니다." }
+    : demo
     ? { label: "인식", value: "녹음에 포함되어 있습니다", level: "ready" }
     : source === "webspeech"
       ? {
@@ -860,7 +883,9 @@ export function readinessRows(input: {
 
   // The line that used to name environment variables. It now describes what
   // the interpreter will see on screen.
-  const interpretation: ReadinessRow = !config
+  const interpretation: ReadinessRow = input.offlineMode
+    ? { label: "AI", value: input.localTranslationReady ? "기기 내 번역" : "기기 내 번역 준비 필요", level: "limited" }
+    : !config
     ? { label: "AI", value: "확인 중…", level: "limited" }
     : !config.llm.modelAvailable
       ? {
@@ -876,7 +901,7 @@ export function readinessRows(input: {
             value: `${config.llm.configured} — 용량 제한`,
             level: "limited",
             detail:
-              `${config.llm.capacityNote ?? ""} 지원되는 데스크톱 Chrome에서는 기기 내 번역으로 전환되며, 그 외 브라우저에서는 규칙 기반 보조만 남습니다.`.trim(),
+              `${config.llm.capacityNote ?? ""} 오프라인 번역 모델을 준비하면 지원되는 브라우저에서 기기 내 번역으로 전환할 수 있습니다.`.trim(),
           }
         : { label: "AI", value: config.llm.configured, level: "ready" };
 
@@ -887,7 +912,7 @@ export function readinessRows(input: {
   const disclosureAcknowledged =
     input.consent === "granted" || input.consent === "clear";
 
-  const privacy: ReadinessRow = demo
+  const privacy: ReadinessRow = demo || input.offlineMode
     ? { label: "개인정보", value: "이 기기 밖으로 나가지 않습니다", level: "ready" }
     : !config || input.consent === "checking"
       ? { label: "개인정보", value: "확인 중…", level: "limited" }
@@ -987,6 +1012,9 @@ function languageRow(input: {
     return { label: "언어", value: "한국어 → English (데모 고정)", level: "ready" };
   }
 
+  if (input.source === "offline") return isKoEn(input.sourceLanguage, input.targetLanguage)
+    ? { label: "언어", value: pair, level: "ready" }
+    : { label: "언어", value: pair, level: "blocked", detail: "기기 내 인식은 한국어 → 영어 통역을 지원합니다." };
   const recogniser = RECOGNISER[input.source];
   const support = recogniser ? sttLanguageSupport(recogniser, input.sourceLanguage) : "unsupported";
 
