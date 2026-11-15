@@ -14,6 +14,7 @@
 
 - lint, typecheck, production build 통과. Vitest 1,917건 통과, 기존 2건 건너뜀.
 - 기존 Live 회귀 5종 통과. fallback 7/7, failure 14/14, quota bypass 4/4, two-lane 16/16, language-pair 전체 통과. 기존 E2E의 Web Speech 및 Chrome Translator는 mock이다.
+- 원격 마이크 회귀 검사는 안내문을 영어 결과로 세던 넓은 정규식 대신, 테스트 한국어가 실제 번역 요청에 도달하고 해당 영어 응답이 자막에 표시되는지 확인한다. WebRTC와 오디오 캡처는 실제 브라우저 경로를 거치며 STT와 번역 공급자는 고정 응답을 사용한다.
 - Chromium 156.0.8078.79의 실제 ONNX/WASM E2E 통과. 다운로드 연결 오류 후 재시도, 200/quota fallback의 영어 출력 및 이후 서버 우회, 서버 키가 없는 상태의 영어 출력, 연결을 끊고 `/live`를 새로고침한 뒤 실제 WAV 마이크 입력 → 한국어 원문 → 영어 자막, 외부 및 `/api/*` 요청 0건을 확인했다. 모델 다운로드 응답은 검증된 고정 파일로 제공했다. 두 건의 same-origin 네트워크 실패 로그가 있었고 Worker, 캐시, 한국어 인식과 영어 출력은 완료됐다.
 - 45분 가상 시계 시뮬레이션 11/11. 499개 턴 중 유실 0, 커밋된 영어 덮어쓰기 0, 동시 cloud 호출 최대 1, 대기 턴 최대 2, 종료 후 heap 증가 4.8 MB. 실모델 또는 실제 45분 기기 메모리·발열 측정과 구분한다.
 - [OPUS-MT 원시 출력 및 시간](../benchmarks/results/offline-opus-cpu.json), [Qwen3](../benchmarks/results/offline-qwen-cpu.json), [Whisper Tiny](../benchmarks/results/offline-whisper-cpu.json). 모델별 p50, p95, 초기화 시간 및 RSS는 [성능 보고서](ipad-offline-performance.md)에 있다.

@@ -12,7 +12,8 @@
  * only mocks are at the edges ASAD does not own: `/api/config` is told a
  * Deepgram key exists, `/api/stt/token` returns a dummy credential, and the
  * Deepgram WebSocket is answered by an in-test mock that MEASURES the PCM16
- * frames it receives and replies with a Korean transcript.
+ * frames it receives and replies with a Korean transcript. The interpretation
+ * API returns an English fixture only after receiving that transcript.
  *
  * What this is NOT: iOS Safari. It is Chromium with an iPhone viewport.
  * Physical iPhone + MacBook verification remains a separate, manual step.
@@ -108,6 +109,7 @@ const PHONE_DEVICE = process.env.E2E_PHONE === "android" ? "Pixel 7" : "iPhone 1
 const RELAY = process.env.E2E_EXPECT_TRANSPORT === "relay";
 
 const KOREAN = "안녕하세요. 지금 아이폰 마이크를 이용해서 실시간 한국어 받아쓰기 기능을 테스트하고 있습니다.";
+const ENGLISH = "Testing live Korean transcription with the iPhone microphone.";
 
 /* --- Mock Deepgram: measures what the existing capture pipeline sends --------- */
 const stt = { connections: 0, frames: 0, bytes: 0, nonSilent: 0, lastRms: 0, transcriptsSent: 0, firstNonSilentAt: 0 };
@@ -143,6 +145,17 @@ async function desktopContext() {
   await context.route("**/api/stt/token", (route) =>
     route.fulfill({ json: { provider: "deepgram", token: "e2e-temporary", url: "ws://stt.e2e.test/v1/listen" } }),
   );
+  const interpretationInputs = [];
+  await context.route("**/api/interpret", async (route) => {
+    const { pending } = route.request().postDataJSON();
+    interpretationInputs.push(pending);
+    const text = typeof pending === "string" && pending.includes("받아쓰기") ? ENGLISH : "Hello.";
+    await route.fulfill({ json: {
+      provider: "test-cloud",
+      model: "remote-mic-fixture",
+      output: { safeChunks: [{ text, confidence: "high" }], confidence: "high" },
+    } });
+  });
   await context.routeWebSocket(/stt\.e2e\.test/, (ws) => {
     stt.connections += 1;
     let sentPartial = false;
@@ -171,7 +184,7 @@ async function desktopContext() {
   const page = await context.newPage();
   const problems = [];
   page.on("pageerror", (error) => problems.push(`exception: ${error.message}`));
-  return { context, page, problems };
+  return { context, page, problems, interpretationInputs };
 }
 
 async function phoneContext(extraInit) {
@@ -320,9 +333,9 @@ const koreanShown = await until(async () => /받아쓰기/.test(await desk.page.
 check("Korean transcript from the (mock) STT is displayed", !!koreanShown);
 const englishShown = await until(async () => {
   const text = await desk.page.locator("main").first().innerText();
-  return /[A-Za-z]{3,}/.test(text.replace(/Waiting for the speaker\.|Connecting…|Not listening\./g, "")) ? text : null;
+  return text.includes(ENGLISH) && desk.interpretationInputs.some((input) => input?.includes("받아쓰기"));
 }, 15_000);
-check("interpretation pipeline produces English assistance", !!englishShown);
+check("remote Korean reaches interpretation and the matching English renders", !!englishShown);
 check("MacBook microphone was never opened (getUserMedia calls = 0)", (await desk.page.evaluate(() => window.__gumCalls)) === 0);
 await desk.page.screenshot({ path: join(outDir, "desktop-1440-live.png") });
 
