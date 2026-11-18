@@ -134,7 +134,12 @@ jobs:
   # and because it needs Chromium, which the fast job has no use for.
   e2e:
     name: End-to-end flow
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # The official Playwright image includes WebKit system libraries absent
+    # from vanilla GitHub runners, preventing false-negative browser failures.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+      options: --ipc=host
     timeout-minutes: 20
 
     steps:
@@ -151,7 +156,7 @@ jobs:
       # This job is the one place Chromium is wanted, so it is installed here
       # rather than on every `npm ci` in the repository.
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium webkit
 
       - name: Build
         run: npm run build
@@ -175,6 +180,17 @@ jobs:
           echo "server never came up"
           cat /tmp/server.log
           exit 1
+
+      - name: Smoke check legacy staff and iPad routes
+        run: |
+          curl -fsSL --max-time 12 http://localhost:3000/secret -o /tmp/asad-staff.html
+          curl -fsSL --max-time 12 'http://localhost:3000/intake?desk=ABCD234567' -o /tmp/asad-intake.html
+          grep -q '실시간 접수 시작' /tmp/asad-staff.html || { echo 'Wrong staff HTML response:'; head -c 900 /tmp/asad-staff.html; exit 1; }
+          grep -q '방문 목적' /tmp/asad-intake.html || { echo 'Wrong visitor HTML response:'; head -c 900 /tmp/asad-intake.html; exit 1; }
+          echo 'PASS: staff and visitor URLs load compatibility HTML'
+
+      - name: Legacy iPad and desktop compatibility (Chromium + WebKit)
+        run: node scripts/e2e-intake-compat.mjs http://localhost:3000
 
       - name: Intake start button and recoverable errors
         run: node scripts/e2e-intake-start.mjs http://localhost:3000

@@ -9,9 +9,16 @@ const errors = [];
 page.on("pageerror", err => errors.push(err.message));
 
 try {
-  // Test the real button and React hydration, with the API mocked so no
+  // Test the real button on the legacy-compatible static desk, with API mocked so no
   // real Redis, paid resources, or visitor records are involved.
   let calls = 0;
+  // URLs with a ?query have distinct route globs in Playwright.
+  await page.route("**/api/intake/session?*", async route => {
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ code: "ABCD234567", expiresAt: Date.now() + 3600000, entries: [] }),
+    });
+  });
   await page.route("**/api/intake/session", async route => {
     if (route.request().method() === "GET") {
       await route.fulfill({
