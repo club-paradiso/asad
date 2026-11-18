@@ -49,7 +49,7 @@
     A.request("POST","/api/intake/session",{},null,function(err,data,status){
       state.busy=false;
       if(err || !data || !data.code || !data.staffToken || !data.expiresAt){
-        state.error = status===503 ? "접수 서버 설정 또는 공유 저장소 연결을 확인해 주세요. (HTTP 503)" :
+        state.error = status===503 ? "접수 서버에 연결할 수 없습니다. 저장소 설정 또는 서버 상태를 확인해 주세요. (HTTP 503)" :
           (err || "접수 세션 생성에 실패했습니다. 다시 눌러 주세요.");
         render();return;
       }
@@ -95,7 +95,9 @@
     var title=A.intro("ASAD / STAFF DESK","실시간 방문 요청 접수",
       state.code?"iPad 연결 · 접수 내역 · 방문예약 직접 확인":"접수 시작 버튼을 누르면 QR과 창구 코드를 발급합니다.");
     root.appendChild(title);
-    if(state.error)root.appendChild(notice(state.error,state.error.indexOf("복사")!==-1?"success":"alert"));
+    if(state.error)var statusNotice = notice(state.error, state.error.indexOf("복사")!==-1?"success":"alert");
+    statusNotice.setAttribute("role",state.error.indexOf("복사")!==-1?"status":"alert");
+    root.appendChild(statusNotice);
     if(!state.code){
       var startPanel=panel();
       A.add(startPanel,A.el("h2","새 창구 세션 시작"),notice("고정 접근키 입력 없이 창구별 비밀 세션을 생성합니다. 직원 신원 인증을 대체하지는 않습니다."));
@@ -121,7 +123,7 @@
     link.type="text";link.value=joinUrl();link.readOnly=true;link.setAttribute("aria-label","iPad 연결 주소");
     link.style.maxWidth="100%";link.style.width="100%";connected.appendChild(link);
     var controls=A.actions(
-      A.btn("연결 주소 복사",function(){copyLink(joinUrl(),link);},"btn"),
+      A.btn("iPad 연결 링크 복사",function(){copyLink(joinUrl(),link);},"btn"),
       A.btn(state.busy?"처리 중…":"접수 종료 · 삭제",end,"btn")
     );connected.appendChild(controls);
     connected.appendChild(notice("연결: "+(state.online?"● 정상 · 약 2초 간격 갱신":"● 재연결 중")+" · 2시간 후 세션 자동 만료"));
