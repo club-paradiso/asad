@@ -134,7 +134,12 @@ jobs:
   # and because it needs Chromium, which the fast job has no use for.
   e2e:
     name: End-to-end flow
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # The official Playwright image includes WebKit system libraries absent
+    # from vanilla GitHub runners, preventing false-negative browser failures.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+      options: --ipc=host
     timeout-minutes: 20
 
     steps:
