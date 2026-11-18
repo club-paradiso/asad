@@ -1,0 +1,120 @@
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
+  validCode, INTAKE_TTL_MS,
+} from "./store";
+import {
+  POST as createSession, GET as readSession, PATCH as markSession,
+} from "@/app/api/intake/session/route";
+import { POST as submit } from "@/app/api/intake/submission/route";
+
+const HOST = "http://localhost:3000";
+const headers = { origin: HOST, "content-type": "application/json" };
+const post = (path: string, body: object) => new Request(HOST + path, {
+  method: "POST", headers, body: JSON.stringify(body),
+});
+const staff = (path: string, token: string, method: "GET" | "PATCH" | "DELETE" = "GET", body?: object) =>
+  new Request(HOST + path, {
+    method,
+    headers: {
+      ...headers,
+      "x-asad-intake-staff-token": token,
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+afterEach(() => __setIntakeStore(null));
+
+describe("intake session store", () => {
+  it("isolates staff capability and expires data", async () => {
+    let now = 10_000;
+    const store = createMemoryIntakeStore(() => now);
+    const { session, staffToken } = await store.create();
+    expect(validCode(session.code)).toBe(true);
+    expect(isStaff(session, staffToken)).toBe(true);
+    expect(isStaff(session, "someone-elses-token")).toBe(false);
+    expect(isStaff(session, null)).toBe(false);
+    await store.modify(session.code, s => {
+      s.entries.push({
+        seq: 1, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0,
+        booking: "unsure", receivedAt: now, verification: "unchecked", ticket: "pending",
+      });
+    });
+    const saved = await store.read(session.code);
+    expect(saved?.entries).toHaveLength(1);
+    expect(publicEntries(saved!)[0]).not.toHaveProperty("requestId");
+    now += INTAKE_TTL_MS + 1;
+    expect(await store.read(session.code)).toBeUndefined();
+  });
+});
+
+describe("intake cross-device API", () => {
+  it("transmits a visitor's choice to exactly one staff queue and records manual decisions", async () => {
+    __setIntakeStore(createMemoryIntakeStore());
+    const created = await createSession(post("/api/intake/session", {}));
+    expect(created.status).toBe(201);
+    const { code, staffToken } = await created.json() as { code: string; staffToken: string };
+    const req = {
+      code, language: "EN", serviceIndex: 5, booking: "yes",
+      requestId: crypto.randomUUID(),
+    };
+    const sent = await submit(post("/api/intake/submission", req));
+    expect(sent.status).toBe(201);
+    const { seq } = await sent.json() as { seq: number };
+    expect(seq).toBe(1);
+
+    // Duplicate retry is idempotent.
+    expect((await submit(post("/api/intake/submission", req))).status).toBe(201);
+
+    const unauthorized = await readSession(new Request(HOST + "/api/intake/session?code=" + code));
+    expect(unauthorized.status).toBe(401);
+    const bogus = await readSession(staff("/api/intake/session?code=" + code, "wrong"));
+    expect(bogus.status).toBe(403);
+
+    const read = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    const data = await read.json() as { entries: Array<{ seq: number; booking: string; language: string; serviceIndex: number }> };
+    expect(data.entries).toHaveLength(1);
+    expect(data.entries[0]).toMatchObject({ seq: 1, booking: "yes", language: "EN", serviceIndex: 5 });
+    expect(data.entries[0]).not.toHaveProperty("requestId");
+
+    const disallowed = await markSession(staff("/api/intake/session", staffToken, "PATCH", {
+      code, seq: 1, ticket: "issued",
+    }));
+    expect(disallowed.status).toBe(409);
+
+    const verified = await markSession(staff("/api/intake/session", staffToken, "PATCH", {
+      code, seq: 1, verification: "confirmed",
+    }));
+    expect(verified.status).toBe(200);
+    const issued = await markSession(staff("/api/intake/session", staffToken, "PATCH", {
+      code, seq: 1, ticket: "issued",
+    }));
+    expect(issued.status).toBe(200);
+    const result = await issued.json() as { entries: Array<{ ticket: string }> };
+    expect(result.entries[0].ticket).toBe("issued");
+
+    const other = await createSession(post("/api/intake/session", {}));
+    expect(other.status).toBe(201);
+    const otherSession = await other.json() as { code: string; staffToken: string };
+    const crossRead = await readSession(staff("/api/intake/session?code=" + code, otherSession.staffToken));
+    expect(crossRead.status).toBe(403);
+  });
+
+  it("refuses invalid input, incorrect origin and unrelated free text", async () => {
+    __setIntakeStore(createMemoryIntakeStore());
+    const created = await createSession(post("/api/intake/session", {}));
+    const { code } = await created.json() as { code: string };
+    const invalid = await submit(post("/api/intake/submission", {
+      code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 55,
+      booking: "yes", passportNumber: "M1234567",
+    }));
+    expect(invalid.status).toBe(400);
+    const blocked = await submit(new Request(HOST + "/api/intake/submission", {
+      method: "POST", headers: { origin: "https://other.example", "content-type": "application/json" },
+      body: JSON.stringify({
+        code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 3, booking: "no",
+      }),
+    }));
+    expect(blocked.status).toBe(403);
+  });
+});
