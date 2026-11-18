@@ -23,8 +23,10 @@
     if(state.expiresAt<=Date.now()){
       resetLocal();setError("접수 세션이 만료됐습니다. 새 접수를 시작해 주세요.");return;
     }
-    A.request("GET","/api/intake/session?code="+state.code+"&t="+Date.now(),null,auth(),function(err,data,status){
-      if(!state.code || state.stopped)return;
+    var pollingCode=state.code,pollingToken=state.token;
+    A.request("GET","/api/intake/session?code="+pollingCode+"&t="+Date.now(),null,auth(),function(err,data,status){
+      // A response from an ended session must never overwrite a new desk.
+      if(state.stopped || state.code!==pollingCode || state.token!==pollingToken)return;
       if(status===401 || status===403 || status===404){
         resetLocal();setError("창구 세션이 종료됐습니다. 새 접수를 시작해 주세요.");return;
       }
@@ -95,9 +97,11 @@
     var title=A.intro("ASAD / STAFF DESK","실시간 방문 요청 접수",
       state.code?"iPad 연결 · 접수 내역 · 방문예약 직접 확인":"접수 시작 버튼을 누르면 QR과 창구 코드를 발급합니다.");
     root.appendChild(title);
-    if(state.error)var statusNotice = notice(state.error, state.error.indexOf("복사")!==-1?"success":"alert");
-    statusNotice.setAttribute("role",state.error.indexOf("복사")!==-1?"status":"alert");
-    root.appendChild(statusNotice);
+    if(state.error){
+      var statusNotice=notice(state.error,state.error.indexOf("복사")!==-1?"success":"alert");
+      statusNotice.setAttribute("role",state.error.indexOf("복사")!==-1?"status":"alert");
+      root.appendChild(statusNotice);
+    }
     if(!state.code){
       var startPanel=panel();
       A.add(startPanel,A.el("h2","새 창구 세션 시작"),notice("고정 접근키 입력 없이 창구별 비밀 세션을 생성합니다. 직원 신원 인증을 대체하지는 않습니다."));
