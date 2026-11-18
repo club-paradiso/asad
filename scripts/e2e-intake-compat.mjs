@@ -67,7 +67,12 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     const guestResponse=await visitor.goto(base+"/intake?desk="+code,{waitUntil:"domcontentloaded"});
     if(staffResponse.headers()["content-type"].indexOf("text/html")<0 ||
        guestResponse.headers()["content-type"].indexOf("text/html")<0)throw Error("Compatibility HTML not served");
-    await staff.getByRole("button",{name:"실시간 접수 시작"}).click();
+    console.log("DEBUG STAFF", JSON.stringify({
+      url:staff.url(),status:staffResponse.status(),
+      text:(await staff.locator("body").innerText()).slice(0,900),
+      html:(await staff.locator("body").innerHTML()).slice(0,700)
+    }));
+    await staff.getByRole("button",{name:"실시간 접수 시작"}).click({timeout:4000});
     await staff.getByText(code,{exact:true}).waitFor({timeout:6000});
     const qr=staff.getByRole("img",{name:"iPad 연결 QR코드"});
     await qr.waitFor({state:"visible"});
