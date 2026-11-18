@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, noarchive: true },
 };
 
-export default function IntakePage() {
-  return <VisitorIntake />;
+export default async function IntakePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ desk?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const code = typeof params.desk === "string" ? params.desk.trim().toUpperCase() : "";
+  return <VisitorIntake initialCode={/^[A-HJ-NP-Z2-9]{10}$/.test(code) ? code : ""} />;
 }

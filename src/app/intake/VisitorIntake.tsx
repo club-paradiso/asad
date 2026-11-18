@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import catalog from "../../../apps/visitor-intake/data.json";
 import styles from "./intake.module.css";
@@ -12,10 +12,10 @@ type ApiResponse = { accepted?: boolean; seq?: number; error?: string };
 const LANGS: Language[] = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"];
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{10}$/;
 
-export function VisitorIntake() {
-  const [code, setCode] = useState("");
-  const [codeDraft, setCodeDraft] = useState("");
-  const [stage, setStage] = useState<Stage>("connect");
+export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
+  const [code, setCode] = useState(initialCode);
+  const [codeDraft, setCodeDraft] = useState(initialCode);
+  const [stage, setStage] = useState<Stage>(initialCode ? "language" : "connect");
   const [lang, setLang] = useState<Language>("KO");
   const [languagePage, setLanguagePage] = useState(0);
   const [servicePage, setServicePage] = useState(0);
@@ -26,16 +26,6 @@ export function VisitorIntake() {
   const [error, setError] = useState("");
   // Kept across retries so a slow response or double tap never creates duplicate entries.
   const [requestId, setRequestId] = useState("");
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const fromQR = url.searchParams.get("desk")?.trim().toUpperCase() ?? "";
-    if (CODE_PATTERN.test(fromQR)) {
-      setCode(fromQR);
-      setCodeDraft(fromQR);
-      setStage("language");
-    }
-  }, []);
 
   const locale = catalog.locales[lang];
   const labels = locale.review;

@@ -36,18 +36,20 @@ export function SecretDesk() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [connection, setConnection] = useState<"connecting" | "live" | "offline">("connecting");
-  const [joinUrl, setJoinUrl] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
-    const saved = retrieve();
-    if (saved) setCredentials(saved);
+    // Browser-only callback avoids rendering a restored session during SSR hydration.
+    const frame = window.requestAnimationFrame(() => {
+      const saved = retrieve();
+      if (saved) setCredentials(saved);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  useEffect(() => {
-    if (!credentials) { setJoinUrl(""); return; }
-    setJoinUrl(new URL("/intake?desk=" + credentials.code, window.location.origin).toString());
-  }, [credentials]);
+  const joinUrl = credentials && typeof window !== "undefined"
+    ? new URL("/intake?desk=" + credentials.code, window.location.origin).toString()
+    : "";
 
   const poll = useCallback(async (creds: Credentials, signal?: AbortSignal) => {
     const res = await fetch("/api/intake/session?code=" + creds.code, {
