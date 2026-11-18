@@ -151,7 +151,7 @@ jobs:
       # This job is the one place Chromium is wanted, so it is installed here
       # rather than on every `npm ci` in the repository.
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Build
         run: npm run build
@@ -175,6 +175,9 @@ jobs:
           echo "server never came up"
           cat /tmp/server.log
           exit 1
+
+      - name: Legacy iPad and desktop compatibility (Chromium + WebKit)
+        run: node scripts/e2e-intake-compat.mjs http://localhost:3000
 
       - name: Intake start button and recoverable errors
         run: node scripts/e2e-intake-start.mjs http://localhost:3000
