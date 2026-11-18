@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- ES5 catch bindings cannot be omitted (pre-Safari 15). */
 /* Staff desk: no React, no ES2018 syntax, no third-party scripts. */
 (function (window, document, A) {
   "use strict";

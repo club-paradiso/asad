@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- ES5 catch bindings cannot be omitted (pre-Safari 15). */
 /* ASAD intake compatibility runtime: ES5 syntax, no frameworks or external JS. */
 (function (window, document) {
   "use strict";
