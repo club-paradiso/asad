@@ -176,6 +176,9 @@ jobs:
           cat /tmp/server.log
           exit 1
 
+      - name: Intake start button and recoverable errors
+        run: node scripts/e2e-intake-start.mjs http://localhost:3000
+
       - name: End-to-end checks
         run: npm run e2e -- http://localhost:3000 ./e2e-out
 
