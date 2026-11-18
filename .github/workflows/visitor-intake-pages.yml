@@ -1,0 +1,27 @@
+name: Visitor Intake - GitHub Pages (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-visitor-intake
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check translation completeness
+        run: |
+          node -e "const d=require('./apps/visitor-intake/data.json');if(Object.keys(d.locales).length!==12||Object.values(d.locales).some(x=>x.services.length!==19||x.services.some(v=>!v)))process.exit(1)"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/visitor-intake
+      - id: deployment
+        uses: actions/deploy-pages@v4
