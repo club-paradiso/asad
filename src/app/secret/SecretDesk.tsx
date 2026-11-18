@@ -95,21 +95,43 @@ export function SecretDesk() {
   const start = async () => {
     if (busy) return;
     setBusy(true);setError("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
       const res = await fetch("/api/intake/session", {
         method: "POST", credentials: "same-origin", cache: "no-store",
+        signal: controller.signal,
         headers: { "content-type": "application/json" },
         body: "{}",
       });
-      const data = await res.json() as Partial<Credentials> & { staffToken?: string; error?: string };
-      if (!res.ok || !data.code || !data.staffToken || !data.expiresAt) {
-        throw new Error(data.error || "접수 시작 실패");
+      const data = await res.json().catch(() => null) as
+        (Partial<Credentials> & { staffToken?: string; error?: string }) | null;
+      if (!res.ok || !data?.code || !data.staffToken || !data.expiresAt) {
+        const message = res.status === 503
+          ? "접수 서버에 연결할 수 없습니다. 저장소 설정 또는 서버 상태를 확인해 주세요."
+          : (data?.error ?? `접수 시작 실패 (HTTP ${res.status})`);
+        throw new Error(message);
       }
       const next = { code: data.code, token: data.staffToken, expiresAt: data.expiresAt };
-      sessionStorage.setItem(STORE_KEY, JSON.stringify(next));
-      setCredentials(next);setEntries([]);setSelected(null);setConnection("connecting");
-    } catch (e) { setError(e instanceof Error ? e.message : "접수 시작 실패"); }
-    finally { setBusy(false); }
+      // Storage can be blocked in a private/managed browser. A working live
+      // session must not disappear because sessionStorage is unavailable.
+      try {
+        sessionStorage.setItem(STORE_KEY, JSON.stringify(next));
+      } catch {
+        // In this case the session lasts until the tab is reloaded.
+      }
+      setCredentials(next);
+      setEntries([]);
+      setSelected(null);
+      setConnection("connecting");
+    } catch (e) {
+      setError(e instanceof DOMException && e.name === "AbortError"
+        ? "서버 응답이 지연되고 있습니다. 네트워크를 확인한 뒤 다시 시도해 주세요."
+        : e instanceof Error ? e.message : "접수 시작 실패");
+    } finally {
+      window.clearTimeout(timeout);
+      setBusy(false);
+    }
   };
 
   const mark = async (seq: number, body: { verification?: PublicEntry["verification"]; ticket?: PublicEntry["ticket"] }) => {
@@ -175,9 +197,10 @@ export function SecretDesk() {
             <h2>새 창구 접수를 시작하세요.</h2>
             <p>고정 직원 접근키 없이 시작할 수 있습니다. 세션마다 고유한 접수 코드와 직원 전용 비밀 토큰을 발급합니다.</p>
             <p className={styles.subtle}>주소를 아는 누구나 자신의 새 창구 세션은 만들 수 있지만, 다른 세션의 접수 내용은 조회할 수 없습니다. 이 기능은 직원 신원 확인을 대신하지 않습니다.</p>
-            <button className={styles.primary} onClick={() => void start()} disabled={busy}>
-              {busy ? "세션 생성 중…" : "실시간 접수 시작"}
+            <button type="button" className={styles.primary} onClick={() => void start()} disabled={busy} aria-busy={busy}>
+              {busy ? "서버에 접속하는 중…" : "실시간 접수 시작"}
             </button>
+            {busy && <p className={styles.subtle} role="status">접수 세션을 생성하고 있습니다. 연결이 지연되면 오류와 재시도 안내가 표시됩니다.</p>}
           </section>
         ) : (
           <>
