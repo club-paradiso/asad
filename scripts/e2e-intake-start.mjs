@@ -13,8 +13,15 @@ try {
   // real Redis, paid resources, or visitor records are involved.
   let calls = 0;
   await page.route("**/api/intake/session", async route => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify({ code: "ABCD234567", expiresAt: Date.now() + 3600000, entries: [] }),
+      });
+      return;
+    }
     if (route.request().method() !== "POST") {
-      await route.fulfill({ status: 404, contentType: "application/json", body: '{"error":"unknown"}' });
+      await route.fulfill({ status: 405, contentType: "application/json", body: '{"error":"not permitted"}' });
       return;
     }
     calls += 1;
