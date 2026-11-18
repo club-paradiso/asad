@@ -22,6 +22,23 @@ const verificationNames: Record<Verification, string> = {
 };
 
 export function SecretDesk() {
+  const [signingOut, setSigningOut] = useState(false);
+  const signOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const response = await fetch("/api/secret/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Logout failed");
+      window.location.replace("/secret");
+    } catch {
+      setSigningOut(false);
+      window.alert("로그아웃 처리에 실패했습니다. 직원 화면을 닫고 관리자에게 알려 주세요.");
+    }
+  };
   const [showDemo, setShowDemo] = useState(false);
   const [serviceIndex, setServiceIndex] = useState(0);
   const [booking, setBooking] = useState<Booking>("yes");
@@ -45,7 +62,12 @@ export function SecretDesk() {
         <p className={styles.brand}>ASAD / STAFF DESK</p>
         <h2>방문 목적 확인</h2>
         <p>비공개 직원용</p>
-        <div className={styles.sidebarNotice}>프로토타입 / 실시간 접수 미연결</div>
+        <div className={styles.sidebarNotice}>
+          <p>프로토타입 / 실시간 접수 미연결</p>
+          <button type="button" className={styles.signOut} onClick={() => void signOut()} disabled={signingOut}>
+            {signingOut ? "로그아웃 중…" : "직원 로그아웃"}
+          </button>
+        </div>
       </aside>
       <main className={styles.main}>
         <header className={styles.heading}>
