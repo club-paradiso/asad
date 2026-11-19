@@ -114,9 +114,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitorTwo.getByRole("button",{name:"English"}).click();
     await visitorTwo.getByRole("button",{name:/다른 업무 11–20/}).click();
     await visitorTwo.getByRole("button",{name:/Report a change of phone number/}).click();
-    await visitorTwo.getByRole("button",{name:"No booking"}).click().catch(async()=>{
-      await visitorTwo.getByRole("button",{name:"Yes, booked"}).click();
-    });
+    await visitorTwo.getByRole("button",{name:"Yes, booked"}).click();
     await visitorTwo.getByRole("button",{name:/직원 화면으로 전송/}).click();
     await visitorTwo.getByText(/요청 순번 #1/).waitFor();
     await staffTwo.getByText("실시간 접수 목록 (1)").waitFor({timeout:9000});
