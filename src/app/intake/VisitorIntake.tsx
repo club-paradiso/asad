@@ -114,7 +114,7 @@ export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
           <>
             <section className={styles.hero}><p className={styles.step}>02 / 03 · SERVICE</p><h1>{locale.heading[servicePage]}</h1><p>{locale.instructions[servicePage]}</p></section>
             <div className={styles.grid}>
-              {locale.services.slice(servicePage===0?0:10,servicePage===0?10:19).map((name,i)=>{
+              {locale.services.slice(servicePage===0?0:10,servicePage===0?10:locale.services.length).map((name,i)=>{
                 const idx = i + (servicePage===0?0:10);
                 return <button className={styles.tile} key={idx} onClick={()=>{setService(idx);setBooking(null);setRequestId("");setStage("review");}}>
                   <span className={styles.number}>{String(idx+1).padStart(2,"0")}</span><span>{name}</span>
@@ -122,7 +122,7 @@ export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
               })}
             </div>
             <div className={styles.actions}>
-              <button className={styles.primary} onClick={()=>setServicePage(servicePage===0?1:0)}>{servicePage===0?"More services 11–19 →":"← Services 01–10"}</button>
+              <button className={styles.primary} onClick={()=>setServicePage(servicePage===0?1:0)}>{servicePage===0?`More services 11–${locale.services.length} →`:"← Services 01–10"}</button>
               <button className={styles.secondary} onClick={()=>setStage("language")}>← Language</button>
             </div>
           </>
@@ -134,6 +134,7 @@ export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
               <h2>{selectedName}</h2>
               {lang!=="KO" && service!==null && <p className={styles.subtle}>{catalog.locales.KO.services[service]}</p>}
             </section>
+            {service===19 && <p className={styles.disclaimer}>{labels.phoneChangeNote}</p>}
             <h2 className={styles.question}>{labels.reservationTitle}</h2>
             <p className={styles.subtle}>{labels.reservationHelp}</p>
             <div className={styles.choices}>
@@ -157,6 +158,7 @@ export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
               <p className={styles.step}>접수 요청 ID #{submittedSeq}</p>
               <h2>{selectedName}</h2>
               <p>{labels.waitingTicket}</p>
+              {service===19 && <p className={styles.disclaimer}>{labels.phoneChangeNote}</p>}
               <p className={styles.subtle}>위 번호는 접수 요청 식별번호일 뿐 번호표 번호가 아닙니다.</p>
             </section>
             <div className={styles.notice}>직원이 예약 증빙과 방문 목적을 확인한 뒤 직접 번호표를 발급합니다.</div>
