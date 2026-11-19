@@ -3,6 +3,28 @@
 (function (window, document, A) {
   "use strict";
   var root = document.getElementById("app");
+  var displayMode=A.getQuery("display")==="1";
+  var stationValue=A.getQuery("station");
+  var displayStation=/^(?:[1-9]|[12][0-9]|30)$/.test(stationValue)?stationValue:"";
+  if(displayMode)document.body.className+=" display-mode";
+  function requestKioskFullscreen(){
+    var elem=document.documentElement;
+    var method=elem.requestFullscreen || elem.webkitRequestFullscreen;
+    if(!method){
+      error("이 브라우저에서는 자동 전체화면을 지원하지 않습니다. 창을 보조 모니터로 옮기고 F11을 눌러 주세요.");
+      return;
+    }
+    try{
+      var outcome=method.call(elem);
+      if(outcome && typeof outcome.catch==="function"){
+        outcome.catch(function(){
+          error("전체화면이 차단되었습니다. 보조 모니터에서 F11을 사용해 주세요.");
+        });
+      }
+    }catch(e){
+      error("전체화면을 시작할 수 없습니다. F11로 전환해 주세요.");
+    }
+  }
   var LANGS = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"];
   var state = {
     data:null,code:"",codeDraft:"",locale:"KO",step:"connect",
@@ -63,6 +85,13 @@
   function render(){
     A.clear(root);
     if (!state.data) return root.appendChild(message("언어 데이터를 불러오는 중입니다…"));
+    if(displayMode){
+      var toolbar=A.el("div",null,"displayBar");
+      A.add(toolbar,
+        message((displayStation?displayStation+"번 창구 · ":"")+"민원인 전용 화면 · 방문 목적 선택"),
+        A.btn("전체화면",requestKioskFullscreen,"btn"));
+      root.appendChild(toolbar);
+    }
     var d = state.data.locales[state.locale];
     document.documentElement.lang = state.step==="connect" || state.step==="language" ? "ko" : state.locale.toLowerCase().split("-")[0];
     if (state.step==="connect") {
