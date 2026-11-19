@@ -37,7 +37,6 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     await staff.getByRole("button",{name:"Yes, booked"}).click();
     await staff.getByRole("button",{name:/직원에게 보여주기/}).click();
     await staff.getByRole("heading",{name:"Please show this screen to staff"}).waitFor();
-    await staff.getByText("No phone number change is submitted here.").count();
     await staff.getByRole("button",{name:"BACK TO START"}).click();
 
     const nextPage=context.waitForEvent("page");
@@ -52,7 +51,7 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitor.getByRole("button",{name:/Report a change of phone number/}).click();
     await staff.getByRole("heading",{name:"Report a change of phone number"}).waitFor();
     await visitor.getByRole("button",{name:"Not booked"}).click();
-    await staff.locator("#app .choiceGrid button[aria-pressed=true]").getByText("Not booked").waitFor();
+    if((await staff.locator("#app .choiceGrid button[aria-pressed=true]").innerText()).trim()!=="Not booked")throw Error("Visitor booking selection not mirrored to staff");
     await staff.getByRole("button",{name:/직원에게 보여주기/}).click();
     await visitor.getByRole("heading",{name:"Please show this screen to staff"}).waitFor();
     await visitor.getByText(/No phone number change is submitted here/).waitFor();
