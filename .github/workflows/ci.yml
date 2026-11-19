@@ -185,7 +185,7 @@ jobs:
         run: |
           curl -fsSL --max-time 12 http://localhost:3000/secret -o /tmp/asad-staff.html
           curl -fsSL --max-time 12 'http://localhost:3000/intake?desk=ABCD234567' -o /tmp/asad-intake.html
-          grep -q '실시간 접수 시작' /tmp/asad-staff.html || { echo 'Wrong staff HTML response:'; head -c 900 /tmp/asad-staff.html; exit 1; }
+          grep -q '직원 화면' /tmp/asad-staff.html || { echo 'Wrong staff HTML response:'; head -c 900 /tmp/asad-staff.html; exit 1; }
           grep -q '방문 목적' /tmp/asad-intake.html || { echo 'Wrong visitor HTML response:'; head -c 900 /tmp/asad-intake.html; exit 1; }
           echo 'PASS: staff and visitor URLs load compatibility HTML'
 

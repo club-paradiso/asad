@@ -43,7 +43,13 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
       await route.fulfill({status:403,contentType:"application/json",body:'{"error":"forbidden"}'});return;
     }
     await route.fulfill({status:200,contentType:"application/json",
-      body:JSON.stringify({code:found.code,expiresAt:found.expiresAt,entries:found.entries})});
+      body:JSON.stringify({code:found.code,expiresAt:found.expiresAt,entries:found.entries,live:found.live||null})});
+  });
+  await context.route("**/api/intake/live",async route=>{
+    const body=route.request().postDataJSON();
+    const found=created.find(s=>s.code===body.code);
+    if(found){const {code:_c,...rest}=body;found.live={...rest,updatedAt:Date.now()};}
+    await route.fulfill({status:found?200:404,contentType:"application/json",body:'{"ok":true}'});
   });
   await context.route("**/api/intake/submission",async route=>{
     const body=route.request().postDataJSON();
@@ -61,14 +67,14 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
 
   try{
     await Promise.all([staffOne.goto(base+"/secret"),staffTwo.goto(base+"/secret")]);
-    await staffOne.getByRole("button",{name:"실시간 접수 시작"}).click();
+    await staffOne.getByRole("button",{name:"시작",exact:true}).click();
     await staffOne.getByText("ABCD234567",{exact:true}).waitFor();
-    await staffTwo.getByRole("button",{name:"실시간 접수 시작"}).click();
+    await staffTwo.getByRole("button",{name:"시작",exact:true}).click();
     await staffTwo.getByText("WXYZ234567",{exact:true}).waitFor();
     await staffOne.locator("#staff-station").selectOption("1");
     await staffTwo.locator("#staff-station").selectOption("2");
-    await staffOne.getByRole("heading",{name:/1번 창구 · 직원 접수 관리/}).waitFor();
-    await staffTwo.getByRole("heading",{name:/2번 창구 · 직원 접수 관리/}).waitFor();
+    await staffOne.getByRole("heading",{name:"1번 창구",exact:true}).waitFor();
+    await staffTwo.getByRole("heading",{name:"2번 창구",exact:true}).waitFor();
 
     const link=staffOne.getByRole("link",{name:"민원인 전용 화면을 새 창에서 열기"});
     const target=await link.getAttribute("target");
@@ -98,10 +104,11 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitor.getByText(/Request no\. #1/).waitFor();
-    await staffOne.getByText("실시간 접수 목록 (1)").waitFor({timeout:9000});
-    await staffOne.getByText("직원 확인 대기 1건 · 총 요청 1건").waitFor();
-    await staffTwo.getByText("실시간 접수 목록 (0)").waitFor();
-    await staffTwo.getByText("직원 확인 대기 0건 · 총 요청 0건").waitFor();
+    await staffOne.getByText("받은 요청 1건").waitFor({timeout:9000});
+    await staffOne.locator(".mirror").getByText("요청 받음 #1").waitFor({timeout:9000});
+    // A desk with no visitor screen yet shows only how to connect one.
+    await staffTwo.getByRole("heading",{name:"민원인 화면 연결"}).waitFor();
+    if(await staffTwo.locator(".mirror").count())throw Error("Unconnected desk must not show an empty mirror");
 
     // A different staff member launches their own public-facing kiosk window.
     const secondPopupPromise=context.waitForEvent("page");
@@ -117,14 +124,14 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitorTwo.getByRole("button",{name:"Yes, booked"}).click();
     await visitorTwo.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitorTwo.getByText(/Request no\. #1/).waitFor();
-    await staffTwo.getByText("실시간 접수 목록 (1)").waitFor({timeout:9000});
-    await staffTwo.getByText(/전화번호 변경 요청: 이 화면은 방문 목적만 전달/).waitFor({timeout:9000});
-    await staffOne.getByText("실시간 접수 목록 (1)").waitFor();
+    await staffTwo.getByText("받은 요청 1건").waitFor({timeout:9000});
+    await staffTwo.getByText("번호 변경은 창구 처리").waitFor({timeout:9000});
+    await staffOne.getByText("받은 요청 1건").waitFor();
 
     // A refreshed staff desk resumes only its own scoped session and display label.
     await staffOne.reload();
-    await staffOne.getByRole("heading",{name:/1번 창구 · 직원 접수 관리/}).waitFor();
-    await staffOne.getByText("실시간 접수 목록 (1)").waitFor({timeout:9000});
+    await staffOne.getByRole("heading",{name:"1번 창구",exact:true}).waitFor();
+    await staffOne.getByText("받은 요청 1건").waitFor({timeout:9000});
     if(errors.length)throw Error("Browser errors: "+errors.join("; "));
     console.log("PASS "+engineName+" two independent desks, no staff token in visitor window, dual-monitor launch and reload");
   }finally{

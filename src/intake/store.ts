@@ -25,7 +25,20 @@ export type IntakeEntry = {
   ticket: Ticket;
 };
 
+/** What the visitor screen shows right now, mirrored to the staff desk. Indices only, no free text. */
+export const LIVE_STEPS = ["language", "services", "review", "sent"] as const;
+export type LiveStep = typeof LIVE_STEPS[number];
+export type IntakeLive = {
+  step: LiveStep;
+  language?: IntakeLanguage;
+  serviceIndex?: number;
+  booking?: Booking;
+  seq?: number;
+  updatedAt: number;
+};
+
 export type IntakeSession = {
+  live?: IntakeLive;
   code: string;
   staffHash: string;
   createdAt: number;
