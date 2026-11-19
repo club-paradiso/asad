@@ -166,7 +166,7 @@
     connected.appendChild(stationPicker());
     var controls=A.actions(
       visitorWindowLink(),
-      A.btn("iPad / 모바일 연결 링크 복사",function(){copyLink(joinUrl(),link);},"btn"),
+      A.btn("iPad 연결 링크 복사",function(){copyLink(joinUrl(),link);},"btn"),
       A.btn(state.busy?"처리 중…":"접수 종료 · 삭제",end,"btn")
     );connected.appendChild(controls);
     connected.appendChild(notice("듀얼 모니터: 새로 열린 민원인 창을 보조 모니터로 옮긴 뒤 F11(또는 화면의 전체화면 버튼)을 사용하세요. 직원 관리 화면은 첫 번째 모니터에 유지됩니다."));
