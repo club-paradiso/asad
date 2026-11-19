@@ -103,6 +103,26 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await staffTwo.getByText("실시간 접수 목록 (0)").waitFor();
     await staffTwo.getByText("직원 확인 대기 0건 · 총 요청 0건").waitFor();
 
+    // A different staff member launches their own public-facing kiosk window.
+    const secondPopupPromise=context.waitForEvent("page");
+    await staffTwo.getByRole("link",{name:"민원인 전용 화면을 새 창에서 열기"}).click();
+    const visitorTwo=await secondPopupPromise;
+    visitorTwo.on("pageerror",err=>errors.push(err.message));
+    await visitorTwo.getByText("2번 창구 · 민원인 전용 화면 · 방문 목적 선택").waitFor();
+    const secondToken=await visitorTwo.evaluate(()=>sessionStorage.getItem("asad:intake:staff:v1"));
+    if(secondToken!==null)throw Error("Second visitor window inherited staff token");
+    await visitorTwo.getByRole("button",{name:"English"}).click();
+    await visitorTwo.getByRole("button",{name:/다른 업무 11–20/}).click();
+    await visitorTwo.getByRole("button",{name:/Report a change of phone number/}).click();
+    await visitorTwo.getByRole("button",{name:"No booking"}).click().catch(async()=>{
+      await visitorTwo.getByRole("button",{name:"Yes, booked"}).click();
+    });
+    await visitorTwo.getByRole("button",{name:/직원 화면으로 전송/}).click();
+    await visitorTwo.getByText(/요청 순번 #1/).waitFor();
+    await staffTwo.getByText("실시간 접수 목록 (1)").waitFor({timeout:9000});
+    await staffTwo.getByText(/전화번호 변경 요청: 이 화면은 방문 목적만 전달/).waitFor({timeout:9000});
+    await staffOne.getByText("실시간 접수 목록 (1)").waitFor();
+
     // A refreshed staff desk resumes only its own scoped session and display label.
     await staffOne.reload();
     await staffOne.getByRole("heading",{name:/1번 창구 · 직원 접수 관리/}).waitFor();
