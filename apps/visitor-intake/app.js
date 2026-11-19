@@ -27,17 +27,18 @@ function render(){
     if(s.stage==="services"){
       root.append(intro("02 / 03 · SERVICE",d.heading[s.page]||"Select service",d.instructions[s.page]||""));
       const grid=node("div",undefined,"grid"),start=s.page?10:0;
-      d.services.slice(start,s.page?19:10).forEach((val,i)=>{
+      d.services.slice(start,s.page?d.services.length:10).forEach((val,i)=>{
         const btn=button("",()=>{s.service=start+i;s.booking=null;s.stage="review";render()});
         add(btn,node("span",String(start+i+1).padStart(2,"0"),"num"),node("span",val));grid.append(btn);
       });
-      add(root,grid,actions(button(s.page===0?"More services 11–19 →":"← Services 01–10",()=>{s.page=1-s.page;render()},"btn primary"),button("← Language",reset,"btn")));
+      add(root,grid,actions(button(s.page===0?"More services 11–"+d.services.length+" →":"← Services 01–10",()=>{s.page=1-s.page;render()},"btn primary"),button("← Language",reset,"btn")));
       root.append(node("p","음성 인식은 후속 버전에서 제공합니다. 현재는 버튼 선택만 가능합니다.","muted"));
     }else if(s.stage==="review"){
       root.append(intro("03 / 03 · REVIEW",r.reviewTitle||"Review",r.reviewHelp||""));
       const panel=add(node("section",undefined,"panel"),node("div",r.serviceLabel||"Service","eyebrow"),node("h2",s.data.locales.KO.services[s.service]));
       if(s.locale!=="KO")panel.append(node("p",d.services[s.service]));
       add(root,panel,node("h2",r.reservationTitle||"HiKorea reservation?"),node("p",r.reservationHelp||"","muted"));
+      if(s.service===19)root.append(node("p",r.phoneChangeNote,"muted"));
       const choices=node("div",undefined,"choices");
       [r.answerYes,r.answerNo,r.answerUnsure].forEach((value,i)=>{const b=button(value||String(i),()=>{s.booking=i;render()});b.setAttribute("aria-pressed",String(s.booking===i));choices.append(b)});
       add(root,choices,node("div",s.booking===null?"응답 없음":[r.answerYes,r.answerNo,r.answerUnsure][s.booking],"notice"),node("p","시연용: 선택 정보는 외부로 전송되거나 저장되지 않습니다.","muted"));
@@ -47,10 +48,11 @@ function render(){
       const panel=add(node("section",undefined,"panel"),node("div",r.serviceLabel||"Service","eyebrow"),node("h2",s.data.locales.KO.services[s.service]));
       if(s.locale!=="KO")panel.append(node("p",d.services[s.service]));
       add(root,panel,node("div",r.waitingTicket||"No ticket issued.","notice warn"),node("p","이 화면은 시연용입니다. 직원 화면으로 전송되지 않으며 실제 예약 확인 또는 발권을 수행하지 않습니다.","muted"));
+      if(s.service===19)root.append(node("p",r.phoneChangeNote,"muted"));
       root.append(actions(button(r.waitingHome||"Start again",reset,"btn primary"),button("← Back",()=>{s.stage="review";render()},"btn")));
     }
   }
   root.focus({preventScroll:true});window.scrollTo(0,0);
 }
-fetch("./data.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Data unavailable");return r.json()}).then(d=>{if(!d.locales||codes.some(c=>d.locales[c]?.services?.length!==19||d.locales[c].services.some(x=>!x)))throw Error("Invalid locale data");state.data=d;render()}).catch(()=>{root.replaceChildren(node("p","언어 데이터를 불러오지 못했습니다. 화면을 새로고침해 주세요."))});
+fetch("./data.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Data unavailable");return r.json()}).then(d=>{if(!d.locales||codes.some(c=>d.locales[c]?.services?.length!==20||d.locales[c].services.some(x=>!x)))throw Error("Invalid locale data");state.data=d;render()}).catch(()=>{root.replaceChildren(node("p","언어 데이터를 불러오지 못했습니다. 화면을 새로고침해 주세요."))});
 })();

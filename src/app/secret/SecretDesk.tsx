@@ -255,6 +255,7 @@ export function SecretDesk() {
                 <p className={styles.serviceTitle}>{catalog.locales.KO.services[picked.serviceIndex]}</p>
                 <p>민원인 언어: {catalog.locales[picked.language].name}</p>
                 <p className={styles.subtle}>민원인 화면: {catalog.locales[picked.language].services[picked.serviceIndex]}</p>
+                {picked.serviceIndex===19 && <div className={styles.notice}>전화번호 변경 요청: 키오스크는 방문 목적만 전달했으며, 번호 변경 신고가 완료된 상태는 아닙니다. 본인 확인 및 처리 경로를 담당자가 안내해야 합니다.</div>}
                 <div className={styles.notice}>HiKorea 방문예약 자기신고: <strong>{choices[picked.booking]}</strong>. 직원 확인 결과가 아닙니다.</div>
                 <h3>방문예약 직접 확인</h3>
                 <p>방문예약 접수증·관서·날짜·시간·방문 목적을 별도로 확인하세요. 예약이 불필요한 업무인지도 직원이 판단합니다.</p>

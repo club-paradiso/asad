@@ -31,7 +31,8 @@
         "보완서류 제출",
         "재입국허가",
         "심사 진행상황 문의",
-        "기타 상담"
+        "기타 상담",
+        "전화번호(연락처) 변경 신고"
       ],
       "review": {
         "reviewTitle": "선택한 업무를 확인해 주세요.",
@@ -48,7 +49,8 @@
         "waitingHelp": "Figma에서는 실제 요청이 전송되지 않습니다.",
         "waitingTicket": "번호표는 아직 발급되지 않았습니다.",
         "waitingNote": "실제 이용 시 직원의 안내를 기다려 주세요.",
-        "waitingHome": "처음으로 돌아가기"
+        "waitingHome": "처음으로 돌아가기",
+        "phoneChangeNote": "이 화면은 방문 목적만 직원에게 전달합니다. 전화번호를 입력하거나 변경할 수 없으며, 실제 변경 절차는 직원이 안내합니다."
       }
     },
     "EN": {
@@ -80,7 +82,8 @@
         "Submit supplementary documents",
         "Apply for a re-entry permit",
         "Check application review status",
-        "Other inquiries"
+        "Other inquiries",
+        "Report a change of phone number"
       ],
       "review": {
         "reviewTitle": "Review your selected service",
@@ -97,7 +100,8 @@
         "waitingHelp": "This Figma prototype does not send real requests.",
         "waitingTicket": "No queue ticket has been issued.",
         "waitingNote": "For actual service, please wait for staff confirmation.",
-        "waitingHome": "BACK TO START"
+        "waitingHome": "BACK TO START",
+        "phoneChangeNote": "This screen only sends your reason for visiting to staff. You cannot enter or update a phone number here. Staff will explain the procedure."
       }
     },
     "ZH-CN": {
@@ -129,7 +133,8 @@
         "提交补正材料",
         "申请再入境许可",
         "查询申请审查进度",
-        "其他咨询"
+        "其他咨询",
+        "申报电话号码（联系方式）变更"
       ],
       "review": {
         "reviewTitle": "请确认您选择的业务",
@@ -146,7 +151,8 @@
         "waitingHelp": "此 Figma 原型不会实际发送请求。",
         "waitingTicket": "尚未发放排队号码。",
         "waitingNote": "实际使用时请等待工作人员确认。",
-        "waitingHome": "返回首页"
+        "waitingHome": "返回首页",
+        "phoneChangeNote": "本页面仅将您选择的业务发送给工作人员。此处无法输入或更改电话号码，请按照工作人员的指引办理。"
       }
     },
     "ID": {
@@ -178,7 +184,8 @@
         "Penyerahan dokumen pelengkap",
         "Permohonan izin masuk kembali",
         "Cek status pemeriksaan permohonan",
-        "Pertanyaan lainnya"
+        "Pertanyaan lainnya",
+        "Melaporkan perubahan nomor telepon"
       ],
       "review": {
         "reviewTitle": "Periksa layanan yang dipilih",
@@ -195,7 +202,8 @@
         "waitingHelp": "Prototipe Figma ini tidak mengirim permintaan nyata.",
         "waitingTicket": "Nomor antrean belum diterbitkan.",
         "waitingNote": "Saat digunakan, tunggu konfirmasi petugas.",
-        "waitingHome": "KEMBALI KE AWAL"
+        "waitingHome": "KEMBALI KE AWAL",
+        "phoneChangeNote": "Layar ini hanya mengirim tujuan kunjungan Anda kepada petugas. Anda tidak dapat memasukkan atau mengubah nomor telepon di sini. Ikuti petunjuk petugas."
       }
     },
     "HI": {
@@ -227,7 +235,8 @@
         "माँगे गए पूरक दस्तावेज़ जमा करना",
         "पुनः प्रवेश परमिट का आवेदन",
         "आवेदन की जाँच की स्थिति जानना",
-        "अन्य प्रश्न / परामर्श"
+        "अन्य प्रश्न / परामर्श",
+        "फ़ोन नंबर बदलने की सूचना देना"
       ],
       "review": {
         "reviewTitle": "चुनी गई सेवा की पुष्टि करें",
@@ -244,7 +253,8 @@
         "waitingHelp": "इस Figma नमूने से असली अनुरोध नहीं भेजा जाता।",
         "waitingTicket": "अभी कतार का नंबर जारी नहीं हुआ है।",
         "waitingNote": "असली उपयोग में कर्मचारी की पुष्टि की प्रतीक्षा करें।",
-        "waitingHome": "शुरू पर लौटें"
+        "waitingHome": "शुरू पर लौटें",
+        "phoneChangeNote": "यह स्क्रीन केवल आपके आने का उद्देश्य कर्मचारियों को भेजती है। यहाँ फ़ोन नंबर दर्ज या बदला नहीं जा सकता। प्रक्रिया के लिए कर्मचारी से पूछें।"
       }
     },
     "VI": {
@@ -276,7 +286,8 @@
         "Nộp hồ sơ bổ sung theo yêu cầu",
         "Xin giấy phép tái nhập cảnh",
         "Hỏi tình trạng xét duyệt hồ sơ",
-        "Câu hỏi / tư vấn khác"
+        "Câu hỏi / tư vấn khác",
+        "Thông báo thay đổi số điện thoại"
       ],
       "review": {
         "reviewTitle": "Kiểm tra dịch vụ đã chọn",
@@ -293,7 +304,8 @@
         "waitingHelp": "Nguyên mẫu Figma này không gửi yêu cầu thực tế.",
         "waitingTicket": "Chưa được cấp số thứ tự.",
         "waitingNote": "Khi sử dụng thực tế, hãy chờ nhân viên xác nhận.",
-        "waitingHome": "VỀ TRANG ĐẦU"
+        "waitingHome": "VỀ TRANG ĐẦU",
+        "phoneChangeNote": "Màn hình này chỉ chuyển mục đích đến cho nhân viên. Không thể nhập hoặc thay đổi số điện thoại tại đây. Vui lòng làm theo hướng dẫn của nhân viên."
       }
     },
     "JA": {
@@ -325,7 +337,8 @@
         "補完書類の提出",
         "再入国許可の申請",
         "申請の審査状況の照会",
-        "その他の相談"
+        "その他の相談",
+        "電話番号（連絡先）の変更届"
       ],
       "review": {
         "reviewTitle": "選択した手続きをご確認ください",
@@ -342,7 +355,8 @@
         "waitingHelp": "このFigma試作では実際には送信されません。",
         "waitingTicket": "番号札はまだ発行されていません。",
         "waitingNote": "実際の利用時は職員の確認をお待ちください。",
-        "waitingHome": "最初に戻る"
+        "waitingHome": "最初に戻る",
+        "phoneChangeNote": "ここでは選択した用件のみ職員に送信します。電話番号の入力・変更はできません。手続きは職員の案内に従ってください。"
       }
     },
     "TH": {
@@ -374,7 +388,8 @@
         "ยื่นเอกสารเพิ่มเติมตามที่ร้องขอ",
         "ขออนุญาตกลับเข้าประเทศอีกครั้ง",
         "สอบถามสถานะการพิจารณาคำขอ",
-        "สอบถาม / ปรึกษาเรื่องอื่น"
+        "สอบถาม / ปรึกษาเรื่องอื่น",
+        "แจ้งเปลี่ยนหมายเลขโทรศัพท์"
       ],
       "review": {
         "reviewTitle": "ตรวจสอบบริการที่เลือก",
@@ -391,7 +406,8 @@
         "waitingHelp": "ต้นแบบ Figma นี้ไม่ได้ส่งคำขอจริง",
         "waitingTicket": "ยังไม่ได้รับบัตรคิว",
         "waitingNote": "โปรดรอให้เจ้าหน้าที่ตรวจสอบเมื่อใช้งานจริง",
-        "waitingHome": "กลับหน้าแรก"
+        "waitingHome": "กลับหน้าแรก",
+        "phoneChangeNote": "หน้าจอนี้ส่งเฉพาะวัตถุประสงค์การมาติดต่อให้เจ้าหน้าที่ ไม่สามารถกรอกหรือเปลี่ยนหมายเลขโทรศัพท์ได้ที่นี่ โปรดทำตามคำแนะนำของเจ้าหน้าที่"
       }
     },
     "RU": {
@@ -423,7 +439,8 @@
         "Подать недостающие документы",
         "Получить разрешение на повторный въезд",
         "Узнать ход рассмотрения заявления",
-        "Другие вопросы и консультации"
+        "Другие вопросы и консультации",
+        "Сообщить об изменении номера телефона"
       ],
       "review": {
         "reviewTitle": "Проверьте выбранную услугу",
@@ -440,7 +457,8 @@
         "waitingHelp": "Прототип Figma не отправляет реальные запросы.",
         "waitingTicket": "Талон электронной очереди ещё не выдан.",
         "waitingNote": "При реальном визите дождитесь сотрудника.",
-        "waitingHome": "НА ГЛАВНУЮ"
+        "waitingHome": "НА ГЛАВНУЮ",
+        "phoneChangeNote": "Здесь сотруднику передаётся только цель вашего визита. Ввести или изменить номер телефона на этом экране нельзя. Следуйте указаниям сотрудника."
       }
     },
     "UZ": {
@@ -472,7 +490,8 @@
         "Yetishmayotgan hujjatlarni topshirish",
         "Qayta kirish ruxsatini olish",
         "Ariza ko‘rib chiqilishi holatini so‘rash",
-        "Boshqa savollar va maslahat"
+        "Boshqa savollar va maslahat",
+        "Telefon raqami o‘zgarganini xabar qilish"
       ],
       "review": {
         "reviewTitle": "Tanlangan xizmatni tekshiring",
@@ -489,7 +508,8 @@
         "waitingHelp": "Bu Figma prototipi haqiqiy so‘rov yubormaydi.",
         "waitingTicket": "Navbat taloni hali berilmadi.",
         "waitingNote": "Haqiqiy tashrifda xodim tasdig‘ini kuting.",
-        "waitingHome": "BOSHIGA QAYTISH"
+        "waitingHome": "BOSHIGA QAYTISH",
+        "phoneChangeNote": "Bu ekran xodimga faqat tashrif maqsadini yuboradi. Telefon raqamini bu yerda kiritib yoki o‘zgartirib bo‘lmaydi. Xodim ko‘rsatmalariga amal qiling."
       }
     },
     "MN": {
@@ -521,7 +541,8 @@
         "Нэмэлтээр шаардсан баримт бичиг өгөх",
         "Дахин нэвтрэх зөвшөөрөл авах",
         "Өргөдөл шийдвэрлэлтийн явцыг лавлах",
-        "Бусад асуулт, зөвлөгөө"
+        "Бусад асуулт, зөвлөгөө",
+        "Утасны дугаар өөрчлөгдсөнийг мэдэгдэх"
       ],
       "review": {
         "reviewTitle": "Сонгосон үйлчилгээгээ шалгана уу",
@@ -538,7 +559,8 @@
         "waitingHelp": "Figma загвараас бодит хүсэлт илгээгдэхгүй.",
         "waitingTicket": "Дарааллын дугаар хараахан олгогдоогүй.",
         "waitingNote": "Бодит үйлчилгээний үед ажилтныг хүлээнэ үү.",
-        "waitingHome": "ЭХЛЭЛ РҮҮ"
+        "waitingHome": "ЭХЛЭЛ РҮҮ",
+        "phoneChangeNote": "Энэ дэлгэц зөвхөн ирсэн зорилгыг ажилтанд дамжуулна. Энд утасны дугаар оруулах эсвэл өөрчлөх боломжгүй. Ажилтны зааврыг дагана уу."
       }
     },
     "NE": {
@@ -570,7 +592,8 @@
         "मागिएका पूरक कागजात बुझाउने",
         "पुनः प्रवेश अनुमति लिनु",
         "आवेदन समीक्षा अवस्था बुझ्नु",
-        "अन्य प्रश्न / परामर्श"
+        "अन्य प्रश्न / परामर्श",
+        "फोन नम्बर परिवर्तनको जानकारी दिनु"
       ],
       "review": {
         "reviewTitle": "छानिएको सेवा जाँच्नुहोस्",
@@ -587,7 +610,8 @@
         "waitingHelp": "यो Figma नमुनाले वास्तविक अनुरोध पठाउँदैन।",
         "waitingTicket": "अहिलेसम्म टोकन नम्बर दिइएको छैन।",
         "waitingNote": "वास्तविक सेवामा कर्मचारीको पुष्टि पर्खनुहोस्।",
-        "waitingHome": "सुरुमा फर्कनुहोस्"
+        "waitingHome": "सुरुमा फर्कनुहोस्",
+        "phoneChangeNote": "यो स्क्रिनले कर्मचारीलाई तपाईं आएको उद्देश्य मात्र पठाउँछ। यहाँ फोन नम्बर प्रविष्ट वा परिवर्तन गर्न सकिँदैन। कर्मचारीको निर्देशन पालना गर्नुहोस्।"
       }
     }
   }

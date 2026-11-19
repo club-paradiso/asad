@@ -1,0 +1,618 @@
+{
+  "schema": 1,
+  "exportedFrom": "Figma V5",
+  "locales": {
+    "KO": {
+      "name": "한국어",
+      "heading": [
+        "어떤 업무로 방문하셨나요?",
+        "다른 업무 선택"
+      ],
+      "instructions": [
+        "해당하는 업무를 눌러 주세요.",
+        "아래에서 해당 업무를 선택해 주세요."
+      ],
+      "services": [
+        "체류기간 연장",
+        "체류지(주소) 변경",
+        "여권·등록사항 변경",
+        "체류자격 변경·부여",
+        "최초 외국인등록·국내거소신고",
+        "등록증 재발급",
+        "등록증 수령",
+        "근무처 변경·추가",
+        "체류자격 외 활동허가",
+        "사실증명 발급",
+        "자진출국 사전신고",
+        "난민인정 신청",
+        "난민 이의신청",
+        "출국금지·출국정지 확인",
+        "정보공개청구",
+        "보완서류 제출",
+        "재입국허가",
+        "심사 진행상황 문의",
+        "기타 상담",
+        "전화번호(연락처) 변경 신고"
+      ],
+      "review": {
+        "reviewTitle": "선택한 업무를 확인해 주세요.",
+        "reviewHelp": "직원에게 전달하기 전에 내용을 확인해 주세요.",
+        "serviceLabel": "선택한 업무",
+        "reservationTitle": "하이코리아 방문예약을 하셨나요?",
+        "reservationHelp": "예약 여부는 직원이 확인합니다. 잘 모르셔도 괜찮습니다.",
+        "answerYes": "예약함",
+        "answerNo": "예약 안 함",
+        "answerUnsure": "잘 모르겠음",
+        "sendLabel": "직원에게 확인 요청하기 →",
+        "privacy": "시연 화면에서 이름이나 여권번호는 수집하지 않습니다.",
+        "waitingTitle": "요청 전송 시연 화면입니다.",
+        "waitingHelp": "Figma에서는 실제 요청이 전송되지 않습니다.",
+        "waitingTicket": "번호표는 아직 발급되지 않았습니다.",
+        "waitingNote": "실제 이용 시 직원의 안내를 기다려 주세요.",
+        "waitingHome": "처음으로 돌아가기",
+        "phoneChangeNote": "이 화면은 방문 목적만 직원에게 전달합니다. 전화번호를 입력하거나 변경할 수 없으며, 실제 변경 절차는 직원이 안내합니다."
+      }
+    },
+    "EN": {
+      "name": "English",
+      "heading": [
+        "How can we help you today?",
+        "More services"
+      ],
+      "instructions": [
+        "Tap the service that matches your visit.",
+        "Choose one of the services below."
+      ],
+      "services": [
+        "Extend my period of stay",
+        "Report a change of address",
+        "Update passport / registration details",
+        "Change / obtain a status of stay",
+        "First-time foreigner registration / domestic residence report",
+        "Reissue a foreigner registration card",
+        "Collect a foreigner registration card",
+        "Change / add a workplace",
+        "Permit for activities outside my status of stay",
+        "Request an immigration certificate of fact",
+        "Give advance notice of voluntary departure",
+        "Apply for refugee recognition",
+        "File an objection to a refugee decision",
+        "Check a departure ban / suspension",
+        "Request disclosure of information",
+        "Submit supplementary documents",
+        "Apply for a re-entry permit",
+        "Check application review status",
+        "Other inquiries",
+        "Report a change of phone number"
+      ],
+      "review": {
+        "reviewTitle": "Review your selected service",
+        "reviewHelp": "Please check the details before sending them to staff.",
+        "serviceLabel": "SELECTED SERVICE",
+        "reservationTitle": "Have you booked a visit on HiKorea?",
+        "reservationHelp": "Staff will check your booking. You can proceed if unsure.",
+        "answerYes": "Yes, booked",
+        "answerNo": "Not booked",
+        "answerUnsure": "Not sure",
+        "sendLabel": "SEND FOR STAFF REVIEW →",
+        "privacy": "This demo does not collect names or passport numbers.",
+        "waitingTitle": "Request submission preview",
+        "waitingHelp": "This Figma prototype does not send real requests.",
+        "waitingTicket": "No queue ticket has been issued.",
+        "waitingNote": "For actual service, please wait for staff confirmation.",
+        "waitingHome": "BACK TO START",
+        "phoneChangeNote": "This screen only sends your reason for visiting to staff. You cannot enter or update a phone number here. Staff will explain the procedure."
+      }
+    },
+    "ZH-CN": {
+      "name": "简体中文",
+      "heading": [
+        "您今天需要办理什么业务？",
+        "更多业务"
+      ],
+      "instructions": [
+        "请选择符合您来访目的的业务。",
+        "请从以下业务中选择。"
+      ],
+      "services": [
+        "申请延长停留期限",
+        "申报居留地（住址）变更",
+        "变更护照／外国人登记事项",
+        "变更或赋予停留资格",
+        "首次外国人登记／国内居所申报",
+        "补发外国人登录证",
+        "领取外国人登录证",
+        "变更／追加工作单位",
+        "申请停留资格外活动许可",
+        "申请出入境相关事实证明",
+        "提前申报自愿出境",
+        "申请难民认定",
+        "对难民认定决定提出异议",
+        "查询禁止出境／暂停出境情况",
+        "申请信息公开",
+        "提交补正材料",
+        "申请再入境许可",
+        "查询申请审查进度",
+        "其他咨询",
+        "申报电话号码（联系方式）变更"
+      ],
+      "review": {
+        "reviewTitle": "请确认您选择的业务",
+        "reviewHelp": "发送给工作人员前，请核对内容。",
+        "serviceLabel": "所选业务",
+        "reservationTitle": "您已在 HiKorea 预约来访吗？",
+        "reservationHelp": "工作人员会核实预约情况，不确定也可以继续。",
+        "answerYes": "已预约",
+        "answerNo": "未预约",
+        "answerUnsure": "不确定",
+        "sendLabel": "提交给工作人员确认 →",
+        "privacy": "此演示不收集姓名或护照号码。",
+        "waitingTitle": "请求提交演示",
+        "waitingHelp": "此 Figma 原型不会实际发送请求。",
+        "waitingTicket": "尚未发放排队号码。",
+        "waitingNote": "实际使用时请等待工作人员确认。",
+        "waitingHome": "返回首页",
+        "phoneChangeNote": "本页面仅将您选择的业务发送给工作人员。此处无法输入或更改电话号码，请按照工作人员的指引办理。"
+      }
+    },
+    "ID": {
+      "name": "Bahasa Indonesia",
+      "heading": [
+        "Apa keperluan Anda hari ini?",
+        "Layanan lainnya"
+      ],
+      "instructions": [
+        "Ketuk layanan yang sesuai keperluan Anda.",
+        "Pilih layanan di bawah ini."
+      ],
+      "services": [
+        "Perpanjangan masa izin tinggal",
+        "Lapor perubahan alamat tempat tinggal",
+        "Perubahan data paspor / registrasi orang asing",
+        "Perubahan / pemberian status izin tinggal",
+        "Pendaftaran orang asing pertama kali / pelaporan domisili di Korea",
+        "Penerbitan ulang kartu registrasi orang asing",
+        "Pengambilan kartu registrasi orang asing",
+        "Perubahan / penambahan tempat kerja",
+        "Izin kegiatan di luar status izin tinggal",
+        "Permohonan surat keterangan fakta keimigrasian",
+        "Pemberitahuan awal keberangkatan sukarela",
+        "Permohonan pengakuan sebagai pengungsi",
+        "Keberatan atas keputusan permohonan pengungsi",
+        "Pemeriksaan larangan / penangguhan keluar negeri",
+        "Permohonan keterbukaan informasi",
+        "Penyerahan dokumen pelengkap",
+        "Permohonan izin masuk kembali",
+        "Cek status pemeriksaan permohonan",
+        "Pertanyaan lainnya",
+        "Melaporkan perubahan nomor telepon"
+      ],
+      "review": {
+        "reviewTitle": "Periksa layanan yang dipilih",
+        "reviewHelp": "Periksa kembali sebelum dikirim ke petugas.",
+        "serviceLabel": "LAYANAN TERPILIH",
+        "reservationTitle": "Sudah membuat janji di HiKorea?",
+        "reservationHelp": "Petugas akan memeriksa janji Anda. Boleh pilih tidak tahu.",
+        "answerYes": "Sudah",
+        "answerNo": "Belum",
+        "answerUnsure": "Tidak tahu",
+        "sendLabel": "KIRIM UNTUK DIPERIKSA →",
+        "privacy": "Demo ini tidak meminta nama atau nomor paspor.",
+        "waitingTitle": "Pratinjau pengiriman permintaan",
+        "waitingHelp": "Prototipe Figma ini tidak mengirim permintaan nyata.",
+        "waitingTicket": "Nomor antrean belum diterbitkan.",
+        "waitingNote": "Saat digunakan, tunggu konfirmasi petugas.",
+        "waitingHome": "KEMBALI KE AWAL",
+        "phoneChangeNote": "Layar ini hanya mengirim tujuan kunjungan Anda kepada petugas. Anda tidak dapat memasukkan atau mengubah nomor telepon di sini. Ikuti petunjuk petugas."
+      }
+    },
+    "HI": {
+      "name": "हिन्दी",
+      "heading": [
+        "आज आप किस सेवा के लिए आए हैं?",
+        "अन्य सेवाएँ"
+      ],
+      "instructions": [
+        "अपनी ज़रूरत की सेवा पर टैप करें।",
+        "नीचे दी गई सेवाओं में से चुनें।"
+      ],
+      "services": [
+        "ठहरने की अवधि बढ़ाने का आवेदन",
+        "निवास के पते में बदलाव की सूचना",
+        "पासपोर्ट / विदेशी पंजीकरण विवरण में बदलाव",
+        "निवास स्थिति में बदलाव / स्वीकृति",
+        "पहला विदेशी पंजीकरण / कोरिया में निवास की सूचना",
+        "विदेशी पंजीकरण कार्ड दोबारा जारी कराना",
+        "विदेशी पंजीकरण कार्ड प्राप्त करना",
+        "कार्यस्थल बदलने / जोड़ने की अनुमति",
+        "निवास स्थिति से बाहर गतिविधि की अनुमति",
+        "आव्रजन संबंधी तथ्य प्रमाणपत्र लेना",
+        "स्वैच्छिक प्रस्थान की अग्रिम सूचना",
+        "शरणार्थी मान्यता के लिए आवेदन",
+        "शरणार्थी निर्णय के विरुद्ध आपत्ति",
+        "प्रस्थान प्रतिबंध / रोक की स्थिति जाँचना",
+        "सूचना सार्वजनिक करने का अनुरोध",
+        "माँगे गए पूरक दस्तावेज़ जमा करना",
+        "पुनः प्रवेश परमिट का आवेदन",
+        "आवेदन की जाँच की स्थिति जानना",
+        "अन्य प्रश्न / परामर्श",
+        "फ़ोन नंबर बदलने की सूचना देना"
+      ],
+      "review": {
+        "reviewTitle": "चुनी गई सेवा की पुष्टि करें",
+        "reviewHelp": "कर्मचारी को भेजने से पहले विवरण जाँच लें।",
+        "serviceLabel": "चुनी गई सेवा",
+        "reservationTitle": "क्या HiKorea पर समय आरक्षित है?",
+        "reservationHelp": "कर्मचारी आरक्षण जाँचेंगे। पता न हो तो भी आगे बढ़ें।",
+        "answerYes": "हाँ, आरक्षित",
+        "answerNo": "नहीं",
+        "answerUnsure": "पता नहीं",
+        "sendLabel": "कर्मचारी से पुष्टि करवाएँ →",
+        "privacy": "इस डेमो में नाम या पासपोर्ट नंबर नहीं लिया जाता।",
+        "waitingTitle": "अनुरोध भेजने का डेमो",
+        "waitingHelp": "इस Figma नमूने से असली अनुरोध नहीं भेजा जाता।",
+        "waitingTicket": "अभी कतार का नंबर जारी नहीं हुआ है।",
+        "waitingNote": "असली उपयोग में कर्मचारी की पुष्टि की प्रतीक्षा करें।",
+        "waitingHome": "शुरू पर लौटें",
+        "phoneChangeNote": "यह स्क्रीन केवल आपके आने का उद्देश्य कर्मचारियों को भेजती है। यहाँ फ़ोन नंबर दर्ज या बदला नहीं जा सकता। प्रक्रिया के लिए कर्मचारी से पूछें।"
+      }
+    },
+    "VI": {
+      "name": "Tiếng Việt",
+      "heading": [
+        "Hôm nay quý vị cần làm thủ tục gì?",
+        "Các dịch vụ khác"
+      ],
+      "instructions": [
+        "Chạm vào dịch vụ phù hợp với nhu cầu.",
+        "Chọn một dịch vụ dưới đây."
+      ],
+      "services": [
+        "Xin gia hạn thời hạn lưu trú",
+        "Khai báo thay đổi địa chỉ cư trú",
+        "Thay đổi thông tin hộ chiếu / đăng ký người nước ngoài",
+        "Thay đổi / được cấp tư cách lưu trú",
+        "Đăng ký người nước ngoài lần đầu / khai báo nơi cư trú tại Hàn Quốc",
+        "Xin cấp lại thẻ đăng ký người nước ngoài",
+        "Nhận thẻ đăng ký người nước ngoài",
+        "Thay đổi / bổ sung nơi làm việc",
+        "Xin phép hoạt động ngoài tư cách lưu trú",
+        "Xin cấp giấy xác nhận sự việc liên quan đến xuất nhập cảnh",
+        "Khai báo trước khi tự nguyện xuất cảnh",
+        "Nộp đơn xin công nhận người tị nạn",
+        "Khiếu nại quyết định về việc công nhận người tị nạn",
+        "Kiểm tra lệnh cấm / tạm hoãn xuất cảnh",
+        "Yêu cầu công khai thông tin",
+        "Nộp hồ sơ bổ sung theo yêu cầu",
+        "Xin giấy phép tái nhập cảnh",
+        "Hỏi tình trạng xét duyệt hồ sơ",
+        "Câu hỏi / tư vấn khác",
+        "Thông báo thay đổi số điện thoại"
+      ],
+      "review": {
+        "reviewTitle": "Kiểm tra dịch vụ đã chọn",
+        "reviewHelp": "Vui lòng kiểm tra trước khi gửi cho nhân viên.",
+        "serviceLabel": "DỊCH VỤ ĐÃ CHỌN",
+        "reservationTitle": "Quý vị đã đặt lịch trên HiKorea chưa?",
+        "reservationHelp": "Nhân viên sẽ kiểm tra; không chắc cũng có thể tiếp tục.",
+        "answerYes": "Đã đặt lịch",
+        "answerNo": "Chưa đặt",
+        "answerUnsure": "Không rõ",
+        "sendLabel": "GỬI NHÂN VIÊN KIỂM TRA →",
+        "privacy": "Bản demo không thu thập tên hay số hộ chiếu.",
+        "waitingTitle": "Mô phỏng gửi yêu cầu",
+        "waitingHelp": "Nguyên mẫu Figma này không gửi yêu cầu thực tế.",
+        "waitingTicket": "Chưa được cấp số thứ tự.",
+        "waitingNote": "Khi sử dụng thực tế, hãy chờ nhân viên xác nhận.",
+        "waitingHome": "VỀ TRANG ĐẦU",
+        "phoneChangeNote": "Màn hình này chỉ chuyển mục đích đến cho nhân viên. Không thể nhập hoặc thay đổi số điện thoại tại đây. Vui lòng làm theo hướng dẫn của nhân viên."
+      }
+    },
+    "JA": {
+      "name": "日本語",
+      "heading": [
+        "本日のご用件をお選びください",
+        "その他の手続き"
+      ],
+      "instructions": [
+        "該当する手続きをタップしてください。",
+        "以下からご希望の手続きをお選びください。"
+      ],
+      "services": [
+        "在留期間の延長申請",
+        "住居地（住所）の変更届",
+        "旅券・外国人登録事項の変更",
+        "在留資格の変更・付与",
+        "初回の外国人登録／国内居所申告",
+        "外国人登録証の再発行",
+        "外国人登録証の受け取り",
+        "勤務先の変更・追加",
+        "資格外活動許可の申請",
+        "出入国等の事実証明書の発行",
+        "自主出国の事前申告",
+        "難民認定の申請",
+        "難民認定の決定に対する異議申立て",
+        "出国禁止・出国停止の確認",
+        "情報公開請求",
+        "補完書類の提出",
+        "再入国許可の申請",
+        "申請の審査状況の照会",
+        "その他の相談",
+        "電話番号（連絡先）の変更届"
+      ],
+      "review": {
+        "reviewTitle": "選択した手続きをご確認ください",
+        "reviewHelp": "職員に送る前に内容をご確認ください。",
+        "serviceLabel": "選択した手続き",
+        "reservationTitle": "HiKoreaで来訪予約をしましたか？",
+        "reservationHelp": "予約状況は職員が確認します。不明でも進めます。",
+        "answerYes": "予約済み",
+        "answerNo": "未予約",
+        "answerUnsure": "わからない",
+        "sendLabel": "職員に確認を依頼する →",
+        "privacy": "デモでは氏名や旅券番号を収集しません。",
+        "waitingTitle": "送信のデモ画面です",
+        "waitingHelp": "このFigma試作では実際には送信されません。",
+        "waitingTicket": "番号札はまだ発行されていません。",
+        "waitingNote": "実際の利用時は職員の確認をお待ちください。",
+        "waitingHome": "最初に戻る",
+        "phoneChangeNote": "ここでは選択した用件のみ職員に送信します。電話番号の入力・変更はできません。手続きは職員の案内に従ってください。"
+      }
+    },
+    "TH": {
+      "name": "ภาษาไทย",
+      "heading": [
+        "วันนี้ท่านมาติดต่อเรื่องใด?",
+        "บริการอื่น ๆ"
+      ],
+      "instructions": [
+        "แตะเลือกบริการที่ตรงกับเรื่องของท่าน",
+        "กรุณาเลือกบริการด้านล่าง"
+      ],
+      "services": [
+        "ขอต่อระยะเวลาพำนัก",
+        "แจ้งเปลี่ยนที่อยู่ (ถิ่นที่พำนัก)",
+        "แจ้งเปลี่ยนข้อมูลหนังสือเดินทาง / ทะเบียนคนต่างด้าว",
+        "เปลี่ยน / ขอรับสถานภาพการพำนัก",
+        "ขึ้นทะเบียนคนต่างด้าวครั้งแรก / แจ้งถิ่นที่อยู่ในเกาหลี",
+        "ขอออกบัตรทะเบียนคนต่างด้าวใหม่",
+        "รับบัตรทะเบียนคนต่างด้าว",
+        "เปลี่ยน / เพิ่มสถานที่ทำงาน",
+        "ขออนุญาตทำกิจกรรมนอกเหนือสถานภาพการพำนัก",
+        "ขอหนังสือรับรองข้อเท็จจริงด้านตรวจคนเข้าเมือง",
+        "แจ้งล่วงหน้าก่อนเดินทางออกโดยสมัครใจ",
+        "ยื่นคำขอรับรองสถานะผู้ลี้ภัย",
+        "ยื่นคัดค้านผลการพิจารณาสถานะผู้ลี้ภัย",
+        "ตรวจสอบการห้าม / ระงับการเดินทางออก",
+        "ยื่นคำขอเปิดเผยข้อมูล",
+        "ยื่นเอกสารเพิ่มเติมตามที่ร้องขอ",
+        "ขออนุญาตกลับเข้าประเทศอีกครั้ง",
+        "สอบถามสถานะการพิจารณาคำขอ",
+        "สอบถาม / ปรึกษาเรื่องอื่น",
+        "แจ้งเปลี่ยนหมายเลขโทรศัพท์"
+      ],
+      "review": {
+        "reviewTitle": "ตรวจสอบบริการที่เลือก",
+        "reviewHelp": "กรุณาตรวจสอบก่อนส่งให้เจ้าหน้าที่",
+        "serviceLabel": "บริการที่เลือก",
+        "reservationTitle": "ท่านได้นัดหมายผ่าน HiKorea แล้วหรือไม่?",
+        "reservationHelp": "เจ้าหน้าที่จะตรวจสอบการนัดหมาย ไม่แน่ใจก็ไปต่อได้",
+        "answerYes": "นัดแล้ว",
+        "answerNo": "ยังไม่ได้นัด",
+        "answerUnsure": "ไม่แน่ใจ",
+        "sendLabel": "ส่งให้เจ้าหน้าที่ตรวจสอบ →",
+        "privacy": "ต้นแบบนี้ไม่เก็บชื่อหรือหมายเลขหนังสือเดินทาง",
+        "waitingTitle": "ตัวอย่างหน้าส่งคำขอ",
+        "waitingHelp": "ต้นแบบ Figma นี้ไม่ได้ส่งคำขอจริง",
+        "waitingTicket": "ยังไม่ได้รับบัตรคิว",
+        "waitingNote": "โปรดรอให้เจ้าหน้าที่ตรวจสอบเมื่อใช้งานจริง",
+        "waitingHome": "กลับหน้าแรก",
+        "phoneChangeNote": "หน้าจอนี้ส่งเฉพาะวัตถุประสงค์การมาติดต่อให้เจ้าหน้าที่ ไม่สามารถกรอกหรือเปลี่ยนหมายเลขโทรศัพท์ได้ที่นี่ โปรดทำตามคำแนะนำของเจ้าหน้าที่"
+      }
+    },
+    "RU": {
+      "name": "Русский",
+      "heading": [
+        "С каким вопросом вы пришли?",
+        "Другие услуги"
+      ],
+      "instructions": [
+        "Нажмите на нужную услугу.",
+        "Выберите услугу из списка ниже."
+      ],
+      "services": [
+        "Продлить срок пребывания",
+        "Сообщить об изменении адреса проживания",
+        "Изменить данные паспорта / регистрации иностранца",
+        "Изменить / получить статус пребывания",
+        "Первичная регистрация иностранца / уведомление о месте проживания в Корее",
+        "Повторно получить карту регистрации иностранца",
+        "Забрать карту регистрации иностранца",
+        "Сменить / добавить место работы",
+        "Разрешение на деятельность вне статуса пребывания",
+        "Получить справку об иммиграционных данных",
+        "Предварительное уведомление о добровольном выезде",
+        "Подать заявление о признании беженцем",
+        "Подать возражение на решение по статусу беженца",
+        "Проверить запрет / приостановку выезда",
+        "Запросить раскрытие информации",
+        "Подать недостающие документы",
+        "Получить разрешение на повторный въезд",
+        "Узнать ход рассмотрения заявления",
+        "Другие вопросы и консультации",
+        "Сообщить об изменении номера телефона"
+      ],
+      "review": {
+        "reviewTitle": "Проверьте выбранную услугу",
+        "reviewHelp": "Проверьте данные перед отправкой сотруднику.",
+        "serviceLabel": "Выбранная услуга",
+        "reservationTitle": "Вы записались на приём через HiKorea?",
+        "reservationHelp": "Сотрудник проверит запись. Можно выбрать «Не знаю».",
+        "answerYes": "Да",
+        "answerNo": "Нет",
+        "answerUnsure": "Не знаю",
+        "sendLabel": "ОТПРАВИТЬ НА ПРОВЕРКУ →",
+        "privacy": "Демо не запрашивает имя и номер паспорта.",
+        "waitingTitle": "Демонстрация отправки запроса",
+        "waitingHelp": "Прототип Figma не отправляет реальные запросы.",
+        "waitingTicket": "Талон электронной очереди ещё не выдан.",
+        "waitingNote": "При реальном визите дождитесь сотрудника.",
+        "waitingHome": "НА ГЛАВНУЮ",
+        "phoneChangeNote": "Здесь сотруднику передаётся только цель вашего визита. Ввести или изменить номер телефона на этом экране нельзя. Следуйте указаниям сотрудника."
+      }
+    },
+    "UZ": {
+      "name": "O‘zbekcha",
+      "heading": [
+        "Bugun qanday masala bilan keldingiz?",
+        "Boshqa xizmatlar"
+      ],
+      "instructions": [
+        "Kerakli xizmatni bosing.",
+        "Quyidagi xizmatlardan birini tanlang."
+      ],
+      "services": [
+        "Koreyada qolish muddatini uzaytirish",
+        "Yashash manzili o‘zgarganini bildirish",
+        "Pasport / chet ellik ro‘yxati maʼlumotlarini o‘zgartirish",
+        "Yashash maqomini o‘zgartirish / olish",
+        "Chet ellikni ilk ro‘yxatga olish / Koreyadagi yashash joyini bildirish",
+        "Chet ellik ro‘yxat kartasini qayta olish",
+        "Chet ellik ro‘yxat kartasini olib ketish",
+        "Ish joyini o‘zgartirish / qo‘shish",
+        "Yashash maqomidan tashqari faoliyatga ruxsat",
+        "Immigratsiyaga oid faktlar haqida maʼlumotnoma olish",
+        "Ixtiyoriy chiqish haqida oldindan xabar berish",
+        "Qochqin deb tan olish uchun ariza",
+        "Qochqinlik qaroriga eʼtiroz bildirish",
+        "Chiqish taqiqi / to‘xtatilishini tekshirish",
+        "Axborotni oshkor qilishni so‘rash",
+        "Yetishmayotgan hujjatlarni topshirish",
+        "Qayta kirish ruxsatini olish",
+        "Ariza ko‘rib chiqilishi holatini so‘rash",
+        "Boshqa savollar va maslahat",
+        "Telefon raqami o‘zgarganini xabar qilish"
+      ],
+      "review": {
+        "reviewTitle": "Tanlangan xizmatni tekshiring",
+        "reviewHelp": "Xodimga yuborishdan oldin tekshiring.",
+        "serviceLabel": "Tanlangan xizmat",
+        "reservationTitle": "HiKorea orqali tashrifga yozilganmisiz?",
+        "reservationHelp": "Xodim yozuvni tekshiradi. Bilmasangiz ham davom eting.",
+        "answerYes": "Ha",
+        "answerNo": "Yo‘q",
+        "answerUnsure": "Bilmayman",
+        "sendLabel": "XODIM TEKSHIRUVIGA YUBORISH →",
+        "privacy": "Demo ism va pasport raqamini yig‘maydi.",
+        "waitingTitle": "So‘rov yuborish namoyishi",
+        "waitingHelp": "Bu Figma prototipi haqiqiy so‘rov yubormaydi.",
+        "waitingTicket": "Navbat taloni hali berilmadi.",
+        "waitingNote": "Haqiqiy tashrifda xodim tasdig‘ini kuting.",
+        "waitingHome": "BOSHIGA QAYTISH",
+        "phoneChangeNote": "Bu ekran xodimga faqat tashrif maqsadini yuboradi. Telefon raqamini bu yerda kiritib yoki o‘zgartirib bo‘lmaydi. Xodim ko‘rsatmalariga amal qiling."
+      }
+    },
+    "MN": {
+      "name": "Монгол",
+      "heading": [
+        "Та ямар асуудлаар ирсэн бэ?",
+        "Бусад үйлчилгээ"
+      ],
+      "instructions": [
+        "Хэрэгтэй үйлчилгээгээ дарна уу.",
+        "Доорх үйлчилгээнээс сонгоно уу."
+      ],
+      "services": [
+        "Солонгост оршин суух хугацаа сунгах",
+        "Оршин суугаа хаяг өөрчлөгдсөнийг мэдэгдэх",
+        "Паспорт / гадаад иргэний бүртгэлийн мэдээлэл өөрчлөх",
+        "Оршин суух ангилал өөрчлөх / олгох",
+        "Гадаад иргэний анхны бүртгэл / Солонгост оршин суух газрын мэдүүлэг",
+        "Гадаад иргэний үнэмлэх дахин авах",
+        "Гадаад иргэний үнэмлэх хүлээн авах",
+        "Ажлын газраа өөрчлөх / нэмэх",
+        "Оршин суух ангиллаас гадуурх үйл ажиллагааны зөвшөөрөл",
+        "Цагаачлалын бүртгэлийн лавлагаа авах",
+        "Сайн дураар гарах тухай урьдчилан мэдэгдэх",
+        "Дүрвэгчээр хүлээн зөвшөөрүүлэх хүсэлт",
+        "Дүрвэгчийн шийдвэрт эсэргүүцэл гаргах",
+        "Гарах хориг / түр түдгэлзүүлэлтийг шалгах",
+        "Мэдээлэл ил болгох хүсэлт",
+        "Нэмэлтээр шаардсан баримт бичиг өгөх",
+        "Дахин нэвтрэх зөвшөөрөл авах",
+        "Өргөдөл шийдвэрлэлтийн явцыг лавлах",
+        "Бусад асуулт, зөвлөгөө",
+        "Утасны дугаар өөрчлөгдсөнийг мэдэгдэх"
+      ],
+      "review": {
+        "reviewTitle": "Сонгосон үйлчилгээгээ шалгана уу",
+        "reviewHelp": "Ажилтанд илгээхээс өмнө мэдээллээ нягтална уу.",
+        "serviceLabel": "Сонгосон үйлчилгээ",
+        "reservationTitle": "HiKorea дээр цаг захиалсан уу?",
+        "reservationHelp": "Ажилтан захиалгыг шалгана. Мэдэхгүй бол үргэлжлүүлж болно.",
+        "answerYes": "Тийм",
+        "answerNo": "Үгүй",
+        "answerUnsure": "Мэдэхгүй",
+        "sendLabel": "АЖИЛТНААР ШАЛГУУЛАХ →",
+        "privacy": "Энэ загвар нэр, паспортын дугаар авахгүй.",
+        "waitingTitle": "Хүсэлт илгээх туршилтын дэлгэц",
+        "waitingHelp": "Figma загвараас бодит хүсэлт илгээгдэхгүй.",
+        "waitingTicket": "Дарааллын дугаар хараахан олгогдоогүй.",
+        "waitingNote": "Бодит үйлчилгээний үед ажилтныг хүлээнэ үү.",
+        "waitingHome": "ЭХЛЭЛ РҮҮ",
+        "phoneChangeNote": "Энэ дэлгэц зөвхөн ирсэн зорилгыг ажилтанд дамжуулна. Энд утасны дугаар оруулах эсвэл өөрчлөх боломжгүй. Ажилтны зааврыг дагана уу."
+      }
+    },
+    "NE": {
+      "name": "नेपाली",
+      "heading": [
+        "तपाईं आज के कामका लागि आउनुभएको हो?",
+        "अन्य सेवाहरू"
+      ],
+      "instructions": [
+        "आवश्यक सेवामा ट्याप गर्नुहोस्।",
+        "तलका सेवामध्ये एउटा छान्नुहोस्।"
+      ],
+      "services": [
+        "कोरियामा बस्ने अवधि थप्ने आवेदन",
+        "बसोबासको ठेगाना परिवर्तनको सूचना",
+        "राहदानी / विदेशी दर्ता विवरण परिवर्तन",
+        "बसोबास अनुमति स्थिति परिवर्तन / प्राप्ति",
+        "पहिलो विदेशी नागरिक दर्ता / कोरियामा बसोबास स्थानको सूचना",
+        "विदेशी दर्ता कार्ड पुनः जारी",
+        "विदेशी दर्ता कार्ड लिनु",
+        "कार्यस्थल परिवर्तन / थप गर्ने",
+        "बसोबास स्थिति बाहिरको गतिविधिको अनुमति",
+        "अध्यागमनसम्बन्धी तथ्य प्रमाणपत्र लिनु",
+        "स्वैच्छिक प्रस्थानको अग्रिम सूचना",
+        "शरणार्थी मान्यताको आवेदन",
+        "शरणार्थी निर्णयविरुद्ध आपत्ति",
+        "प्रस्थान प्रतिबन्ध / रोकको अवस्था जाँच",
+        "सूचना सार्वजनिक गर्न अनुरोध",
+        "मागिएका पूरक कागजात बुझाउने",
+        "पुनः प्रवेश अनुमति लिनु",
+        "आवेदन समीक्षा अवस्था बुझ्नु",
+        "अन्य प्रश्न / परामर्श",
+        "फोन नम्बर परिवर्तनको जानकारी दिनु"
+      ],
+      "review": {
+        "reviewTitle": "छानिएको सेवा जाँच्नुहोस्",
+        "reviewHelp": "कर्मचारीलाई पठाउनुअघि विवरण जाँच्नुहोस्।",
+        "serviceLabel": "छानिएको सेवा",
+        "reservationTitle": "HiKorea मा भेटघाटको समय लिनुभएको छ?",
+        "reservationHelp": "कर्मचारीले समय जाँच्नेछन्। थाहा नभए पनि अघि बढ्नुहोस्।",
+        "answerYes": "लिएको छ",
+        "answerNo": "लिएको छैन",
+        "answerUnsure": "थाहा छैन",
+        "sendLabel": "कर्मचारीलाई जाँच्न पठाउनुहोस् →",
+        "privacy": "यस नमुनामा नाम वा राहदानी नम्बर लिइँदैन।",
+        "waitingTitle": "अनुरोध पठाउने नमुना",
+        "waitingHelp": "यो Figma नमुनाले वास्तविक अनुरोध पठाउँदैन।",
+        "waitingTicket": "अहिलेसम्म टोकन नम्बर दिइएको छैन।",
+        "waitingNote": "वास्तविक सेवामा कर्मचारीको पुष्टि पर्खनुहोस्।",
+        "waitingHome": "सुरुमा फर्कनुहोस्",
+        "phoneChangeNote": "यो स्क्रिनले कर्मचारीलाई तपाईं आएको उद्देश्य मात्र पठाउँछ। यहाँ फोन नम्बर प्रविष्ट वा परिवर्तन गर्न सकिँदैन। कर्मचारीको निर्देशन पालना गर्नुहोस्।"
+      }
+    }
+  }
+}

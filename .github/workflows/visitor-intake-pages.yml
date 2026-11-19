@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check translation completeness
         run: |
-          node -e "const d=require('./apps/visitor-intake/data.json');if(Object.keys(d.locales).length!==12||Object.values(d.locales).some(x=>x.services.length!==19||x.services.some(v=>!v)))process.exit(1)"
+          node -e "const d=require('./apps/visitor-intake/data.json');if(Object.keys(d.locales).length!==12||Object.values(d.locales).some(x=>x.services.length!==20||x.services.some(v=>!v)))process.exit(1)"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
