@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+import liveCatalog from "../../public/compat/data.json";
+import demoCatalog from "../../apps/visitor-intake/data.json";
 import {
   __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
   validCode, INTAKE_TTL_MS,
@@ -25,6 +27,19 @@ const staff = (path: string, token: string, method: "GET" | "PATCH" | "DELETE" =
 
 afterEach(() => __setIntakeStore(null));
 
+describe("intake service catalog", () => {
+  it("keeps live and demo catalogs aligned with 20 translated services", () => {
+    expect(liveCatalog).toEqual(demoCatalog);
+    expect(Object.keys(liveCatalog.locales)).toHaveLength(12);
+    for (const locale of Object.values(liveCatalog.locales)) {
+      expect(locale.services).toHaveLength(20);
+      expect(locale.services[19]).toBeTruthy();
+      expect(locale.review.phoneChangeNote).toBeTruthy();
+    }
+    expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
+  });
+});
+
 describe("intake session store", () => {
   it("isolates staff capability and expires data", async () => {
     let now = 10_000;
@@ -49,6 +64,34 @@ describe("intake session store", () => {
 });
 
 describe("intake cross-device API", () => {
+  it("accepts phone-number change as service 20, without collecting contact details", async () => {
+    __setIntakeStore(createMemoryIntakeStore());
+    const created = await createSession(post("/api/intake/session", {}));
+    expect(created.status).toBe(201);
+    const { code, staffToken } = await created.json() as { code: string; staffToken: string };
+    const requestId = crypto.randomUUID();
+    const response = await submit(post("/api/intake/submission", {
+      code, requestId, language: "EN", serviceIndex: 19, booking: "unsure",
+    }));
+    expect(response.status).toBe(201);
+    const staffResult = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    const entries = (await staffResult.json() as { entries: Array<Record<string, unknown>> }).entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].serviceIndex).toBe(19);
+    expect(entries[0]).not.toHaveProperty("phoneNumber");
+    expect(entries[0]).not.toHaveProperty("requestId");
+
+    // A 21st index and extra phone-number fields must be rejected.
+    expect((await submit(post("/api/intake/submission", {
+      code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 20, booking: "no",
+    }))).status).toBe(400);
+    expect((await submit(post("/api/intake/submission", {
+      code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 19, booking: "no",
+      phoneNumber: "01012345678",
+    }))).status).toBe(400);
+  });
+
+
   it("transmits a visitor's choice to exactly one staff queue and records manual decisions", async () => {
     __setIntakeStore(createMemoryIntakeStore());
     const created = await createSession(post("/api/intake/session", {}));
