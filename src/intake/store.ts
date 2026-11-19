@@ -47,8 +47,21 @@ export type IntakeLive = {
   updatedAt: number;
 };
 
+/** Fixed staff-to-visitor phrases. The text lives in data.json; only the id travels. */
+export const NOTICE_IDS = [
+  "ticket", "call", "moment", "counter", "floor3", "back4", "visit", "resvNeed", "resvShow",
+  "docs", "form", "passport", "photo", "fee", "online", "today", "interp",
+] as const;
+export type NoticeId = typeof NOTICE_IDS[number];
+export const NOTICE_COUNTER_MIN = 1, NOTICE_COUNTER_MAX = 30;
+export type IntakeNotice = { id: NoticeId; counter?: number; n: number; at: number };
+
 export type IntakeSession = {
   live?: IntakeLive;
+  /** Phrase the staff member is showing on the visitor screen; absent when cleared. */
+  notice?: IntakeNotice;
+  /** Increments on every show/clear so a visitor screen can tell a repeat from a new one. */
+  noticeSeq?: number;
   station?: number;
   code: string;
   staffHash: string;

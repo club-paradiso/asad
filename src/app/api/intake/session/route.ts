@@ -74,6 +74,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       code, expiresAt: session.expiresAt, entries: publicEntries(session),
       live: session.live ?? null,
+      notice: session.notice ?? null,
       station: session.station ?? null,
     }, { headers: noStore });
   } catch { return failure(503, "접수 상태를 확인할 수 없습니다."); }

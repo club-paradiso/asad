@@ -39,6 +39,9 @@
     }
   }
   var LANGS = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"];
+  // Staff -> visitor fixed phrases. The desk sends only a phrase id; the text comes from data.json.
+  var NOTICE_POLL_MS=2500,NOTICE_HIDE_MS=30000;
+  var notice={shown:null,seq:-1,dismissedSeq:-1,timer:0,hideTimer:0,stopped:false,failures:0,gen:0};
   var state = {
     data:null,code:"",codeDraft:"",locale:"KO",step:"connect",
     servicePage:0,serviceIndex:-1,booking:"",reservationNo:"",resvError:false,
@@ -68,7 +71,8 @@
   function connect() {
     var code = state.codeDraft.replace(/\s/g,"").toUpperCase();
     if (!A.queryCode(code)) return error("직원 화면에 나온 10자리 접수 코드를 다시 확인해 주세요.");
-    state.code = code; state.error = ""; state.errorDetail = ""; state.step = "language";render();
+    state.code = code; state.error = ""; state.errorDetail = ""; state.step = "language";
+    notice.gen++;notice.stopped=false;notice.seq=-1;render();pollNotice();
   }
   function reset() {
     state.step="language";state.locale="KO";state.servicePage=0;
@@ -226,6 +230,67 @@
     A.add(box,A.el("p",state.error),state.errorDetail?A.el("p",state.errorDetail,"errorDetail"):null);
     return box;
   }
+  function noticeText(code,id,counter){
+    var loc=state.data && state.data.locales[code];
+    var t=loc && loc.notice && loc.notice.texts[id];
+    return t ? t.replace("{n}",String(counter||"")) : "";
+  }
+  function hideNotice(){
+    if(notice.hideTimer){window.clearTimeout(notice.hideTimer);notice.hideTimer=0;}
+    notice.shown=null;
+    var old=document.getElementById("notice-layer");
+    if(old && old.parentNode)old.parentNode.removeChild(old);
+  }
+  function showNotice(n,seq){
+    hideNotice();
+    if(!state.data)return;
+    // Before a language is chosen, show English; Korean underneath lets the staff member read along.
+    var chosen=state.step!=="language" && state.step!=="connect";
+    var code=chosen?state.locale:"EN";
+    var main=noticeText(code,n.id,n.counter);
+    if(!main)return;
+    notice.shown=n;
+    var layer=A.el("div",null,"noticeLayer");
+    layer.id="notice-layer";
+    layer.setAttribute("role","alertdialog");
+    layer.setAttribute("aria-modal","true");
+    var card=A.el("div",null,"noticeCard");
+    card.lang=htmlLang(code);
+    if(n.id==="counter" && n.counter)card.appendChild(A.el("p",String(n.counter),"noticeNumber"));
+    card.appendChild(A.el("p",main,"noticeText"));
+    if(code!=="KO")card.appendChild(A.el("p",noticeText("KO",n.id,n.counter),"noticeKo"));
+    var ok=A.btn(state.data.locales[code].notice.ok,function(){notice.dismissedSeq=seq;hideNotice();},"btn primary noticeOk");
+    card.appendChild(ok);
+    layer.appendChild(card);
+    document.body.appendChild(layer);
+    try{ok.focus();}catch(e){}
+    notice.hideTimer=window.setTimeout(function(){notice.dismissedSeq=seq;hideNotice();},NOTICE_HIDE_MS);
+  }
+  function applyNotice(n,seq){
+    if(seq===notice.seq)return;
+    notice.seq=seq;
+    if(!n){hideNotice();return;}
+    if(seq===notice.dismissedSeq)return;
+    showNotice(n,seq);
+  }
+  function pollNotice(){
+    if(notice.timer){window.clearTimeout(notice.timer);notice.timer=0;}
+    if(notice.stopped)return;
+    if(!A.queryCode(state.code) || state.step==="connect" || !state.data){
+      notice.timer=window.setTimeout(pollNotice,NOTICE_POLL_MS);return;
+    }
+    var polling=state.code,gen=notice.gen;
+    A.request("GET","/api/intake/notice?code="+polling+"&t="+Date.now(),null,null,function(err,data,status){
+      if(gen!==notice.gen)return;
+      if(status===400 || status===404){
+        // The desk closed; stop instead of polling a dead session.
+        notice.stopped=true;hideNotice();return;
+      }
+      if(!err && data && polling===state.code){notice.failures=0;applyNotice(data.notice||null,Number(data.seq)||0);}
+      else notice.failures++;
+      notice.timer=window.setTimeout(pollNotice,notice.failures?Math.min(NOTICE_POLL_MS*(1+notice.failures),15000):NOTICE_POLL_MS);
+    });
+  }
   function render(){
     stopTimers();
     A.clear(root);
@@ -342,7 +407,7 @@
   document.addEventListener("webkitfullscreenchange",onFullscreenChange);
   var qrCode=A.getQuery("desk").replace(/\s/g,"").toUpperCase();
   if(A.queryCode(qrCode)){state.code=qrCode;state.codeDraft=qrCode;state.step="language";}
-  A.request("GET","/compat/data.json?v=4",null,null,function(err,data){
+  A.request("GET","/compat/data.json?v=5",null,null,function(err,data){
     if (err || !data || !data.locales) {
       A.clear(root).appendChild(message("화면 정보를 불러오지 못했습니다. 직원에게 알려 주세요.","error"));
       return;
@@ -354,5 +419,6 @@
       }
     }
     state.data=data;render();
+    pollNotice();
   });
 })(window,document,window.ASADCompat);

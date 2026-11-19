@@ -204,6 +204,9 @@ jobs:
       - name: Independent desk + dual-monitor visitor window (Chromium + WebKit)
         run: node scripts/e2e-intake-dual-monitor.mjs http://localhost:3000
 
+      - name: Staff fixed phrases on the visitor screen (Chromium + WebKit)
+        run: node scripts/e2e-intake-notice.mjs http://localhost:3000
+
       - name: Standalone offline HTML + dual-monitor sync (file:// Chromium + WebKit)
         run: node scripts/e2e-intake-standalone.mjs
 
