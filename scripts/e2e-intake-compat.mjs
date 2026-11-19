@@ -27,7 +27,7 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
   const staff=await desktop.newPage();
   const visitor=await ipad.newPage();
   const errors=[],entries=[];
-  let live=null,sessionStarted=false;
+  let live=null,sessionStarted=false,liveFailuresLeft=2,liveRev=0;
   for (const page of [staff,visitor]) page.on("pageerror",err=>errors.push(err.message));
   const code="ABCD234567";
   const token="abcdefghijklmnopqrstuvwxyzABCDE1234567";
@@ -56,7 +56,16 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
   await visitor.route("**/api/intake/live",async route=>{
     const body=route.request().postDataJSON();
     if(body.code!==code || !body.step || "note" in body)throw Error("Invalid live payload");
-    if(sessionStarted){const {code:_c,...rest}=body;live={...rest,updatedAt:Date.now()};}
+    // Every response is slow, and the first two after the desk opens fail: the kiosk must
+    // retry by itself and must never let an older state overwrite a newer one.
+    await new Promise(r=>setTimeout(r,350));
+    if(sessionStarted && liveFailuresLeft>0){
+      liveFailuresLeft--;
+      await route.fulfill({status:503,contentType:"application/json",body:'{"error":"temporarily unavailable"}'});return;
+    }
+    if(sessionStarted && !(body.rev<=liveRev)){
+      const {code:_c,...rest}=body;live={...rest,updatedAt:Date.now()};liveRev=body.rev||liveRev;
+    }
     await route.fulfill({status:200,contentType:"application/json",body:'{"ok":true}'});
   });
   await visitor.route("**/api/intake/submission",async route=>{
@@ -90,7 +99,8 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     // The staff desk mirrors each visitor tap without any staff action.
     const mirror=staff.locator(".mirror");
     await visitor.getByRole("button",{name:"English"}).click();
-    await mirror.getByText("업무 고르는 중").waitFor({timeout:6000});
+    await mirror.getByText("업무 고르는 중").waitFor({timeout:12000});
+    if(liveFailuresLeft!==0)throw Error("Expected the kiosk to retry failed mirror updates");
     await mirror.getByText("영어").waitFor();
     await visitor.getByRole("button",{name:/Extend my period of stay/}).click();
     await mirror.getByText("예약 여부 고르는 중").waitFor({timeout:6000});
@@ -113,6 +123,8 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitor.getByText(/Request no\. #2/).waitFor({timeout:6000});
     await staff.getByText("받은 요청 2건").waitFor({timeout:8500});
+    // Fast taps with slow responses: the mirror must settle on the newest screen.
+    await staff.locator(".mirror").getByText("요청 받음 #2").waitFor({timeout:8000});
     await staff.getByText("번호 변경은 창구 처리").waitFor({timeout:8500});
     if(errors.length)throw Error("Browser errors: "+errors.join(" | "));
     console.log("PASS "+name+" complete: /secret → QR → iPad mini → 12 languages × 20 services → live mirror → request list → phone-change tag");

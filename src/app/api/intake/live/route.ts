@@ -23,6 +23,8 @@ const schema = z.object({
   serviceIndex: z.number().int().min(0).max(19).optional(),
   booking: z.enum(["yes", "no", "unsure"]).optional(),
   seq: z.number().int().min(1).max(10_000).optional(),
+  // Client clock-based revision. Optional so an already-loaded older kiosk keeps working.
+  rev: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
 }).strict();
 
 /**
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
   if (!body.ok) return fail(body.status, body.error);
   const parsed = schema.safeParse(body.value);
   if (!parsed.success || !validCode(parsed.data.code)) return fail(400, "Invalid live state.");
-  const { code, step, language, serviceIndex, booking, seq } = parsed.data;
+  const { code, step, language, serviceIndex, booking, seq, rev } = parsed.data;
   if (language !== undefined && !validLanguage(language)) return fail(400, "Invalid live state.");
   const store = intakeStore();
   if (!store) return fail(503, "실시간 접수 저장소가 연결되지 않았습니다.");
@@ -47,9 +49,17 @@ export async function POST(request: Request) {
   if (serviceIndex !== undefined) live.serviceIndex = serviceIndex;
   if (booking !== undefined) live.booking = booking as Booking;
   if (seq !== undefined) live.seq = seq;
+  if (rev !== undefined) live.rev = rev;
   try {
-    const s = await store.modify(code, current => { current.live = live; });
+    let stale = false;
+    const s = await store.modify(code, current => {
+      // A slower, older update must never overwrite a newer screen state.
+      if (rev !== undefined && current.live?.rev !== undefined && current.live.rev >= rev) {
+        stale = true; return false;
+      }
+      current.live = live;
+    });
     if (!s) return fail(404, "Session not found.");
-    return NextResponse.json({ ok: true }, { headers: noStore });
+    return NextResponse.json({ ok: true, stale }, { headers: noStore });
   } catch { return fail(503, "Live state unavailable."); }
 }

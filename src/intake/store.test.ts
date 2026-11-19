@@ -173,6 +173,17 @@ describe("intake cross-device API", () => {
     expect(live).toMatchObject({ step: "review", language: "VI", serviceIndex: 4, booking: "no" });
     expect(typeof live.updatedAt).toBe("number");
 
+    // Out-of-order delivery: an older revision arriving late is ignored.
+    expect((await postLive(post("/api/intake/live", { code, step: "sent", language: "VI", serviceIndex: 4, booking: "no", seq: 1, rev: 200 }))).status).toBe(200);
+    const late = await postLive(post("/api/intake/live", { code, step: "services", language: "VI", rev: 150 }));
+    expect(late.status).toBe(200);
+    expect((await late.json() as { stale: boolean }).stale).toBe(true);
+    const kept = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await kept.json() as { live: { step: string } }).live.step).toBe("sent");
+    expect((await postLive(post("/api/intake/live", { code, step: "language", rev: 201 }))).status).toBe(200);
+    const next = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await next.json() as { live: { step: string } }).live.step).toBe("language");
+
     // Unknown steps, languages, indices and free-text fields are rejected; unknown desks 404.
     for (const bad of [
       { code, step: "typing" },
