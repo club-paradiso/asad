@@ -125,7 +125,7 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await staff.getByText("받은 요청 2건").waitFor({timeout:8500});
     // Fast taps with slow responses: the mirror must settle on the newest screen.
     await staff.locator(".mirror").getByText("요청 받음 #2").waitFor({timeout:8000});
-    await staff.getByText("번호 변경은 창구 처리").waitFor({timeout:8500});
+    await staff.locator(".reqList").getByText("전화번호(연락처) 변경 신고").waitFor({timeout:8500});
     if(errors.length)throw Error("Browser errors: "+errors.join(" | "));
     console.log("PASS "+name+" complete: /secret → QR → iPad mini → 12 languages × 20 services → live mirror → request list → phone-change tag");
   } finally {
