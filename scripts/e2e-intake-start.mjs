@@ -47,15 +47,15 @@ try {
   });
 
   await page.goto(base + "/secret", { waitUntil: "networkidle" });
-  const btn = page.getByRole("button", { name: "실시간 접수 시작" });
+  const btn = page.getByRole("button", { name: "시작", exact: true });
   await btn.waitFor({ state: "visible" });
   if (!(await btn.isEnabled())) throw Error("Start button is disabled on first render");
   await btn.click();
-  await page.getByRole("alert").getByText(/접수 서버에 연결할 수 없습니다/).waitFor({ timeout: 8000 });
-  const retry = page.getByRole("button", { name: "실시간 접수 시작" });
+  await page.getByRole("alert").getByText(/접수 서버에 연결하지 못했습니다/).waitFor({ timeout: 8000 });
+  const retry = page.getByRole("button", { name: "시작", exact: true });
   await retry.click();
   await page.getByText("ABCD234567").waitFor({ timeout: 8000 });
-  await page.getByRole("button", { name: "iPad 연결 링크 복사" }).waitFor({ timeout: 8000 });
+  await page.getByRole("button", { name: "연결 주소 복사" }).waitFor({ timeout: 8000 });
   if (errors.length) throw Error("Browser exceptions: " + errors.join("; "));
   if (calls !== 2) throw Error("Expected 2 POST requests, got " + calls);
   console.log("PASS /secret button click, API 503 visible, retry, session code & QR UI, " + calls + " POST calls");

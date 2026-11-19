@@ -213,7 +213,7 @@
     A.clear(root);
     if(!state.code){
       root.appendChild(A.intro("","창구 열기","시작하면 이 PC 전용 연결 코드가 만들어집니다. 창구 번호는 화면 표시에만 씁니다."));
-      if(state.error)root.appendChild(text(state.error,"alert"));
+      if(state.error){var startAlert=text(state.error,"alert");startAlert.setAttribute("role","alert");root.appendChild(startAlert);}
       var startPanel=A.el("section",null,"panel");
       var b=A.btn(state.busy?"여는 중…":"시작",start,"btn primary");
       b.disabled=state.busy;
