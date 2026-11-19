@@ -22,11 +22,10 @@ export default async function IntakePage({
   const query = new URLSearchParams();
   if (/^[A-HJ-NP-Z2-9]{10}$/.test(code)) {
     query.set("desk", code);
-    if (params.display === "1") {
-      query.set("display", "1");
-      if (typeof params.station === "string" && /^(?:[1-9]|[12][0-9]|30)$/.test(params.station)) {
-        query.set("station", params.station);
-      }
+    if (params.display === "1") query.set("display", "1");
+    // Counter number is a public display label (shown to the visitor after sending).
+    if (typeof params.station === "string" && /^(?:[1-9]|[12][0-9]|30)$/.test(params.station)) {
+      query.set("station", params.station);
     }
   }
   const encoded = query.toString();

@@ -83,3 +83,17 @@ body.staff .container{max-width:1180px}
 .setup summary{cursor:pointer;font-weight:bold;padding:12px 0;min-height:44px;display:flex;align-items:center}
 .setup[open]{padding-bottom:16px}
 @media(max-width:760px){.facts{grid-template-columns:1fr}.connectBlock{grid-template-columns:1fr}.reqRow{grid-template-columns:44px 52px 1fr}.reqMeta{grid-column:3/-1;white-space:normal}.deskBar .stationPicker{margin:0}.mirrorStatus{font-size:28px}}
+
+/* Counter identity + reservation number */
+.deskTitle{color:#fff;border-radius:14px;padding:6px 16px;font-size:30px}
+.counterChip{display:inline-block;color:#fff;font-weight:bold;border-radius:8px;padding:3px 9px;font-size:13px;white-space:nowrap}
+.reqRow{grid-template-columns:auto 44px 52px 1fr auto}
+.facts{grid-template-columns:1fr 2fr 1fr 1.2fr}
+.resvBox{background:#fff;border:1px solid #d5e6e1;border-radius:16px;padding:16px;margin:14px 0;display:grid;gap:10px}
+.resvLabel{font-weight:bold;font-size:17px}
+.resvBox input[type=text]{max-width:100%;font-size:26px;letter-spacing:.06em}
+.resvBox input[aria-invalid=true]{border-color:#c0582a}
+.resvError{margin:0;color:#873518;font-size:15px}
+.keypad{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.keypad .key{text-align:center;font-size:22px;min-height:56px;padding:8px}
+@media(max-width:760px){.facts{grid-template-columns:1fr}.reqRow{grid-template-columns:auto 40px 1fr}.reqService{grid-column:1/-1}.keypad{grid-template-columns:repeat(4,minmax(0,1fr))}}

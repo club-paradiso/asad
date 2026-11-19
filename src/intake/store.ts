@@ -8,6 +8,11 @@ const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{10}$/;
 const EVAL_RETRIES = 6;
 
+/** Counter numbers shown in the office. */
+export const STATION_MIN = 1, STATION_MAX = 30;
+/** HiKorea visit-reservation number as typed by the visitor. Format is not officially published, so only a safe charset and length are enforced. */
+export const RESERVATION_NO = /^[A-Za-z0-9-]{4,30}$/;
+
 export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"] as const;
 export type IntakeLanguage = typeof LANGUAGES[number];
 export type Booking = "yes" | "no" | "unsure";
@@ -20,6 +25,8 @@ export type IntakeEntry = {
   language: IntakeLanguage;
   serviceIndex: number;
   booking: Booking;
+  reservationNo?: string;
+  station?: number;
   receivedAt: number;
   verification: Verification;
   ticket: Ticket;
@@ -33,6 +40,7 @@ export type IntakeLive = {
   language?: IntakeLanguage;
   serviceIndex?: number;
   booking?: Booking;
+  reservationNo?: string;
   seq?: number;
   epoch?: string;
   rev?: number;
@@ -41,6 +49,7 @@ export type IntakeLive = {
 
 export type IntakeSession = {
   live?: IntakeLive;
+  station?: number;
   code: string;
   staffHash: string;
   createdAt: number;

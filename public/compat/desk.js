@@ -13,6 +13,14 @@
     "JA":"일본어","TH":"태국어","RU":"러시아어","UZ":"우즈베크어","MN":"몽골어","NE":"네팔어"};
   var BOOKING={yes:"예약함",no:"예약 안 함",unsure:"모름"};
   var BOOKING_LIST={yes:"예약함",no:"예약 안 함",unsure:"예약 모름"};
+  // One fixed color per counter so desks (and their requests) are told apart at a glance.
+  var COUNTER_COLORS=["#087d70","#2456c4","#7b3fc1","#b4520e","#b02f6e","#3d7a1d"];
+  function counterColor(n){ if(!Number(n))return "#3f5f62"; return COUNTER_COLORS[(Number(n)-1+COUNTER_COLORS.length)%COUNTER_COLORS.length]; }
+  function counterChip(n,cls){
+    var chip=A.el("span",Number(n)?n+"번 창구":"창구",cls||"counterChip");
+    chip.style.backgroundColor=counterColor(n);
+    return chip;
+  }
 
   function text(s,cls){return A.el("p",s,cls||"muted");}
   function auth(){return {"x-asad-intake-staff-token":state.token};}
@@ -25,7 +33,6 @@
     var d=new Date(ms),h=d.getHours(),m=d.getMinutes();
     return (h<10?"0":"")+h+":"+(m<10?"0":"")+m;
   }
-  function stationLabel(){ return state.station ? state.station+"번 창구" : "창구"; }
   function setError(s){state.error=s;state.notice="";render();}
   function resetLocal(){
     state.code="";state.token="";state.expiresAt=0;state.entries=[];state.live=null;
@@ -58,6 +65,7 @@
         var changed=before!==after;
         var recovered=!state.online || !!state.error;
         state.entries=data.entries;state.live=data.live||null;
+        if(data.station && String(data.station)!==state.station){state.station=String(data.station);changed=true;}
         state.online=true;state.error="";
         if(changed)state.lastChangeAt=Date.now();
         if(changed || recovered)render();
@@ -68,7 +76,8 @@
   function start(){
     if(state.busy)return;
     state.busy=true;state.error="";render();
-    A.request("POST","/api/intake/session",{},null,function(err,data,status){
+    if(!state.station)return;
+    A.request("POST","/api/intake/session",{station:Number(state.station)},null,function(err,data,status){
       state.busy=false;
       if(err || !data || !data.code || !data.staffToken || !data.expiresAt){
         state.error = status===503 ? "접수 서버에 연결하지 못했습니다. 서버 저장소 설정을 확인해 주세요. (HTTP 503)" :
@@ -76,6 +85,7 @@
         render();return;
       }
       state.code=data.code;state.token=data.staffToken;state.expiresAt=data.expiresAt;
+      if(data.station)state.station=String(data.station);
       state.entries=[];state.live=null;state.online=false;state.error="";state.lastChangeAt=Date.now();
       if(!A.storageWrite(KEY,JSON.stringify({code:state.code,token:state.token,expiresAt:state.expiresAt}))){
         state.notice="이 브라우저는 탭 저장을 막고 있어 새로고침하면 창구가 사라집니다.";
@@ -94,10 +104,11 @@
     });
   }
   function joinUrl(){
-    return window.location.protocol+"//"+window.location.host+"/intake?desk="+encodeURIComponent(state.code);
+    return window.location.protocol+"//"+window.location.host+"/intake?desk="+encodeURIComponent(state.code)+
+      (state.station?"&station="+encodeURIComponent(state.station):"");
   }
   function displayUrl(){
-    return joinUrl()+"&display=1"+(state.station?"&station="+encodeURIComponent(state.station):"");
+    return joinUrl()+"&display=1";
   }
   function copyLink(field){
     var ok=false;
@@ -120,8 +131,9 @@
     label.setAttribute("for","staff-station");
     var select=A.el("select");
     select.id="staff-station";
-    var none=A.el("option","선택 안 함");
+    var none=A.el("option","창구 선택");
     none.value="";
+    none.disabled=true;
     select.appendChild(none);
     for(var i=1;i<=30;i++){
       var option=A.el("option",i+"번 창구");
@@ -164,6 +176,7 @@
   function mirror(){
     var live=state.live;
     var card=A.el("section",null,"mirror");
+    card.style.borderColor=counterColor(state.station);
     var status;
     if(!live)status="민원인 화면 연결 전";
     else if(live.step==="language")status="언어 고르는 중";
@@ -177,17 +190,19 @@
     var hasLang=!!(live && live.language);
     var hasService=!!(live && typeof live.serviceIndex==="number");
     var hasBooking=!!(live && live.booking);
+    var hasResv=!!(live && live.booking==="yes" && live.reservationNo);
     var facts=A.el("div",null,"facts");
     A.add(facts,
       fact("언어",hasLang?langName(live.language):"—",!hasLang),
       fact("업무",hasService?serviceName(live.serviceIndex):"—",!hasService),
-      fact("하이코리아 예약",hasBooking?BOOKING[live.booking]:"—",!hasBooking));
+      fact("하이코리아 예약",hasBooking?BOOKING[live.booking]:"—",!hasBooking),
+      fact("예약 번호",hasResv?live.reservationNo:"—",!hasResv));
     A.add(card,head,h,facts);
     return card;
   }
   function requestList(){
     var section=A.el("section",null,"requests");
-    section.appendChild(A.el("h2","받은 요청 "+state.entries.length+"건"));
+    section.appendChild(A.el("h2",(state.station?state.station+"번 창구 ":"")+"받은 요청 "+state.entries.length+"건"));
     if(!state.entries.length){
       return section;
     }
@@ -196,10 +211,11 @@
       var e=state.entries[i];
       var row=A.el("li",null,"reqRow"+(i===state.entries.length-1?" is-latest":""));
       A.add(row,
+        counterChip(e.station||state.station,"counterChip small"),
         A.el("span","#"+e.seq,"reqSeq"),
         A.el("span",clock(e.receivedAt),"reqTime"),
         A.el("strong",serviceName(e.serviceIndex),"reqService"),
-        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking],"reqMeta"));
+        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking]+(e.reservationNo?" "+e.reservationNo:""),"reqMeta"));
       list.appendChild(row);
     }
     section.appendChild(list);
@@ -212,14 +228,16 @@
       if(state.error){var startAlert=text(state.error,"alert");startAlert.setAttribute("role","alert");root.appendChild(startAlert);}
       var startPanel=A.el("section",null,"panel");
       var b=A.btn(state.busy?"여는 중…":"시작",start,"btn primary");
-      b.disabled=state.busy;
+      b.disabled=state.busy || !state.station;
       A.add(startPanel,stationPicker(),A.actions(b));
       root.appendChild(startPanel);
       return;
     }
     var bar=A.el("div",null,"deskBar");
-    A.add(bar,A.el("h1",stationLabel(),"deskTitle"),
-      A.el("span",state.online?"실시간 연결됨":"연결 중…","chip"+(state.online?" is-on":"")),stationPicker());
+    var title=A.el("h1",state.station?state.station+"번 창구":"창구","deskTitle");
+    title.style.backgroundColor=counterColor(state.station);
+    A.add(bar,title,
+      A.el("span",state.online?"실시간 연결됨":"연결 중…","chip"+(state.online?" is-on":"")));
     root.appendChild(bar);
     if(state.error){var alert=text(state.error,"alert");alert.setAttribute("role","alert");root.appendChild(alert);}
     if(state.notice){var ok=text(state.notice,"success");ok.setAttribute("role","status");root.appendChild(ok);}

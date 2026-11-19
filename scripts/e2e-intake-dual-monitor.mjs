@@ -29,10 +29,10 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     if(req.method()==="POST"){
       const next=samples[created.length];
       if(!next)throw Error("Unexpected third staff session");
-      const session={...next,expiresAt:Date.now()+3600000,entries:[]};
+      const session={...next,expiresAt:Date.now()+3600000,entries:[],station:req.postDataJSON().station};
       created.push(session);
       await route.fulfill({status:201,contentType:"application/json",
-        body:JSON.stringify({code:session.code,staffToken:session.token,expiresAt:session.expiresAt})});
+        body:JSON.stringify({code:session.code,staffToken:session.token,expiresAt:session.expiresAt,station:session.station})});
       return;
     }
     const found=created.find(s=>s.code===url.searchParams.get("code"));
@@ -43,7 +43,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
       await route.fulfill({status:403,contentType:"application/json",body:'{"error":"forbidden"}'});return;
     }
     await route.fulfill({status:200,contentType:"application/json",
-      body:JSON.stringify({code:found.code,expiresAt:found.expiresAt,entries:found.entries,live:found.live||null})});
+      body:JSON.stringify({code:found.code,expiresAt:found.expiresAt,entries:found.entries,live:found.live||null,station:found.station})});
   });
   await context.route("**/api/intake/live",async route=>{
     const body=route.request().postDataJSON();
@@ -59,7 +59,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     }
     found.entries.push({
       seq:found.entries.length+1,language:body.language,serviceIndex:body.serviceIndex,
-      booking:body.booking,receivedAt:Date.now(),verification:"unchecked",ticket:"pending"
+      booking:body.booking,receivedAt:Date.now(),verification:"unchecked",ticket:"pending",station:found.station
     });
     await route.fulfill({status:201,contentType:"application/json",
       body:JSON.stringify({accepted:true,seq:found.entries.length})});
@@ -67,12 +67,13 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
 
   try{
     await Promise.all([staffOne.goto(base+"/secret"),staffTwo.goto(base+"/secret")]);
+    await staffOne.locator("#staff-station").selectOption("1");
     await staffOne.getByRole("button",{name:"시작",exact:true}).click();
     await staffOne.getByText("ABCD234567",{exact:true}).waitFor();
+    await staffTwo.locator("#staff-station").selectOption("2");
     await staffTwo.getByRole("button",{name:"시작",exact:true}).click();
     await staffTwo.getByText("WXYZ234567",{exact:true}).waitFor();
-    await staffOne.locator("#staff-station").selectOption("1");
-    await staffTwo.locator("#staff-station").selectOption("2");
+    if(created[0].station!==1 || created[1].station!==2)throw Error("Counter number was not sent when opening the desk");
     await staffOne.getByRole("heading",{name:"1번 창구",exact:true}).waitFor();
     await staffTwo.getByRole("heading",{name:"2번 창구",exact:true}).waitFor();
 
@@ -127,6 +128,11 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await staffTwo.getByText("받은 요청 1건").waitFor({timeout:9000});
     await staffTwo.locator(".reqList").getByText("전화번호(연락처) 변경 신고").waitFor({timeout:9000});
     await staffOne.getByText("받은 요청 1건").waitFor();
+    // Each desk's requests carry that desk's counter, never the other one's.
+    await staffOne.locator(".reqList").getByText("1번 창구").waitFor();
+    await staffTwo.locator(".reqList").getByText("2번 창구").waitFor();
+    if(await staffOne.locator(".reqList").getByText("2번 창구").count())throw Error("Counter 2 request leaked into counter 1");
+    if(await staffTwo.locator(".reqList").getByText("1번 창구").count())throw Error("Counter 1 request leaked into counter 2");
 
     // A refreshed staff desk resumes only its own scoped session and display label.
     await staffOne.reload();
