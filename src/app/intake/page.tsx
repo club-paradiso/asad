@@ -11,12 +11,20 @@ export const metadata: Metadata = {
 export default async function IntakePage({
   searchParams,
 }: {
-  searchParams: Promise<{ desk?: string | string[] }>;
+  searchParams: Promise<{
+    desk?: string | string[];
+    display?: string | string[];
+    station?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
   const code = typeof params.desk === "string" ? params.desk.trim().toUpperCase() : "";
-  const param = /^[A-HJ-NP-Z2-9]{10}$/.test(code)
-    ? "?desk=" + encodeURIComponent(code)
-    : "";
-  redirect("/compat/kiosk.html" + param);
+  const query = new URLSearchParams();
+  if (/^[A-HJ-NP-Z2-9]{10}$/.test(code)) query.set("desk", code);
+  if (params.display === "1") query.set("display", "1");
+  if (typeof params.station === "string" && /^(?:[1-9]|[12][0-9]|30)$/.test(params.station)) {
+    query.set("station", params.station);
+  }
+  const encoded = query.toString();
+  redirect("/compat/kiosk.html" + (encoded ? "?" + encoded : ""));
 }
