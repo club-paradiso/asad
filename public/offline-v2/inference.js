@@ -133,8 +133,8 @@ self.addEventListener("message", ({ data }) => {
       // downloading large private-use model fixtures or sending API requests.
       const response = await networkFetch(wasm, { cache: "no-store" });
       if (!response.ok) throw new Error("Local ONNX WASM is unavailable.");
-      const module = await WebAssembly.compile(await response.arrayBuffer());
-      publish({ ok: module instanceof WebAssembly.Module, version: env.version });
+      const compiledWasm = await WebAssembly.compile(await response.arrayBuffer());
+      publish({ ok: compiledWasm instanceof WebAssembly.Module, version: env.version });
       return;
     }
     if (action === "download") {
