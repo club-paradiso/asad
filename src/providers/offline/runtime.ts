@@ -33,10 +33,10 @@ interface Reply {
 }
 type Pending = { receive: (reply: Reply) => void; fail: (error: Error) => void };
 
-const RUNTIME = "/offline-v1/";
-const ASSETS = ["inference.js", "transformers.min.js", "ort-wasm-simd-threaded.jsep.mjs", "ort-wasm-simd-threaded.jsep.wasm", "ko-check.wav"];
-const SHELL_CACHE = "asad-offline-shell-v1";
-const MARKER = "/offline-v1/shell-ready";
+const RUNTIME = "/offline-v2/";
+const ASSETS = ["inference.js", "transformers.web.js", "ort-wasm-simd-threaded.jsep.mjs", "ort-wasm-simd-threaded.jsep.wasm", "ko-check.wav"];
+const SHELL_CACHE = "asad-offline-shell-v2";
+const MARKER = "/offline-v2/shell-ready";
 const empty = (): ModelState => ({ status: "unavailable", samples: [] });
 const INITIAL: OfflineState = { translation: empty(), speech: empty(), shell: false };
 const WORD = /[a-z]{2,}/i;
