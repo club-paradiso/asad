@@ -206,11 +206,11 @@
       state.phrase?A.el("span","표시 중: "+noticeLabel(state.phrase),"chip is-on"):A.el("span","표시 안 함","chip"));
     if(state.phrase){
       var clear=A.btn("화면에서 지우기",function(){sendNotice(null);},"btn");
-      clear.disabled=state.phraseBusy;
+      clear.disabled=state.noticeBusy;
       head.appendChild(clear);
     }
     section.appendChild(head);
-    if(state.phraseError){var e=text(state.phraseError,"alert");e.setAttribute("role","alert");section.appendChild(e);}
+    if(state.noticeError){var e=text(state.noticeError,"alert");e.setAttribute("role","alert");section.appendChild(e);}
     for(var g=0;g<cfg.groups.length;g++){
       var group=cfg.groups[g];
       var row=A.el("div",null,"noticeGroup");
@@ -223,7 +223,7 @@
             if(item.id==="counter"){state.counterPicker=!state.counterPicker;render();return;}
             sendNotice(item.id);
           },"btn noticeBtn"+(active?" is-active":""));
-          b.disabled=state.phraseBusy;
+          b.disabled=state.noticeBusy;
           if(item.id==="counter")b.setAttribute("aria-expanded",String(state.counterPicker));
           b.setAttribute("aria-pressed",String(!!active));
           items.appendChild(b);
@@ -237,7 +237,7 @@
           (function(no){
             var nb=A.btn(String(no),function(){sendNotice("counter",no);},"btn key");
             nb.setAttribute("aria-label",no+"번 창구");
-            nb.disabled=state.phraseBusy;
+            nb.disabled=state.noticeBusy;
             pad.appendChild(nb);
           })(cfg.counters[c]);
         }

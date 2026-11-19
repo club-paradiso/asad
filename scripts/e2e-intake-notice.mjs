@@ -9,7 +9,7 @@ const json = (route, status, body) => route.fulfill({ status, contentType: "appl
 // CI runs without the shared Redis store, so the intake API is served by an in-test fake with the same
 // contract as src/app/api/intake/*. Server-side validation itself is covered by src/intake/store.test.ts.
 async function fakeBackend(ctx, station) {
-  const s = { code: "NTCE234567", token: "n".repeat(43), station, entries: [], live: null, notice: null, seq: 0 };
+  const s = { failNext: false, code: "NTCE234567", token: "n".repeat(43), station, entries: [], live: null, notice: null, seq: 0 };
   await ctx.route("**/api/intake/session*", async route => {
     const req = route.request();
     if (req.method() === "POST") return json(route, 201, { code: s.code, staffToken: s.token, expiresAt: Date.now() + 3600e3, station });
@@ -25,6 +25,7 @@ async function fakeBackend(ctx, station) {
     const req = route.request();
     if (req.method() === "GET") return json(route, 200, { notice: s.notice, seq: s.seq });
     if (req.headers()["x-asad-intake-staff-token"] !== s.token) return json(route, 403, { error: "forbidden" });
+    if (s.failNext) { s.failNext = false; return json(route, 503, { error: "down" }); }
     const body = req.postDataJSON();
     const ok = body.code === s.code && (body.id === null || IDS.includes(body.id)) &&
       (body.id === "counter") === (body.counter !== undefined) && Object.keys(body).every(k => ["code", "id", "counter"].includes(k));
@@ -33,6 +34,7 @@ async function fakeBackend(ctx, station) {
     s.notice = body.id === null ? null : { id: body.id, n: s.seq, at: Date.now(), ...(body.counter ? { counter: body.counter } : {}) };
     return json(route, 200, { ok: true, notice: s.notice, seq: s.seq });
   });
+  return s;
 }
 
 const textOf = async (page) => (await page.locator("#notice-layer").innerText()).replace(/\s+/g, " ");
@@ -42,7 +44,7 @@ async function run(name, engine, station) {
   const errors = [];
   try {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    await fakeBackend(ctx, station);
+    const backend = await fakeBackend(ctx, station);
     const desk = await ctx.newPage();
     desk.on("pageerror", e => errors.push("desk: " + e.message));
     await desk.goto(BASE + "/compat/desk.html");
@@ -79,6 +81,12 @@ async function run(name, engine, station) {
     if (await kiosk.locator("#notice-layer").count()) throw Error("dismissed phrase came back");
     await desk.getByRole("button", { name: "번호표" }).click();
     await kiosk.locator("#notice-layer").waitFor({ timeout: 8000 });
+
+    // A failed send is visible to staff and the cards stay usable.
+    backend.failNext = true;
+    await desk.getByRole("button", { name: "사진" }).click();
+    await desk.getByText("문구를 보내지 못했습니다. 다시 눌러 주세요.").waitFor({ timeout: 5000 });
+    if (await desk.getByRole("button", { name: "사진" }).isDisabled()) throw Error("cards stuck disabled after failure");
 
     if (errors.length) throw Error(errors.join("\n"));
     console.log(`PASS ${name}: desk phrase cards → visitor overlay (counter pad, replace, clear, dismiss, resend)`);
