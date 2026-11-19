@@ -93,6 +93,20 @@ function actions(doc){var n=el(doc,"div",null,"actions");for(var i=1;i<arguments
 function intro(doc,step,title,desc){return add(el(doc,"section",null,"hero"),el(doc,"p",step,"step"),el(doc,"h1",title),el(doc,"p",desc));}
 function note(doc,t,c){return el(doc,"p",t,c||"muted");}
 function koService(){return DATA.locales.KO.services[state.service];}
+var PHONE_NOTES={
+  "KO":"이 화면에서는 전화번호 변경 신고가 접수되지 않습니다. 실제 처리 방법은 직원에게 문의해 주세요.",
+  "EN":"No phone number change is submitted here. Please ask staff about the actual procedure.",
+  "ZH-CN":"此页面不会提交电话号码变更申报。办理方法请咨询工作人员。",
+  "ID":"Layar ini tidak mengirim laporan perubahan nomor telepon. Tanyakan prosedur sebenarnya kepada petugas.",
+  "HI":"यहाँ फ़ोन नंबर परिवर्तन की सूचना जमा नहीं होती। कृपया कर्मचारी से प्रक्रिया पूछें।",
+  "VI":"Trang này không nộp thông báo đổi số điện thoại. Hãy hỏi nhân viên về thủ tục.",
+  "JA":"この画面では電話番号変更届は提出されません。手続きは職員に確認してください。",
+  "TH":"หน้านี้ไม่ได้ยื่นแจ้งเปลี่ยนหมายเลขโทรศัพท์ โปรดสอบถามขั้นตอนกับเจ้าหน้าที่",
+  "RU":"На этом экране не подаётся уведомление о смене номера. Уточните порядок у сотрудника.",
+  "UZ":"Bu ekranda telefon raqami o‘zgargani haqida ariza yuborilmaydi. Tartibni xodimdan so‘rang.",
+  "MN":"Энэ дэлгэцээр утасны дугаар солих мэдэгдэл илгээхгүй. Журмыг ажилтнаас асууна уу.",
+  "NE":"यस स्क्रिनबाट फोन नम्बर परिवर्तनको सूचना बुझाइँदैन। प्रक्रिया कर्मचारीलाई सोध्नुहोस्।"
+};
 function stopTimers(){if(idleTimer){clearTimeout(idleTimer);idleTimer=null;}if(finishedTimer){clearInterval(finishedTimer);finishedTimer=null;}}
 function touch(){
   if(idleTimer){clearTimeout(idleTimer);idleTimer=null;}
@@ -138,7 +152,7 @@ function renderView(doc,visitor){
     var panel=el(doc,"section",null,"panel highlight");
     add(panel,el(doc,"p",r.serviceLabel,"step"),el(doc,"h2",d.services[state.service]));
     if(state.locale!=="KO"){var ko=note(doc,koService());ko.lang="ko";panel.appendChild(ko);}
-    if(state.service===19)panel.appendChild(note(doc,r.phoneChangeNote,"note"));
+    if(state.service===19)panel.appendChild(note(doc,PHONE_NOTES[state.locale],"note"));
     app.appendChild(panel);
     app.appendChild(el(doc,"h2",r.reservationTitle,"question"));
     app.appendChild(note(doc,r.reservationHelp));
@@ -156,12 +170,35 @@ function renderView(doc,visitor){
     var primary=app.querySelector(".actions .primary");if(primary)primary.disabled=!state.booking;
     app.appendChild(note(doc,"이 파일은 정보를 인터넷이나 출입국 전산으로 보내지 않습니다. / No data is transmitted.","offline-helper"));
   }else if(state.stage==="summary"){
-    var heading=state.locale==="KO"?"직원에게 이 화면을 보여주세요":"Please show this screen to staff";
-    if(state.locale==="ZH-CN")heading="请向工作人员出示此页面";
-    else if(state.locale==="JA")heading="この画面を職員に見せてください";
-    else if(state.locale==="VI")heading="Vui lòng đưa màn hình này cho nhân viên";
-    else if(state.locale==="ID")heading="Tunjukkan layar ini kepada petugas";
-    app.appendChild(intro(doc,"3 / 3 · COMPLETE",heading,"선택한 업무와 예약 여부를 직원과 함께 확인하세요."));
+    var showTitle={
+      "KO":"직원에게 이 화면을 보여주세요",
+      "EN":"Please show this screen to staff",
+      "ZH-CN":"请向工作人员出示此页面",
+      "ID":"Tunjukkan layar ini kepada petugas",
+      "HI":"कृपया यह स्क्रीन कर्मचारी को दिखाएँ",
+      "VI":"Vui lòng đưa màn hình này cho nhân viên",
+      "JA":"この画面を職員に見せてください",
+      "TH":"กรุณาแสดงหน้าจอนี้ให้เจ้าหน้าที่ดู",
+      "RU":"Пожалуйста, покажите этот экран сотруднику",
+      "UZ":"Iltimos, ushbu ekranni xodimga ko‘rsating",
+      "MN":"Энэ дэлгэцийг ажилтанд харуулна уу",
+      "NE":"कृपया यो स्क्रिन कर्मचारीलाई देखाउनुहोस्"
+    };
+    var showHelp={
+      "KO":"선택한 업무와 예약 여부를 직원과 함께 확인하세요.",
+      "EN":"Please confirm your selected service and booking status with staff.",
+      "ZH-CN":"请与工作人员确认所选业务及预约情况。",
+      "ID":"Konfirmasikan layanan dan status janji temu dengan petugas.",
+      "HI":"चुनी गई सेवा और अपॉइंटमेंट की स्थिति कर्मचारी से पुष्टि करें।",
+      "VI":"Vui lòng xác nhận dịch vụ và tình trạng đặt lịch với nhân viên.",
+      "JA":"選択した手続きと予約状況を職員と一緒に確認してください。",
+      "TH":"โปรดตรวจสอบบริการที่เลือกและสถานะการนัดหมายกับเจ้าหน้าที่",
+      "RU":"Уточните выбранную услугу и наличие записи у сотрудника.",
+      "UZ":"Tanlangan xizmat va bandlov holatini xodim bilan tekshiring.",
+      "MN":"Сонгосон үйлчилгээ болон цаг захиалгыг ажилтантай нягтална уу.",
+      "NE":"कर्मचारीसँग छानेको सेवा र बुकिङ अवस्था पुष्टि गर्नुहोस्।"
+    };
+    app.appendChild(intro(doc,"3 / 3 · COMPLETE",showTitle[state.locale],showHelp[state.locale]));
     var sPanel=el(doc,"section",null,"panel highlight");
     sPanel.appendChild(el(doc,"p",r.serviceLabel,"step"));
     sPanel.appendChild(el(doc,"h2",d.services[state.service]));
@@ -170,7 +207,7 @@ function renderView(doc,visitor){
     var bi=state.booking==="yes"?0:state.booking==="no"?1:2;
     sPanel.appendChild(el(doc,"h2",[r.answerYes,r.answerNo,r.answerUnsure][bi]));
     sPanel.appendChild(note(doc,"직원 확인용: "+[DATA.locales.KO.review.answerYes,DATA.locales.KO.review.answerNo,DATA.locales.KO.review.answerUnsure][bi]));
-    if(state.service===19)sPanel.appendChild(note(doc,r.phoneChangeNote,"note"));
+    if(state.service===19)sPanel.appendChild(note(doc,PHONE_NOTES[state.locale],"note"));
     app.appendChild(sPanel);
     app.appendChild(note(doc,"안내 전용입니다. 실제 신고, 예약 확인 및 번호표 발급은 이루어지지 않았습니다.","warning-banner"));
     app.appendChild(actions(doc,btn(doc,r.waitingHome||"처음으로 돌아가기",reset,"btn primary"),
