@@ -87,7 +87,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     const visitor=await popupPromise;
     visitor.on("pageerror",err=>errors.push(err.message));
     await visitor.waitForLoadState("domcontentloaded");
-    await visitor.getByText("1번 창구 · 민원인 화면").waitFor();
+    await visitor.getByText("1번 창구").waitFor();
     const leaked=await visitor.evaluate(()=>({
       token:sessionStorage.getItem("asad:intake:staff:v1"),
       opener:window.opener!==null
@@ -108,7 +108,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await staffTwo.getByRole("link",{name:"민원인 전용 화면을 새 창에서 열기"}).click();
     const visitorTwo=await secondPopupPromise;
     visitorTwo.on("pageerror",err=>errors.push(err.message));
-    await visitorTwo.getByText("2번 창구 · 민원인 화면").waitFor();
+    await visitorTwo.getByText("2번 창구").waitFor();
     const secondToken=await visitorTwo.evaluate(()=>sessionStorage.getItem("asad:intake:staff:v1"));
     if(secondToken!==null)throw Error("Second visitor window inherited staff token");
     await visitorTwo.getByRole("button",{name:"English"}).click();

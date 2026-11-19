@@ -40,7 +40,7 @@ describe("intake service catalog", () => {
 
   it("localizes every visitor-facing kiosk control in all 12 languages", () => {
     const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
-    expect(keys).toHaveLength(13);
+    expect(keys).toHaveLength(11);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(Object.keys(locale.kiosk).sort()).toEqual(keys);
       for (const value of Object.values(locale.kiosk)) {

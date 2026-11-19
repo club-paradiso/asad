@@ -58,14 +58,12 @@
         "changeLanguage": "언어 바꾸기",
         "changeService": "업무 다시 고르기",
         "sending": "보내는 중…",
-        "noPersonalInfo": "이 화면에서는 이름이나 여권번호를 묻지 않습니다.",
         "sentTitle": "직원에게 보냈습니다",
         "sentBody": "잠시 기다려 주세요. 직원이 방문 목적과 예약을 확인한 뒤 번호표를 드립니다.",
         "requestNo": "요청 번호",
         "requestNoHelp": "직원이 이 번호로 요청을 찾습니다. 번호표 번호가 아닙니다.",
         "autoReset": "{s}초 뒤 처음 화면으로 돌아갑니다.",
-        "sendFailed": "보내지 못했습니다. 다시 눌러 주세요. 계속 안 되면 직원에게 알려 주세요.",
-        "footer": "번호표는 직원이 직접 드립니다."
+        "sendFailed": "보내지 못했습니다. 다시 눌러 주세요. 계속 안 되면 직원에게 알려 주세요."
       }
     },
     "EN": {
@@ -124,14 +122,12 @@
         "changeLanguage": "Change language",
         "changeService": "Choose another service",
         "sending": "Sending…",
-        "noPersonalInfo": "This screen does not ask for your name or passport number.",
         "sentTitle": "Sent to staff",
         "sentBody": "Please wait a moment. Staff will check your reason for visiting and your booking, then give you a queue ticket.",
         "requestNo": "Request no.",
         "requestNoHelp": "Staff use this number to find your request. It is not a queue ticket number.",
         "autoReset": "Returning to the start screen in {s} seconds.",
-        "sendFailed": "Could not send. Please tap again. If it keeps failing, please tell a staff member.",
-        "footer": "Queue tickets are given by staff in person."
+        "sendFailed": "Could not send. Please tap again. If it keeps failing, please tell a staff member."
       }
     },
     "ZH-CN": {
@@ -190,14 +186,12 @@
         "changeLanguage": "更改语言",
         "changeService": "重新选择业务",
         "sending": "正在发送…",
-        "noPersonalInfo": "本页面不会要求您填写姓名或护照号码。",
         "sentTitle": "已发送给工作人员",
         "sentBody": "请稍候。工作人员确认您的来访事由和预约后，会为您发放排队号码。",
         "requestNo": "申请编号",
         "requestNoHelp": "工作人员会用此编号查找您的申请。这不是排队号码。",
         "autoReset": "{s}秒后返回首页。",
-        "sendFailed": "发送失败。请再点一次。如仍无法发送，请告知工作人员。",
-        "footer": "排队号码由工作人员当面发放。"
+        "sendFailed": "发送失败。请再点一次。如仍无法发送，请告知工作人员。"
       }
     },
     "ID": {
@@ -256,14 +250,12 @@
         "changeLanguage": "Ganti bahasa",
         "changeService": "Pilih layanan lain",
         "sending": "Mengirim…",
-        "noPersonalInfo": "Layar ini tidak meminta nama atau nomor paspor Anda.",
         "sentTitle": "Terkirim ke petugas",
         "sentBody": "Mohon tunggu sebentar. Petugas akan memeriksa keperluan dan reservasi Anda, lalu memberikan nomor antrean.",
         "requestNo": "Nomor permintaan",
         "requestNoHelp": "Petugas memakai nomor ini untuk menemukan permintaan Anda. Ini bukan nomor antrean.",
         "autoReset": "Kembali ke layar awal dalam {s} detik.",
-        "sendFailed": "Gagal mengirim. Silakan ketuk lagi. Jika tetap gagal, beri tahu petugas.",
-        "footer": "Nomor antrean diberikan langsung oleh petugas."
+        "sendFailed": "Gagal mengirim. Silakan ketuk lagi. Jika tetap gagal, beri tahu petugas."
       }
     },
     "HI": {
@@ -322,14 +314,12 @@
         "changeLanguage": "भाषा बदलें",
         "changeService": "दूसरी सेवा चुनें",
         "sending": "भेजा जा रहा है…",
-        "noPersonalInfo": "यह स्क्रीन आपका नाम या पासपोर्ट नंबर नहीं माँगती।",
         "sentTitle": "कर्मचारी को भेज दिया गया",
         "sentBody": "कृपया थोड़ा इंतज़ार करें। कर्मचारी आपके आने का कारण और बुकिंग जाँचकर आपको कतार का नंबर देंगे।",
         "requestNo": "अनुरोध संख्या",
         "requestNoHelp": "कर्मचारी इसी संख्या से आपका अनुरोध ढूँढते हैं। यह कतार का नंबर नहीं है।",
         "autoReset": "{s} सेकंड में शुरुआती स्क्रीन पर लौटेंगे।",
-        "sendFailed": "भेजा नहीं जा सका। कृपया फिर से दबाएँ। फिर भी न हो तो कर्मचारी को बताएँ।",
-        "footer": "कतार का नंबर कर्मचारी स्वयं देते हैं।"
+        "sendFailed": "भेजा नहीं जा सका। कृपया फिर से दबाएँ। फिर भी न हो तो कर्मचारी को बताएँ।"
       }
     },
     "VI": {
@@ -388,14 +378,12 @@
         "changeLanguage": "Đổi ngôn ngữ",
         "changeService": "Chọn dịch vụ khác",
         "sending": "Đang gửi…",
-        "noPersonalInfo": "Màn hình này không hỏi tên hay số hộ chiếu của quý vị.",
         "sentTitle": "Đã gửi cho nhân viên",
         "sentBody": "Vui lòng chờ một chút. Nhân viên sẽ kiểm tra mục đích đến và lịch hẹn, sau đó cấp số thứ tự cho quý vị.",
         "requestNo": "Số yêu cầu",
         "requestNoHelp": "Nhân viên dùng số này để tìm yêu cầu của quý vị. Đây không phải số thứ tự.",
         "autoReset": "Quay về màn hình đầu sau {s} giây.",
-        "sendFailed": "Không gửi được. Vui lòng chạm lại. Nếu vẫn lỗi, hãy báo nhân viên.",
-        "footer": "Số thứ tự do nhân viên trực tiếp cấp."
+        "sendFailed": "Không gửi được. Vui lòng chạm lại. Nếu vẫn lỗi, hãy báo nhân viên."
       }
     },
     "JA": {
@@ -454,14 +442,12 @@
         "changeLanguage": "言語を変更",
         "changeService": "手続きを選び直す",
         "sending": "送信中…",
-        "noPersonalInfo": "この画面では氏名やパスポート番号をお聞きしません。",
         "sentTitle": "職員に送信しました",
         "sentBody": "少々お待ちください。職員がご用件と予約を確認したうえで、番号札をお渡しします。",
         "requestNo": "受付番号",
         "requestNoHelp": "職員はこの番号でご依頼を確認します。番号札の番号ではありません。",
         "autoReset": "{s}秒後に最初の画面に戻ります。",
-        "sendFailed": "送信できませんでした。もう一度押してください。続く場合は職員にお知らせください。",
-        "footer": "番号札は職員が直接お渡しします。"
+        "sendFailed": "送信できませんでした。もう一度押してください。続く場合は職員にお知らせください。"
       }
     },
     "TH": {
@@ -520,14 +506,12 @@
         "changeLanguage": "เปลี่ยนภาษา",
         "changeService": "เลือกบริการใหม่",
         "sending": "กำลังส่ง…",
-        "noPersonalInfo": "หน้าจอนี้ไม่ขอชื่อหรือหมายเลขหนังสือเดินทางของท่าน",
         "sentTitle": "ส่งให้เจ้าหน้าที่แล้ว",
         "sentBody": "กรุณารอสักครู่ เจ้าหน้าที่จะตรวจสอบเรื่องที่มาติดต่อและการจอง แล้วจึงให้บัตรคิวแก่ท่าน",
         "requestNo": "หมายเลขคำขอ",
         "requestNoHelp": "เจ้าหน้าที่ใช้หมายเลขนี้ค้นหาคำขอของท่าน ไม่ใช่หมายเลขบัตรคิว",
         "autoReset": "จะกลับไปหน้าแรกใน {s} วินาที",
-        "sendFailed": "ส่งไม่สำเร็จ กรุณากดอีกครั้ง หากยังไม่ได้ กรุณาแจ้งเจ้าหน้าที่",
-        "footer": "เจ้าหน้าที่จะให้บัตรคิวด้วยตนเอง"
+        "sendFailed": "ส่งไม่สำเร็จ กรุณากดอีกครั้ง หากยังไม่ได้ กรุณาแจ้งเจ้าหน้าที่"
       }
     },
     "RU": {
@@ -586,14 +570,12 @@
         "changeLanguage": "Сменить язык",
         "changeService": "Выбрать другую услугу",
         "sending": "Отправка…",
-        "noPersonalInfo": "На этом экране не нужно указывать имя или номер паспорта.",
         "sentTitle": "Отправлено сотруднику",
         "sentBody": "Пожалуйста, подождите. Сотрудник проверит цель визита и запись, а затем выдаст вам талон очереди.",
         "requestNo": "Номер запроса",
         "requestNoHelp": "По этому номеру сотрудник найдёт ваш запрос. Это не номер талона очереди.",
         "autoReset": "Возврат на начальный экран через {s} с.",
-        "sendFailed": "Не удалось отправить. Нажмите ещё раз. Если ошибка повторится, сообщите сотруднику.",
-        "footer": "Талон очереди выдаёт сотрудник лично."
+        "sendFailed": "Не удалось отправить. Нажмите ещё раз. Если ошибка повторится, сообщите сотруднику."
       }
     },
     "UZ": {
@@ -652,14 +634,12 @@
         "changeLanguage": "Tilni o‘zgartirish",
         "changeService": "Boshqa xizmatni tanlash",
         "sending": "Yuborilmoqda…",
-        "noPersonalInfo": "Bu ekran ismingiz yoki pasport raqamingizni so‘ramaydi.",
         "sentTitle": "Xodimga yuborildi",
         "sentBody": "Biroz kuting. Xodim tashrif maqsadingiz va bronni tekshirib, sizga navbat talonini beradi.",
         "requestNo": "So‘rov raqami",
         "requestNoHelp": "Xodim so‘rovingizni shu raqam orqali topadi. Bu navbat taloni raqami emas.",
         "autoReset": "{s} soniyadan keyin bosh ekranga qaytiladi.",
-        "sendFailed": "Yuborib bo‘lmadi. Yana bir marta bosing. Takrorlansa, xodimga ayting.",
-        "footer": "Navbat talonini xodim shaxsan beradi."
+        "sendFailed": "Yuborib bo‘lmadi. Yana bir marta bosing. Takrorlansa, xodimga ayting."
       }
     },
     "MN": {
@@ -718,14 +698,12 @@
         "changeLanguage": "Хэл солих",
         "changeService": "Өөр үйлчилгээ сонгох",
         "sending": "Илгээж байна…",
-        "noPersonalInfo": "Энэ дэлгэц таны нэр, паспортын дугаарыг асуухгүй.",
         "sentTitle": "Ажилтанд илгээлээ",
         "sentBody": "Түр хүлээнэ үү. Ажилтан таны ирсэн зорилго болон цаг захиалгыг шалгаад дарааллын дугаар олгоно.",
         "requestNo": "Хүсэлтийн дугаар",
         "requestNoHelp": "Ажилтан энэ дугаараар таны хүсэлтийг олно. Энэ нь дарааллын дугаар биш.",
         "autoReset": "{s} секундын дараа эхлэл рүү буцна.",
-        "sendFailed": "Илгээж чадсангүй. Дахин дарна уу. Үргэлжилбэл ажилтанд хэлнэ үү.",
-        "footer": "Дарааллын дугаарыг ажилтан биечлэн олгоно."
+        "sendFailed": "Илгээж чадсангүй. Дахин дарна уу. Үргэлжилбэл ажилтанд хэлнэ үү."
       }
     },
     "NE": {
@@ -784,14 +762,12 @@
         "changeLanguage": "भाषा बदल्नुहोस्",
         "changeService": "अर्को सेवा छान्नुहोस्",
         "sending": "पठाउँदै…",
-        "noPersonalInfo": "यो स्क्रिनले तपाईंको नाम वा राहदानी नम्बर सोध्दैन।",
         "sentTitle": "कर्मचारीलाई पठाइयो",
         "sentBody": "कृपया केही बेर पर्खनुहोस्। कर्मचारीले तपाईं आउनुको कारण र बुकिङ जाँचेर टोकन नम्बर दिनुहुनेछ।",
         "requestNo": "अनुरोध नम्बर",
         "requestNoHelp": "कर्मचारीले यही नम्बरबाट तपाईंको अनुरोध खोज्नुहुन्छ। यो टोकन नम्बर होइन।",
         "autoReset": "{s} सेकेन्डमा सुरुको स्क्रिनमा फर्किन्छ।",
-        "sendFailed": "पठाउन सकिएन। फेरि थिच्नुहोस्। फेरि पनि भएन भने कर्मचारीलाई भन्नुहोस्।",
-        "footer": "टोकन नम्बर कर्मचारीले नै दिनुहुन्छ।"
+        "sendFailed": "पठाउन सकिएन। फेरि थिच्नुहोस्। फेरि पनि भएन भने कर्मचारीलाई भन्नुहोस्।"
       }
     }
   }
