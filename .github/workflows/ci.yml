@@ -112,6 +112,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify version-matched offline runtime assets
+        run: node scripts/verify-offline-runtime.mjs
+
       # Runs against the local interpreter only when no key is configured,
       # which is the CI case. It verifies the harness itself still works.
       - name: LLM smoke test (local only, no credentials)
@@ -191,6 +194,9 @@ jobs:
 
       - name: Legacy iPad and desktop compatibility (Chromium + WebKit)
         run: node scripts/e2e-intake-compat.mjs http://localhost:3000
+
+      - name: Verify offline v4 worker in Chromium and WebKit
+        run: node scripts/e2e-runtime-v4.mjs http://localhost:3000
 
       - name: Intake start button and recoverable errors
         run: node scripts/e2e-intake-start.mjs http://localhost:3000

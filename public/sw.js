@@ -1,13 +1,13 @@
-const CACHE = "tong-yuck-shell-v2";
-const OFFLINE = "asad-offline-shell-v1";
-const READY = "/offline-v1/shell-ready";
+const CACHE = "tong-yuck-shell-v3";
+const OFFLINE = "asad-offline-shell-v2";
+const READY = "/offline-v2/shell-ready";
 const SHELL = ["/", "/live", "/prep", "/sessions", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 const RUNTIME = new Set([
-  "/offline-v1/inference.js",
-  "/offline-v1/transformers.min.js",
-  "/offline-v1/ort-wasm-simd-threaded.jsep.mjs",
-  "/offline-v1/ort-wasm-simd-threaded.jsep.wasm",
-  "/offline-v1/ko-check.wav",
+  "/offline-v2/inference.js",
+  "/offline-v2/transformers.min.js",
+  "/offline-v2/ort-wasm-simd-threaded.jsep.mjs",
+  "/offline-v2/ort-wasm-simd-threaded.jsep.wasm",
+  "/offline-v2/ko-check.wav",
 ]);
 const asset = (path) => RUNTIME.has(path) || /^\/_next\/static\/[\w./-]+$/.test(path);
 
@@ -19,7 +19,8 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(
-    keys.filter((key) => key.startsWith("tong-yuck-shell-") && key !== CACHE).map((key) => caches.delete(key)),
+    keys.filter((key) => (key.startsWith("tong-yuck-shell-") && key !== CACHE) ||
+      (key.startsWith("asad-offline-shell-") && key !== OFFLINE)).map((key) => caches.delete(key)),
   )).then(() => self.clients.claim()));
 });
 
