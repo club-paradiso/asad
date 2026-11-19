@@ -19,7 +19,7 @@ const schema = z.object({
   code: z.string().length(10),
   requestId: z.string().uuid(),
   language: z.string().max(5),
-  serviceIndex: z.number().int().min(0).max(18),
+  serviceIndex: z.number().int().min(0).max(19),
   booking: z.enum(["yes", "no", "unsure"]),
 }).strict();
 

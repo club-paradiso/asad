@@ -84,7 +84,7 @@
     }else if(state.step==="services"){
       root.appendChild(A.intro("02 / 03 · SERVICE",d.heading[state.servicePage] || "서비스 선택",d.instructions[state.servicePage] || ""));
       var grid=A.el("div",null,"grid");
-      var first=state.servicePage===0?0:10,limit=state.servicePage===0?10:19;
+      var first=state.servicePage===0?0:10,limit=state.servicePage===0?10:d.services.length;
       for(var n=first;n<limit;n++){
         (function(idx){var b=A.btn("",function(){
             state.serviceIndex=idx;state.booking="";state.requestId="";state.step="review";render();
@@ -96,7 +96,7 @@
       }
       root.appendChild(grid);
       root.appendChild(A.actions(
-        A.btn(state.servicePage===0?"다른 업무 11–19 →":"← 이전 업무 01–10",function(){state.servicePage=1-state.servicePage;render();},"btn primary"),
+        A.btn(state.servicePage===0?"다른 업무 11–"+d.services.length+" →":"← 이전 업무 01–10",function(){state.servicePage=1-state.servicePage;render();},"btn primary"),
         A.btn("← 언어 선택",function(){state.step="language";render();},"btn")));
     }else if(state.step==="review"){
       var t=d.review;
@@ -105,6 +105,7 @@
       A.add(selected,A.el("p",t.serviceLabel,"step"),A.el("h2",d.services[state.serviceIndex]));
       if(state.locale!=="KO")selected.appendChild(message(state.data.locales.KO.services[state.serviceIndex]));
       root.appendChild(selected);
+      if(state.serviceIndex===19)root.appendChild(message(t.phoneChangeNote,"muted"));
       root.appendChild(A.el("h2",t.reservationTitle));
       root.appendChild(message(t.reservationHelp));
       var opts=[["yes",t.answerYes],["no",t.answerNo],["unsure",t.answerUnsure]];
@@ -128,6 +129,7 @@
       var done=A.el("section",null,"panel");
       A.add(done,A.el("p","요청 순번 #"+state.sentSeq,"step"),A.el("h2",d.services[state.serviceIndex]),
         message("이 번호는 번호표 번호가 아닙니다. 실제 번호표는 담당 직원이 발급합니다."));
+      if(state.serviceIndex===19)done.appendChild(message(d.review.phoneChangeNote,"muted"));
       root.appendChild(done);
       root.appendChild(A.actions(A.btn("다음 민원인 · 처음으로",reset,"btn primary")));
     }
@@ -136,14 +138,14 @@
   }
   var qrCode=A.getQuery("desk").replace(/\s/g,"").toUpperCase();
   if(A.queryCode(qrCode)){state.code=qrCode;state.codeDraft=qrCode;state.step="language";}
-  A.request("GET","/compat/data.json?v=2",null,null,function(err,data){
+  A.request("GET","/compat/data.json?v=3",null,null,function(err,data){
     if (err || !data || !data.locales) {
       A.clear(root).appendChild(message("언어 정보를 불러올 수 없습니다. 직원에게 알려 주세요.","error"));
       return;
     }
     for(var i=0;i<LANGS.length;i++){
       var entry=data.locales[LANGS[i]];
-      if(!entry || !entry.services || entry.services.length!==19 || !entry.review) {
+      if(!entry || !entry.services || entry.services.length!==20 || !entry.review) {
         A.clear(root).appendChild(message("언어 데이터가 올바르지 않습니다.","error"));return;
       }
     }
