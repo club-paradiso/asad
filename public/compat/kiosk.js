@@ -194,8 +194,10 @@
     field.autocomplete="off";field.autocapitalize="characters";field.spellcheck=false;
     field.setAttribute("inputmode","text");
     field.value=state.reservationNo;
+    field.disabled=state.sending;
     if(state.resvError)field.setAttribute("aria-invalid","true");
     field.oninput=function(){
+      if(state.sending){field.value=state.reservationNo;return;}
       var hadError=state.resvError;
       var clean=setReservation(field.value);
       if(field.value!==clean)field.value=clean;
@@ -206,11 +208,13 @@
     for(var i=0;i<keys.length;i++){
       (function(ch){
         var b=A.btn(ch,function(){ if(state.sending)return; setReservation(state.reservationNo+ch); render(); },"btn key");
+        b.disabled=state.sending;
         pad.appendChild(b);
       })(keys[i]);
     }
     var erase=A.btn("⌫",function(){ if(state.sending)return; setReservation(state.reservationNo.slice(0,-1)); render(); },"btn key");
     erase.setAttribute("aria-label",k.erase);
+    erase.disabled=state.sending;
     pad.appendChild(erase);
     A.add(box,label,field,state.resvError?A.el("p",k.reservationNoInvalid,"resvError"):null,pad);
     return box;
@@ -239,7 +243,9 @@
       A.add(p,label,textInput(),A.actions(A.btn("연결하기",connect,"btn primary")));
       root.appendChild(p);
     }else if(state.step==="language"){
-      root.appendChild(A.intro("1 / 3","언어를 선택하세요","Choose your language"));
+      var langHero=A.intro("1 / 3","언어를 선택하세요","Choose your language");
+      langHero.className+=" compact";
+      root.appendChild(langHero);
       var langGrid=A.el("div",null,"grid langGrid");
       for(var i=0;i<LANGS.length;i++){
         (function(code){var b=A.btn(state.data.locales[code].name,function(){chooseLanguage(code);},"tile");

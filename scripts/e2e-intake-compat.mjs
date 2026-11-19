@@ -98,9 +98,14 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     const qr=staff.getByRole("img",{name:"iPad 연결 QR코드"});
     await qr.waitFor({state:"visible"});
     const qrUrl=await qr.getAttribute("src");
+    if(qrUrl.indexOf("station=3")<0)throw Error("QR pairing must carry the counter number");
     const qrResponse=await staff.request.get(base+qrUrl);
     if(!qrResponse.ok()||!((await qrResponse.text()).indexOf("<svg")>=0))throw Error("QR not generated");
     // The staff desk mirrors each visitor tap without any staff action.
+    // All 12 languages must be visible on one screen, without scrolling.
+    await visitor.locator(".langGrid .tile").first().waitFor();
+    const fit=await visitor.locator(".langGrid .tile").evaluateAll(els=>els.filter(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}).length);
+    if(fit!==12)throw Error("Only "+fit+" of 12 languages fit on the first screen");
     const mirror=staff.locator(".mirror");
     await visitor.getByRole("button",{name:"English"}).click();
     await mirror.getByText("업무 고르는 중").waitFor({timeout:12000});

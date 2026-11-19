@@ -97,3 +97,12 @@ body.staff .container{max-width:1180px}
 .keypad{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 .keypad .key{text-align:center;font-size:22px;min-height:56px;padding:8px}
 @media(max-width:760px){.facts{grid-template-columns:1fr}.reqRow{grid-template-columns:auto 40px 1fr}.reqService{grid-column:1/-1}.keypad{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* All 12 languages on one screen, including 1366x768 and iPad */
+.hero.compact{padding:16px 22px;margin-bottom:14px}
+.hero.compact h1{font-size:30px;margin:4px 0 4px}
+.hero.compact p:last-child{font-size:16px;margin:0}
+.langGrid{gap:10px}
+.langGrid .tile{min-height:72px;padding:12px}
+@media(min-width:900px){.langGrid,body.visitor.display-mode .langGrid{grid-template-columns:repeat(4,minmax(0,1fr))}.hero.compact h1{font-size:34px}}
+@media(max-width:560px){.langGrid .tile{min-height:60px}.hero.compact h1{font-size:26px}}

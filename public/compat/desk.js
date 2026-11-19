@@ -158,7 +158,7 @@
     qr.className="qr";
     qr.alt="iPad 연결 QR코드";
     qr.width=180;qr.height=180;
-    qr.src="/api/intake/qr?code="+encodeURIComponent(state.code);
+    qr.src="/api/intake/qr?code="+encodeURIComponent(state.code)+(state.station?"&station="+encodeURIComponent(state.station):"");
     qr.onerror=function(){qr.style.display="none";};
     var field=A.el("input");
     field.type="text";field.value=joinUrl();field.readOnly=true;

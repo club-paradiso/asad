@@ -12,7 +12,9 @@ export function GET(request: Request) {
   if (!validCode(code)) {
     return NextResponse.json({ error: "Invalid desk code" }, { status: 400 });
   }
-  const joinUrl = new URL("/intake?desk=" + encodeURIComponent(code), url.origin).toString();
+  const station = url.searchParams.get("station") || "";
+  const stationPart = /^(?:[1-9]|[12][0-9]|30)$/.test(station) ? "&station=" + station : "";
+  const joinUrl = new URL("/intake?desk=" + encodeURIComponent(code) + stationPart, url.origin).toString();
   try {
     const matrix = encodeQr(joinUrl);
     const quiet = 4;
