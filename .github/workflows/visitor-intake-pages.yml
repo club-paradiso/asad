@@ -1,5 +1,10 @@
-name: Visitor Intake - GitHub Pages (manual)
+name: Visitor Intake - GitHub Pages (standalone offline kiosk)
 on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/visitor-intake/index.html"
+      - ".github/workflows/visitor-intake-pages.yml"
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,9 +21,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Check translation completeness
+      - name: Verify fully embedded translation catalog and no external dependencies
         run: |
-          node -e "const d=require('./apps/visitor-intake/data.json');if(Object.keys(d.locales).length!==12||Object.values(d.locales).some(x=>x.services.length!==20||x.services.some(v=>!v)))process.exit(1)"
+          node - <<'NODE'
+          const fs=require("fs");
+          const s=fs.readFileSync("apps/visitor-intake/index.html","utf8");
+          if(!s.includes("data:image/png;base64,")||!s.includes("window.ASAD_OFFLINE_DATA=")||/<script[^>]+src=|<link[^>]+rel=["\x27]stylesheet/.test(s))process.exit(1);
+          const m=s.match(/window\.ASAD_OFFLINE_DATA=(\{.*?\});<\/script>/);
+          if(!m)process.exit(1);
+          const d=JSON.parse(m[1]);
+          if(Object.keys(d.locales).length!==12||Object.values(d.locales).some(x=>x.services.length!==20||x.services.some(v=>!v)||!x.kiosk))process.exit(1);
+          NODE
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
