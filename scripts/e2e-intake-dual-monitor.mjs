@@ -125,7 +125,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitorTwo.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitorTwo.getByText(/Request no\. #1/).waitFor();
     await staffTwo.getByText("받은 요청 1건").waitFor({timeout:9000});
-    await staffTwo.getByText("번호 변경은 창구 처리").waitFor({timeout:9000});
+    await staffTwo.locator(".reqList").getByText("전화번호(연락처) 변경 신고").waitFor({timeout:9000});
     await staffOne.getByText("받은 요청 1건").waitFor();
 
     // A refreshed staff desk resumes only its own scoped session and display label.

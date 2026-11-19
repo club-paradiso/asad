@@ -140,8 +140,7 @@
   function connectBlock(){
     var box=A.el("div",null,"connectBlock");
     var monitor=A.el("div",null,"connectWay");
-    A.add(monitor,A.el("h3","보조 모니터"),visitorWindowLink(true),
-      text("열린 창을 보조 모니터로 옮기고 F11을 누르세요."));
+    A.add(monitor,A.el("h3","보조 모니터"),visitorWindowLink(true));
     var ipad=A.el("div",null,"connectWay");
     var qr=document.createElement("img");
     qr.className="qr";
@@ -184,14 +183,12 @@
       fact("업무",hasService?serviceName(live.serviceIndex):"—",!hasService),
       fact("하이코리아 예약",hasBooking?BOOKING[live.booking]:"—",!hasBooking));
     A.add(card,head,h,facts);
-    if(hasService && live.serviceIndex===19)card.appendChild(text("전화번호는 화면에서 받지 않습니다. 창구에서 직접 처리해 주세요.","note"));
     return card;
   }
   function requestList(){
     var section=A.el("section",null,"requests");
     section.appendChild(A.el("h2","받은 요청 "+state.entries.length+"건"));
     if(!state.entries.length){
-      section.appendChild(text("민원인이 화면에서 보내면 여기에 쌓입니다."));
       return section;
     }
     var list=A.el("ol",null,"reqList");
@@ -203,7 +200,6 @@
         A.el("span",clock(e.receivedAt),"reqTime"),
         A.el("strong",serviceName(e.serviceIndex),"reqService"),
         A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking],"reqMeta"));
-      if(e.serviceIndex===19)row.appendChild(A.el("span","번호 변경은 창구 처리","reqTag"));
       list.appendChild(row);
     }
     section.appendChild(list);
@@ -212,7 +208,7 @@
   function render(){
     A.clear(root);
     if(!state.code){
-      root.appendChild(A.intro("","창구 열기","시작하면 이 PC 전용 연결 코드가 만들어집니다. 창구 번호는 화면 표시에만 씁니다."));
+      root.appendChild(A.intro("","창구 열기",""));
       if(state.error){var startAlert=text(state.error,"alert");startAlert.setAttribute("role","alert");root.appendChild(startAlert);}
       var startPanel=A.el("section",null,"panel");
       var b=A.btn(state.busy?"여는 중…":"시작",start,"btn primary");
@@ -244,7 +240,6 @@
     more.appendChild(sum);
     if(connected)more.appendChild(connectBlock());
     more.appendChild(A.actions(A.btn(state.busy?"닫는 중…":"창구 닫기",end,"btn")));
-    more.appendChild(text("2시간이 지나면 창구가 자동으로 닫힙니다. 민원인 창에는 직원용 정보가 담기지 않습니다."));
     root.appendChild(more);
   }
   // Station label is tab-scoped and not used as authorization or a session key.
