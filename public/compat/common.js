@@ -27,7 +27,7 @@
     return n;
   }
   function intro(step, title, desc) {
-    return add(el("section", null, "hero"),el("p", step, "step"), el("h1", title), el("p", desc));
+    return add(el("section", null, "hero"), step ? el("p", step, "step") : null, el("h1", title), desc ? el("p", desc) : null);
   }
   function storageRead(key) {
     try { return window.sessionStorage.getItem(key); } catch (e) { return null; }

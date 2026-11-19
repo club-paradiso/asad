@@ -82,22 +82,22 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await visitor.getByRole("button",{name:"English"}).click();
     await visitor.getByRole("button",{name:/Extend my period of stay/}).click();
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
-    await visitor.getByRole("button",{name:/직원 화면으로 전송/}).click();
-    await visitor.getByText(/요청 순번 #1/).waitFor({timeout:6000});
+    await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
+    await visitor.getByText(/Request no\. #1/).waitFor({timeout:6000});
     await staff.getByText("실시간 접수 목록 (1)").waitFor({timeout:8500});
     await staff.getByRole("button",{name:"예약 확인됨"}).click();
     await staff.getByText(/확인 결과: 예약 증빙 확인/).waitFor({timeout:5000});
     await staff.getByRole("button",{name:"번호표 전달 완료 기록"}).click();
     await staff.getByText(/발권 상태: 직원 발권 완료 기록/).waitFor({timeout:5000});
     // The 20th service must render on legacy iPad and reach the live staff queue.
-    await visitor.getByRole("button",{name:"다음 민원인 · 처음으로"}).click();
+    await visitor.getByRole("button",{name:/BACK TO START/}).click();
     await visitor.getByRole("button",{name:"English"}).click();
-    await visitor.getByRole("button",{name:/다른 업무 11–20/}).click();
+    await visitor.getByRole("button",{name:/More services \(11–20\)/}).click();
     await visitor.getByRole("button",{name:/Report a change of phone number/}).click();
     await visitor.getByText(/This screen only sends your reason for visiting to staff/).waitFor();
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
-    await visitor.getByRole("button",{name:/직원 화면으로 전송/}).click();
-    await visitor.getByText(/요청 순번 #2/).waitFor({timeout:6000});
+    await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
+    await visitor.getByText(/Request no\. #2/).waitFor({timeout:6000});
     await staff.getByText("실시간 접수 목록 (2)").waitFor({timeout:8500});
     await staff.getByText(/전화번호 변경 요청: 이 화면은 방문 목적만 전달/).waitFor({timeout:8500});
     if(errors.length)throw Error("Browser errors: "+errors.join(" | "));
