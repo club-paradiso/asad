@@ -67,6 +67,28 @@
         "reservationNoInvalid": "예약 번호를 다시 확인해 주세요.",
         "erase": "지우기",
         "counter": "{n}번 창구"
+      },
+      "notice": {
+        "ok": "확인",
+        "texts": {
+          "ticket": "번호표를 받고 기다려 주세요.",
+          "call": "화면에 호출 번호가 나오면 창구로 가세요. 예약하신 분은 본인 예약 내역을 확인해 주세요.",
+          "moment": "잠시만 기다려 주세요.",
+          "counter": "{n}번 창구로 가세요.",
+          "floor3": "3층(3F)으로 가세요.",
+          "back4": "뒷 건물 4층(4F)으로 가세요.",
+          "visit": "뒷 건물 1층(1F)에서 면회를 접수하세요.",
+          "resvNeed": "이 업무는 하이코리아 방문 예약이 필요합니다. 예약한 뒤 다시 와 주세요.",
+          "resvShow": "예약 화면(예약 번호)을 보여 주세요.",
+          "docs": "가져온 서류를 보여 주세요.",
+          "form": "통합신청서(Application Form)를 작성해 주세요.",
+          "passport": "여권과 외국인등록증을 준비해 주세요.",
+          "photo": "증명사진이 필요합니다.",
+          "fee": "수수료를 내야 합니다. 안내에 따라 납부해 주세요.",
+          "online": "이 업무는 하이코리아에서 온라인으로 신청할 수 있습니다.",
+          "today": "오늘은 처리할 수 없습니다. 다시 방문해 주세요.",
+          "interp": "통역이 필요하면 직원에게 말해 주세요."
+        }
       }
     },
     "EN": {
@@ -134,6 +156,28 @@
         "reservationNoInvalid": "Please check the reservation number.",
         "erase": "Delete",
         "counter": "Counter {n}"
+      },
+      "notice": {
+        "ok": "OK",
+        "texts": {
+          "ticket": "Please take a queue ticket and wait.",
+          "call": "When your number appears on the screen, please go to the counter. If you have a booking, please check your booking details.",
+          "moment": "Please wait a moment.",
+          "counter": "Please go to Counter {n}.",
+          "floor3": "Please go to the 3rd floor (3F).",
+          "back4": "Please go to the 4th floor (4F) of the building at the back.",
+          "visit": "Please register your visit to a detained person on the ground floor (1F) of the building at the back.",
+          "resvNeed": "This service requires a HiKorea visit booking. Please make a booking and come back.",
+          "resvShow": "Please show your booking screen (booking number).",
+          "docs": "Please show the documents you brought.",
+          "form": "Please fill out the Application Form.",
+          "passport": "Please have your passport and foreigner registration card ready.",
+          "photo": "An ID photo is required.",
+          "fee": "There is a fee for this service. Please pay as instructed.",
+          "online": "You can apply for this service online on HiKorea.",
+          "today": "We cannot process this today. Please come back another day.",
+          "interp": "If you need an interpreter, please tell a staff member."
+        }
       }
     },
     "ZH-CN": {
@@ -201,6 +245,28 @@
         "reservationNoInvalid": "请核对预约号码。",
         "erase": "删除",
         "counter": "{n}号窗口"
+      },
+      "notice": {
+        "ok": "确认",
+        "texts": {
+          "ticket": "请取号后等候。",
+          "call": "屏幕上显示您的号码时，请前往窗口。已预约的人士请确认本人的预约信息。",
+          "moment": "请稍等。",
+          "counter": "请前往{n}号窗口。",
+          "floor3": "请前往3楼（3F）。",
+          "back4": "请前往后楼4楼（4F）。",
+          "visit": "请在后楼1楼（1F）办理探视登记。",
+          "resvNeed": "办理此业务需在HiKorea预约来访。请预约后再来。",
+          "resvShow": "请出示预约页面（预约号码）。",
+          "docs": "请出示您带来的材料。",
+          "form": "请填写综合申请表（Application Form）。",
+          "passport": "请准备好护照和外国人登录证。",
+          "photo": "需要证件照。",
+          "fee": "需要缴纳手续费。请按照指引缴费。",
+          "online": "此业务可在HiKorea网上申请。",
+          "today": "今天无法办理。请改日再来。",
+          "interp": "如需翻译，请告诉工作人员。"
+        }
       }
     },
     "ID": {
@@ -268,6 +334,28 @@
         "reservationNoInvalid": "Periksa kembali nomor reservasi.",
         "erase": "Hapus",
         "counter": "Loket {n}"
+      },
+      "notice": {
+        "ok": "OK",
+        "texts": {
+          "ticket": "Silakan ambil nomor antrean dan tunggu.",
+          "call": "Jika nomor Anda muncul di layar, silakan menuju loket. Jika sudah membuat janji, periksa detail reservasi Anda.",
+          "moment": "Mohon tunggu sebentar.",
+          "counter": "Silakan menuju loket nomor {n}.",
+          "floor3": "Silakan menuju lantai 3 (3F).",
+          "back4": "Silakan menuju lantai 4 (4F) gedung belakang.",
+          "visit": "Silakan daftar kunjungan (besuk) di lantai 1 (1F) gedung belakang.",
+          "resvNeed": "Layanan ini memerlukan janji kunjungan di HiKorea. Silakan buat janji, lalu datang kembali.",
+          "resvShow": "Silakan tunjukkan layar reservasi (nomor reservasi) Anda.",
+          "docs": "Silakan tunjukkan dokumen yang Anda bawa.",
+          "form": "Silakan isi formulir permohonan terpadu (Application Form).",
+          "passport": "Silakan siapkan paspor dan kartu registrasi orang asing Anda.",
+          "photo": "Diperlukan pas foto.",
+          "fee": "Layanan ini dikenakan biaya. Silakan bayar sesuai petunjuk.",
+          "online": "Layanan ini dapat diajukan secara online di HiKorea.",
+          "today": "Hari ini tidak dapat diproses. Silakan datang kembali di hari lain.",
+          "interp": "Jika memerlukan penerjemah, silakan beri tahu petugas."
+        }
       }
     },
     "HI": {
@@ -335,6 +423,28 @@
         "reservationNoInvalid": "कृपया आरक्षण संख्या जाँचें।",
         "erase": "मिटाएँ",
         "counter": "काउंटर {n}"
+      },
+      "notice": {
+        "ok": "ठीक है",
+        "texts": {
+          "ticket": "कृपया टोकन लें और प्रतीक्षा करें।",
+          "call": "स्क्रीन पर आपका नंबर आने पर काउंटर पर जाएँ। जिनका आरक्षण है, वे अपना आरक्षण विवरण जाँच लें।",
+          "moment": "कृपया थोड़ी देर प्रतीक्षा करें।",
+          "counter": "कृपया काउंटर नंबर {n} पर जाएँ।",
+          "floor3": "कृपया 3F पर जाएँ।",
+          "back4": "कृपया पीछे वाली इमारत में 4F पर जाएँ।",
+          "visit": "हिरासत में रखे व्यक्ति से मुलाक़ात के लिए पीछे वाली इमारत के भूतल (1F) पर पंजीकरण करें।",
+          "resvNeed": "इस सेवा के लिए HiKorea पर पहले से समय आरक्षित करना ज़रूरी है। आरक्षण करके फिर आएँ।",
+          "resvShow": "कृपया अपनी आरक्षण स्क्रीन (आरक्षण संख्या) दिखाएँ।",
+          "docs": "कृपया अपने साथ लाए दस्तावेज़ दिखाएँ।",
+          "form": "कृपया एकीकृत आवेदन पत्र (Application Form) भरें।",
+          "passport": "कृपया पासपोर्ट और विदेशी पंजीकरण कार्ड तैयार रखें।",
+          "photo": "पहचान पत्र वाला फ़ोटो चाहिए।",
+          "fee": "इस सेवा का शुल्क देना होगा। कृपया निर्देश के अनुसार भुगतान करें।",
+          "online": "इस सेवा के लिए HiKorea पर ऑनलाइन आवेदन किया जा सकता है।",
+          "today": "आज यह काम नहीं हो सकता। कृपया किसी और दिन आएँ।",
+          "interp": "दुभाषिये की ज़रूरत हो तो कर्मचारी को बताएँ।"
+        }
       }
     },
     "VI": {
@@ -402,6 +512,28 @@
         "reservationNoInvalid": "Vui lòng kiểm tra lại số đặt lịch.",
         "erase": "Xóa",
         "counter": "Quầy số {n}"
+      },
+      "notice": {
+        "ok": "OK",
+        "texts": {
+          "ticket": "Vui lòng lấy số thứ tự và chờ.",
+          "call": "Khi số của quý vị hiện trên màn hình, vui lòng đến quầy. Nếu đã đặt lịch, vui lòng kiểm tra thông tin đặt lịch của mình.",
+          "moment": "Vui lòng chờ một chút.",
+          "counter": "Vui lòng đến quầy số {n}.",
+          "floor3": "Vui lòng lên tầng 3 (3F).",
+          "back4": "Vui lòng đến tầng 4 (4F) của tòa nhà phía sau.",
+          "visit": "Vui lòng đăng ký thăm gặp tại tầng 1 (1F) của tòa nhà phía sau.",
+          "resvNeed": "Thủ tục này cần đặt lịch hẹn trên HiKorea. Vui lòng đặt lịch rồi quay lại.",
+          "resvShow": "Vui lòng cho xem màn hình đặt lịch (số đặt lịch).",
+          "docs": "Vui lòng cho xem giấy tờ quý vị mang theo.",
+          "form": "Vui lòng điền Đơn đăng ký tổng hợp (Application Form).",
+          "passport": "Vui lòng chuẩn bị hộ chiếu và thẻ đăng ký người nước ngoài.",
+          "photo": "Cần có ảnh thẻ.",
+          "fee": "Thủ tục này phải nộp lệ phí. Vui lòng nộp theo hướng dẫn.",
+          "online": "Thủ tục này có thể nộp trực tuyến trên HiKorea.",
+          "today": "Hôm nay không thể xử lý. Vui lòng quay lại vào ngày khác.",
+          "interp": "Nếu cần phiên dịch, vui lòng báo cho nhân viên."
+        }
       }
     },
     "JA": {
@@ -469,6 +601,28 @@
         "reservationNoInvalid": "予約番号をご確認ください。",
         "erase": "削除",
         "counter": "{n}番窓口"
+      },
+      "notice": {
+        "ok": "OK",
+        "texts": {
+          "ticket": "番号札を取ってお待ちください。",
+          "call": "画面にお客様の番号が表示されたら窓口へお進みください。予約済みの方はご自身の予約内容をご確認ください。",
+          "moment": "少々お待ちください。",
+          "counter": "{n}番窓口へお進みください。",
+          "floor3": "3階（3F）へお進みください。",
+          "back4": "裏の建物の4階（4F）へお進みください。",
+          "visit": "面会の受付は裏の建物の1階（1F）で行ってください。",
+          "resvNeed": "この手続きにはHiKoreaでの来訪予約が必要です。予約してから再度お越しください。",
+          "resvShow": "予約画面（予約番号）をお見せください。",
+          "docs": "お持ちの書類をお見せください。",
+          "form": "統合申請書（Application Form）にご記入ください。",
+          "passport": "パスポートと外国人登録証をご用意ください。",
+          "photo": "証明写真が必要です。",
+          "fee": "手数料がかかります。案内に従ってお支払いください。",
+          "online": "この手続きはHiKoreaでオンライン申請できます。",
+          "today": "本日は処理できません。改めてお越しください。",
+          "interp": "通訳が必要な場合は職員にお知らせください。"
+        }
       }
     },
     "TH": {
@@ -536,6 +690,28 @@
         "reservationNoInvalid": "กรุณาตรวจสอบหมายเลขการจอง",
         "erase": "ลบ",
         "counter": "ช่องบริการที่ {n}"
+      },
+      "notice": {
+        "ok": "ตกลง",
+        "texts": {
+          "ticket": "กรุณารับบัตรคิวและรอ",
+          "call": "เมื่อหมายเลขของท่านขึ้นบนจอ กรุณาไปที่ช่องบริการ ผู้ที่นัดหมายแล้วกรุณาตรวจสอบรายละเอียดการนัดหมายของตน",
+          "moment": "กรุณารอสักครู่",
+          "counter": "กรุณาไปที่ช่องบริการหมายเลข {n}",
+          "floor3": "กรุณาไปที่ชั้น 3 (3F)",
+          "back4": "กรุณาไปที่ชั้น 4 (4F) ของอาคารด้านหลัง",
+          "visit": "กรุณายื่นขอเยี่ยมผู้ถูกควบคุมตัวที่ชั้น 1 (1F) ของอาคารด้านหลัง",
+          "resvNeed": "บริการนี้ต้องนัดหมายเข้าพบผ่าน HiKorea กรุณานัดหมายแล้วกลับมาใหม่",
+          "resvShow": "กรุณาแสดงหน้าจอการนัดหมาย (หมายเลขนัดหมาย)",
+          "docs": "กรุณาแสดงเอกสารที่ท่านนำมา",
+          "form": "กรุณากรอกแบบคำร้องรวม (Application Form)",
+          "passport": "กรุณาเตรียมหนังสือเดินทางและบัตรทะเบียนคนต่างด้าว",
+          "photo": "ต้องใช้รูปถ่ายติดบัตร",
+          "fee": "บริการนี้มีค่าธรรมเนียม กรุณาชำระตามคำแนะนำ",
+          "online": "บริการนี้สามารถยื่นออนไลน์ได้ที่ HiKorea",
+          "today": "วันนี้ไม่สามารถดำเนินการได้ กรุณามาใหม่ในวันอื่น",
+          "interp": "หากต้องการล่าม กรุณาแจ้งเจ้าหน้าที่"
+        }
       }
     },
     "RU": {
@@ -603,6 +779,28 @@
         "reservationNoInvalid": "Проверьте номер записи.",
         "erase": "Стереть",
         "counter": "Окно {n}"
+      },
+      "notice": {
+        "ok": "OK",
+        "texts": {
+          "ticket": "Возьмите талон и ожидайте.",
+          "call": "Когда ваш номер появится на экране, подойдите к окну. Если у вас есть запись, проверьте данные своей записи.",
+          "moment": "Подождите, пожалуйста, немного.",
+          "counter": "Пройдите, пожалуйста, к окну № {n}.",
+          "floor3": "Пройдите, пожалуйста, на 3-й этаж (3F).",
+          "back4": "Пройдите, пожалуйста, на 4-й этаж (4F) заднего здания.",
+          "visit": "Запись на свидание с задержанным принимается на 1-м этаже (1F) заднего здания.",
+          "resvNeed": "Для этой услуги нужна предварительная запись на HiKorea. Запишитесь и приходите снова.",
+          "resvShow": "Покажите, пожалуйста, экран записи (номер записи).",
+          "docs": "Покажите, пожалуйста, документы, которые вы принесли.",
+          "form": "Заполните, пожалуйста, единую форму заявления (Application Form).",
+          "passport": "Приготовьте, пожалуйста, паспорт и карту регистрации иностранца.",
+          "photo": "Нужна фотография на документы.",
+          "fee": "За эту услугу взимается пошлина. Оплатите её по инструкции.",
+          "online": "Эту услугу можно оформить онлайн на HiKorea.",
+          "today": "Сегодня это оформить нельзя. Приходите, пожалуйста, в другой день.",
+          "interp": "Если нужен переводчик, скажите сотруднику."
+        }
       }
     },
     "UZ": {
@@ -670,6 +868,28 @@
         "reservationNoInvalid": "Bron raqamini tekshiring.",
         "erase": "O‘chirish",
         "counter": "{n}-oyna"
+      },
+      "notice": {
+        "ok": "OK",
+        "texts": {
+          "ticket": "Iltimos, navbat raqamini olib, kuting.",
+          "call": "Raqamingiz ekranda chiqqanda, darchaga boring. Oldindan yozilgan bo‘lsangiz, o‘z yozilish ma’lumotlaringizni tekshiring.",
+          "moment": "Iltimos, biroz kuting.",
+          "counter": "Iltimos, {n}-darchaga boring.",
+          "floor3": "Iltimos, 3-qavatga (3F) chiqing.",
+          "back4": "Iltimos, orqadagi binoning 4-qavatiga (4F) boring.",
+          "visit": "Hibsdagi shaxs bilan uchrashuvga yozilish orqadagi binoning 1-qavatida (1F) amalga oshiriladi.",
+          "resvNeed": "Bu xizmat uchun HiKorea’da tashrifga oldindan yozilish kerak. Yozilib, keyin qayta keling.",
+          "resvShow": "Iltimos, yozilish ekranini (yozilish raqamini) ko‘rsating.",
+          "docs": "Iltimos, olib kelgan hujjatlaringizni ko‘rsating.",
+          "form": "Iltimos, umumiy ariza shaklini (Application Form) to‘ldiring.",
+          "passport": "Iltimos, pasport va chet ellik ro‘yxatga olish kartangizni tayyorlang.",
+          "photo": "Hujjat uchun surat kerak.",
+          "fee": "Bu xizmat uchun yig‘im to‘lanadi. Ko‘rsatmaga muvofiq to‘lang.",
+          "online": "Bu xizmatga HiKorea orqali onlayn ariza berish mumkin.",
+          "today": "Bugun buni rasmiylashtirib bo‘lmaydi. Iltimos, boshqa kuni keling.",
+          "interp": "Tarjimon kerak bo‘lsa, xodimga ayting."
+        }
       }
     },
     "MN": {
@@ -737,6 +957,28 @@
         "reservationNoInvalid": "Захиалгын дугаараа шалгана уу.",
         "erase": "Устгах",
         "counter": "{n}-р цонх"
+      },
+      "notice": {
+        "ok": "OK",
+        "texts": {
+          "ticket": "Дугаарын тасалбар аваад хүлээнэ үү.",
+          "call": "Дэлгэц дээр таны дугаар гарвал цонх руу очно уу. Цаг захиалсан бол өөрийн захиалгын мэдээллээ шалгана уу.",
+          "moment": "Түр хүлээнэ үү.",
+          "counter": "{n} дугаар цонх руу очно уу.",
+          "floor3": "3 давхарт (3F) очно уу.",
+          "back4": "Арын байрны 4 давхарт (4F) очно уу.",
+          "visit": "Цагдан хоригдсон хүнтэй уулзах бүртгэлийг арын байрны 1 давхарт (1F) хийнэ үү.",
+          "resvNeed": "Энэ үйлчилгээнд HiKorea-д урьдчилан цаг захиалах шаардлагатай. Цаг захиалаад дахин ирнэ үү.",
+          "resvShow": "Захиалгын дэлгэцээ (захиалгын дугаар) үзүүлнэ үү.",
+          "docs": "Авчирсан бичиг баримтаа үзүүлнэ үү.",
+          "form": "Нэгдсэн өргөдлийн маягтыг (Application Form) бөглөнө үү.",
+          "passport": "Паспорт болон гадаадын иргэний бүртгэлийн үнэмлэхээ бэлдэнэ үү.",
+          "photo": "Цээж зураг шаардлагатай.",
+          "fee": "Энэ үйлчилгээнд хураамж төлнө. Зааврын дагуу төлнө үү.",
+          "online": "Энэ үйлчилгээг HiKorea-аар онлайнаар хүсэлт гаргаж болно.",
+          "today": "Өнөөдөр шийдвэрлэх боломжгүй. Өөр өдөр дахин ирнэ үү.",
+          "interp": "Орчуулагч хэрэгтэй бол ажилтанд хэлнэ үү."
+        }
       }
     },
     "NE": {
@@ -804,7 +1046,138 @@
         "reservationNoInvalid": "कृपया आरक्षण नम्बर जाँच्नुहोस्।",
         "erase": "मेटाउनुहोस्",
         "counter": "काउन्टर {n}"
+      },
+      "notice": {
+        "ok": "ठिक छ",
+        "texts": {
+          "ticket": "कृपया टोकन लिएर पर्खनुहोस्।",
+          "call": "स्क्रिनमा तपाईंको नम्बर आएपछि काउन्टरमा जानुहोस्। बुकिङ गर्नुभएको छ भने आफ्नो बुकिङ विवरण जाँच गर्नुहोस्।",
+          "moment": "कृपया केही बेर पर्खनुहोस्।",
+          "counter": "कृपया काउन्टर नम्बर {n} मा जानुहोस्।",
+          "floor3": "कृपया 3F मा जानुहोस्।",
+          "back4": "कृपया पछाडिको भवनको 4F मा जानुहोस्।",
+          "visit": "हिरासतमा रहेका व्यक्तिसँग भेटघाटको दर्ता पछाडिको भवनको भुइँ तला (1F) मा गर्नुहोस्।",
+          "resvNeed": "यो सेवाका लागि HiKorea मा भेटको समय बुक गर्नुपर्छ। बुक गरेर फेरि आउनुहोस्।",
+          "resvShow": "कृपया बुकिङ स्क्रिन (बुकिङ नम्बर) देखाउनुहोस्।",
+          "docs": "कृपया ल्याउनुभएका कागजात देखाउनुहोस्।",
+          "form": "कृपया एकीकृत आवेदन फाराम (Application Form) भर्नुहोस्।",
+          "passport": "कृपया राहदानी र विदेशी दर्ता कार्ड तयार राख्नुहोस्।",
+          "photo": "पासपोर्ट साइजको फोटो चाहिन्छ।",
+          "fee": "यो सेवाका लागि शुल्क तिर्नुपर्छ। निर्देशनअनुसार भुक्तानी गर्नुहोस्।",
+          "online": "यो सेवाका लागि HiKorea मा अनलाइन आवेदन दिन सकिन्छ।",
+          "today": "आज यो काम हुन सक्दैन। कृपया अर्को दिन आउनुहोस्।",
+          "interp": "दोभाषे चाहिएमा कर्मचारीलाई भन्नुहोस्।"
+        }
       }
     }
+  },
+  "notices": {
+    "counters": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "groups": [
+      {
+        "label": "순서·대기",
+        "items": [
+          {
+            "id": "ticket",
+            "label": "번호표"
+          },
+          {
+            "id": "call",
+            "label": "호출 대기"
+          },
+          {
+            "id": "moment",
+            "label": "잠시 대기"
+          },
+          {
+            "id": "counter",
+            "label": "창구 안내"
+          }
+        ]
+      },
+      {
+        "label": "위치 안내",
+        "items": [
+          {
+            "id": "floor3",
+            "label": "3층"
+          },
+          {
+            "id": "back4",
+            "label": "뒷 건물 4층"
+          },
+          {
+            "id": "visit",
+            "label": "면회 접수"
+          }
+        ]
+      },
+      {
+        "label": "예약",
+        "items": [
+          {
+            "id": "resvNeed",
+            "label": "예약 필요"
+          },
+          {
+            "id": "resvShow",
+            "label": "예약 확인"
+          }
+        ]
+      },
+      {
+        "label": "서류·준비물",
+        "items": [
+          {
+            "id": "docs",
+            "label": "서류 확인"
+          },
+          {
+            "id": "form",
+            "label": "통합신청서"
+          },
+          {
+            "id": "passport",
+            "label": "여권·등록증"
+          },
+          {
+            "id": "photo",
+            "label": "사진"
+          },
+          {
+            "id": "fee",
+            "label": "수수료"
+          }
+        ]
+      },
+      {
+        "label": "기타",
+        "items": [
+          {
+            "id": "online",
+            "label": "온라인 신청"
+          },
+          {
+            "id": "today",
+            "label": "오늘 처리 불가"
+          },
+          {
+            "id": "interp",
+            "label": "통역 요청"
+          }
+        ]
+      }
+    ]
   }
 }

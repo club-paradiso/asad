@@ -3,13 +3,14 @@ import liveCatalog from "../../public/compat/data.json";
 import demoCatalog from "../../apps/visitor-intake/data.json";
 import {
   __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
-  validCode, INTAKE_TTL_MS,
+  validCode, INTAKE_TTL_MS, NOTICE_IDS,
 } from "./store";
 import {
   POST as createSession, GET as readSession, PATCH as markSession,
 } from "@/app/api/intake/session/route";
 import { POST as submit } from "@/app/api/intake/submission/route";
 import { POST as postLive } from "@/app/api/intake/live/route";
+import { GET as readNotice, POST as postNotice } from "@/app/api/intake/notice/route";
 
 const HOST = "http://localhost:3000";
 const headers = { origin: HOST, "content-type": "application/json" };
@@ -52,6 +53,24 @@ describe("intake service catalog", () => {
       expect(locale.kiosk.counter).toContain("{n}");
     }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
+  });
+});
+
+describe("staff notice phrases", () => {
+  it("translates every fixed phrase in all 12 languages and lists each one exactly once for staff", () => {
+    const cfg = liveCatalog.notices;
+    const listed = cfg.groups.flatMap(g => g.items.map(i => i.id));
+    expect([...listed].sort()).toEqual([...NOTICE_IDS].sort());
+    expect(cfg.counters.length).toBeGreaterThan(0);
+    for (const locale of Object.values(liveCatalog.locales)) {
+      expect(Object.keys(locale.notice.texts).sort()).toEqual([...NOTICE_IDS].sort());
+      expect(locale.notice.ok.trim()).not.toBe("");
+      for (const value of Object.values(locale.notice.texts)) {
+        expect(value.trim()).not.toBe("");
+        expect(value).not.toMatch(/[\u202f\u00a0]/);
+      }
+      expect(locale.notice.texts.counter).toContain("{n}");
+    }
   });
 });
 
@@ -254,5 +273,45 @@ describe("intake cross-device API", () => {
       }),
     }));
     expect(blocked.status).toBe(403);
+  });
+
+  it("lets only the staff desk show or clear a fixed phrase on the visitor screen", async () => {
+    // Created directly in the store: the session-create route is rate-limited across this file.
+    const store = createMemoryIntakeStore();
+    __setIntakeStore(store);
+    const { session: { code }, staffToken } = await store.create();
+    const visitor = () => readNotice(new Request(HOST + "/api/intake/notice?code=" + code));
+    const send = (body: object, token: string | null = staffToken) => postNotice(new Request(HOST + "/api/intake/notice", {
+      method: "POST",
+      headers: token ? { ...headers, "x-asad-intake-staff-token": token } : headers,
+      body: JSON.stringify(body),
+    }));
+    expect(await (await visitor()).json()).toEqual({ notice: null, seq: 0 });
+
+    expect((await send({ code, id: "ticket" }, null)).status).toBe(401);
+    expect((await send({ code, id: "ticket" }, "x".repeat(43))).status).toBe(403);
+    for (const bad of [
+      { code, id: "counter" },
+      { code, id: "ticket", counter: 3 },
+      { code, id: "counter", counter: 31 },
+      { code, id: "hello" },
+      { code, id: "ticket", text: "free text" },
+    ]) expect((await send(bad)).status).toBe(400);
+
+    expect((await send({ code, id: "counter", counter: 3 })).status).toBe(200);
+    const shown = await (await visitor()).json() as { notice: Record<string, unknown>; seq: number };
+    expect(shown.notice).toMatchObject({ id: "counter", counter: 3, n: 1 });
+    expect(shown.seq).toBe(1);
+    const desk = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await desk.json() as { notice: { id: string } }).notice.id).toBe("counter");
+
+    // Repeating the same phrase is a new event so a dismissed screen shows it again.
+    await send({ code, id: "counter", counter: 3 });
+    expect((await (await visitor()).json() as { seq: number }).seq).toBe(2);
+    expect((await send({ code, id: null })).status).toBe(200);
+    expect(await (await visitor()).json()).toEqual({ notice: null, seq: 3 });
+
+    expect((await readNotice(new Request(HOST + "/api/intake/notice?code=ABCDEFGHJK"))).status).toBe(404);
+    expect((await readNotice(new Request(HOST + "/api/intake/notice?code=bad"))).status).toBe(400);
   });
 });

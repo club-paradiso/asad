@@ -130,7 +130,8 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await staff.locator(".reqList").getByText("영어 · 예약함 123456").waitFor();
     await staff.locator(".reqList").getByText("3번 창구").waitFor();
     if(await visitor.getByText(/Staff use this number/).count())throw Error("Visitor still sees the request-number explanation");
-    if(await staff.getByRole("button",{name:/예약 확인|번호표/}).count())throw Error("Staff desk must not require manual steps");
+    // Fixed phrase cards (incl. "번호표"/"예약 확인") live in .noticePanel; requests themselves need no clicks.
+    if(await staff.locator(".reqList, .mirror").getByRole("button").count())throw Error("Staff desk must not require manual steps");
     // The 20th service must render on legacy iPad and reach the live staff queue.
     await visitor.getByRole("button",{name:/BACK TO START/}).click();
     await visitor.getByRole("button",{name:"English"}).click();

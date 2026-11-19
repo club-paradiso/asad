@@ -106,3 +106,25 @@ body.staff .container{max-width:1180px}
 .langGrid .tile{min-height:72px;padding:12px}
 @media(min-width:900px){.langGrid,body.visitor.display-mode .langGrid{grid-template-columns:repeat(4,minmax(0,1fr))}.hero.compact h1{font-size:34px}}
 @media(max-width:560px){.langGrid .tile{min-height:60px}.hero.compact h1{font-size:26px}}
+/* Staff -> visitor fixed phrases */
+.noticePanel{background:#fff;border:1px solid #d6e2e0;border-radius:20px;padding:20px 22px;margin:0 0 18px}
+.noticeHead{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0 0 12px}
+.noticeHead h2{margin:0;font-size:20px}
+.noticeHead .btn{margin-left:auto;min-height:44px;padding:8px 16px;font-size:16px}
+.noticeGroup{display:grid;grid-template-columns:110px 1fr;gap:8px 14px;align-items:start;padding:10px 0;border-top:1px solid #edf2f1}
+.noticeGroupLabel{margin:10px 0 0;font-size:14px;color:#3f5f62}
+.noticeItems{display:flex;flex-wrap:wrap;gap:8px}
+.noticeBtn{min-height:48px;padding:8px 16px;font-size:17px;white-space:nowrap}
+.noticeBtn.is-active{background:#087d70;border-color:#087d70;color:#fff}
+.counterPad{grid-column:2;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.counterPad .key{min-height:52px;font-size:22px;font-weight:bold;text-align:center;padding:6px}
+@media(max-width:760px){.noticeGroup{grid-template-columns:1fr}.counterPad{grid-column:1;grid-template-columns:repeat(5,minmax(0,1fr))}}
+.noticeLayer{position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(9,32,36,.62)}
+.noticeCard{background:#fff;border-radius:28px;max-width:880px;width:100%;padding:44px 48px 36px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.25)}
+.noticeNumber{margin:0 0 4px;font-size:140px;line-height:1;font-weight:800;color:#087d70;font-variant-numeric:tabular-nums}
+.noticeText{margin:0;font-size:40px;line-height:1.35;font-weight:bold;color:#143e45;word-break:keep-all}
+.noticeKo{margin:18px 0 0;font-size:20px;color:#5b7477;word-break:keep-all}
+.noticeOk{margin-top:30px;min-width:220px;font-size:24px}
+@media(max-width:760px){.noticeNumber{font-size:96px}.noticeText{font-size:28px}.noticeCard{padding:30px 22px 26px}}
+@media(prefers-reduced-motion:no-preference){.noticeCard{animation:noticeIn .18s ease-out}}
+@keyframes noticeIn{from{transform:scale(.97);opacity:0}to{transform:none;opacity:1}}

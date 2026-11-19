@@ -8,7 +8,8 @@
   // Poll fast while the visitor is tapping, slower when the counter is quiet.
   var FAST_MS=1000,SLOW_MS=2500,FAST_WINDOW_MS=60000;
   var state={code:"",token:"",expiresAt:0,entries:[],live:null,busy:false,error:"",notice:"",online:false,
-    pollTimer:0,stopped:false,data:null,station:"",setupOpen:false,lastChangeAt:0};
+    pollTimer:0,stopped:false,data:null,station:"",setupOpen:false,lastChangeAt:0,
+    phrase:null,noticeBusy:false,counterPicker:false,noticeError:""};
   var LANG_KO={"KO":"한국어","EN":"영어","ZH-CN":"중국어(간체)","ID":"인도네시아어","HI":"힌디어","VI":"베트남어",
     "JA":"일본어","TH":"태국어","RU":"러시아어","UZ":"우즈베크어","MN":"몽골어","NE":"네팔어"};
   var BOOKING={yes:"예약함",no:"예약 안 함",unsure:"모름"};
@@ -60,11 +61,12 @@
         state.online=false;
         if(wasOnline || !state.error){state.error="연결이 끊겨 다시 연결하는 중입니다.";render();}
       }else{
-        var before=JSON.stringify([state.entries,state.live]);
-        var after=JSON.stringify([data.entries,data.live||null]);
+        var before=JSON.stringify([state.entries,state.live,state.noticeBusy?null:state.phrase]);
+        var after=JSON.stringify([data.entries,data.live||null,state.noticeBusy?null:(data.notice||null)]);
         var changed=before!==after;
         var recovered=!state.online || !!state.error;
         state.entries=data.entries;state.live=data.live||null;
+        if(!state.noticeBusy)state.phrase=data.notice||null;
         if(data.station && String(data.station)!==state.station){state.station=String(data.station);changed=true;}
         state.online=true;state.error="";
         if(changed)state.lastChangeAt=Date.now();
@@ -173,6 +175,78 @@
     A.add(f,A.el("span",label,"factLabel"),A.el("strong",value,"factValue"));
     return f;
   }
+  function noticeLabel(n){
+    if(!n)return "";
+    var cfg=state.data && state.data.notices;
+    var label=n.id;
+    if(cfg)for(var g=0;g<cfg.groups.length;g++)for(var i=0;i<cfg.groups[g].items.length;i++)
+      if(cfg.groups[g].items[i].id===n.id)label=cfg.groups[g].items[i].label;
+    return n.id==="counter" && n.counter ? n.counter+"번 "+label : label;
+  }
+  function sendNotice(id,counter){
+    if(state.noticeBusy || !state.code)return;
+    var body={code:state.code,id:id};
+    if(id==="counter")body.counter=counter;
+    state.noticeBusy=true;state.noticeError="";state.counterPicker=false;render();
+    A.request("POST","/api/intake/notice",body,auth(),function(err,data,status){
+      state.noticeBusy=false;
+      if(err || !data || !data.ok){
+        state.noticeError=status===403||status===404?"창구가 닫혀 문구를 보내지 못했습니다.":"문구를 보내지 못했습니다. 다시 눌러 주세요.";
+      }else state.phrase=data.notice||null;
+      state.lastChangeAt=Date.now();
+      render();
+    });
+  }
+  function noticePanel(){
+    var cfg=state.data && state.data.notices;
+    if(!cfg)return null;
+    var section=A.el("section",null,"noticePanel");
+    var head=A.el("div",null,"noticeHead");
+    A.add(head,A.el("h2","안내 문구"),
+      state.phrase?A.el("span","표시 중: "+noticeLabel(state.phrase),"chip is-on"):A.el("span","표시 안 함","chip"));
+    if(state.phrase){
+      var clear=A.btn("화면에서 지우기",function(){sendNotice(null);},"btn");
+      clear.disabled=state.phraseBusy;
+      head.appendChild(clear);
+    }
+    section.appendChild(head);
+    if(state.phraseError){var e=text(state.phraseError,"alert");e.setAttribute("role","alert");section.appendChild(e);}
+    for(var g=0;g<cfg.groups.length;g++){
+      var group=cfg.groups[g];
+      var row=A.el("div",null,"noticeGroup");
+      row.appendChild(A.el("h3",group.label,"noticeGroupLabel"));
+      var items=A.el("div",null,"noticeItems");
+      for(var i=0;i<group.items.length;i++){
+        (function(item){
+          var active=state.phrase && state.phrase.id===item.id;
+          var b=A.btn(item.label,function(){
+            if(item.id==="counter"){state.counterPicker=!state.counterPicker;render();return;}
+            sendNotice(item.id);
+          },"btn noticeBtn"+(active?" is-active":""));
+          b.disabled=state.phraseBusy;
+          if(item.id==="counter")b.setAttribute("aria-expanded",String(state.counterPicker));
+          b.setAttribute("aria-pressed",String(!!active));
+          items.appendChild(b);
+        })(group.items[i]);
+      }
+      row.appendChild(items);
+      if(group.items.some(function(it){return it.id==="counter";}) && state.counterPicker){
+        var pad=A.el("div",null,"counterPad");
+        pad.setAttribute("aria-label","창구 번호 고르기");
+        for(var c=0;c<cfg.counters.length;c++){
+          (function(no){
+            var nb=A.btn(String(no),function(){sendNotice("counter",no);},"btn key");
+            nb.setAttribute("aria-label",no+"번 창구");
+            nb.disabled=state.phraseBusy;
+            pad.appendChild(nb);
+          })(cfg.counters[c]);
+        }
+        row.appendChild(pad);
+      }
+      section.appendChild(row);
+    }
+    return section;
+  }
   function mirror(){
     var live=state.live;
     var card=A.el("section",null,"mirror");
@@ -249,6 +323,8 @@
     }
     else{
       root.appendChild(mirror());
+      var np=noticePanel();
+      if(np)root.appendChild(np);
       root.appendChild(requestList());
     }
     var more=A.el("details",null,"setup");
@@ -273,7 +349,7 @@
       }else A.storageRemove(KEY);
     }catch(e){A.storageRemove(KEY);}
   }
-  A.request("GET","/compat/data.json?v=4",null,null,function(err,data){
+  A.request("GET","/compat/data.json?v=5",null,null,function(err,data){
     if(!err && data && data.locales)state.data=data;
     if(err)state.notice="업무 이름 목록을 불러오지 못해 번호로 표시합니다.";
     render();
