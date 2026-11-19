@@ -49,7 +49,10 @@ try {
   await page.goto(base + "/secret", { waitUntil: "networkidle" });
   const btn = page.getByRole("button", { name: "시작", exact: true });
   await btn.waitFor({ state: "visible" });
-  if (!(await btn.isEnabled())) throw Error("Start button is disabled on first render");
+  // A counter number is required before a desk can open.
+  if (await btn.isEnabled()) throw Error("Start must wait for a counter number");
+  await page.locator("#staff-station").selectOption("4");
+  if (!(await btn.isEnabled())) throw Error("Start button stays disabled after choosing a counter");
   await btn.click();
   await page.getByRole("alert").getByText(/접수 서버에 연결하지 못했습니다/).waitFor({ timeout: 8000 });
   const retry = page.getByRole("button", { name: "시작", exact: true });

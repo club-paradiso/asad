@@ -71,9 +71,11 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
   await visitor.route("**/api/intake/submission",async route=>{
     const body=route.request().postDataJSON();
     if(body.serviceIndex<0||body.serviceIndex>19||!body.booking||!body.language)throw Error("Invalid visitor payload");
+    if(body.reservationNo!==undefined && (body.booking!=="yes" || !/^[A-Z0-9-]{4,30}$/.test(body.reservationNo)))throw Error("Bad reservation number payload");
     entries.push({
       seq:entries.length+1,language:body.language,serviceIndex:body.serviceIndex,
-      booking:body.booking,receivedAt:Date.now(),verification:"unchecked",ticket:"pending"
+      booking:body.booking,receivedAt:Date.now(),verification:"unchecked",ticket:"pending",station:3,
+      ...(body.reservationNo?{reservationNo:body.reservationNo}:{})
     });
     await route.fulfill({status:201,contentType:"application/json",
       body:JSON.stringify({accepted:true,seq:entries.length})});
@@ -89,14 +91,21 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
       text:(await staff.locator("body").innerText()).slice(0,900),
       html:(await staff.locator("body").innerHTML()).slice(0,700)
     }));
+    await staff.locator("#staff-station").selectOption("3");
     await staff.getByRole("button",{name:"시작",exact:true}).click({timeout:4000});
+    await staff.getByRole("heading",{name:"3번 창구",exact:true}).waitFor({timeout:6000});
     await staff.getByText(code,{exact:true}).waitFor({timeout:6000});
     const qr=staff.getByRole("img",{name:"iPad 연결 QR코드"});
     await qr.waitFor({state:"visible"});
     const qrUrl=await qr.getAttribute("src");
+    if(qrUrl.indexOf("station=3")<0)throw Error("QR pairing must carry the counter number");
     const qrResponse=await staff.request.get(base+qrUrl);
     if(!qrResponse.ok()||!((await qrResponse.text()).indexOf("<svg")>=0))throw Error("QR not generated");
     // The staff desk mirrors each visitor tap without any staff action.
+    // All 12 languages must be visible on one screen, without scrolling.
+    await visitor.locator(".langGrid .tile").first().waitFor();
+    const fit=await visitor.locator(".langGrid .tile").evaluateAll(els=>els.filter(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}).length);
+    if(fit!==12)throw Error("Only "+fit+" of 12 languages fit on the first screen");
     const mirror=staff.locator(".mirror");
     await visitor.getByRole("button",{name:"English"}).click();
     await mirror.getByText("업무 고르는 중").waitFor({timeout:12000});
@@ -108,10 +117,19 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
     await mirror.getByText("보내기 직전").waitFor({timeout:6000});
     await mirror.getByText("예약함").waitFor();
+    // Optional reservation number: too short is refused, a full one reaches the staff mirror.
+    for(const key of ["1","2"])await visitor.getByRole("button",{name:key,exact:true}).click();
+    await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
+    await visitor.getByText("Please check the reservation number.").waitFor();
+    for(const key of ["3","4","5","6"])await visitor.getByRole("button",{name:key,exact:true}).click();
+    await mirror.getByText("123456").waitFor({timeout:6000});
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitor.getByText(/Request no\. #1/).waitFor({timeout:6000});
     await mirror.getByText("요청 받음 #1").waitFor({timeout:6000});
     await staff.getByText("받은 요청 1건").waitFor({timeout:6000});
+    await staff.locator(".reqList").getByText("영어 · 예약함 123456").waitFor();
+    await staff.locator(".reqList").getByText("3번 창구").waitFor();
+    if(await visitor.getByText(/Staff use this number/).count())throw Error("Visitor still sees the request-number explanation");
     if(await staff.getByRole("button",{name:/예약 확인|번호표/}).count())throw Error("Staff desk must not require manual steps");
     // The 20th service must render on legacy iPad and reach the live staff queue.
     await visitor.getByRole("button",{name:/BACK TO START/}).click();

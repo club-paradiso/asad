@@ -41,7 +41,7 @@ describe("intake service catalog", () => {
 
   it("localizes every visitor-facing kiosk control in all 12 languages", () => {
     const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
-    expect(keys).toHaveLength(11);
+    expect(keys).toHaveLength(14);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(Object.keys(locale.kiosk).sort()).toEqual(keys);
       for (const value of Object.values(locale.kiosk)) {
@@ -49,6 +49,7 @@ describe("intake service catalog", () => {
         expect(value).not.toMatch(/[\u202f\u00a0]/);
       }
       expect(locale.kiosk.autoReset).toContain("{s}");
+      expect(locale.kiosk.counter).toContain("{n}");
     }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
   });
@@ -155,6 +156,43 @@ describe("intake cross-device API", () => {
     const otherSession = await other.json() as { code: string; staffToken: string };
     const crossRead = await readSession(staff("/api/intake/session?code=" + code, otherSession.staffToken));
     expect(crossRead.status).toBe(403);
+  });
+
+  it("stamps every request with its desk's counter number and keeps an optional reservation number", async () => {
+    const memory = createMemoryIntakeStore();
+    __setIntakeStore(memory);
+    const one = await (await createSession(post("/api/intake/session", { station: 3 }))).json() as { code: string; staffToken: string; station: number };
+    expect(one.station).toBe(3);
+    // Second desk made directly in the store: the create endpoint is rate limited per minute.
+    const made = await memory.create();
+    await memory.modify(made.session.code, s => { s.station = 7; });
+    const two = { code: made.session.code, staffToken: made.staffToken };
+
+    expect((await submit(post("/api/intake/submission", {
+      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes",
+      reservationNo: "ab12-3456",
+    }))).status).toBe(201);
+    expect((await submit(post("/api/intake/submission", {
+      code: two.code, requestId: crypto.randomUUID(), language: "VI", serviceIndex: 1, booking: "no",
+    }))).status).toBe(201);
+    // A reservation number only goes with "booked", and must be letters, digits or hyphens.
+    expect((await submit(post("/api/intake/submission", {
+      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "no", reservationNo: "1234",
+    }))).status).toBe(400);
+    expect((await submit(post("/api/intake/submission", {
+      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes", reservationNo: "12 34<script>",
+    }))).status).toBe(400);
+
+    const a = await (await readSession(staff("/api/intake/session?code=" + one.code, one.staffToken))).json() as
+      { station: number; entries: Array<{ station: number; reservationNo?: string }> };
+    expect(a.station).toBe(3);
+    expect(a.entries).toHaveLength(1);
+    expect(a.entries[0]).toMatchObject({ station: 3, reservationNo: "AB12-3456" });
+    const b = await (await readSession(staff("/api/intake/session?code=" + two.code, two.staffToken))).json() as
+      { entries: Array<{ station: number; reservationNo?: string }> };
+    expect(b.entries).toHaveLength(1);
+    expect(b.entries[0].station).toBe(7);
+    expect(b.entries[0]).not.toHaveProperty("reservationNo");
   });
 
   it("mirrors the visitor's current screen to the staff desk only", async () => {

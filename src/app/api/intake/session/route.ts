@@ -3,12 +3,16 @@ import { z } from "zod";
 import { clientAddress, isSameOrigin, readJsonBody } from "@/lib/guard";
 import { RequestRateLimiter } from "@/lib/rate-limit";
 import {
-  intakeStore, isStaff, publicEntries, validCode,
+  STATION_MAX, STATION_MIN, intakeStore, isStaff, publicEntries, validCode,
   type Verification, type Ticket,
 } from "@/intake/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const createSchema = z.object({
+  station: z.number().int().min(STATION_MIN).max(STATION_MAX).optional(),
+}).strict();
 
 const createLimit = new RequestRateLimiter({ limit: 6, windowMs: 60_000 });
 const pollLimit = new RequestRateLimiter({ limit: 120, windowMs: 60_000 });
@@ -32,14 +36,22 @@ export async function POST(request: Request) {
   if (!isSameOrigin(request)) return failure(403, "Invalid request origin.");
   const attempt = createLimit.check("create:" + clientAddress(request));
   if (!attempt.allowed) return failure(429, "Too many sessions.");
+  const body = await readJsonBody(request, 256);
+  const parsedCreate = createSchema.safeParse(body.ok ? body.value : {});
+  if (!parsedCreate.success) return failure(400, "창구 번호를 확인해 주세요.");
+  const station = parsedCreate.data.station;
   const store = intakeStore();
   if (!store) return noBackend();
   try {
     const { session, staffToken } = await store.create();
+    if (station !== undefined) {
+      await store.modify(session.code, s => { s.station = station; });
+    }
     return NextResponse.json({
       code: session.code,
       staffToken,
       expiresAt: session.expiresAt,
+      station: station ?? null,
     }, { status: 201, headers: noStore });
   } catch {
     return failure(503, "접수 세션을 시작할 수 없습니다.");
@@ -62,6 +74,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       code, expiresAt: session.expiresAt, entries: publicEntries(session),
       live: session.live ?? null,
+      station: session.station ?? null,
     }, { headers: noStore });
   } catch { return failure(503, "접수 상태를 확인할 수 없습니다."); }
 }

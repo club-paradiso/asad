@@ -3,7 +3,7 @@ import { z } from "zod";
 import { clientAddress, isSameOrigin, readJsonBody } from "@/lib/guard";
 import { RequestRateLimiter } from "@/lib/rate-limit";
 import {
-  INTAKE_MAX_ENTRIES, intakeStore, validCode, validLanguage,
+  INTAKE_MAX_ENTRIES, RESERVATION_NO, intakeStore, validCode, validLanguage,
   type Booking, type IntakeLanguage,
 } from "@/intake/store";
 
@@ -21,7 +21,9 @@ const schema = z.object({
   language: z.string().max(5),
   serviceIndex: z.number().int().min(0).max(19),
   booking: z.enum(["yes", "no", "unsure"]),
-}).strict();
+  // Optional HiKorea visit-reservation number, only meaningful when the visitor says they booked.
+  reservationNo: z.string().regex(RESERVATION_NO).optional(),
+}).strict().refine(v => v.reservationNo === undefined || v.booking === "yes");
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) return fail(403, "Invalid origin.");
@@ -49,6 +51,8 @@ export async function POST(request: Request) {
         language: parsed.data.language as IntakeLanguage,
         serviceIndex: parsed.data.serviceIndex,
         booking: parsed.data.booking as Booking,
+        ...(parsed.data.reservationNo ? { reservationNo: parsed.data.reservationNo.toUpperCase() } : {}),
+        ...(current.station ? { station: current.station } : {}),
         receivedAt: Date.now(),
         verification: "unchecked", ticket: "pending",
       });

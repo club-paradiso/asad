@@ -61,9 +61,12 @@
         "sentTitle": "직원에게 보냈습니다",
         "sentBody": "잠시 기다려 주세요. 직원이 방문 목적과 예약을 확인한 뒤 번호표를 드립니다.",
         "requestNo": "요청 번호",
-        "requestNoHelp": "직원이 이 번호로 요청을 찾습니다. 번호표 번호가 아닙니다.",
         "autoReset": "{s}초 뒤 처음 화면으로 돌아갑니다.",
-        "sendFailed": "보내지 못했습니다. 다시 눌러 주세요. 계속 안 되면 직원에게 알려 주세요."
+        "sendFailed": "보내지 못했습니다. 다시 눌러 주세요. 계속 안 되면 직원에게 알려 주세요.",
+        "reservationNoLabel": "예약 번호 (선택)",
+        "reservationNoInvalid": "예약 번호를 다시 확인해 주세요.",
+        "erase": "지우기",
+        "counter": "{n}번 창구"
       }
     },
     "EN": {
@@ -125,9 +128,12 @@
         "sentTitle": "Sent to staff",
         "sentBody": "Please wait a moment. Staff will check your reason for visiting and your booking, then give you a queue ticket.",
         "requestNo": "Request no.",
-        "requestNoHelp": "Staff use this number to find your request. It is not a queue ticket number.",
         "autoReset": "Returning to the start screen in {s} seconds.",
-        "sendFailed": "Could not send. Please tap again. If it keeps failing, please tell a staff member."
+        "sendFailed": "Could not send. Please tap again. If it keeps failing, please tell a staff member.",
+        "reservationNoLabel": "Reservation number (optional)",
+        "reservationNoInvalid": "Please check the reservation number.",
+        "erase": "Delete",
+        "counter": "Counter {n}"
       }
     },
     "ZH-CN": {
@@ -189,9 +195,12 @@
         "sentTitle": "已发送给工作人员",
         "sentBody": "请稍候。工作人员确认您的来访事由和预约后，会为您发放排队号码。",
         "requestNo": "申请编号",
-        "requestNoHelp": "工作人员会用此编号查找您的申请。这不是排队号码。",
         "autoReset": "{s}秒后返回首页。",
-        "sendFailed": "发送失败。请再点一次。如仍无法发送，请告知工作人员。"
+        "sendFailed": "发送失败。请再点一次。如仍无法发送，请告知工作人员。",
+        "reservationNoLabel": "预约号码（选填）",
+        "reservationNoInvalid": "请核对预约号码。",
+        "erase": "删除",
+        "counter": "{n}号窗口"
       }
     },
     "ID": {
@@ -253,9 +262,12 @@
         "sentTitle": "Terkirim ke petugas",
         "sentBody": "Mohon tunggu sebentar. Petugas akan memeriksa keperluan dan reservasi Anda, lalu memberikan nomor antrean.",
         "requestNo": "Nomor permintaan",
-        "requestNoHelp": "Petugas memakai nomor ini untuk menemukan permintaan Anda. Ini bukan nomor antrean.",
         "autoReset": "Kembali ke layar awal dalam {s} detik.",
-        "sendFailed": "Gagal mengirim. Silakan ketuk lagi. Jika tetap gagal, beri tahu petugas."
+        "sendFailed": "Gagal mengirim. Silakan ketuk lagi. Jika tetap gagal, beri tahu petugas.",
+        "reservationNoLabel": "Nomor reservasi (opsional)",
+        "reservationNoInvalid": "Periksa kembali nomor reservasi.",
+        "erase": "Hapus",
+        "counter": "Loket {n}"
       }
     },
     "HI": {
@@ -317,9 +329,12 @@
         "sentTitle": "कर्मचारी को भेज दिया गया",
         "sentBody": "कृपया थोड़ा इंतज़ार करें। कर्मचारी आपके आने का कारण और बुकिंग जाँचकर आपको कतार का नंबर देंगे।",
         "requestNo": "अनुरोध संख्या",
-        "requestNoHelp": "कर्मचारी इसी संख्या से आपका अनुरोध ढूँढते हैं। यह कतार का नंबर नहीं है।",
         "autoReset": "{s} सेकंड में शुरुआती स्क्रीन पर लौटेंगे।",
-        "sendFailed": "भेजा नहीं जा सका। कृपया फिर से दबाएँ। फिर भी न हो तो कर्मचारी को बताएँ।"
+        "sendFailed": "भेजा नहीं जा सका। कृपया फिर से दबाएँ। फिर भी न हो तो कर्मचारी को बताएँ।",
+        "reservationNoLabel": "आरक्षण संख्या (वैकल्पिक)",
+        "reservationNoInvalid": "कृपया आरक्षण संख्या जाँचें।",
+        "erase": "मिटाएँ",
+        "counter": "काउंटर {n}"
       }
     },
     "VI": {
@@ -381,9 +396,12 @@
         "sentTitle": "Đã gửi cho nhân viên",
         "sentBody": "Vui lòng chờ một chút. Nhân viên sẽ kiểm tra mục đích đến và lịch hẹn, sau đó cấp số thứ tự cho quý vị.",
         "requestNo": "Số yêu cầu",
-        "requestNoHelp": "Nhân viên dùng số này để tìm yêu cầu của quý vị. Đây không phải số thứ tự.",
         "autoReset": "Quay về màn hình đầu sau {s} giây.",
-        "sendFailed": "Không gửi được. Vui lòng chạm lại. Nếu vẫn lỗi, hãy báo nhân viên."
+        "sendFailed": "Không gửi được. Vui lòng chạm lại. Nếu vẫn lỗi, hãy báo nhân viên.",
+        "reservationNoLabel": "Số đặt lịch (không bắt buộc)",
+        "reservationNoInvalid": "Vui lòng kiểm tra lại số đặt lịch.",
+        "erase": "Xóa",
+        "counter": "Quầy số {n}"
       }
     },
     "JA": {
@@ -445,9 +463,12 @@
         "sentTitle": "職員に送信しました",
         "sentBody": "少々お待ちください。職員がご用件と予約を確認したうえで、番号札をお渡しします。",
         "requestNo": "受付番号",
-        "requestNoHelp": "職員はこの番号でご依頼を確認します。番号札の番号ではありません。",
         "autoReset": "{s}秒後に最初の画面に戻ります。",
-        "sendFailed": "送信できませんでした。もう一度押してください。続く場合は職員にお知らせください。"
+        "sendFailed": "送信できませんでした。もう一度押してください。続く場合は職員にお知らせください。",
+        "reservationNoLabel": "予約番号（任意）",
+        "reservationNoInvalid": "予約番号をご確認ください。",
+        "erase": "削除",
+        "counter": "{n}番窓口"
       }
     },
     "TH": {
@@ -509,9 +530,12 @@
         "sentTitle": "ส่งให้เจ้าหน้าที่แล้ว",
         "sentBody": "กรุณารอสักครู่ เจ้าหน้าที่จะตรวจสอบเรื่องที่มาติดต่อและการจอง แล้วจึงให้บัตรคิวแก่ท่าน",
         "requestNo": "หมายเลขคำขอ",
-        "requestNoHelp": "เจ้าหน้าที่ใช้หมายเลขนี้ค้นหาคำขอของท่าน ไม่ใช่หมายเลขบัตรคิว",
         "autoReset": "จะกลับไปหน้าแรกใน {s} วินาที",
-        "sendFailed": "ส่งไม่สำเร็จ กรุณากดอีกครั้ง หากยังไม่ได้ กรุณาแจ้งเจ้าหน้าที่"
+        "sendFailed": "ส่งไม่สำเร็จ กรุณากดอีกครั้ง หากยังไม่ได้ กรุณาแจ้งเจ้าหน้าที่",
+        "reservationNoLabel": "หมายเลขการจอง (ไม่บังคับ)",
+        "reservationNoInvalid": "กรุณาตรวจสอบหมายเลขการจอง",
+        "erase": "ลบ",
+        "counter": "ช่องบริการที่ {n}"
       }
     },
     "RU": {
@@ -573,9 +597,12 @@
         "sentTitle": "Отправлено сотруднику",
         "sentBody": "Пожалуйста, подождите. Сотрудник проверит цель визита и запись, а затем выдаст вам талон очереди.",
         "requestNo": "Номер запроса",
-        "requestNoHelp": "По этому номеру сотрудник найдёт ваш запрос. Это не номер талона очереди.",
         "autoReset": "Возврат на начальный экран через {s} с.",
-        "sendFailed": "Не удалось отправить. Нажмите ещё раз. Если ошибка повторится, сообщите сотруднику."
+        "sendFailed": "Не удалось отправить. Нажмите ещё раз. Если ошибка повторится, сообщите сотруднику.",
+        "reservationNoLabel": "Номер записи (необязательно)",
+        "reservationNoInvalid": "Проверьте номер записи.",
+        "erase": "Стереть",
+        "counter": "Окно {n}"
       }
     },
     "UZ": {
@@ -637,9 +664,12 @@
         "sentTitle": "Xodimga yuborildi",
         "sentBody": "Biroz kuting. Xodim tashrif maqsadingiz va bronni tekshirib, sizga navbat talonini beradi.",
         "requestNo": "So‘rov raqami",
-        "requestNoHelp": "Xodim so‘rovingizni shu raqam orqali topadi. Bu navbat taloni raqami emas.",
         "autoReset": "{s} soniyadan keyin bosh ekranga qaytiladi.",
-        "sendFailed": "Yuborib bo‘lmadi. Yana bir marta bosing. Takrorlansa, xodimga ayting."
+        "sendFailed": "Yuborib bo‘lmadi. Yana bir marta bosing. Takrorlansa, xodimga ayting.",
+        "reservationNoLabel": "Bron raqami (ixtiyoriy)",
+        "reservationNoInvalid": "Bron raqamini tekshiring.",
+        "erase": "O‘chirish",
+        "counter": "{n}-oyna"
       }
     },
     "MN": {
@@ -701,9 +731,12 @@
         "sentTitle": "Ажилтанд илгээлээ",
         "sentBody": "Түр хүлээнэ үү. Ажилтан таны ирсэн зорилго болон цаг захиалгыг шалгаад дарааллын дугаар олгоно.",
         "requestNo": "Хүсэлтийн дугаар",
-        "requestNoHelp": "Ажилтан энэ дугаараар таны хүсэлтийг олно. Энэ нь дарааллын дугаар биш.",
         "autoReset": "{s} секундын дараа эхлэл рүү буцна.",
-        "sendFailed": "Илгээж чадсангүй. Дахин дарна уу. Үргэлжилбэл ажилтанд хэлнэ үү."
+        "sendFailed": "Илгээж чадсангүй. Дахин дарна уу. Үргэлжилбэл ажилтанд хэлнэ үү.",
+        "reservationNoLabel": "Захиалгын дугаар (заавал биш)",
+        "reservationNoInvalid": "Захиалгын дугаараа шалгана уу.",
+        "erase": "Устгах",
+        "counter": "{n}-р цонх"
       }
     },
     "NE": {
@@ -765,9 +798,12 @@
         "sentTitle": "कर्मचारीलाई पठाइयो",
         "sentBody": "कृपया केही बेर पर्खनुहोस्। कर्मचारीले तपाईं आउनुको कारण र बुकिङ जाँचेर टोकन नम्बर दिनुहुनेछ।",
         "requestNo": "अनुरोध नम्बर",
-        "requestNoHelp": "कर्मचारीले यही नम्बरबाट तपाईंको अनुरोध खोज्नुहुन्छ। यो टोकन नम्बर होइन।",
         "autoReset": "{s} सेकेन्डमा सुरुको स्क्रिनमा फर्किन्छ।",
-        "sendFailed": "पठाउन सकिएन। फेरि थिच्नुहोस्। फेरि पनि भएन भने कर्मचारीलाई भन्नुहोस्।"
+        "sendFailed": "पठाउन सकिएन। फेरि थिच्नुहोस्। फेरि पनि भएन भने कर्मचारीलाई भन्नुहोस्।",
+        "reservationNoLabel": "आरक्षण नम्बर (ऐच्छिक)",
+        "reservationNoInvalid": "कृपया आरक्षण नम्बर जाँच्नुहोस्।",
+        "erase": "मेटाउनुहोस्",
+        "counter": "काउन्टर {n}"
       }
     }
   }
