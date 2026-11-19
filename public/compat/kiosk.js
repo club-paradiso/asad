@@ -3,7 +3,6 @@
 (function (window, document, A) {
   "use strict";
   var root = document.getElementById("app");
-  var footer = document.getElementById("kiosk-footer");
   var displayMode=A.getQuery("display")==="1";
   var stationValue=A.getQuery("station");
   var displayStation=/^(?:[1-9]|[12][0-9]|30)$/.test(stationValue)?stationValue:"";
@@ -120,7 +119,7 @@
   function displayBar(){
     var bar=A.el("div",null,"displayBar");
     A.add(bar,
-      message((displayStation?displayStation+"번 창구 · ":"")+"민원인 화면"),
+      message(displayStation?displayStation+"번 창구":"창구 미지정"),
       A.btn("전체화면",requestKioskFullscreen,"btn"));
     if(isFullscreen())bar.className+=" is-hidden";
     return bar;
@@ -141,9 +140,6 @@
     var k = d.kiosk;
     var uiLang = state.step==="connect" || state.step==="language" ? "KO" : state.locale;
     document.documentElement.lang = htmlLang(uiLang);
-    if(footer)footer.textContent = state.step==="connect" ? "번호표는 직원이 직접 드립니다." :
-      state.step==="language" ? "번호표는 직원이 직접 드립니다. · Queue tickets are given by staff in person." :
-      k.footer;
     if (state.step==="connect") {
       root.appendChild(A.intro("","직원 창구와 연결","직원 화면의 QR코드를 스캔하거나 10자리 접수 코드를 입력하세요."));
       var p=A.el("section",null,"panel");
@@ -160,7 +156,7 @@
       }
       root.appendChild(langGrid);
     }else if(state.step==="services"){
-      root.appendChild(A.intro("2 / 3",d.heading[state.servicePage] || d.heading[0],d.instructions[state.servicePage] || ""));
+      root.appendChild(A.intro("2 / 3",d.heading[state.servicePage] || d.heading[0],""));
       var grid=A.el("div",null,"grid");
       var first=state.servicePage===0?0:10,limit=state.servicePage===0?10:d.services.length;
       for(var n=first;n<limit;n++){
@@ -178,13 +174,9 @@
         A.btn(k.changeLanguage,function(){state.step="language";render();},"btn")));
     }else if(state.step==="review"){
       var t=d.review;
-      root.appendChild(A.intro("3 / 3",t.reviewTitle,t.reviewHelp));
+      root.appendChild(A.intro("3 / 3",t.reviewTitle,""));
       var selected=A.el("section",null,"panel");
-      A.add(selected,A.el("p",t.serviceLabel,"step"),A.el("h2",d.services[state.serviceIndex]));
-      if(state.locale!=="KO"){
-        var ko=message(state.data.locales.KO.services[state.serviceIndex]);
-        ko.lang="ko";selected.appendChild(ko);
-      }
+      selected.appendChild(A.el("h2",d.services[state.serviceIndex]));
       if(state.serviceIndex===19)selected.appendChild(message(t.phoneChangeNote,"note"));
       root.appendChild(selected);
       root.appendChild(A.el("h2",t.reservationTitle,"question"));
@@ -199,7 +191,6 @@
         })(opts[c]);
       }
       root.appendChild(choiceGrid);
-      root.appendChild(message(k.noPersonalInfo));
       // Keep a send failure next to the button the visitor just pressed.
       var sendError=errorBox();
       if(sendError)root.appendChild(sendError);
