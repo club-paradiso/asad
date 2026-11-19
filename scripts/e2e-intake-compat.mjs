@@ -27,7 +27,7 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
   const staff=await desktop.newPage();
   const visitor=await ipad.newPage();
   const errors=[],entries=[];
-  let live=null,sessionStarted=false,liveFailuresLeft=2,liveRev=0;
+  let live=null,sessionStarted=false,liveFailuresLeft=2,liveRev=0,liveEpoch="";
   for (const page of [staff,visitor]) page.on("pageerror",err=>errors.push(err.message));
   const code="ABCD234567";
   const token="abcdefghijklmnopqrstuvwxyzABCDE1234567";
@@ -63,8 +63,8 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
       liveFailuresLeft--;
       await route.fulfill({status:503,contentType:"application/json",body:'{"error":"temporarily unavailable"}'});return;
     }
-    if(sessionStarted && !(body.rev<=liveRev)){
-      const {code:_c,...rest}=body;live={...rest,updatedAt:Date.now()};liveRev=body.rev||liveRev;
+    if(sessionStarted && !(body.epoch===liveEpoch && body.rev<=liveRev)){
+      const {code:_c,...rest}=body;live={...rest,updatedAt:Date.now()};liveRev=body.rev;liveEpoch=body.epoch;
     }
     await route.fulfill({status:200,contentType:"application/json",body:'{"ok":true}'});
   });

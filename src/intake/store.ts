@@ -34,6 +34,7 @@ export type IntakeLive = {
   serviceIndex?: number;
   booking?: Booking;
   seq?: number;
+  epoch?: string;
   rev?: number;
   updatedAt: number;
 };

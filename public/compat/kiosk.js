@@ -12,6 +12,8 @@
   var idleTimer=null,countdownTimer=null,countdownLeft=0,lastStep="";
   // Live mirror: one request in flight, newest state wins, failed sends retry on their own.
   var liveSent="",liveWanted=null,liveBusy=false,liveTimer=0,liveFailures=0,liveRev=0;
+  // Ordering key that does not depend on the device clock: a random id per page load plus a counter.
+  var liveEpoch=(A.uuid()||String(Math.random()).slice(2)+String(Math.random()).slice(2)).replace(/[^a-z0-9]/gi,"").slice(0,24);
   if(displayMode)document.body.className+=" display-mode";
   function isFullscreen(){
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -138,8 +140,8 @@
     var key=JSON.stringify(live);
     if(key===liveSent && !liveWanted)return;
     if(liveWanted && JSON.stringify(liveWanted.body)===key)return;
-    // Monotonic across reloads, so the server can drop anything older than what it already has.
-    liveRev=Math.max(Date.now(),liveRev+1);
+    liveRev++;
+    live.epoch=liveEpoch;
     live.rev=liveRev;
     liveWanted={key:key,body:live};
     liveFailures=0;
