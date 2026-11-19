@@ -61,6 +61,7 @@ export async function GET(request: Request) {
     if (!isStaff(session, supplied)) return failure(403, "Invalid staff capability.");
     return NextResponse.json({
       code, expiresAt: session.expiresAt, entries: publicEntries(session),
+      live: session.live ?? null,
     }, { headers: noStore });
   } catch { return failure(503, "접수 상태를 확인할 수 없습니다."); }
 }

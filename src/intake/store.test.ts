@@ -9,6 +9,7 @@ import {
   POST as createSession, GET as readSession, PATCH as markSession,
 } from "@/app/api/intake/session/route";
 import { POST as submit } from "@/app/api/intake/submission/route";
+import { POST as postLive } from "@/app/api/intake/live/route";
 
 const HOST = "http://localhost:3000";
 const headers = { origin: HOST, "content-type": "application/json" };
@@ -154,6 +155,36 @@ describe("intake cross-device API", () => {
     const otherSession = await other.json() as { code: string; staffToken: string };
     const crossRead = await readSession(staff("/api/intake/session?code=" + code, otherSession.staffToken));
     expect(crossRead.status).toBe(403);
+  });
+
+  it("mirrors the visitor's current screen to the staff desk only", async () => {
+    __setIntakeStore(createMemoryIntakeStore());
+    const created = await createSession(post("/api/intake/session", {}));
+    const { code, staffToken } = await created.json() as { code: string; staffToken: string };
+    const before = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await before.json() as { live: unknown }).live).toBeNull();
+
+    expect((await postLive(post("/api/intake/live", { code, step: "language" }))).status).toBe(200);
+    expect((await postLive(post("/api/intake/live", {
+      code, step: "review", language: "VI", serviceIndex: 4, booking: "no",
+    }))).status).toBe(200);
+    const read = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    const { live } = await read.json() as { live: Record<string, unknown> };
+    expect(live).toMatchObject({ step: "review", language: "VI", serviceIndex: 4, booking: "no" });
+    expect(typeof live.updatedAt).toBe("number");
+
+    // Unknown steps, languages, indices and free-text fields are rejected; unknown desks 404.
+    for (const bad of [
+      { code, step: "typing" },
+      { code, step: "services", language: "XX" },
+      { code, step: "review", serviceIndex: 20 },
+      { code, step: "review", note: "passport M1234567" },
+    ]) expect((await postLive(post("/api/intake/live", bad))).status).toBe(400);
+    expect((await postLive(post("/api/intake/live", { code: "ABCDEFGHJK", step: "language" }))).status).toBe(404);
+    expect((await postLive(new Request(HOST + "/api/intake/live", {
+      method: "POST", headers: { origin: "https://other.example", "content-type": "application/json" },
+      body: JSON.stringify({ code, step: "language" }),
+    }))).status).toBe(403);
   });
 
   it("refuses invalid input, incorrect origin and unrelated free text", async () => {

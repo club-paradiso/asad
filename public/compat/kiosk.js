@@ -9,7 +9,7 @@
   // A visitor who walks away mid-flow must not leave their choices for the next person.
   var IDLE_RESET_MS=120000;
   var SENT_RESET_SECONDS=30;
-  var idleTimer=null,countdownTimer=null,countdownLeft=0,lastStep="";
+  var idleTimer=null,countdownTimer=null,countdownLeft=0,lastStep="",lastLive="";
   if(displayMode)document.body.className+=" display-mode";
   function isFullscreen(){
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -124,6 +124,20 @@
     if(isFullscreen())bar.className+=" is-hidden";
     return bar;
   }
+  // Mirror the visible screen to the staff desk. Same coded choices as a submission; failures are ignored
+  // because the visitor flow must never block on the staff mirror.
+  function syncLive(){
+    if(!A.queryCode(state.code) || state.step==="connect")return;
+    var live={code:state.code,step:state.step};
+    if(state.step!=="language")live.language=state.locale;
+    if(state.step==="review" || state.step==="sent")live.serviceIndex=state.serviceIndex;
+    if((state.step==="review" || state.step==="sent") && state.booking)live.booking=state.booking;
+    if(state.step==="sent" && state.sentSeq)live.seq=state.sentSeq;
+    var key=JSON.stringify(live);
+    if(key===lastLive)return;
+    lastLive=key;
+    A.request("POST","/api/intake/live",live,null,function(err){ if(err)lastLive=""; });
+  }
   function errorBox(){
     if(!state.error)return null;
     var box=A.el("div",null,"error");
@@ -219,6 +233,7 @@
       if(box)root.appendChild(box);
     }
     armIdleTimer();
+    syncLive();
     var view=state.step+":"+state.servicePage;
     if(lastStep!==view){
       lastStep=view;
