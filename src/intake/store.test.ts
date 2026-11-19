@@ -173,6 +173,19 @@ describe("intake cross-device API", () => {
     expect(live).toMatchObject({ step: "review", language: "VI", serviceIndex: 4, booking: "no" });
     expect(typeof live.updatedAt).toBe("number");
 
+    // Out-of-order delivery within one kiosk page: an older revision arriving late is ignored.
+    const epoch = "kioskpageA1234";
+    expect((await postLive(post("/api/intake/live", { code, step: "sent", language: "VI", serviceIndex: 4, booking: "no", seq: 1, epoch, rev: 5 }))).status).toBe(200);
+    const late = await postLive(post("/api/intake/live", { code, step: "services", language: "VI", epoch, rev: 3 }));
+    expect(late.status).toBe(200);
+    expect((await late.json() as { stale: boolean }).stale).toBe(true);
+    const kept = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await kept.json() as { live: { step: string } }).live.step).toBe("sent");
+    // A reloaded kiosk (new epoch, counter back at 1) is accepted regardless of earlier revisions.
+    expect((await postLive(post("/api/intake/live", { code, step: "language", epoch: "kioskpageB5678", rev: 1 }))).status).toBe(200);
+    const next = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await next.json() as { live: { step: string } }).live.step).toBe("language");
+
     // Unknown steps, languages, indices and free-text fields are rejected; unknown desks 404.
     for (const bad of [
       { code, step: "typing" },

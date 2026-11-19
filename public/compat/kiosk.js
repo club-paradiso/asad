@@ -9,7 +9,11 @@
   // A visitor who walks away mid-flow must not leave their choices for the next person.
   var IDLE_RESET_MS=120000;
   var SENT_RESET_SECONDS=30;
-  var idleTimer=null,countdownTimer=null,countdownLeft=0,lastStep="",lastLive="";
+  var idleTimer=null,countdownTimer=null,countdownLeft=0,lastStep="";
+  // Live mirror: one request in flight, newest state wins, failed sends retry on their own.
+  var liveSent="",liveWanted=null,liveBusy=false,liveTimer=0,liveFailures=0,liveRev=0;
+  // Ordering key that does not depend on the device clock: a random id per page load plus a counter.
+  var liveEpoch=(A.uuid()||String(Math.random()).slice(2)+String(Math.random()).slice(2)).replace(/[^a-z0-9]/gi,"").slice(0,24);
   if(displayMode)document.body.className+=" display-mode";
   function isFullscreen(){
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -134,9 +138,35 @@
     if((state.step==="review" || state.step==="sent") && state.booking)live.booking=state.booking;
     if(state.step==="sent" && state.sentSeq)live.seq=state.sentSeq;
     var key=JSON.stringify(live);
-    if(key===lastLive)return;
-    lastLive=key;
-    A.request("POST","/api/intake/live",live,null,function(err){ if(err)lastLive=""; });
+    if(key===liveSent && !liveWanted)return;
+    if(liveWanted && JSON.stringify(liveWanted.body)===key)return;
+    liveRev++;
+    live.epoch=liveEpoch;
+    live.rev=liveRev;
+    liveWanted={key:key,body:live};
+    liveFailures=0;
+    pumpLive();
+  }
+  function pumpLive(){
+    if(liveBusy || !liveWanted)return;
+    if(liveTimer){window.clearTimeout(liveTimer);liveTimer=0;}
+    var job=liveWanted;
+    liveBusy=true;
+    A.request("POST","/api/intake/live",job.body,null,function(err,data,status){
+      liveBusy=false;
+      var gone=status===400 || status===403 || status===404;
+      if(!err || gone){
+        // 400/403/404 will not succeed on retry; stop instead of looping.
+        if(!err)liveSent=job.key;
+        if(liveWanted===job)liveWanted=null;
+        liveFailures=0;
+        pumpLive();
+        return;
+      }
+      liveFailures++;
+      if(liveFailures>5){ if(liveWanted===job)liveWanted=null; liveFailures=0; return; }
+      liveTimer=window.setTimeout(pumpLive,Math.min(1000*liveFailures,4000));
+    });
   }
   function errorBox(){
     if(!state.error)return null;

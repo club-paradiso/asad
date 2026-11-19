@@ -23,6 +23,11 @@ const schema = z.object({
   serviceIndex: z.number().int().min(0).max(19).optional(),
   booking: z.enum(["yes", "no", "unsure"]).optional(),
   seq: z.number().int().min(1).max(10_000).optional(),
+  // Ordering: a random id per kiosk page load plus a counter. No wall clock involved, so a
+  // clock correction or a different device can never freeze the mirror. Optional so an
+  // already-open older kiosk keeps working.
+  epoch: z.string().regex(/^[A-Za-z0-9]{8,32}$/).optional(),
+  rev: z.number().int().positive().max(1_000_000_000).optional(),
 }).strict();
 
 /**
@@ -37,7 +42,7 @@ export async function POST(request: Request) {
   if (!body.ok) return fail(body.status, body.error);
   const parsed = schema.safeParse(body.value);
   if (!parsed.success || !validCode(parsed.data.code)) return fail(400, "Invalid live state.");
-  const { code, step, language, serviceIndex, booking, seq } = parsed.data;
+  const { code, step, language, serviceIndex, booking, seq, epoch, rev } = parsed.data;
   if (language !== undefined && !validLanguage(language)) return fail(400, "Invalid live state.");
   const store = intakeStore();
   if (!store) return fail(503, "실시간 접수 저장소가 연결되지 않았습니다.");
@@ -47,9 +52,20 @@ export async function POST(request: Request) {
   if (serviceIndex !== undefined) live.serviceIndex = serviceIndex;
   if (booking !== undefined) live.booking = booking as Booking;
   if (seq !== undefined) live.seq = seq;
+  if (epoch !== undefined && rev !== undefined) { live.epoch = epoch; live.rev = rev; }
   try {
-    const s = await store.modify(code, current => { current.live = live; });
+    let stale = false;
+    const s = await store.modify(code, current => {
+      // A slower, older update must never overwrite a newer screen state.
+      // Only updates from the same page load are compared; a new page load always wins.
+      const prev = current.live;
+      if (epoch !== undefined && rev !== undefined && prev?.epoch === epoch &&
+          prev.rev !== undefined && prev.rev >= rev) {
+        stale = true; return false;
+      }
+      current.live = live;
+    });
     if (!s) return fail(404, "Session not found.");
-    return NextResponse.json({ ok: true }, { headers: noStore });
+    return NextResponse.json({ ok: true, stale }, { headers: noStore });
   } catch { return fail(503, "Live state unavailable."); }
 }
