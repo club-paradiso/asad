@@ -36,6 +36,19 @@ describe("intake service catalog", () => {
       expect(locale.services[19]).toBeTruthy();
       expect(locale.review.phoneChangeNote).toBeTruthy();
     }
+  });
+
+  it("localizes every visitor-facing kiosk control in all 12 languages", () => {
+    const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
+    expect(keys).toHaveLength(13);
+    for (const locale of Object.values(liveCatalog.locales)) {
+      expect(Object.keys(locale.kiosk).sort()).toEqual(keys);
+      for (const value of Object.values(locale.kiosk)) {
+        expect(value.trim()).not.toBe("");
+        expect(value).not.toMatch(/[\u202f\u00a0]/);
+      }
+      expect(locale.kiosk.autoReset).toContain("{s}");
+    }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
   });
 });

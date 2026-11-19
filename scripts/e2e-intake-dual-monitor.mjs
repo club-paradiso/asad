@@ -87,7 +87,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     const visitor=await popupPromise;
     visitor.on("pageerror",err=>errors.push(err.message));
     await visitor.waitForLoadState("domcontentloaded");
-    await visitor.getByText("1번 창구 · 민원인 전용 화면 · 방문 목적 선택").waitFor();
+    await visitor.getByText("1번 창구 · 민원인 화면").waitFor();
     const leaked=await visitor.evaluate(()=>({
       token:sessionStorage.getItem("asad:intake:staff:v1"),
       opener:window.opener!==null
@@ -96,8 +96,8 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitor.getByRole("button",{name:"English"}).click();
     await visitor.getByRole("button",{name:/Extend my period of stay/}).click();
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
-    await visitor.getByRole("button",{name:/직원 화면으로 전송/}).click();
-    await visitor.getByText(/요청 순번 #1/).waitFor();
+    await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
+    await visitor.getByText(/Request no\. #1/).waitFor();
     await staffOne.getByText("실시간 접수 목록 (1)").waitFor({timeout:9000});
     await staffOne.getByText("직원 확인 대기 1건 · 총 요청 1건").waitFor();
     await staffTwo.getByText("실시간 접수 목록 (0)").waitFor();
@@ -108,15 +108,15 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await staffTwo.getByRole("link",{name:"민원인 전용 화면을 새 창에서 열기"}).click();
     const visitorTwo=await secondPopupPromise;
     visitorTwo.on("pageerror",err=>errors.push(err.message));
-    await visitorTwo.getByText("2번 창구 · 민원인 전용 화면 · 방문 목적 선택").waitFor();
+    await visitorTwo.getByText("2번 창구 · 민원인 화면").waitFor();
     const secondToken=await visitorTwo.evaluate(()=>sessionStorage.getItem("asad:intake:staff:v1"));
     if(secondToken!==null)throw Error("Second visitor window inherited staff token");
     await visitorTwo.getByRole("button",{name:"English"}).click();
-    await visitorTwo.getByRole("button",{name:/다른 업무 11–20/}).click();
+    await visitorTwo.getByRole("button",{name:/More services \(11–20\)/}).click();
     await visitorTwo.getByRole("button",{name:/Report a change of phone number/}).click();
     await visitorTwo.getByRole("button",{name:"Yes, booked"}).click();
-    await visitorTwo.getByRole("button",{name:/직원 화면으로 전송/}).click();
-    await visitorTwo.getByText(/요청 순번 #1/).waitFor();
+    await visitorTwo.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
+    await visitorTwo.getByText(/Request no\. #1/).waitFor();
     await staffTwo.getByText("실시간 접수 목록 (1)").waitFor({timeout:9000});
     await staffTwo.getByText(/전화번호 변경 요청: 이 화면은 방문 목적만 전달/).waitFor({timeout:9000});
     await staffOne.getByText("실시간 접수 목록 (1)").waitFor();

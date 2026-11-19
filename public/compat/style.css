@@ -35,3 +35,13 @@ body.visitor.display-mode .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 footer{font-size:13px;color:#637e7c;border-top:1px solid #d8e6e2;padding:18px 4%;line-height:1.7}
 @media(min-width:800px){.hero h1{font-size:44px}.site-head img{width:360px}}
 @media(max-width:560px){.site-head img{width:220px}.container{padding:18px 3%}.hero{padding:22px 17px}.hero h1{font-size:29px}.grid{gap:8px}.tile{padding:10px;font-size:16px;min-height:90px;gap:7px}.num{min-width:26px;width:26px;height:28px;font-size:12px}.choiceGrid{grid-template-columns:1fr}.actions{flex-direction:column}.columns>div{min-width:160px}.code{font-size:25px}}
+.langGrid .tile{justify-content:center;text-align:center;font-size:22px}
+.displayBar.is-hidden{display:none}
+.question{font-size:26px;line-height:1.4;margin:26px 0 6px}
+.seq{font-size:20px;font-weight:bold;color:#087d70;margin:0}
+.note{background:#fff7e8;color:#6b4a14;border-radius:12px;padding:12px 14px;line-height:1.6;font-size:16px}
+.countdown{text-align:center;margin-top:-6px}
+.error p{margin:0}.error .errorDetail{margin-top:6px;font-size:14px;opacity:.85}
+body.visitor .btn.primary{text-align:center}
+@media(min-width:800px){.langGrid,body.visitor.display-mode .langGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.question{font-size:30px}}
+@media(max-width:560px){.langGrid .tile{font-size:18px;min-height:72px}}
