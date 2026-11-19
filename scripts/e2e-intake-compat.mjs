@@ -92,7 +92,7 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     // The 20th service must render on legacy iPad and reach the live staff queue.
     await visitor.getByRole("button",{name:"다음 민원인 · 처음으로"}).click();
     await visitor.getByRole("button",{name:"English"}).click();
-    await visitor.getByRole("button",{name:/More services 11–20/}).click();
+    await visitor.getByRole("button",{name:/다른 업무 11–20/}).click();
     await visitor.getByRole("button",{name:/Report a change of phone number/}).click();
     await visitor.getByText(/This screen only sends your reason for visiting to staff/).waitFor();
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
