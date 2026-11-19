@@ -15,7 +15,7 @@ if (transformerPackage.version !== "4.3.2" ||
 }
 await mkdir(runtime, { recursive: true });
 const assets = [
-  [new URL("dist/transformers.web.js", transformers), "transformers.web.js"],
+  [new URL("dist/transformers.min.js", transformers), "transformers.min.js"],
   [new URL("dist/ort-wasm-simd-threaded.jsep.mjs", onnx), "ort-wasm-simd-threaded.jsep.mjs"],
   [new URL("dist/ort-wasm-simd-threaded.jsep.wasm", onnx), "ort-wasm-simd-threaded.jsep.wasm"],
   [new URL("public/offline-v1/ko-check.wav", root), "ko-check.wav"],

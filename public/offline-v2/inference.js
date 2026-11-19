@@ -1,4 +1,4 @@
-import { env, pipeline } from "./transformers.web.js";
+import { env, pipeline } from "./transformers.min.js";
 
 const runtime = new URL("./", import.meta.url).href;
 const networkFetch = self.fetch.bind(self);

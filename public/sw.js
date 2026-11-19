@@ -4,7 +4,7 @@ const READY = "/offline-v2/shell-ready";
 const SHELL = ["/", "/live", "/prep", "/sessions", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 const RUNTIME = new Set([
   "/offline-v2/inference.js",
-  "/offline-v2/transformers.web.js",
+  "/offline-v2/transformers.min.js",
   "/offline-v2/ort-wasm-simd-threaded.jsep.mjs",
   "/offline-v2/ort-wasm-simd-threaded.jsep.wasm",
   "/offline-v2/ko-check.wav",

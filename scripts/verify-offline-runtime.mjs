@@ -7,7 +7,7 @@ const transformers = JSON.parse(await readFile(new URL("node_modules/@huggingfac
 const ort = JSON.parse(await readFile(new URL("node_modules/onnxruntime-web/package.json", root)));
 assert.equal(transformers.version, "4.3.2");
 assert.equal(ort.version, transformers.dependencies["onnxruntime-web"]);
-const files = ["inference.js", "transformers.web.js", "ort-wasm-simd-threaded.jsep.mjs",
+const files = ["inference.js", "transformers.min.js", "ort-wasm-simd-threaded.jsep.mjs",
   "ort-wasm-simd-threaded.jsep.wasm", "ko-check.wav"];
 for (const name of files) assert.ok((await stat(new URL(name, runtime))).size > 100, name);
 const shell = await readFile(new URL("public/sw.js", root), "utf8");

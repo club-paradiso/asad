@@ -4,7 +4,7 @@ import { chromiumLaunchOptions } from "./browser.mjs";
 
 const base = process.argv[2] ?? "http://localhost:3000";
 const runtime = "/offline-v2/";
-const assets = ["inference.js", "transformers.web.js", "ort-wasm-simd-threaded.jsep.mjs",
+const assets = ["inference.js", "transformers.min.js", "ort-wasm-simd-threaded.jsep.mjs",
   "ort-wasm-simd-threaded.jsep.wasm", "ko-check.wav"].map(x => runtime + x);
 for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
   const browser = await engine.launch(name === "Chromium" ? chromiumLaunchOptions() : {});
