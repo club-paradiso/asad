@@ -163,6 +163,7 @@
         notice("선택한 언어: "+chosen.language+" · 예약 자기신고: "+booking[chosen.booking]),
         notice("예약접수증, 방문관서, 예약 날짜·시간, 방문 목적을 직원이 직접 확인하세요."),
         A.el("p","확인 결과: "+verified[chosen.verification],"success"));
+      if(chosen.serviceIndex===19)p.appendChild(notice("전화번호 변경 요청: 이 화면은 방문 목적만 전달하며 실제 번호 변경 신고를 완료하지 않습니다. 신원 및 처리 경로를 담당자가 확인하세요.","alert"));
       var buttons=A.actions(
         A.btn("예약 확인됨",function(){mark(chosen.seq,{verification:"confirmed",ticket:"pending"});},"btn"),
         A.btn("확인 불가 · 보류",function(){mark(chosen.seq,{verification:"unclear",ticket:"held"});},"btn"),
@@ -188,7 +189,7 @@
       }else A.storageRemove(KEY);
     }catch(e){A.storageRemove(KEY);}
   }
-  A.request("GET","/compat/data.json?v=2",null,null,function(err,data){
+  A.request("GET","/compat/data.json?v=3",null,null,function(err,data){
     if(!err && data && data.locales)state.data=data;
     if(err)state.error="번역 목록을 불러오지 못했습니다. 업무 번호로 표시됩니다.";
     render();
