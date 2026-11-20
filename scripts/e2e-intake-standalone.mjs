@@ -28,7 +28,7 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
   try{
     await staff.goto(pathToFileURL(path).toString());
     await staff.getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
-    if(await staff.locator(".langGrid .tile").count()!==12)throw Error("Must show 12 languages on one page");
+    if(await staff.locator(".langGrid .tile").count()!==11)throw Error("Must show 11 languages on one page");
 
     await staff.getByRole("button",{name:"English"}).click();
     if(await staff.locator(".grid .tile").count()!==10)throw Error("First service page must have 10 services");
@@ -43,7 +43,7 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     await staff.getByRole("button",{name:"보조 모니터 열기"}).click();
     const visitor=await nextPage;
     await visitor.locator("#display-app").getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
-    if(await visitor.locator("#display-app .langGrid .tile").count()!==12)throw Error("Visitor window did not mirror language list");
+    if(await visitor.locator("#display-app .langGrid .tile").count()!==11)throw Error("Visitor window did not mirror language list");
 
     await visitor.getByRole("button",{name:"English"}).click();
     await staff.getByRole("heading",{name:"How can we help you today?"}).waitFor();
