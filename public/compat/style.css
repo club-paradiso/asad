@@ -88,7 +88,16 @@ body.staff .container{max-width:1180px}
 .deskTitle{color:#fff;border-radius:14px;padding:6px 16px;font-size:30px}
 .counterChip{display:inline-block;color:#fff;font-weight:bold;border-radius:8px;padding:3px 9px;font-size:13px;white-space:nowrap}
 .reqRow{grid-template-columns:auto 44px 52px 1fr auto}
-.facts{grid-template-columns:1fr 2fr 1fr 1.2fr}
+.facts{grid-template-columns:1fr 2fr 1fr 1fr 1.4fr}
+.reqMeta{white-space:normal}
+.dateBox{background:#f2f8f6;border:1px solid #d5e6e1;border-radius:16px;padding:16px;margin:0 0 14px}
+.dateChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.dateChoices .btn{min-height:55px;text-align:center;font-size:17px;padding:10px}
+.dateChoices .btn[aria-pressed=true]{border:3px solid #087d70;background:#e6f5f1}
+.dateEntry{margin-top:14px;display:grid;gap:10px}
+.dateEntry input[type=text]{max-width:100%;font-size:25px;letter-spacing:.06em}
+.dateEntry input[aria-invalid=true]{border-color:#c0582a}
+.datePreview{font-variant-numeric:tabular-nums;margin:0;color:#087d70;font-size:19px;font-weight:bold}
 .resvBox{background:#fff;border:1px solid #d5e6e1;border-radius:16px;padding:16px;margin:14px 0;display:grid;gap:10px}
 .resvLabel{font-weight:bold;font-size:17px}
 .resvBox input[type=text]{max-width:100%;font-size:26px;letter-spacing:.06em}
@@ -128,3 +137,5 @@ body.staff .container{max-width:1180px}
 @media(max-width:760px){.noticeNumber{font-size:96px}.noticeText{font-size:28px}.noticeCard{padding:30px 22px 26px}}
 @media(prefers-reduced-motion:no-preference){.noticeCard{animation:noticeIn .18s ease-out}}
 @keyframes noticeIn{from{transform:scale(.97);opacity:0}to{transform:none;opacity:1}}
+
+@media(max-width:560px){.dateChoices{grid-template-columns:1fr}.dateChoices .btn{min-height:50px}}

@@ -265,12 +265,16 @@
     var hasService=!!(live && typeof live.serviceIndex==="number");
     var hasBooking=!!(live && live.booking);
     var hasResv=!!(live && live.booking==="yes" && live.reservationNo);
+    var bookingDate=live && live.booking==="yes" ?
+      (live.reservationDate || (live.reservationDateMode==="other"?"날짜 입력 중":
+        live.reservationDateMode==="today"?"오늘(민원인 응답)":"—")) : "—";
     var facts=A.el("div",null,"facts");
     A.add(facts,
       fact("언어",hasLang?langName(live.language):"—",!hasLang),
       fact("업무",hasService?serviceName(live.serviceIndex):"—",!hasService),
       fact("하이코리아 예약",hasBooking?BOOKING[live.booking]:"—",!hasBooking),
-      fact("예약 번호",hasResv?live.reservationNo:"—",!hasResv));
+      fact("예약 번호",hasResv?live.reservationNo+"번":"—",!hasResv),
+      fact("예약 날짜",bookingDate,bookingDate==="—"));
     A.add(card,head,h,facts);
     return card;
   }
@@ -289,7 +293,7 @@
         A.el("span","#"+e.seq,"reqSeq"),
         A.el("span",clock(e.receivedAt),"reqTime"),
         A.el("strong",serviceName(e.serviceIndex),"reqService"),
-        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking]+(e.reservationNo?" "+e.reservationNo:""),"reqMeta"));
+        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking]+(e.reservationNo?" · "+e.reservationNo+"번":"")+(e.reservationDate?" · 다른 날짜 "+e.reservationDate:""),"reqMeta"));
       list.appendChild(row);
     }
     section.appendChild(list);
