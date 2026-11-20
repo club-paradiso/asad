@@ -32,7 +32,10 @@ afterEach(() => __setIntakeStore(null));
 describe("intake service catalog", () => {
   it("keeps live and demo catalogs aligned with 20 translated services", () => {
     expect(liveCatalog).toEqual(demoCatalog);
-    expect(Object.keys(liveCatalog.locales)).toHaveLength(12);
+    expect(Object.keys(liveCatalog.locales)).toHaveLength(11);
+    expect(liveCatalog.locales).toHaveProperty("HI");
+    expect(liveCatalog.locales).not.toHaveProperty("UZ");
+    expect(Object.keys(liveCatalog.locales).filter(code => code === "HI")).toHaveLength(1);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(locale.services).toHaveLength(20);
       expect(locale.services[19]).toBeTruthy();
@@ -40,7 +43,7 @@ describe("intake service catalog", () => {
     }
   });
 
-  it("localizes every visitor-facing kiosk control in all 12 languages", () => {
+  it("localizes every visitor-facing kiosk control in all 11 languages", () => {
     const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
     expect(keys).toHaveLength(18);
     for (const locale of Object.values(liveCatalog.locales)) {
@@ -54,11 +57,12 @@ describe("intake service catalog", () => {
       expect(locale.kiosk.reservationDateLabel).toBeTruthy();
     }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
+    expect(validCode("ABCDEFGHIJ")).toBe(false); // language catalog changes never alter desk pairing codes
   });
 });
 
 describe("staff notice phrases", () => {
-  it("translates every fixed phrase in all 12 languages and lists each one exactly once for staff", () => {
+  it("translates every fixed phrase in all 11 languages and lists each one exactly once for staff", () => {
     const cfg = liveCatalog.notices;
     const listed = cfg.groups.flatMap(g => g.items.map(i => i.id));
     expect([...listed].sort()).toEqual([...NOTICE_IDS].sort());
