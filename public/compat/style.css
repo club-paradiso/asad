@@ -161,3 +161,19 @@ body.staff .container{max-width:1180px}
 .visitorNextMain{display:block;font-size:23px;font-weight:700;color:#143e45;overflow-wrap:anywhere}
 .visitorNextKo{display:block;font-size:17px;color:#526c70;margin-top:6px;overflow-wrap:anywhere}
 @media(max-width:760px){.nextStepsChecks{grid-template-columns:1fr}.visitorNextMain{font-size:19px}.visitorNextKo{font-size:15px}.nextStepsTitle{font-size:26px}.visitorNextSteps{gap:8px}}
+
+/* BEGIN RESERVATION STYLES */
+.choiceGrid.bookingChoices{grid-template-columns:repeat(2,minmax(0,1fr))}
+.resvBox{background:#fff;border:1px solid #d5e6e1;border-radius:16px;padding:16px;margin:14px 0;display:grid;gap:10px}
+.resvFields{display:flex;flex-wrap:wrap;gap:12px}
+.resvLabel{flex:1 1 190px;min-width:0;font-weight:bold;font-size:17px}
+.resvBox input[type=text]{display:block;max-width:100%;min-width:0;font-size:24px;letter-spacing:.06em;margin-top:5px;cursor:pointer}
+.resvBox input[data-active=true]{border-color:#087d70;background:#f1faf7}
+.resvBox input[aria-invalid=true]{border-color:#c0582a}
+.resvError{margin:0;color:#873518;font-size:15px}
+.resvError:empty{display:none}
+.keypad{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.keypad .key{text-align:center;font-size:21px;min-height:52px;padding:6px;overflow-wrap:anywhere}
+.keypad .key:nth-child(10){font-size:14px}
+@media(max-width:560px){.keypad{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* END RESERVATION STYLES */
