@@ -139,3 +139,25 @@ body.staff .container{max-width:1180px}
 @keyframes noticeIn{from{transform:scale(.97);opacity:0}to{transform:none;opacity:1}}
 
 @media(max-width:560px){.dateChoices{grid-template-columns:1fr}.dateChoices .btn{min-height:50px}}
+
+/* Fifteen languages in three touch-friendly rows on landscape tablets. */
+@media(min-width:900px){
+  .langGrid,body.visitor.display-mode .langGrid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .langGrid .tile{font-size:18px;min-height:74px;padding:10px}
+}
+.nextStepsPanel{border-top:2px solid #d8e6e2;margin-top:16px;padding-top:16px}
+.nextStepsPanel h3{margin:0 0 8px;font-size:21px}
+.nextStepsChecks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.nextStepsCheck{display:flex;align-items:center;gap:12px;border:1px solid #d8e6e2;border-radius:12px;padding:11px 14px;min-height:54px;font-size:17px;font-weight:600;cursor:pointer}
+.nextStepsCheck input{width:24px;height:24px;flex-shrink:0;accent-color:#087d70}
+.nextFeeField{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:14px 0;font-size:17px;font-weight:600}
+.nextFeeField input{width:205px;max-width:100%;font:inherit;border:2px solid #bdd5d0;border-radius:10px;padding:10px;min-height:48px}
+.nextStepsPanel .btn.primary{min-height:54px;text-align:center}
+.noticeCard{box-sizing:border-box;max-height:calc(100vh - 32px);overflow-y:auto}
+.nextStepsTitle{font-size:32px;line-height:1.3;font-weight:800;color:#143e45;margin:0 0 20px}
+.visitorNextSteps{display:grid;gap:12px;list-style:decimal;margin:0;padding:0 0 0 32px;text-align:left}
+.visitorNextStep{padding:10px 10px 10px 4px;line-height:1.35}
+.visitorNextStep::marker{font-size:20px;font-weight:bold;color:#087d70}
+.visitorNextMain{display:block;font-size:23px;font-weight:700;color:#143e45;overflow-wrap:anywhere}
+.visitorNextKo{display:block;font-size:17px;color:#526c70;margin-top:6px;overflow-wrap:anywhere}
+@media(max-width:760px){.nextStepsChecks{grid-template-columns:1fr}.visitorNextMain{font-size:19px}.visitorNextKo{font-size:15px}.nextStepsTitle{font-size:26px}.visitorNextSteps{gap:8px}}
