@@ -23,7 +23,7 @@ export function validReservationDate(value: string): boolean {
   return day <= days[month - 1];
 }
 
-export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"] as const;
+export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","MN","NE"] as const;
 export type IntakeLanguage = typeof LANGUAGES[number];
 export type Booking = "yes" | "no" | "unsure";
 export type Verification = "unchecked" | "confirmed" | "unclear" | "exempt";

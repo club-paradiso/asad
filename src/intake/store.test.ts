@@ -3,7 +3,7 @@ import liveCatalog from "../../public/compat/data.json";
 import demoCatalog from "../../apps/visitor-intake/data.json";
 import {
   __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
-  validCode, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS,
+  validCode, validLanguage, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS,
 } from "./store";
 import {
   POST as createSession, GET as readSession, PATCH as markSession,
@@ -32,7 +32,12 @@ afterEach(() => __setIntakeStore(null));
 describe("intake service catalog", () => {
   it("keeps live and demo catalogs aligned with 20 translated services", () => {
     expect(liveCatalog).toEqual(demoCatalog);
-    expect(Object.keys(liveCatalog.locales)).toHaveLength(12);
+    expect(Object.keys(liveCatalog.locales)).toHaveLength(11);
+    expect(liveCatalog.locales).toHaveProperty("HI");
+    expect(liveCatalog.locales).not.toHaveProperty("UZ");
+    expect(validLanguage("HI")).toBe(true);
+    expect(validLanguage("UZ")).toBe(false);
+    expect(Object.keys(liveCatalog.locales).filter(code => code === "HI")).toHaveLength(1);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(locale.services).toHaveLength(20);
       expect(locale.services[19]).toBeTruthy();
@@ -40,7 +45,7 @@ describe("intake service catalog", () => {
     }
   });
 
-  it("localizes every visitor-facing kiosk control in all 12 languages", () => {
+  it("localizes every visitor-facing kiosk control in all 11 languages", () => {
     const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
     expect(keys).toHaveLength(18);
     for (const locale of Object.values(liveCatalog.locales)) {
@@ -58,7 +63,7 @@ describe("intake service catalog", () => {
 });
 
 describe("staff notice phrases", () => {
-  it("translates every fixed phrase in all 12 languages and lists each one exactly once for staff", () => {
+  it("translates every fixed phrase in all 11 languages and lists each one exactly once for staff", () => {
     const cfg = liveCatalog.notices;
     const listed = cfg.groups.flatMap(g => g.items.map(i => i.id));
     expect([...listed].sort()).toEqual([...NOTICE_IDS].sort());

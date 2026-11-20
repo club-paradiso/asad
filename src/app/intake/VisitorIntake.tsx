@@ -9,7 +9,7 @@ type Language = keyof typeof catalog.locales;
 type Booking = "yes" | "no" | "unsure";
 type Stage = "connect" | "language" | "services" | "review" | "sent";
 type ApiResponse = { accepted?: boolean; seq?: number; error?: string };
-const LANGS: Language[] = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"];
+const LANGS: Language[] = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","MN","NE"];
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{10}$/;
 
 export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
@@ -98,7 +98,7 @@ export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
           </>
         ) : stage === "language" ? (
           <>
-            <section className={styles.hero}><p className={styles.step}>01 / 03 · LANGUAGE</p><h1>사용할 언어를 선택하세요</h1><p>Choose your language · 12 languages available</p></section>
+            <section className={styles.hero}><p className={styles.step}>01 / 03 · LANGUAGE</p><h1>사용할 언어를 선택하세요</h1><p>Choose your language · 11 languages available</p></section>
             <div className={styles.grid}>
               {LANGS.slice(languagePage*6,languagePage*6+6).map(value=>(
                 <button className={styles.tile} lang={value.toLowerCase().split("-")[0]} key={value} onClick={()=>{
@@ -107,7 +107,7 @@ export function VisitorIntake({ initialCode = "" }: { initialCode?: string }) {
               ))}
             </div>
             <div className={styles.actions}><button className={styles.primary} onClick={()=>setLanguagePage(languagePage===0?1:0)}>
-              {languagePage===0 ? "다른 언어 보기 7–12 →" : "← 처음 6개 언어"}
+              {languagePage===0 ? "다른 언어 보기 7–11 →" : "← 처음 6개 언어"}
             </button></div>
           </>
         ) : stage === "services" ? (

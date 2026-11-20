@@ -11,7 +11,7 @@
     pollTimer:0,stopped:false,data:null,station:"",setupOpen:false,lastChangeAt:0,
     phrase:null,noticeBusy:false,counterPicker:false,noticeError:""};
   var LANG_KO={"KO":"한국어","EN":"영어","ZH-CN":"중국어(간체)","ID":"인도네시아어","HI":"힌디어","VI":"베트남어",
-    "JA":"일본어","TH":"태국어","RU":"러시아어","UZ":"우즈베크어","MN":"몽골어","NE":"네팔어"};
+    "JA":"일본어","TH":"태국어","RU":"러시아어","MN":"몽골어","NE":"네팔어"};
   var BOOKING={yes:"예약함",no:"예약 안 함",unsure:"모름"};
   var BOOKING_LIST={yes:"예약함",no:"예약 안 함",unsure:"예약 모름"};
   // One fixed color per counter so desks (and their requests) are told apart at a glance.
