@@ -1,13 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars -- ES5 catch bindings cannot be omitted (pre-Safari 15). */
 /* Visitor kiosk for legacy Safari and all modern browsers. No React hydration. */
-(function (window, document, A) {
+(function (window, document, A, R) {
   "use strict";
   var root = document.getElementById("app");
   var displayMode=A.getQuery("display")==="1";
   var stationValue=A.getQuery("station");
   var displayStation=/^(?:[1-9]|[12][0-9]|30)$/.test(stationValue)?stationValue:"";
-  var RESV_OK=/^[A-Z0-9-]{4,30}$/;
-  var liveSoonTimer=0;
   // A visitor who walks away mid-flow must not leave their choices for the next person.
   var IDLE_RESET_MS=120000;
   var SENT_RESET_SECONDS=30;
@@ -44,7 +42,7 @@
   var notice={shown:null,seq:-1,dismissedSeq:-1,timer:0,hideTimer:0,stopped:false,failures:0,gen:0};
   var state = {
     data:null,code:"",codeDraft:"",locale:"KO",step:"connect",
-    servicePage:0,serviceIndex:-1,booking:"",reservationNo:"",resvError:false,
+    servicePage:0,serviceIndex:-1,booking:"",reservation:R.newDraft(),
     sending:false,requestId:"",sentSeq:0,error:"",errorDetail:""
   };
   function error(text, detail) {
@@ -76,13 +74,16 @@
   }
   function reset() {
     state.step="language";state.locale="KO";state.servicePage=0;
-    state.serviceIndex=-1;state.booking="";state.reservationNo="";state.resvError=false;state.requestId="";state.sentSeq=0;
-    state.error="";state.errorDetail="";
+    state.serviceIndex=-1;state.booking="";resetReservation();state.sentSeq=0;
     render();
   }
+  function resetReservation(){
+    state.reservation=R.newDraft();state.requestId="";
+    state.error="";state.errorDetail="";
+  }
   function chooseLanguage(code){
-    state.locale=code;state.serviceIndex=-1;state.booking="";state.reservationNo="";state.resvError=false;
-    state.servicePage=0;state.step="services";state.error="";state.errorDetail="";render();
+    state.locale=code;state.serviceIndex=-1;state.booking="";resetReservation();
+    state.servicePage=0;state.step="services";render();
   }
   function stopTimers(){
     if(idleTimer){window.clearTimeout(idleTimer);idleTimer=null;}
@@ -110,16 +111,20 @@
   function submit() {
     if (state.sending || state.serviceIndex<0 || !state.booking) return;
     var k = state.data.locales[state.locale].kiosk;
-    var resv = state.booking==="yes" ? state.reservationNo : "";
-    if (resv && !RESV_OK.test(resv)) { state.resvError=true; render(); return; }
+    var invalid=R.validate(state.booking,state.reservation);
+    if(invalid){
+      state.reservation.active=invalid;state.reservation.error=invalid;
+      render();
+      document.getElementById("reservation-"+invalid).focus();
+      return;
+    }
     if (!A.queryCode(state.code)) return error(k.sendFailed, "접수 코드가 올바르지 않습니다. 직원 화면에서 창구를 다시 연결해 주세요.");
     if (!state.requestId) state.requestId = A.uuid();
     if (!state.requestId) return error(k.sendFailed, "이 브라우저는 보안 난수를 만들 수 없습니다. Safari를 업데이트해 주세요.");
     state.sending=true;state.error="";state.errorDetail="";render();
-    A.request("POST", "/api/intake/submission",
-      resv ? {code:state.code,requestId:state.requestId,language:state.locale,serviceIndex:state.serviceIndex,booking:state.booking,reservationNo:resv}
-           : {code:state.code,requestId:state.requestId,language:state.locale,serviceIndex:state.serviceIndex,booking:state.booking},
-      null,function(err,data){
+    var payload={code:state.code,requestId:state.requestId,language:state.locale,serviceIndex:state.serviceIndex,booking:state.booking};
+    addReservation(payload);
+    A.request("POST", "/api/intake/submission",payload,null,function(err,data){
         state.sending=false;
         if(err || !data || !data.accepted || !data.seq) {
           // Visitors get a message in their language; the Korean detail is for the staff member they ask.
@@ -137,6 +142,11 @@
     if(isFullscreen())bar.className+=" is-hidden";
     return bar;
   }
+  function addReservation(payload){
+    var values=R.details(state.booking,state.reservation);
+    if(values.reservationNo)payload.reservationNo=values.reservationNo;
+    if(values.reservationDate)payload.reservationDate=values.reservationDate;
+  }
   // Mirror the visible screen to the staff desk. Same coded choices as a submission; failures are ignored
   // because the visitor flow must never block on the staff mirror.
   function syncLive(){
@@ -144,12 +154,14 @@
     var live={code:state.code,step:state.step};
     if(state.step!=="language")live.language=state.locale;
     if(state.step==="review" || state.step==="sent")live.serviceIndex=state.serviceIndex;
-    if((state.step==="review" || state.step==="sent") && state.booking)live.booking=state.booking;
-    if((state.step==="review" || state.step==="sent") && state.booking==="yes" && state.reservationNo)live.reservationNo=state.reservationNo;
+    if((state.step==="review" || state.step==="sent") && state.booking){
+      live.booking=state.booking;
+      addReservation(live);
+    }
     if(state.step==="sent" && state.sentSeq)live.seq=state.sentSeq;
     var key=JSON.stringify(live);
     if(key===liveSent && !liveWanted)return;
-    if(liveWanted && JSON.stringify(liveWanted.body)===key)return;
+    if(liveWanted && liveWanted.key===key)return;
     liveRev++;
     live.epoch=liveEpoch;
     live.rev=liveRev;
@@ -177,51 +189,6 @@
       if(liveFailures>5){ if(liveWanted===job)liveWanted=null; liveFailures=0; return; }
       liveTimer=window.setTimeout(pumpLive,Math.min(1000*liveFailures,4000));
     });
-  }
-  function setReservation(value){
-    var clean=String(value).toUpperCase().replace(/[^A-Z0-9-]/g,"").slice(0,30);
-    if(clean!==state.reservationNo){state.reservationNo=clean;state.requestId="";}
-    if(state.resvError && (!clean || RESV_OK.test(clean)))state.resvError=false;
-    return clean;
-  }
-  // Typing should reach the staff mirror without a request per keystroke.
-  function syncLiveSoon(){
-    if(liveSoonTimer)window.clearTimeout(liveSoonTimer);
-    liveSoonTimer=window.setTimeout(function(){liveSoonTimer=0;syncLive();},400);
-  }
-  function reservationField(k){
-    var box=A.el("section",null,"resvBox");
-    var label=A.el("label",k.reservationNoLabel,"resvLabel");
-    label.setAttribute("for","kiosk-resv");
-    var field=A.el("input");
-    field.type="text";field.id="kiosk-resv";field.maxLength=30;
-    field.autocomplete="off";field.autocapitalize="characters";field.spellcheck=false;
-    field.setAttribute("inputmode","text");
-    field.value=state.reservationNo;
-    field.disabled=state.sending;
-    if(state.resvError)field.setAttribute("aria-invalid","true");
-    field.oninput=function(){
-      if(state.sending){field.value=state.reservationNo;return;}
-      var hadError=state.resvError;
-      var clean=setReservation(field.value);
-      if(field.value!==clean)field.value=clean;
-      if(hadError!==state.resvError)render(); else syncLiveSoon();
-    };
-    var pad=A.el("div",null,"keypad");
-    var keys=["1","2","3","4","5","6","7","8","9","-","0"];
-    for(var i=0;i<keys.length;i++){
-      (function(ch){
-        var b=A.btn(ch,function(){ if(state.sending)return; setReservation(state.reservationNo+ch); render(); },"btn key");
-        b.disabled=state.sending;
-        pad.appendChild(b);
-      })(keys[i]);
-    }
-    var erase=A.btn("⌫",function(){ if(state.sending)return; setReservation(state.reservationNo.slice(0,-1)); render(); },"btn key");
-    erase.setAttribute("aria-label",k.erase);
-    erase.disabled=state.sending;
-    pad.appendChild(erase);
-    A.add(box,label,field,state.resvError?A.el("p",k.reservationNoInvalid,"resvError"):null,pad);
-    return box;
   }
   function errorBox(){
     if(!state.error)return null;
@@ -323,7 +290,7 @@
       var first=state.servicePage===0?0:10,limit=state.servicePage===0?10:d.services.length;
       for(var n=first;n<limit;n++){
         (function(idx){var b=A.btn("",function(){
-            state.serviceIndex=idx;state.booking="";state.reservationNo="";state.resvError=false;state.requestId="";state.step="review";render();
+            state.serviceIndex=idx;state.booking="";resetReservation();state.step="review";render();
           },"tile");
           var badge=A.el("span",idx<9?"0"+(idx+1):String(idx+1),"num");
           A.add(b,badge,A.el("span",d.services[idx]));
@@ -343,28 +310,39 @@
       root.appendChild(selected);
       root.appendChild(A.el("h2",t.reservationTitle,"question"));
       root.appendChild(message(t.reservationHelp));
-      var opts=[["yes",t.answerYes],["no",t.answerNo],["unsure",t.answerUnsure]];
-      var choiceGrid=A.el("div",null,"choiceGrid");
+      root.appendChild(message(t.reviewHelp));
+      var opts=[["yes",R.bookingLabel(state.locale,"yes")],["other",R.bookingLabel(state.locale,"other")],["no",t.answerNo],["unsure",t.answerUnsure]];
+      var choiceGrid=A.el("div",null,"choiceGrid bookingChoices");
       for(var c=0;c<opts.length;c++){
         (function(opt){
           var b=A.btn(opt[1],function(){
-            if(state.sending)return;
-            state.booking=opt[0];state.requestId="";
-            if(opt[0]!=="yes"){state.reservationNo="";state.resvError=false;}
+            if(state.sending || state.booking===opt[0])return;
+            resetReservation();
+            state.booking=opt[0];
             render();
           },"btn");
           b.setAttribute("aria-pressed",String(state.booking===opt[0]));
+          b.disabled=state.sending;
           choiceGrid.appendChild(b);
         })(opts[c]);
       }
       root.appendChild(choiceGrid);
-      if(state.booking==="yes")root.appendChild(reservationField(k));
+      if(state.booking==="yes" || state.booking==="other"){
+        root.appendChild(R.keypad(document,state.booking,state.reservation,state.locale,state.sending,function(){
+          state.requestId="";
+          var staleError=root.querySelector(".error");
+          if(staleError)staleError.parentNode.removeChild(staleError);
+          state.error="";state.errorDetail="";
+          armIdleTimer();
+          syncLive();
+        }));
+      }
       // Keep a send failure next to the button the visitor just pressed.
       var sendError=errorBox();
       if(sendError)root.appendChild(sendError);
       var send=A.btn(state.sending?k.sending:t.sendLabel,submit,"btn primary");
       send.disabled = state.sending || !state.booking;
-      var back=A.btn(k.changeService,function(){state.step="services";render();},"btn");
+      var back=A.btn(k.changeService,function(){resetReservation();state.booking="";state.step="services";render();},"btn");
       back.disabled=state.sending;
       root.appendChild(A.actions(send,back));
     }else if(state.step==="sent"){
@@ -373,7 +351,7 @@
       A.add(done,
         A.el("p",k.requestNo+" #"+state.sentSeq,"seq"),
         A.el("h2",d.services[state.serviceIndex]),
-        state.booking==="yes" && state.reservationNo?A.el("p",k.reservationNoLabel.replace(/\s*[(（].*$/,"")+" "+state.reservationNo,"muted"):null);
+        R.summary(document,state.booking,state.reservation,state.locale));
       if(state.serviceIndex===19)done.appendChild(message(d.review.phoneChangeNote,"note"));
       root.appendChild(done);
       var countdown=message("","muted countdown");
@@ -421,4 +399,4 @@
     state.data=data;render();
     pollNotice();
   });
-})(window,document,window.ASADCompat);
+})(window,document,window.ASADCompat,window.ASADReservation);

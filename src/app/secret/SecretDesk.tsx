@@ -10,7 +10,7 @@ import styles from "./secret.module.css";
 type Credentials = { code: string; token: string; expiresAt: number };
 type DeskResponse = { code: string; expiresAt: number; entries: PublicEntry[] };
 const STORE_KEY = "asad:intake:staff:v1";
-const choices = { yes: "예약했다고 응답", no: "예약하지 않았다고 응답", unsure: "잘 모르겠다고 응답" };
+const choices = { yes: "예약했다고 응답", other: "다른 날짜로 예약했다고 응답", no: "예약하지 않았다고 응답", unsure: "잘 모르겠다고 응답" };
 const verifyLabels = {
   unchecked: "직원 확인 전", confirmed: "예약 증빙 확인",
   unclear: "확인 불가", exempt: "예약 불요 업무 확인",
@@ -256,7 +256,7 @@ export function SecretDesk() {
                 <p>민원인 언어: {catalog.locales[picked.language].name}</p>
                 <p className={styles.subtle}>민원인 화면: {catalog.locales[picked.language].services[picked.serviceIndex]}</p>
                 {picked.serviceIndex===19 && <div className={styles.notice}>전화번호 변경 요청: 키오스크는 방문 목적만 전달했으며, 번호 변경 신고가 완료된 상태는 아닙니다. 본인 확인 및 처리 경로를 담당자가 안내해야 합니다.</div>}
-                <div className={styles.notice}>HiKorea 방문예약 자기신고: <strong>{choices[picked.booking]}</strong>. 직원 확인 결과가 아닙니다.</div>
+                <div className={styles.notice}>HiKorea 방문예약 자기신고: <strong>{choices[picked.booking]}{picked.reservationDate && ` · ${picked.reservationDate}`}{picked.reservationNo && ` · ${picked.reservationNo}`}</strong>. 직원 확인 결과가 아닙니다.</div>
                 <h3>방문예약 직접 확인</h3>
                 <p>방문예약 접수증·관서·날짜·시간·방문 목적을 별도로 확인하세요. 예약이 불필요한 업무인지도 직원이 판단합니다.</p>
                 <div className={styles.buttons}>

@@ -13,7 +13,7 @@ import { parse } from "acorn";
 const base=process.argv[2] || "http://localhost:3000";
 
 // Old iPads need JS syntax no newer than ES5; no polyfill download required.
-for (const file of ["public/compat/common.js","public/compat/kiosk.js","public/compat/desk.js"]) {
+for (const file of ["public/compat/common.js","public/compat/kiosk.js","public/compat/reservation.js","public/compat/desk.js"]) {
   parse(readFileSync(file,"utf8"), { ecmaVersion: 5, allowHashBang: false });
   console.log("PASS ES5 syntax:",file);
 }
@@ -27,7 +27,7 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
   const staff=await desktop.newPage();
   const visitor=await ipad.newPage();
   const errors=[],entries=[];
-  let live=null,sessionStarted=false,liveFailuresLeft=2,liveRev=0,liveEpoch="";
+  let live=null,sessionStarted=false,liveFailuresLeft=2,liveRev=0,liveEpoch="",failedRequestId="";
   for (const page of [staff,visitor]) page.on("pageerror",err=>errors.push(err.message));
   const code="ABCD234567";
   const token="abcdefghijklmnopqrstuvwxyzABCDE1234567";
@@ -71,11 +71,21 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
   await visitor.route("**/api/intake/submission",async route=>{
     const body=route.request().postDataJSON();
     if(body.serviceIndex<0||body.serviceIndex>19||!body.booking||!body.language)throw Error("Invalid visitor payload");
-    if(body.reservationNo!==undefined && (body.booking!=="yes" || !/^[A-Z0-9-]{4,30}$/.test(body.reservationNo)))throw Error("Bad reservation number payload");
+    if(body.reservationNo!==undefined && (!["yes","other"].includes(body.booking) || !/^(?:[1-9][0-9]?|10[0-8])$/.test(body.reservationNo)))throw Error("Bad reservation number payload");
+    if(body.booking==="other"){
+      if(body.reservationDate!=="2028-02-29" || body.reservationNo!=="1")throw Error("Incorrect other-date payload");
+      if(!failedRequestId){
+        failedRequestId=body.requestId;
+        await route.fulfill({status:503,contentType:"application/json",body:'{"error":"temporarily unavailable"}'});
+        return;
+      }
+      if(failedRequestId!==body.requestId)throw Error("Retry must keep the request ID");
+    }
     entries.push({
       seq:entries.length+1,language:body.language,serviceIndex:body.serviceIndex,
       booking:body.booking,receivedAt:Date.now(),verification:"unchecked",ticket:"pending",station:3,
-      ...(body.reservationNo?{reservationNo:body.reservationNo}:{})
+      ...(body.reservationNo?{reservationNo:body.reservationNo}:{}),
+      ...(body.reservationDate?{reservationDate:body.reservationDate}:{})
     });
     await route.fulfill({status:201,contentType:"application/json",
       body:JSON.stringify({accepted:true,seq:entries.length})});
@@ -114,20 +124,29 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await visitor.getByRole("button",{name:/Extend my period of stay/}).click();
     await mirror.getByText("예약 여부 고르는 중").waitFor({timeout:6000});
     await mirror.getByText("체류기간 연장").waitFor();
-    await visitor.getByRole("button",{name:"Yes, booked"}).click();
+    await visitor.getByRole("button",{name:"Booked for today"}).click();
     await mirror.getByText("보내기 직전").waitFor({timeout:6000});
     await mirror.getByText("예약함").waitFor();
-    // Optional reservation number: too short is refused, a full one reaches the staff mirror.
-    for(const key of ["1","2"])await visitor.getByRole("button",{name:key,exact:true}).click();
-    await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
-    await visitor.getByText("Please check the reservation number.").waitFor();
-    for(const key of ["3","4","5","6"])await visitor.getByRole("button",{name:key,exact:true}).click();
-    await mirror.getByText("123456").waitFor({timeout:6000});
-    await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
+    const tapDigits=async digits=>{
+      for(const key of digits)await visitor.locator(".keypad").getByRole("button",{name:key,exact:true}).click();
+    };
+    const send=visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/});
+    // Invalid numbers cannot leave the keypad. Backspace can correct an out-of-range entry.
+    await tapDigits("0");
+    await send.click();
+    await visitor.getByText("Enter a booking number from 1 to 108.").waitFor();
+    await visitor.getByRole("button",{name:"Clear",exact:true}).click();
+    await tapDigits("109");
+    await send.click();
+    await visitor.getByText("Enter a booking number from 1 to 108.").waitFor();
+    await visitor.getByRole("button",{name:"Delete last digit"}).click();
+    await tapDigits("8");
+    await mirror.getByText("108",{exact:true}).waitFor({timeout:6000});
+    await send.click();
     await visitor.getByText(/Request no\. #1/).waitFor({timeout:6000});
     await mirror.getByText("요청 받음 #1").waitFor({timeout:6000});
     await staff.getByText("받은 요청 1건").waitFor({timeout:6000});
-    await staff.locator(".reqList").getByText("영어 · 예약함 123456").waitFor();
+    await staff.locator(".reqList").getByText("영어 · 예약함 108").waitFor();
     await staff.locator(".reqList").getByText("3번 창구").waitFor();
     if(await visitor.getByText(/Staff use this number/).count())throw Error("Visitor still sees the request-number explanation");
     // Fixed phrase cards (incl. "번호표"/"예약 확인") live in .noticePanel; requests themselves need no clicks.
@@ -138,15 +157,43 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await visitor.getByRole("button",{name:/More services \(11–20\)/}).click();
     await visitor.getByRole("button",{name:/Report a change of phone number/}).click();
     await visitor.getByText(/This screen only sends your reason for visiting to staff/).waitFor();
-    await visitor.getByRole("button",{name:"Yes, booked"}).click();
+    await visitor.getByRole("button",{name:"Booked for today"}).click();
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitor.getByText(/Request no\. #2/).waitFor({timeout:6000});
     await staff.getByText("받은 요청 2건").waitFor({timeout:8500});
     // Fast taps with slow responses: the mirror must settle on the newest screen.
     await staff.locator(".mirror").getByText("요청 받음 #2").waitFor({timeout:8000});
     await staff.locator(".reqList").getByText("전화번호(연락처) 변경 신고").waitFor({timeout:8500});
+    await visitor.getByRole("button",{name:/BACK TO START/}).click();
+    await visitor.getByRole("button",{name:"English"}).click();
+    await visitor.getByRole("button",{name:/Extend my period of stay/}).click();
+    const other=visitor.getByRole("button",{name:"Booked for another date"});
+    await other.click();
+    await mirror.getByText("예약 날짜와 번호 입력 중").waitFor({timeout:6000});
+    await tapDigits("20270229");
+    await send.click();
+    await visitor.getByText("Enter a valid booking date using eight digits.").waitFor();
+    await visitor.getByRole("button",{name:"Not booked"}).click();
+    await other.click();
+    const date=visitor.locator("#reservation-date");
+    if(await date.inputValue()!=="")throw Error("Switching booking answers retained the old date");
+    await tapDigits("20280229");
+    if(await date.inputValue()!=="2028-02-29")throw Error("Date preview is not formatted");
+    await send.click();
+    await visitor.getByText("Enter a booking number from 1 to 108.").waitFor();
+    await tapDigits("1");
+    await mirror.getByText("2028-02-29 · 1",{exact:true}).waitFor({timeout:6000});
+    await send.click();
+    await visitor.getByText(/Could not send/).waitFor();
+    if(await date.inputValue()!=="2028-02-29")throw Error("Send failure cleared the date");
+    await send.click();
+    await visitor.getByText(/Request no\. #3/).waitFor({timeout:6000});
+    await visitor.getByText("Booking date 2028-02-29").waitFor();
+    await staff.locator(".reqList").getByText("영어 · 다른 날짜로 예약함 · 2028-02-29 · 예약번호 1").waitFor({timeout:8500});
+    await visitor.getByRole("button",{name:/BACK TO START/}).click();
+    await mirror.getByText("언어 고르는 중").waitFor({timeout:6000});
     if(errors.length)throw Error("Browser errors: "+errors.join(" | "));
-    console.log("PASS "+name+" complete: /secret → QR → iPad mini → 12 languages × 20 services → live mirror → request list → phone-change tag");
+    console.log("PASS "+name+" complete: /secret → QR → iPad mini → 12 languages × 20 services → live mirror → request list → phone-change tag → other-date validation/retry/reset");
   } finally {
     await desktop.close();await ipad.close();await browser.close();
   }

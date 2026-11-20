@@ -10,12 +10,11 @@ const EVAL_RETRIES = 6;
 
 /** Counter numbers shown in the office. */
 export const STATION_MIN = 1, STATION_MAX = 30;
-/** HiKorea visit-reservation number as typed by the visitor. Format is not officially published, so only a safe charset and length are enforced. */
-export const RESERVATION_NO = /^[A-Za-z0-9-]{4,30}$/;
 
 export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"] as const;
 export type IntakeLanguage = typeof LANGUAGES[number];
-export type Booking = "yes" | "no" | "unsure";
+export const BOOKING_OPTIONS = ["yes", "no", "unsure", "other"] as const;
+export type Booking = typeof BOOKING_OPTIONS[number];
 export type Verification = "unchecked" | "confirmed" | "unclear" | "exempt";
 export type Ticket = "pending" | "held" | "issued";
 
@@ -26,6 +25,7 @@ export type IntakeEntry = {
   serviceIndex: number;
   booking: Booking;
   reservationNo?: string;
+  reservationDate?: string;
   station?: number;
   receivedAt: number;
   verification: Verification;
@@ -41,6 +41,7 @@ export type IntakeLive = {
   serviceIndex?: number;
   booking?: Booking;
   reservationNo?: string;
+  reservationDate?: string;
   seq?: number;
   epoch?: string;
   rev?: number;

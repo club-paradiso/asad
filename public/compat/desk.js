@@ -12,8 +12,8 @@
     phrase:null,noticeBusy:false,counterPicker:false,noticeError:""};
   var LANG_KO={"KO":"한국어","EN":"영어","ZH-CN":"중국어(간체)","ID":"인도네시아어","HI":"힌디어","VI":"베트남어",
     "JA":"일본어","TH":"태국어","RU":"러시아어","UZ":"우즈베크어","MN":"몽골어","NE":"네팔어"};
-  var BOOKING={yes:"예약함",no:"예약 안 함",unsure:"모름"};
-  var BOOKING_LIST={yes:"예약함",no:"예약 안 함",unsure:"예약 모름"};
+  var BOOKING={yes:"예약함",other:"다른 날짜로 예약함",no:"예약 안 함",unsure:"모름"};
+  var BOOKING_LIST={yes:"예약함",other:"다른 날짜로 예약함",no:"예약 안 함",unsure:"예약 모름"};
   // One fixed color per counter so desks (and their requests) are told apart at a glance.
   var COUNTER_COLORS=["#087d70","#2456c4","#7b3fc1","#b4520e","#b02f6e","#3d7a1d"];
   function counterColor(n){ if(!Number(n))return "#3f5f62"; return COUNTER_COLORS[(Number(n)-1+COUNTER_COLORS.length)%COUNTER_COLORS.length]; }
@@ -255,7 +255,10 @@
     if(!live)status="민원인 화면 연결 전";
     else if(live.step==="language")status="언어 고르는 중";
     else if(live.step==="services")status="업무 고르는 중";
-    else if(live.step==="review")status=live.booking?"보내기 직전":"예약 여부 고르는 중";
+    else if(live.step==="review"){
+      if(live.booking==="other" && !live.reservationDate)status="예약 날짜와 번호 입력 중";
+      else status=live.booking?"보내기 직전":"예약 여부 고르는 중";
+    }
     else status="요청 받음"+(live.seq?" #"+live.seq:"");
     var head=A.el("div",null,"mirrorHead");
     A.add(head,A.el("span","민원인 화면","mirrorLabel"),
@@ -264,13 +267,14 @@
     var hasLang=!!(live && live.language);
     var hasService=!!(live && typeof live.serviceIndex==="number");
     var hasBooking=!!(live && live.booking);
-    var hasResv=!!(live && live.booking==="yes" && live.reservationNo);
+    var hasResv=!!(live && live.reservationNo);
+    var reservation=hasResv?(live.reservationDate?live.reservationDate+" · ":"")+live.reservationNo:"—";
     var facts=A.el("div",null,"facts");
     A.add(facts,
       fact("언어",hasLang?langName(live.language):"—",!hasLang),
       fact("업무",hasService?serviceName(live.serviceIndex):"—",!hasService),
       fact("하이코리아 예약",hasBooking?BOOKING[live.booking]:"—",!hasBooking),
-      fact("예약 번호",hasResv?live.reservationNo:"—",!hasResv));
+      fact(live && live.reservationDate?"예약 날짜 · 예약번호":"예약 번호",reservation,!hasResv));
     A.add(card,head,h,facts);
     return card;
   }
@@ -289,7 +293,7 @@
         A.el("span","#"+e.seq,"reqSeq"),
         A.el("span",clock(e.receivedAt),"reqTime"),
         A.el("strong",serviceName(e.serviceIndex),"reqService"),
-        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking]+(e.reservationNo?" "+e.reservationNo:""),"reqMeta"));
+        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking]+(e.reservationDate?" · "+e.reservationDate+" · 예약번호":"")+(e.reservationNo?" "+e.reservationNo:""),"reqMeta"));
       list.appendChild(row);
     }
     section.appendChild(list);

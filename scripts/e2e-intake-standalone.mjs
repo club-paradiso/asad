@@ -34,7 +34,7 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     if(await staff.locator(".grid .tile").count()!==10)throw Error("First service page must have 10 services");
     await staff.getByRole("button",{name:/Extend my period of stay/}).click();
     await staff.getByRole("heading",{name:"Have you booked a visit on HiKorea?"}).waitFor();
-    await staff.getByRole("button",{name:"Yes, booked"}).click();
+    await staff.getByRole("button",{name:"Booked for today"}).click();
     await staff.getByRole("button",{name:/직원에게 보여주기/}).click();
     await staff.getByRole("heading",{name:"Please show this screen to staff"}).waitFor();
     await staff.getByRole("button",{name:"BACK TO START"}).click();
@@ -57,12 +57,36 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitor.getByText(/No phone number change is submitted here/).waitFor();
     await staff.getByText("안내 전용입니다. 실제 신고, 예약 확인 및 번호표 발급은 이루어지지 않았습니다.").waitFor();
 
+    await visitor.getByRole("button",{name:"BACK TO START"}).click();
+    await visitor.getByRole("button",{name:"English"}).click();
+    await visitor.getByRole("button",{name:/Extend my period of stay/}).click();
+    await visitor.getByRole("button",{name:"Booked for another date"}).click();
+    const tap=async (page,digits)=>{
+      for(const digit of digits)await page.locator(".keypad").getByRole("button",{name:digit,exact:true}).click();
+    };
+    await tap(visitor,"20280431");
+    const show=staff.getByRole("button",{name:/직원에게 보여주기/});
+    await show.click();
+    await visitor.getByText("Enter a valid booking date using eight digits.").waitFor();
+    await staff.getByRole("button",{name:"Clear",exact:true}).click();
+    await tap(staff,"20280430");
+    if(await visitor.locator("#reservation-date").inputValue()!=="2028-04-30")throw Error("Date was not mirrored to the visitor");
+    await visitor.locator("#reservation-number").click();
+    await tap(visitor,"109");
+    await show.click();
+    await staff.getByText("Enter a booking number from 1 to 108.").waitFor();
+    await visitor.getByRole("button",{name:"Delete last digit"}).click();
+    await tap(visitor,"8");
+    await show.click();
+    await staff.getByText("예약 날짜 2028-04-30").waitFor();
+    await visitor.getByText("Booking number 108",{exact:true}).waitFor();
+
     // A new session resets BOTH displays without sending a network request.
     await staff.getByRole("button",{name:"처음부터"}).click();
     await visitor.getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
     if(network.length)throw Error("Unexpected network requests: "+network.join(", "));
     if(errors.length)throw Error("Browser errors: "+errors.join(" / "));
-    console.log("PASS "+name+": fully offline file://, bilingual service, popup sync, phone-change disclaimer, reset");
+    console.log("PASS "+name+": fully offline file://, bilingual service, popup sync, phone-change disclaimer, other-date keypad and reset");
   } finally {
     await context.close();
     await browser.close();

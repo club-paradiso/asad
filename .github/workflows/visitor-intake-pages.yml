@@ -21,6 +21,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verify embedded reservation keypad
+        run: node scripts/embed-intake-reservation.mjs --check
       - name: Verify fully embedded translation catalog and no external dependencies
         run: |
           node - <<'NODE'

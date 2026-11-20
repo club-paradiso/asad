@@ -102,7 +102,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     if(leaked.token!==null || leaked.opener)throw Error("Visitor page inherited staff capability");
     await visitor.getByRole("button",{name:"English"}).click();
     await visitor.getByRole("button",{name:/Extend my period of stay/}).click();
-    await visitor.getByRole("button",{name:"Yes, booked"}).click();
+    await visitor.getByRole("button",{name:"Booked for today"}).click();
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitor.getByText(/Request no\. #1/).waitFor();
     await staffOne.getByText("받은 요청 1건").waitFor({timeout:9000});
@@ -122,7 +122,7 @@ for(const [engineName, engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitorTwo.getByRole("button",{name:"English"}).click();
     await visitorTwo.getByRole("button",{name:/More services \(11–20\)/}).click();
     await visitorTwo.getByRole("button",{name:/Report a change of phone number/}).click();
-    await visitorTwo.getByRole("button",{name:"Yes, booked"}).click();
+    await visitorTwo.getByRole("button",{name:"Booked for today"}).click();
     await visitorTwo.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitorTwo.getByText(/Request no\. #1/).waitFor();
     await staffTwo.getByText("받은 요청 1건").waitFor({timeout:9000});

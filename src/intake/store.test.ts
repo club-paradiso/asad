@@ -189,14 +189,14 @@ describe("intake cross-device API", () => {
 
     expect((await submit(post("/api/intake/submission", {
       code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes",
-      reservationNo: "ab12-3456",
+      reservationNo: "108",
     }))).status).toBe(201);
     expect((await submit(post("/api/intake/submission", {
       code: two.code, requestId: crypto.randomUUID(), language: "VI", serviceIndex: 1, booking: "no",
     }))).status).toBe(201);
-    // A reservation number only goes with "booked", and must be letters, digits or hyphens.
+    // A reservation number only goes with "booked", and must be in range.
     expect((await submit(post("/api/intake/submission", {
-      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "no", reservationNo: "1234",
+      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "no", reservationNo: "1",
     }))).status).toBe(400);
     expect((await submit(post("/api/intake/submission", {
       code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes", reservationNo: "12 34<script>",
@@ -206,12 +206,59 @@ describe("intake cross-device API", () => {
       { station: number; entries: Array<{ station: number; reservationNo?: string }> };
     expect(a.station).toBe(3);
     expect(a.entries).toHaveLength(1);
-    expect(a.entries[0]).toMatchObject({ station: 3, reservationNo: "AB12-3456" });
+    expect(a.entries[0]).toMatchObject({ station: 3, reservationNo: "108" });
     const b = await (await readSession(staff("/api/intake/session?code=" + two.code, two.staffToken))).json() as
       { entries: Array<{ station: number; reservationNo?: string }> };
     expect(b.entries).toHaveLength(1);
     expect(b.entries[0].station).toBe(7);
     expect(b.entries[0]).not.toHaveProperty("reservationNo");
+  });
+
+  it("accepts 1–108, requires a real date and number for other-day bookings, and preserves stored legacy entries", async () => {
+    const memory = createMemoryIntakeStore();
+    __setIntakeStore(memory);
+    const { session: { code }, staffToken } = await memory.create();
+    await memory.modify(code, session => {
+      session.entries.push({
+        seq: session.nextSeq++, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0,
+        booking: "yes", reservationNo: "AB12-3456", receivedAt: Date.now(),
+        verification: "unchecked", ticket: "pending",
+      });
+    });
+    const send = (values: object, requestId = crypto.randomUUID()) => submit(post("/api/intake/submission", {
+      code, requestId, language: "EN", serviceIndex: 0, booking: "yes", ...values,
+    }));
+    for (const reservationNo of ["0", "109", "1.5", "01", "AB12", 1]) {
+      expect((await send({ reservationNo })).status).toBe(400);
+    }
+    const other = { booking: "other", reservationNo: "1", reservationDate: "2028-02-29" };
+    for (const values of [
+      { ...other, reservationDate: "2027-02-29" },
+      { ...other, reservationDate: "2028-04-31" },
+      { ...other, reservationDate: "0000-01-01" },
+      { ...other, reservationDate: undefined },
+      { ...other, reservationNo: undefined },
+      { ...other, booking: "yes" },
+    ]) expect((await send(values)).status).toBe(400);
+
+    expect((await send({ reservationNo: "1" })).status).toBe(201);
+    const id = crypto.randomUUID();
+    expect(await (await send(other, id)).json()).toEqual({ accepted: true, seq: 3 });
+    expect(await (await send(other, id)).json()).toEqual({ accepted: true, seq: 3 });
+
+    const live = (values: object) => postLive(post("/api/intake/live", {
+      code, step: "review", language: "EN", serviceIndex: 0, ...values,
+    }));
+    expect((await live({ booking: "other" })).status).toBe(200);
+    expect((await live({ ...other, reservationNo: "109" })).status).toBe(400);
+    expect((await live({ ...other, reservationDate: undefined })).status).toBe(400);
+    expect((await live({ ...other, reservationDate: "1900-02-29" })).status).toBe(400);
+    expect((await live(other)).status).toBe(200);
+    const desk = await (await readSession(staff("/api/intake/session?code=" + code, staffToken))).json();
+    expect(desk.live).toMatchObject(other);
+    expect(desk.entries).toHaveLength(3);
+    expect(desk.entries[0]).toMatchObject({ reservationNo: "AB12-3456" });
+    expect(desk.entries[2]).toMatchObject(other);
   });
 
   it("mirrors the visitor's current screen to the staff desk only", async () => {
