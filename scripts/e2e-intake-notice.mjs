@@ -27,11 +27,19 @@ async function fakeBackend(ctx, station) {
     if (req.headers()["x-asad-intake-staff-token"] !== s.token) return json(route, 403, { error: "forbidden" });
     if (s.failNext) { s.failNext = false; return json(route, 503, { error: "down" }); }
     const body = req.postDataJSON();
-    const ok = body.code === s.code && (body.id === null || IDS.includes(body.id)) &&
-      (body.id === "counter") === (body.counter !== undefined) && Object.keys(body).every(k => ["code", "id", "counter"].includes(k));
+    const stepsValid = body.id === "nextSteps"
+      && Array.isArray(body.steps) && body.steps.length > 0 && body.steps.length <= 4
+      && body.steps.every(k => ["form", "stamp", "atm", "photo"].includes(k))
+      && new Set(body.steps).size === body.steps.length
+      && (body.steps.includes("stamp") === (Number.isInteger(body.feeManwon) && body.feeManwon >= 1 && body.feeManwon <= 999));
+    const allowedKeys = body.id === "nextSteps" ? ["code", "id", "steps", "feeManwon"] : ["code", "id", "counter"];
+    const ok = body.code === s.code
+      && (stepsValid || body.id === null || IDS.includes(body.id))
+      && (body.id === "counter") === (body.counter !== undefined)
+      && Object.keys(body).every(k => allowedKeys.includes(k));
     if (!ok) return json(route, 400, { error: "Invalid notice." });
     s.seq++;
-    s.notice = body.id === null ? null : { id: body.id, n: s.seq, at: Date.now(), ...(body.counter ? { counter: body.counter } : {}) };
+    s.notice = body.id === null ? null : { ...body, n: s.seq, at: Date.now() };
     return json(route, 200, { ok: true, notice: s.notice, seq: s.seq });
   });
   return s;
@@ -87,6 +95,19 @@ async function run(name, engine, station) {
     await desk.getByRole("button", { name: "사진" }).click();
     await desk.getByText("문구를 보내지 못했습니다. 다시 눌러 주세요.").waitFor({ timeout: 5000 });
     if (await desk.getByRole("button", { name: "사진" }).isDisabled()) throw Error("cards stuck disabled after failure");
+
+    // Staff picks an actionable bundle; the visitor gets a localized list plus Korean cross-check.
+    await desk.locator(".nextStepsCheck").filter({hasText:"통합신청서 작성"}).locator("input").check();
+    await desk.locator(".nextStepsCheck").filter({hasText:"연장 수수료 수입인지 구매"}).locator("input").check();
+    await desk.locator(".nextStepsCheck").filter({hasText:"ATM에서 등록증 발급 비용 납부"}).locator("input").check();
+    await desk.locator(".nextFeeField input").fill("6");
+    await desk.getByRole("button",{name:"선택 항목 민원인에게 보여주기"}).click();
+    await kiosk.locator("#notice-layer .visitorNextSteps li").first().waitFor({timeout:8000});
+    if(await kiosk.locator("#notice-layer .visitorNextSteps li").count()!==3)throw Error("Expected exactly 3 checked tasks");
+    const bundle=await textOf(kiosk);
+    if(!bundle.includes("6 × 10.000 KRW")||!bundle.includes("체류기간 연장 수수료 6만 원")||!bundle.includes("ATM"))throw Error("Checklist translation mismatch: "+bundle);
+    await desk.getByRole("button",{name:"화면에서 지우기"}).click();
+    await kiosk.locator("#notice-layer").waitFor({state:"detached",timeout:8000});
 
     if (errors.length) throw Error(errors.join("\n"));
     console.log(`PASS ${name}: desk phrase cards → visitor overlay (counter pad, replace, clear, dismiss, resend)`);
