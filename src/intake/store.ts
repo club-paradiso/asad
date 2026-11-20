@@ -14,7 +14,7 @@ export const STATION_MIN = 1, STATION_MAX = 30;
 export const RESERVATION_NO = /^(?:[1-9]|[1-9][0-9]|10[0-8])$/;
 /** Optional alternative appointment date; no date is stored for a same-day self-report. */
 export function validReservationDate(value: string): boolean {
-  if (!/^20\\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])$/.test(value)) return false;
+  if (!/^20\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(value)) return false;
   const year = Number(value.slice(0, 4));
   const month = Number(value.slice(5, 7));
   const day = Number(value.slice(8, 10));
