@@ -20,23 +20,51 @@
   function isFullscreen(){
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
-  function requestKioskFullscreen(){
-    var elem=document.documentElement;
-    var method=elem.requestFullscreen || elem.webkitRequestFullscreen;
-    if(!method){
-      error("이 브라우저는 전체화면 버튼을 지원하지 않습니다. 창을 보조 모니터로 옮긴 뒤 F11을 눌러 주세요.");
+  function isStandalone(){
+    return !!window.navigator.standalone ||
+      !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  }
+  function fullscreenHelp(){
+    var ua=window.navigator.userAgent || "";
+    if(/iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && window.navigator.maxTouchPoints > 1)){
+      return "iPad Safari에서 전체화면 전환이 안 되면 공유 버튼 → 홈 화면에 추가 → 홈 화면 아이콘으로 실행하세요. 기기에 따라 상단 상태 표시줄은 남을 수 있습니다.";
+    }
+    return "이 브라우저가 전체화면 전환을 허용하지 않습니다. 데스크톱에서는 이 창을 선택한 상태로 F11을 누르세요.";
+  }
+  function setFullscreenHelp(text){
+    var status=root.querySelector(".fullscreen-status");
+    if(status)status.textContent=text;
+  }
+  function syncFullscreenButton(){
+    var btn=root.querySelector(".fullscreen-toggle");
+    if(!btn)return;
+    if(isStandalone() && !isFullscreen()){
+      btn.textContent="홈 화면 앱 모드";
+      btn.disabled=true;
+      btn.setAttribute("aria-pressed","false");
+      setFullscreenHelp("홈 화면 앱으로 실행 중입니다.");
       return;
     }
+    btn.disabled=false;
+    var active=isFullscreen();
+    btn.textContent=active?"전체화면 종료":"전체화면";
+    btn.setAttribute("aria-pressed",String(active));
+    if(active)setFullscreenHelp("전체화면 사용 중 · Esc 또는 이 버튼으로 종료");
+  }
+  function requestKioskFullscreen(){
+    if(isStandalone() && !isFullscreen())return;
+    var active=isFullscreen(),elem=document.documentElement;
+    var target=active?document:elem;
+    var method=active?(document.exitFullscreen || document.webkitExitFullscreen):
+      (elem.requestFullscreen || elem.webkitRequestFullscreen);
+    if(!method){setFullscreenHelp(fullscreenHelp());return;}
     try{
-      var outcome=method.call(elem);
-      if(outcome && typeof outcome.catch==="function"){
-        outcome.catch(function(){
-          error("브라우저가 전체화면을 막았습니다. 보조 모니터에서 F11을 눌러 주세요.");
-        });
+      // Must be called synchronously inside the visitor's own click gesture.
+      var outcome=method.call(target);
+      if(outcome && typeof outcome.then==="function"){
+        outcome.then(function(){syncFullscreenButton();},function(){setFullscreenHelp(fullscreenHelp());});
       }
-    }catch(e){
-      error("전체화면으로 바꾸지 못했습니다. F11을 눌러 주세요.");
-    }
+    }catch(e){setFullscreenHelp(fullscreenHelp());}
   }
   var LANGS = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","FIL","SI","KM","MY","MN","NE"];
   // Staff -> visitor fixed phrases. The desk sends only a phrase id; the text comes from data.json.
@@ -138,10 +166,11 @@
   }
   function displayBar(){
     var bar=A.el("div",null,"displayBar");
-    A.add(bar,
-      message(displayStation?displayStation+"번 창구":"창구 미지정"),
-      A.btn("전체화면",requestKioskFullscreen,"btn"));
-    if(isFullscreen())bar.className+=" is-hidden";
+    var status=message("민원인 화면에서 전체화면 버튼을 눌러 전환하세요.","muted fullscreen-status");
+    status.setAttribute("role","status");
+    var button=A.btn("전체화면",requestKioskFullscreen,"btn fullscreen-toggle");
+    button.setAttribute("aria-pressed","false");
+    A.add(bar,message(displayStation?displayStation+"번 창구":"민원인 키오스크","muted"),status,button);
     return bar;
   }
   // Mirror the visible screen to the staff desk. Same coded choices as a submission; failures are ignored
@@ -387,7 +416,8 @@
     stopTimers();
     A.clear(root);
     if (!state.data) return root.appendChild(message("화면을 준비하는 중입니다…"));
-    if(displayMode)root.appendChild(displayBar());
+    root.appendChild(displayBar());
+    syncFullscreenButton();
     var d = state.data.locales[state.locale];
     var k = d.kiosk;
     var uiLang = state.step==="connect" || state.step==="language" ? "KO" : state.locale;
@@ -497,9 +527,7 @@
   document.addEventListener("touchstart",onActivity,true);
   document.addEventListener("keydown",onActivity,true);
   function onFullscreenChange(){
-    var bar=root.querySelector(".displayBar");
-    if(!bar)return;
-    bar.className="displayBar"+(isFullscreen()?" is-hidden":"");
+    syncFullscreenButton();
   }
   document.addEventListener("fullscreenchange",onFullscreenChange);
   document.addEventListener("webkitfullscreenchange",onFullscreenChange);
