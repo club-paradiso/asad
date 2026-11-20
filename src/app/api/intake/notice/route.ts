@@ -3,7 +3,7 @@ import { z } from "zod";
 import { clientAddress, isSameOrigin, readJsonBody } from "@/lib/guard";
 import { RequestRateLimiter } from "@/lib/rate-limit";
 import {
-  NOTICE_COUNTER_MAX, NOTICE_COUNTER_MIN, NOTICE_IDS, intakeStore, isStaff, validCode,
+  NEXT_STEP_IDS, NOTICE_COUNTER_MAX, NOTICE_COUNTER_MIN, NOTICE_IDS, intakeStore, isStaff, validCode,
   type IntakeNotice,
 } from "@/intake/store";
 
@@ -20,9 +20,17 @@ const fail = (status: number, error: string) =>
 const schema = z.object({
   code: z.string().length(10),
   // null clears the visitor screen.
-  id: z.enum(NOTICE_IDS).nullable(),
+  id: z.enum(NOTICE_IDS).or(z.literal("nextSteps")).nullable(),
   counter: z.number().int().min(NOTICE_COUNTER_MIN).max(NOTICE_COUNTER_MAX).optional(),
-}).strict().refine(v => (v.id === "counter") === (v.counter !== undefined));
+  steps: z.array(z.enum(NEXT_STEP_IDS)).min(1).max(4).optional(),
+  feeManwon: z.number().int().min(1).max(999).optional(),
+}).strict().refine(v => {
+  const bundle = v.id === "nextSteps";
+  return ((v.id === "counter") === (v.counter !== undefined))
+    && (bundle === (v.steps !== undefined))
+    && (!bundle || (v.steps !== undefined && new Set(v.steps).size === v.steps.length))
+    && ((v.feeManwon !== undefined) === (bundle && !!v.steps?.includes("stamp")));
+});
 
 function parseCode(request: Request): string {
   try { return new URL(request.url).searchParams.get("code")?.trim().toUpperCase() ?? ""; }
@@ -53,7 +61,7 @@ export async function POST(request: Request) {
   if (!body.ok) return fail(body.status, body.error);
   const parsed = schema.safeParse(body.value);
   if (!parsed.success || !validCode(parsed.data.code)) return fail(400, "Invalid notice.");
-  const { code, id, counter } = parsed.data;
+  const { code, id, counter, steps, feeManwon } = parsed.data;
   const store = intakeStore();
   if (!store) return fail(503, "실시간 접수 저장소가 연결되지 않았습니다.");
   try {
@@ -64,6 +72,10 @@ export async function POST(request: Request) {
       const n = (s.noticeSeq ?? 0) + 1;
       s.noticeSeq = n;
       if (id === null) { delete s.notice; return; }
+      if (id === "nextSteps") {
+        s.notice = { id, n, at: Date.now(), steps: steps!, ...(feeManwon !== undefined ? { feeManwon } : {}) };
+        return;
+      }
       const notice: IntakeNotice = { id, n, at: Date.now() };
       if (counter !== undefined) notice.counter = counter;
       s.notice = notice;

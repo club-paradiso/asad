@@ -104,13 +104,14 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     const qrResponse=await staff.request.get(base+qrUrl);
     if(!qrResponse.ok()||!((await qrResponse.text()).indexOf("<svg")>=0))throw Error("QR not generated");
     // The staff desk mirrors each visitor tap without any staff action.
-    // All 11 languages must be visible on one screen, without scrolling.
+    // All 15 languages must be visible on one screen, without scrolling.
     await visitor.locator(".langGrid .tile").first().waitFor();
     const fit=await visitor.locator(".langGrid .tile").evaluateAll(els=>els.filter(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}).length);
-    if(fit!==11)throw Error("Only "+fit+" of 11 languages fit on the first screen");
+    if(fit!==15)throw Error("Only "+fit+" of 15 languages fit on the first screen");
     const mirror=staff.locator(".mirror");
     if(await visitor.getByRole("button",{name:"O‘zbekcha"}).count())throw Error("Uzbek must not appear in kiosk");
     if(await visitor.getByRole("button",{name:"हिन्दी"}).count()!==1)throw Error("Hindi must appear exactly once");
+    for(const title of ["Filipino","සිංහල","ភាសាខ្មែរ","မြန်မာဘာသာ"]) if(await visitor.getByRole("button",{name:title,exact:true}).count()!==1)throw Error("Language missing: "+title);
     await visitor.getByRole("button",{name:"English"}).click();
     await mirror.getByText("업무 고르는 중").waitFor({timeout:12000});
     if(liveFailuresLeft!==0)throw Error("Expected the kiosk to retry failed mirror updates");

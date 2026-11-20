@@ -3,7 +3,7 @@ import liveCatalog from "../../public/compat/data.json";
 import demoCatalog from "../../apps/visitor-intake/data.json";
 import {
   __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
-  validCode, validLanguage, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS,
+  validCode, validLanguage, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS, NEXT_STEP_IDS,
 } from "./store";
 import {
   POST as createSession, GET as readSession, PATCH as markSession,
@@ -32,7 +32,11 @@ afterEach(() => __setIntakeStore(null));
 describe("intake service catalog", () => {
   it("keeps live and demo catalogs aligned with 20 translated services", () => {
     expect(liveCatalog).toEqual(demoCatalog);
-    expect(Object.keys(liveCatalog.locales)).toHaveLength(11);
+    expect(Object.keys(liveCatalog.locales)).toHaveLength(15);
+    for (const code of ["FIL", "SI", "KM", "MY"] as const) {
+      expect(validLanguage(code)).toBe(true);
+      expect(liveCatalog.locales[code].name).toBeTruthy();
+    }
     expect(liveCatalog.locales).toHaveProperty("HI");
     expect(liveCatalog.locales).not.toHaveProperty("UZ");
     expect(validLanguage("HI")).toBe(true);
@@ -45,7 +49,7 @@ describe("intake service catalog", () => {
     }
   });
 
-  it("localizes every visitor-facing kiosk control in all 11 languages", () => {
+  it("localizes every visitor-facing kiosk control in all 15 languages", () => {
     const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
     expect(keys).toHaveLength(18);
     for (const locale of Object.values(liveCatalog.locales)) {
@@ -59,11 +63,16 @@ describe("intake service catalog", () => {
       expect(locale.kiosk.reservationDateLabel).toBeTruthy();
     }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
+    for (const locale of Object.values(liveCatalog.locales)) {
+      expect(Object.keys(locale.nextSteps).sort()).toEqual(["title", ...NEXT_STEP_IDS].sort());
+      for (const text of Object.values(locale.nextSteps)) expect(text.trim()).not.toBe("");
+      expect(locale.nextSteps.stamp).toContain("{n}");
+    }
   });
 });
 
 describe("staff notice phrases", () => {
-  it("translates every fixed phrase in all 11 languages and lists each one exactly once for staff", () => {
+  it("translates every fixed phrase in all 15 languages and lists each one exactly once for staff", () => {
     const cfg = liveCatalog.notices;
     const listed = cfg.groups.flatMap(g => g.items.map(i => i.id));
     expect([...listed].sort()).toEqual([...NOTICE_IDS].sort());
@@ -319,6 +328,44 @@ describe("intake cross-device API", () => {
       }),
     }));
     expect(blocked.status).toBe(403);
+  });
+
+  it("allows only staff to show a validated multi-step checklist and an explicit fee", async () => {
+    const store = createMemoryIntakeStore();
+    __setIntakeStore(store);
+    const { session: { code }, staffToken } = await store.create();
+    const send = (body: object, token: string | null = staffToken) => postNotice(new Request(HOST + "/api/intake/notice", {
+      method: "POST",
+      headers: token ? { ...headers, "x-asad-intake-staff-token": token } : headers,
+      body: JSON.stringify(body),
+    }));
+    const good = { code, id: "nextSteps", steps: ["form", "stamp", "atm", "photo"], feeManwon: 6 };
+    expect((await send(good, null)).status).toBe(401);
+    expect((await send(good, "q".repeat(43))).status).toBe(403);
+    for (const bad of [
+      { code, id: "nextSteps" },
+      { code, id: "nextSteps", steps: [] },
+      { code, id: "nextSteps", steps: ["form", "form"] },
+      { code, id: "nextSteps", steps: ["form", "unknown"] },
+      { code, id: "nextSteps", steps: ["stamp"] },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: 0 },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: 1000 },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: 2.5 },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: "6" },
+      { code, id: "nextSteps", steps: ["form"], feeManwon: 6 },
+      { ...good, visitorName: "should-not-store" },
+      { ...good, counter: 3 },
+    ]) expect((await send(bad)).status).toBe(400);
+    expect((await send(good)).status).toBe(200);
+    const visitor = await readNotice(new Request(HOST + "/api/intake/notice?code=" + code));
+    expect((await visitor.json() as { notice: unknown }).notice).toMatchObject({
+      id: "nextSteps", steps: ["form", "stamp", "atm", "photo"], feeManwon: 6,
+    });
+    expect((await send({ code, id: "nextSteps", steps: ["photo"] })).status).toBe(200);
+    expect((await (await readNotice(new Request(HOST + "/api/intake/notice?code=" + code))).json() as {
+      notice: { steps: string[]; feeManwon?: number };
+    }).notice).toMatchObject({ steps: ["photo"] });
+    expect((await send({ code, id: null })).status).toBe(200);
   });
 
   it("lets only the staff desk show or clear a fixed phrase on the visitor screen", async () => {

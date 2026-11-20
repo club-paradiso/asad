@@ -23,7 +23,7 @@ export function validReservationDate(value: string): boolean {
   return day <= days[month - 1];
 }
 
-export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","MN","NE"] as const;
+export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","FIL","SI","KM","MY","MN","NE"] as const;
 export type IntakeLanguage = typeof LANGUAGES[number];
 export type Booking = "yes" | "no" | "unsure";
 export type Verification = "unchecked" | "confirmed" | "unclear" | "exempt";
@@ -67,7 +67,12 @@ export const NOTICE_IDS = [
 ] as const;
 export type NoticeId = typeof NOTICE_IDS[number];
 export const NOTICE_COUNTER_MIN = 1, NOTICE_COUNTER_MAX = 30;
-export type IntakeNotice = { id: NoticeId; counter?: number; n: number; at: number };
+/** Only these predefined tasks can be sent. Never pass free-text visitor instructions. */
+export const NEXT_STEP_IDS = ["form", "stamp", "atm", "photo"] as const;
+export type NextStepId = typeof NEXT_STEP_IDS[number];
+export type IntakeNotice =
+  | { id: NoticeId; counter?: number; n: number; at: number }
+  | { id: "nextSteps"; steps: NextStepId[]; feeManwon?: number; n: number; at: number };
 
 export type IntakeSession = {
   live?: IntakeLive;

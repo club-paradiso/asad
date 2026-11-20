@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const root=document.getElementById("main");
-const codes=["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","MN","NE"];
+const codes=["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","FIL","SI","KM","MY","MN","NE"];
 const state={data:null,locale:null,service:null,booking:null,stage:"language",page:0};
 function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
 function button(text,handler,cls="tile"){const n=node("button",text,cls);n.type="button";n.addEventListener("click",handler);return n}
