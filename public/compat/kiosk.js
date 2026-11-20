@@ -6,7 +6,7 @@
   var displayMode=A.getQuery("display")==="1";
   var stationValue=A.getQuery("station");
   var displayStation=/^(?:[1-9]|[12][0-9]|30)$/.test(stationValue)?stationValue:"";
-  var RESV_OK=/^[A-Z0-9-]{4,30}$/;
+  var RESV_OK=/^(?:[1-9]|[1-9][0-9]|10[0-8])$/;
   var liveSoonTimer=0;
   // A visitor who walks away mid-flow must not leave their choices for the next person.
   var IDLE_RESET_MS=120000;
@@ -45,6 +45,7 @@
   var state = {
     data:null,code:"",codeDraft:"",locale:"KO",step:"connect",
     servicePage:0,serviceIndex:-1,booking:"",reservationNo:"",resvError:false,
+    dateMode:"today",dateDigits:"",dateError:false,
     sending:false,requestId:"",sentSeq:0,error:"",errorDetail:""
   };
   function error(text, detail) {
@@ -76,12 +77,14 @@
   }
   function reset() {
     state.step="language";state.locale="KO";state.servicePage=0;
-    state.serviceIndex=-1;state.booking="";state.reservationNo="";state.resvError=false;state.requestId="";state.sentSeq=0;
+    state.serviceIndex=-1;state.booking="";state.reservationNo="";state.resvError=false;
+    state.dateMode="today";state.dateDigits="";state.dateError=false;state.requestId="";state.sentSeq=0;
     state.error="";state.errorDetail="";
     render();
   }
   function chooseLanguage(code){
     state.locale=code;state.serviceIndex=-1;state.booking="";state.reservationNo="";state.resvError=false;
+    state.dateMode="today";state.dateDigits="";state.dateError=false;
     state.servicePage=0;state.step="services";state.error="";state.errorDetail="";render();
   }
   function stopTimers(){
@@ -111,14 +114,18 @@
     if (state.sending || state.serviceIndex<0 || !state.booking) return;
     var k = state.data.locales[state.locale].kiosk;
     var resv = state.booking==="yes" ? state.reservationNo : "";
-    if (resv && !RESV_OK.test(resv)) { state.resvError=true; render(); return; }
+    var otherDate = state.booking==="yes" && state.dateMode==="other";
+    var isoDate = otherDate ? toDateIso(state.dateDigits) : "";
+    if ((resv && !RESV_OK.test(resv)) || (otherDate && !resv)) { state.resvError=true; render(); return; }
+    if (otherDate && !isoDate) { state.dateError=true; render(); return; }
     if (!A.queryCode(state.code)) return error(k.sendFailed, "접수 코드가 올바르지 않습니다. 직원 화면에서 창구를 다시 연결해 주세요.");
     if (!state.requestId) state.requestId = A.uuid();
     if (!state.requestId) return error(k.sendFailed, "이 브라우저는 보안 난수를 만들 수 없습니다. Safari를 업데이트해 주세요.");
     state.sending=true;state.error="";state.errorDetail="";render();
-    A.request("POST", "/api/intake/submission",
-      resv ? {code:state.code,requestId:state.requestId,language:state.locale,serviceIndex:state.serviceIndex,booking:state.booking,reservationNo:resv}
-           : {code:state.code,requestId:state.requestId,language:state.locale,serviceIndex:state.serviceIndex,booking:state.booking},
+    var payload={code:state.code,requestId:state.requestId,language:state.locale,serviceIndex:state.serviceIndex,booking:state.booking};
+    if(resv)payload.reservationNo=resv;
+    if(otherDate)payload.reservationDate=isoDate;
+    A.request("POST", "/api/intake/submission",payload,
       null,function(err,data){
         state.sending=false;
         if(err || !data || !data.accepted || !data.seq) {
@@ -145,7 +152,12 @@
     if(state.step!=="language")live.language=state.locale;
     if(state.step==="review" || state.step==="sent")live.serviceIndex=state.serviceIndex;
     if((state.step==="review" || state.step==="sent") && state.booking)live.booking=state.booking;
-    if((state.step==="review" || state.step==="sent") && state.booking==="yes" && state.reservationNo)live.reservationNo=state.reservationNo;
+    if((state.step==="review" || state.step==="sent") && state.booking==="yes"){
+      live.reservationDateMode=state.dateMode;
+      if(RESV_OK.test(state.reservationNo))live.reservationNo=state.reservationNo;
+      var date=state.dateMode==="other"?toDateIso(state.dateDigits):"";
+      if(date && RESV_OK.test(state.reservationNo))live.reservationDate=date;
+    }
     if(state.step==="sent" && state.sentSeq)live.seq=state.sentSeq;
     var key=JSON.stringify(live);
     if(key===liveSent && !liveWanted)return;
@@ -179,9 +191,24 @@
     });
   }
   function setReservation(value){
-    var clean=String(value).toUpperCase().replace(/[^A-Z0-9-]/g,"").slice(0,30);
+    var clean=String(value).replace(/[^0-9]/g,"").slice(0,3);
     if(clean!==state.reservationNo){state.reservationNo=clean;state.requestId="";}
     if(state.resvError && (!clean || RESV_OK.test(clean)))state.resvError=false;
+    return clean;
+  }
+  function toDateIso(digits){
+    if(!/^20[0-9]{6}$/.test(digits))return "";
+    var year=Number(digits.slice(0,4)),month=Number(digits.slice(4,6)),day=Number(digits.slice(6,8));
+    if(month<1 || month>12 || day<1)return "";
+    var leap=year%4===0 && (year%100!==0 || year%400===0);
+    var days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+    if(day>days[month-1])return "";
+    return digits.slice(0,4)+"-"+digits.slice(4,6)+"-"+digits.slice(6,8);
+  }
+  function setDateDigits(value){
+    var clean=String(value).replace(/[^0-9]/g,"").slice(0,8);
+    if(clean!==state.dateDigits){state.dateDigits=clean;state.requestId="";}
+    if(state.dateError && (!clean || toDateIso(clean)))state.dateError=false;
     return clean;
   }
   // Typing should reach the staff mirror without a request per keystroke.
@@ -189,14 +216,31 @@
     if(liveSoonTimer)window.clearTimeout(liveSoonTimer);
     liveSoonTimer=window.setTimeout(function(){liveSoonTimer=0;syncLive();},400);
   }
+  function numericPad(current,onValue,eraseText){
+    var pad=A.el("div",null,"keypad");
+    var keys=["1","2","3","4","5","6","7","8","9","0"];
+    for(var i=0;i<keys.length;i++){
+      (function(ch){
+        var b=A.btn(ch,function(){if(state.sending)return;onValue(current()+ch);render();},"btn key");
+        b.disabled=state.sending;
+        pad.appendChild(b);
+      })(keys[i]);
+    }
+    var erase=A.btn("⌫",function(){if(state.sending)return;onValue(current().slice(0,-1));render();},"btn key");
+    erase.setAttribute("aria-label",eraseText);
+    erase.disabled=state.sending;
+    pad.appendChild(erase);
+    return pad;
+  }
   function reservationField(k){
     var box=A.el("section",null,"resvBox");
     var label=A.el("label",k.reservationNoLabel,"resvLabel");
     label.setAttribute("for","kiosk-resv");
     var field=A.el("input");
-    field.type="text";field.id="kiosk-resv";field.maxLength=30;
-    field.autocomplete="off";field.autocapitalize="characters";field.spellcheck=false;
-    field.setAttribute("inputmode","text");
+    field.type="text";field.id="kiosk-resv";field.maxLength=3;
+    field.autocomplete="off";field.spellcheck=false;
+    field.setAttribute("inputmode","numeric");
+    field.setAttribute("pattern","[0-9]*");
     field.value=state.reservationNo;
     field.disabled=state.sending;
     if(state.resvError)field.setAttribute("aria-invalid","true");
@@ -207,21 +251,52 @@
       if(field.value!==clean)field.value=clean;
       if(hadError!==state.resvError)render(); else syncLiveSoon();
     };
-    var pad=A.el("div",null,"keypad");
-    var keys=["1","2","3","4","5","6","7","8","9","-","0"];
-    for(var i=0;i<keys.length;i++){
-      (function(ch){
-        var b=A.btn(ch,function(){ if(state.sending)return; setReservation(state.reservationNo+ch); render(); },"btn key");
-        b.disabled=state.sending;
-        pad.appendChild(b);
-      })(keys[i]);
-    }
-    var erase=A.btn("⌫",function(){ if(state.sending)return; setReservation(state.reservationNo.slice(0,-1)); render(); },"btn key");
-    erase.setAttribute("aria-label",k.erase);
-    erase.disabled=state.sending;
-    pad.appendChild(erase);
-    A.add(box,label,field,state.resvError?A.el("p",k.reservationNoInvalid,"resvError"):null,pad);
+    A.add(box,label,field,state.resvError?A.el("p",k.reservationNoInvalid,"resvError"):null,
+      numericPad(function(){return state.reservationNo;},setReservation,k.erase));
     return box;
+  }
+  function reservationDateChoice(k){
+    var section=A.el("section",null,"dateBox");
+    var choices=A.el("div",null,"dateChoices");
+    var options=[["today",k.reservationToday],["other",k.reservationOtherDate]];
+    for(var i=0;i<options.length;i++){
+      (function(opt){
+        var b=A.btn(opt[1],function(){
+          if(state.sending)return;
+          if(state.dateMode!==opt[0]){
+            state.dateMode=opt[0];state.dateDigits="";state.dateError=false;state.requestId="";
+          }
+          render();
+        },"btn");
+        b.setAttribute("aria-pressed",String(state.dateMode===opt[0]));
+        choices.appendChild(b);
+      })(options[i]);
+    }
+    section.appendChild(choices);
+    if(state.dateMode==="other"){
+      var fieldBox=A.el("div",null,"dateEntry");
+      var label=A.el("label",k.reservationDateLabel,"resvLabel");
+      label.setAttribute("for","kiosk-resv-date");
+      var field=A.el("input");
+      field.type="text";field.id="kiosk-resv-date";field.maxLength=8;
+      field.setAttribute("inputmode","numeric");field.setAttribute("pattern","[0-9]*");
+      field.setAttribute("placeholder","YYYYMMDD");field.autocomplete="off";field.spellcheck=false;
+      field.value=state.dateDigits;field.disabled=state.sending;
+      if(state.dateError)field.setAttribute("aria-invalid","true");
+      field.oninput=function(){
+        if(state.sending){field.value=state.dateDigits;return;}
+        var hadError=state.dateError;
+        var clean=setDateDigits(field.value);
+        if(field.value!==clean)field.value=clean;
+        if(hadError!==state.dateError)render(); else syncLiveSoon();
+      };
+      var preview=toDateIso(state.dateDigits);
+      A.add(fieldBox,label,field,preview?A.el("p",preview,"datePreview"):null,
+        state.dateError?A.el("p",k.reservationDateInvalid,"resvError"):null,
+        numericPad(function(){return state.dateDigits;},setDateDigits,k.erase));
+      section.appendChild(fieldBox);
+    }
+    return section;
   }
   function errorBox(){
     if(!state.error)return null;
@@ -323,7 +398,8 @@
       var first=state.servicePage===0?0:10,limit=state.servicePage===0?10:d.services.length;
       for(var n=first;n<limit;n++){
         (function(idx){var b=A.btn("",function(){
-            state.serviceIndex=idx;state.booking="";state.reservationNo="";state.resvError=false;state.requestId="";state.step="review";render();
+            state.serviceIndex=idx;state.booking="";state.reservationNo="";state.resvError=false;
+            state.dateMode="today";state.dateDigits="";state.dateError=false;state.requestId="";state.step="review";render();
           },"tile");
           var badge=A.el("span",idx<9?"0"+(idx+1):String(idx+1),"num");
           A.add(b,badge,A.el("span",d.services[idx]));
@@ -350,7 +426,8 @@
           var b=A.btn(opt[1],function(){
             if(state.sending)return;
             state.booking=opt[0];state.requestId="";
-            if(opt[0]!=="yes"){state.reservationNo="";state.resvError=false;}
+            if(opt[0]!=="yes"){state.reservationNo="";state.resvError=false;
+              state.dateMode="today";state.dateDigits="";state.dateError=false;}
             render();
           },"btn");
           b.setAttribute("aria-pressed",String(state.booking===opt[0]));
@@ -358,7 +435,10 @@
         })(opts[c]);
       }
       root.appendChild(choiceGrid);
-      if(state.booking==="yes")root.appendChild(reservationField(k));
+      if(state.booking==="yes"){
+        root.appendChild(reservationField(k));
+        root.appendChild(reservationDateChoice(k));
+      }
       // Keep a send failure next to the button the visitor just pressed.
       var sendError=errorBox();
       if(sendError)root.appendChild(sendError);
@@ -373,7 +453,8 @@
       A.add(done,
         A.el("p",k.requestNo+" #"+state.sentSeq,"seq"),
         A.el("h2",d.services[state.serviceIndex]),
-        state.booking==="yes" && state.reservationNo?A.el("p",k.reservationNoLabel.replace(/\s*[(（].*$/,"")+" "+state.reservationNo,"muted"):null);
+        state.booking==="yes" && state.reservationNo?A.el("p",k.reservationNoLabel.replace(/\s*[(（].*$/,"")+" "+state.reservationNo,"muted"):null,
+        state.booking==="yes" && state.dateMode==="other"?A.el("p",k.reservationDateLabel+": "+toDateIso(state.dateDigits),"muted"):null);
       if(state.serviceIndex===19)done.appendChild(message(d.review.phoneChangeNote,"note"));
       root.appendChild(done);
       var countdown=message("","muted countdown");
