@@ -63,10 +63,14 @@
         "requestNo": "요청 번호",
         "autoReset": "{s}초 뒤 처음 화면으로 돌아갑니다.",
         "sendFailed": "보내지 못했습니다. 다시 눌러 주세요. 계속 안 되면 직원에게 알려 주세요.",
-        "reservationNoLabel": "예약 번호 (선택)",
-        "reservationNoInvalid": "예약 번호를 다시 확인해 주세요.",
+        "reservationNoLabel": "예약번호 (1~108, 선택)",
+        "reservationNoInvalid": "예약번호는 1부터 108까지 입력해 주세요.",
         "erase": "지우기",
-        "counter": "{n}번 창구"
+        "counter": "{n}번 창구",
+        "reservationToday": "오늘 방문 예약",
+        "reservationOtherDate": "다른 날짜로 예약함",
+        "reservationDateLabel": "예약 날짜 (연도·월·일, 숫자 8자리)",
+        "reservationDateInvalid": "예약 날짜를 8자리로 정확히 입력해 주세요."
       },
       "notice": {
         "ok": "확인",
@@ -152,10 +156,14 @@
         "requestNo": "Request no.",
         "autoReset": "Returning to the start screen in {s} seconds.",
         "sendFailed": "Could not send. Please tap again. If it keeps failing, please tell a staff member.",
-        "reservationNoLabel": "Reservation number (optional)",
-        "reservationNoInvalid": "Please check the reservation number.",
+        "reservationNoLabel": "Reservation number (1–108, optional)",
+        "reservationNoInvalid": "Enter a reservation number from 1 to 108.",
         "erase": "Delete",
-        "counter": "Counter {n}"
+        "counter": "Counter {n}",
+        "reservationToday": "Appointment for today",
+        "reservationOtherDate": "Appointment for another date",
+        "reservationDateLabel": "Appointment date (YYYYMMDD, 8 digits)",
+        "reservationDateInvalid": "Enter a valid 8-digit appointment date."
       },
       "notice": {
         "ok": "OK",
@@ -241,10 +249,14 @@
         "requestNo": "申请编号",
         "autoReset": "{s}秒后返回首页。",
         "sendFailed": "发送失败。请再点一次。如仍无法发送，请告知工作人员。",
-        "reservationNoLabel": "预约号码（选填）",
-        "reservationNoInvalid": "请核对预约号码。",
+        "reservationNoLabel": "预约号码（1–108，选填）",
+        "reservationNoInvalid": "请输入1至108之间的预约号码。",
         "erase": "删除",
-        "counter": "{n}号窗口"
+        "counter": "{n}号窗口",
+        "reservationToday": "预约日期为今天",
+        "reservationOtherDate": "预约了其他日期",
+        "reservationDateLabel": "预约日期（年月日，8位数字）",
+        "reservationDateInvalid": "请输入有效的8位预约日期。"
       },
       "notice": {
         "ok": "确认",
@@ -330,10 +342,14 @@
         "requestNo": "Nomor permintaan",
         "autoReset": "Kembali ke layar awal dalam {s} detik.",
         "sendFailed": "Gagal mengirim. Silakan ketuk lagi. Jika tetap gagal, beri tahu petugas.",
-        "reservationNoLabel": "Nomor reservasi (opsional)",
-        "reservationNoInvalid": "Periksa kembali nomor reservasi.",
+        "reservationNoLabel": "Nomor reservasi (1–108, opsional)",
+        "reservationNoInvalid": "Masukkan nomor reservasi dari 1 hingga 108.",
         "erase": "Hapus",
-        "counter": "Loket {n}"
+        "counter": "Loket {n}",
+        "reservationToday": "Janji temu untuk hari ini",
+        "reservationOtherDate": "Janji temu pada tanggal lain",
+        "reservationDateLabel": "Tanggal janji temu (YYYYMMDD, 8 angka)",
+        "reservationDateInvalid": "Masukkan tanggal janji temu 8 angka yang valid."
       },
       "notice": {
         "ok": "OK",
@@ -419,10 +435,14 @@
         "requestNo": "अनुरोध संख्या",
         "autoReset": "{s} सेकंड में शुरुआती स्क्रीन पर लौटेंगे।",
         "sendFailed": "भेजा नहीं जा सका। कृपया फिर से दबाएँ। फिर भी न हो तो कर्मचारी को बताएँ।",
-        "reservationNoLabel": "आरक्षण संख्या (वैकल्पिक)",
-        "reservationNoInvalid": "कृपया आरक्षण संख्या जाँचें।",
+        "reservationNoLabel": "आरक्षण नंबर (1–108, वैकल्पिक)",
+        "reservationNoInvalid": "कृपया 1 से 108 तक आरक्षण नंबर दर्ज करें।",
         "erase": "मिटाएँ",
-        "counter": "काउंटर {n}"
+        "counter": "काउंटर {n}",
+        "reservationToday": "आज के लिए अपॉइंटमेंट",
+        "reservationOtherDate": "किसी और तारीख का अपॉइंटमेंट",
+        "reservationDateLabel": "अपॉइंटमेंट की तारीख (YYYYMMDD, 8 अंक)",
+        "reservationDateInvalid": "कृपया 8 अंकों की सही तारीख दर्ज करें।"
       },
       "notice": {
         "ok": "ठीक है",
@@ -508,10 +528,14 @@
         "requestNo": "Số yêu cầu",
         "autoReset": "Quay về màn hình đầu sau {s} giây.",
         "sendFailed": "Không gửi được. Vui lòng chạm lại. Nếu vẫn lỗi, hãy báo nhân viên.",
-        "reservationNoLabel": "Số đặt lịch (không bắt buộc)",
-        "reservationNoInvalid": "Vui lòng kiểm tra lại số đặt lịch.",
+        "reservationNoLabel": "Số đặt lịch (1–108, tùy chọn)",
+        "reservationNoInvalid": "Nhập số đặt lịch từ 1 đến 108.",
         "erase": "Xóa",
-        "counter": "Quầy số {n}"
+        "counter": "Quầy số {n}",
+        "reservationToday": "Lịch hẹn hôm nay",
+        "reservationOtherDate": "Lịch hẹn vào ngày khác",
+        "reservationDateLabel": "Ngày hẹn (YYYYMMDD, 8 chữ số)",
+        "reservationDateInvalid": "Hãy nhập ngày hẹn hợp lệ gồm 8 chữ số."
       },
       "notice": {
         "ok": "OK",
@@ -597,10 +621,14 @@
         "requestNo": "受付番号",
         "autoReset": "{s}秒後に最初の画面に戻ります。",
         "sendFailed": "送信できませんでした。もう一度押してください。続く場合は職員にお知らせください。",
-        "reservationNoLabel": "予約番号（任意）",
-        "reservationNoInvalid": "予約番号をご確認ください。",
+        "reservationNoLabel": "予約番号（1～108・任意）",
+        "reservationNoInvalid": "予約番号は1～108で入力してください。",
         "erase": "削除",
-        "counter": "{n}番窓口"
+        "counter": "{n}番窓口",
+        "reservationToday": "本日の予約",
+        "reservationOtherDate": "別の日の予約",
+        "reservationDateLabel": "予約日（年月日・数字8桁）",
+        "reservationDateInvalid": "正しい予約日を数字8桁で入力してください。"
       },
       "notice": {
         "ok": "OK",
@@ -686,10 +714,14 @@
         "requestNo": "หมายเลขคำขอ",
         "autoReset": "จะกลับไปหน้าแรกใน {s} วินาที",
         "sendFailed": "ส่งไม่สำเร็จ กรุณากดอีกครั้ง หากยังไม่ได้ กรุณาแจ้งเจ้าหน้าที่",
-        "reservationNoLabel": "หมายเลขการจอง (ไม่บังคับ)",
-        "reservationNoInvalid": "กรุณาตรวจสอบหมายเลขการจอง",
+        "reservationNoLabel": "หมายเลขการจอง (1–108, ไม่บังคับ)",
+        "reservationNoInvalid": "กรุณากรอกหมายเลข 1 ถึง 108",
         "erase": "ลบ",
-        "counter": "ช่องบริการที่ {n}"
+        "counter": "ช่องบริการที่ {n}",
+        "reservationToday": "นัดหมายสำหรับวันนี้",
+        "reservationOtherDate": "นัดหมายวันอื่น",
+        "reservationDateLabel": "วันที่นัดหมาย (YYYYMMDD, ตัวเลข 8 หลัก)",
+        "reservationDateInvalid": "กรุณากรอกวันที่นัดหมาย 8 หลักให้ถูกต้อง"
       },
       "notice": {
         "ok": "ตกลง",
@@ -775,10 +807,14 @@
         "requestNo": "Номер запроса",
         "autoReset": "Возврат на начальный экран через {s} с.",
         "sendFailed": "Не удалось отправить. Нажмите ещё раз. Если ошибка повторится, сообщите сотруднику.",
-        "reservationNoLabel": "Номер записи (необязательно)",
-        "reservationNoInvalid": "Проверьте номер записи.",
+        "reservationNoLabel": "Номер записи (1–108, необязательно)",
+        "reservationNoInvalid": "Введите номер записи от 1 до 108.",
         "erase": "Стереть",
-        "counter": "Окно {n}"
+        "counter": "Окно {n}",
+        "reservationToday": "Запись на сегодня",
+        "reservationOtherDate": "Запись на другую дату",
+        "reservationDateLabel": "Дата записи (ГГГГММДД, 8 цифр)",
+        "reservationDateInvalid": "Введите корректную дату из 8 цифр."
       },
       "notice": {
         "ok": "OK",
@@ -864,10 +900,14 @@
         "requestNo": "So‘rov raqami",
         "autoReset": "{s} soniyadan keyin bosh ekranga qaytiladi.",
         "sendFailed": "Yuborib bo‘lmadi. Yana bir marta bosing. Takrorlansa, xodimga ayting.",
-        "reservationNoLabel": "Bron raqami (ixtiyoriy)",
-        "reservationNoInvalid": "Bron raqamini tekshiring.",
+        "reservationNoLabel": "Bron raqami (1–108, ixtiyoriy)",
+        "reservationNoInvalid": "1 dan 108 gacha bron raqamini kiriting.",
         "erase": "O‘chirish",
-        "counter": "{n}-oyna"
+        "counter": "{n}-oyna",
+        "reservationToday": "Bugungi uchrashuv",
+        "reservationOtherDate": "Boshqa kunga yozilgan",
+        "reservationDateLabel": "Uchrashuv sanasi (YYYYMMDD, 8 raqam)",
+        "reservationDateInvalid": "8 raqamli to‘g‘ri sanani kiriting."
       },
       "notice": {
         "ok": "OK",
@@ -953,10 +993,14 @@
         "requestNo": "Хүсэлтийн дугаар",
         "autoReset": "{s} секундын дараа эхлэл рүү буцна.",
         "sendFailed": "Илгээж чадсангүй. Дахин дарна уу. Үргэлжилбэл ажилтанд хэлнэ үү.",
-        "reservationNoLabel": "Захиалгын дугаар (заавал биш)",
-        "reservationNoInvalid": "Захиалгын дугаараа шалгана уу.",
+        "reservationNoLabel": "Захиалгын дугаар (1–108, заавал биш)",
+        "reservationNoInvalid": "1-ээс 108 хүртэлх дугаар оруулна уу.",
         "erase": "Устгах",
-        "counter": "{n}-р цонх"
+        "counter": "{n}-р цонх",
+        "reservationToday": "Өнөөдрийн цаг захиалга",
+        "reservationOtherDate": "Өөр өдрийн цаг захиалга",
+        "reservationDateLabel": "Захиалсан өдөр (YYYYMMDD, 8 орон)",
+        "reservationDateInvalid": "8 оронтой зөв огноо оруулна уу."
       },
       "notice": {
         "ok": "OK",
@@ -1042,10 +1086,14 @@
         "requestNo": "अनुरोध नम्बर",
         "autoReset": "{s} सेकेन्डमा सुरुको स्क्रिनमा फर्किन्छ।",
         "sendFailed": "पठाउन सकिएन। फेरि थिच्नुहोस्। फेरि पनि भएन भने कर्मचारीलाई भन्नुहोस्।",
-        "reservationNoLabel": "आरक्षण नम्बर (ऐच्छिक)",
-        "reservationNoInvalid": "कृपया आरक्षण नम्बर जाँच्नुहोस्।",
+        "reservationNoLabel": "आरक्षण नम्बर (१–१०८, ऐच्छिक)",
+        "reservationNoInvalid": "कृपया १ देखि १०८ सम्मको नम्बर लेख्नुहोस्।",
         "erase": "मेटाउनुहोस्",
-        "counter": "काउन्टर {n}"
+        "counter": "काउन्टर {n}",
+        "reservationToday": "आजको अपोइन्टमेन्ट",
+        "reservationOtherDate": "अर्को मितिको अपोइन्टमेन्ट",
+        "reservationDateLabel": "अपोइन्टमेन्ट मिति (YYYYMMDD, ८ अंक)",
+        "reservationDateInvalid": "कृपया सही ८ अंकको मिति लेख्नुहोस्।"
       },
       "notice": {
         "ok": "ठिक छ",
