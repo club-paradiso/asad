@@ -36,7 +36,7 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     if(await staff.locator(".grid .tile").count()!==10)throw Error("First service page must have 10 services");
     await staff.getByRole("button",{name:/Extend my period of stay/}).click();
     await staff.getByRole("heading",{name:"Have you booked a visit on HiKorea?"}).waitFor();
-    await staff.getByRole("button",{name:"Yes, booked"}).click();
+    await staff.getByRole("button",{name:"Booked for today"}).click();
     await staff.getByRole("button",{name:/직원에게 보여주기/}).click();
     await staff.getByRole("heading",{name:"Please show this screen to staff"}).waitFor();
     await staff.getByRole("button",{name:"BACK TO START"}).click();
