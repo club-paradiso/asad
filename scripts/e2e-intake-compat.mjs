@@ -71,11 +71,13 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
   await visitor.route("**/api/intake/submission",async route=>{
     const body=route.request().postDataJSON();
     if(body.serviceIndex<0||body.serviceIndex>19||!body.booking||!body.language)throw Error("Invalid visitor payload");
-    if(body.reservationNo!==undefined && (body.booking!=="yes" || !/^[A-Z0-9-]{4,30}$/.test(body.reservationNo)))throw Error("Bad reservation number payload");
+    if(body.reservationNo!==undefined && (body.booking!=="yes" || !/^(?:[1-9]|[1-9][0-9]|10[0-8])$/.test(body.reservationNo)))throw Error("Bad reservation number payload");
+    if(body.reservationDate!==undefined && (body.booking!=="yes" || !body.reservationNo || !/^20\d{2}-\d{2}-\d{2}$/.test(body.reservationDate)))throw Error("Bad appointment date payload");
     entries.push({
       seq:entries.length+1,language:body.language,serviceIndex:body.serviceIndex,
       booking:body.booking,receivedAt:Date.now(),verification:"unchecked",ticket:"pending",station:3,
-      ...(body.reservationNo?{reservationNo:body.reservationNo}:{})
+      ...(body.reservationNo?{reservationNo:body.reservationNo}:{}),
+      ...(body.reservationDate?{reservationDate:body.reservationDate}:{})
     });
     await route.fulfill({status:201,contentType:"application/json",
       body:JSON.stringify({accepted:true,seq:entries.length})});
@@ -117,17 +119,18 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
     await mirror.getByText("보내기 직전").waitFor({timeout:6000});
     await mirror.getByText("예약함").waitFor();
-    // Optional reservation number: too short is refused, a full one reaches the staff mirror.
-    for(const key of ["1","2"])await visitor.getByRole("button",{name:key,exact:true}).click();
+    // Out-of-range 109 is blocked; upper bound 108 reaches the staff mirror.
+    for(const key of ["1","0","9"])await visitor.locator(".resvBox .keypad").getByRole("button",{name:key,exact:true}).click();
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
-    await visitor.getByText("Please check the reservation number.").waitFor();
-    for(const key of ["3","4","5","6"])await visitor.getByRole("button",{name:key,exact:true}).click();
-    await mirror.getByText("123456").waitFor({timeout:6000});
+    await visitor.getByText("Enter a reservation number from 1 to 108.").waitFor();
+    await visitor.locator(".resvBox .keypad").getByRole("button",{name:"Delete"}).click();
+    await visitor.locator(".resvBox .keypad").getByRole("button",{name:"8",exact:true}).click();
+    await mirror.getByText("108번").waitFor({timeout:6000});
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitor.getByText(/Request no\. #1/).waitFor({timeout:6000});
     await mirror.getByText("요청 받음 #1").waitFor({timeout:6000});
     await staff.getByText("받은 요청 1건").waitFor({timeout:6000});
-    await staff.locator(".reqList").getByText("영어 · 예약함 123456").waitFor();
+    await staff.locator(".reqList").getByText("영어 · 예약함 · 108번").waitFor();
     await staff.locator(".reqList").getByText("3번 창구").waitFor();
     if(await visitor.getByText(/Staff use this number/).count())throw Error("Visitor still sees the request-number explanation");
     // Fixed phrase cards (incl. "번호표"/"예약 확인") live in .noticePanel; requests themselves need no clicks.
@@ -139,14 +142,23 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await visitor.getByRole("button",{name:/Report a change of phone number/}).click();
     await visitor.getByText(/This screen only sends your reason for visiting to staff/).waitFor();
     await visitor.getByRole("button",{name:"Yes, booked"}).click();
+    await visitor.getByRole("button",{name:"Appointment for another date"}).click();
+    for(const key of ["1","2"])await visitor.locator(".resvBox .keypad").getByRole("button",{name:key,exact:true}).click();
+    for(const key of ["2","0","2","6","0","2","3","0"])await visitor.locator(".dateEntry .keypad").getByRole("button",{name:key,exact:true}).click();
+    await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
+    await visitor.getByText("Enter a valid 8-digit appointment date.").waitFor();
+    for(const key of ["Delete","Delete"])await visitor.locator(".dateEntry .keypad").getByRole("button",{name:key}).click();
+    for(const key of ["2","8"])await visitor.locator(".dateEntry .keypad").getByRole("button",{name:key,exact:true}).click();
+    await mirror.getByText("2026-02-28").waitFor({timeout:6000});
     await visitor.getByRole("button",{name:/SEND FOR STAFF REVIEW/}).click();
     await visitor.getByText(/Request no\. #2/).waitFor({timeout:6000});
     await staff.getByText("받은 요청 2건").waitFor({timeout:8500});
     // Fast taps with slow responses: the mirror must settle on the newest screen.
     await staff.locator(".mirror").getByText("요청 받음 #2").waitFor({timeout:8000});
     await staff.locator(".reqList").getByText("전화번호(연락처) 변경 신고").waitFor({timeout:8500});
+    await staff.locator(".reqList").getByText("영어 · 예약함 · 12번 · 다른 날짜 2026-02-28").waitFor({timeout:8500});
     if(errors.length)throw Error("Browser errors: "+errors.join(" | "));
-    console.log("PASS "+name+" complete: /secret → QR → iPad mini → 12 languages × 20 services → live mirror → request list → phone-change tag");
+    console.log("PASS "+name+" complete: /secret → QR → iPad mini → number range 1-108 → alternate-date keypad → live mirror and queue");
   } finally {
     await desktop.close();await ipad.close();await browser.close();
   }
