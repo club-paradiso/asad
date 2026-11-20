@@ -43,7 +43,7 @@
   var NOTICE_POLL_MS=2500,NOTICE_HIDE_MS=30000;
   var notice={shown:null,seq:-1,dismissedSeq:-1,timer:0,hideTimer:0,stopped:false,failures:0,gen:0};
   var state = {
-    data:null,code:"",codeDraft:"",locale:"KO",step:"connect",
+    data:null,code:"",codeDraft:"",locale:"KO",lastLocale:"",step:"connect",
     servicePage:0,serviceIndex:-1,booking:"",reservationNo:"",resvError:false,
     dateMode:"today",dateDigits:"",dateError:false,
     sending:false,requestId:"",sentSeq:0,error:"",errorDetail:""
@@ -72,7 +72,7 @@
   function connect() {
     var code = state.codeDraft.replace(/\s/g,"").toUpperCase();
     if (!A.queryCode(code)) return error("직원 화면에 나온 10자리 접수 코드를 다시 확인해 주세요.");
-    state.code = code; state.error = ""; state.errorDetail = ""; state.step = "language";
+    state.code = code; state.lastLocale = ""; state.error = ""; state.errorDetail = ""; state.step = "language";
     notice.gen++;notice.stopped=false;notice.seq=-1;render();pollNotice();
   }
   function reset() {
@@ -83,7 +83,7 @@
     render();
   }
   function chooseLanguage(code){
-    state.locale=code;state.serviceIndex=-1;state.booking="";state.reservationNo="";state.resvError=false;
+    state.locale=code;state.lastLocale=code;state.serviceIndex=-1;state.booking="";state.reservationNo="";state.resvError=false;
     state.dateMode="today";state.dateDigits="";state.dateError=false;
     state.servicePage=0;state.step="services";state.error="";state.errorDetail="";render();
   }
@@ -321,7 +321,7 @@
     if(!state.data)return;
     // Before a language is chosen, show English; Korean underneath lets the staff member read along.
     var chosen=state.step!=="language" && state.step!=="connect";
-    var code=chosen?state.locale:"EN";
+    var code=bundle && state.lastLocale ? state.lastLocale : (chosen?state.locale:"EN");
     var bundle=n.id==="nextSteps";
     var main=bundle ? state.data.locales[code].nextSteps && state.data.locales[code].nextSteps.title : noticeText(code,n.id,n.counter);
     if(!main)return;
