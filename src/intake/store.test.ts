@@ -3,7 +3,7 @@ import liveCatalog from "../../public/compat/data.json";
 import demoCatalog from "../../apps/visitor-intake/data.json";
 import {
   __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
-  validCode, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS,
+  validCode, validLanguage, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS,
 } from "./store";
 import {
   POST as createSession, GET as readSession, PATCH as markSession,
@@ -35,6 +35,8 @@ describe("intake service catalog", () => {
     expect(Object.keys(liveCatalog.locales)).toHaveLength(11);
     expect(liveCatalog.locales).toHaveProperty("HI");
     expect(liveCatalog.locales).not.toHaveProperty("UZ");
+    expect(validLanguage("HI")).toBe(true);
+    expect(validLanguage("UZ")).toBe(false);
     expect(Object.keys(liveCatalog.locales).filter(code => code === "HI")).toHaveLength(1);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(locale.services).toHaveLength(20);
