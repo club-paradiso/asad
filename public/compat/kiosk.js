@@ -488,14 +488,14 @@
   document.addEventListener("webkitfullscreenchange",onFullscreenChange);
   var qrCode=A.getQuery("desk").replace(/\s/g,"").toUpperCase();
   if(A.queryCode(qrCode)){state.code=qrCode;state.codeDraft=qrCode;state.step="language";}
-  A.request("GET","/compat/data.json?v=5",null,null,function(err,data){
+  A.request("GET","/compat/data.json?v=6",null,null,function(err,data){
     if (err || !data || !data.locales) {
       A.clear(root).appendChild(message("화면 정보를 불러오지 못했습니다. 직원에게 알려 주세요.","error"));
       return;
     }
     for(var i=0;i<LANGS.length;i++){
       var entry=data.locales[LANGS[i]];
-      if(!entry || !entry.services || entry.services.length!==20 || !entry.review || !entry.kiosk) {
+      if(!entry || !entry.services || entry.services.length!==20 || !entry.review || !entry.kiosk || !entry.kiosk.reservationOtherDate || !entry.kiosk.reservationDateInvalid) {
         A.clear(root).appendChild(message("언어 데이터가 올바르지 않습니다. 직원에게 알려 주세요.","error"));return;
       }
     }
