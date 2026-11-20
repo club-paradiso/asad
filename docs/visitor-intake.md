@@ -58,10 +58,11 @@
 
 ## 품질 확인
 
-- \`npm run lint && npm run typecheck && npm test && npm run build\`
-- \`src/intake/store.test.ts\`: 토큰 권한 분리, 세션 만료, 입력 제한, 중복 제출, 민원인 제출→직원 조회→직원 확인→발권 기록.
+- `npm run lint && npm run typecheck && npm test && npm run build`
+- `src/intake/store.test.ts`: 토큰 권한 분리, 세션 만료, 예약번호 1~108 경계값·윤년 및 잘못된 날짜 검증, 입력 제한, 중복 제출, 민원인 제출→직원 조회→직원 확인→발권 기록.
+- `scripts/e2e-intake-compat.mjs`: Chromium·WebKit에서 109번 차단, 108번 정상 전달, 다른 날짜(잘못된 날짜 수정 포함) 키패드 입력과 직원 화면 반영.
 - ASAD GitHub Actions CI에서 기존 기능 회귀 검사.
-- \`scripts/e2e-intake-dual-monitor.mjs\`: Chromium·WebKit에서 직원 2명 대기열 격리, 새 민원인 창의 토큰 비노출, 창구 화면 레이블·직원 새로고침 후 복원 확인.
+- `scripts/e2e-intake-dual-monitor.mjs`: Chromium·WebKit에서 직원 2명 대기열 격리, 새 민원인 창의 토큰 비노출, 창구 화면 레이블·직원 새로고침 후 복원 확인.
 - 기관 승인 후 실제 iPad Safari와 데스크톱 간 QR 연결·새로고침·멀티 창구·Wi-Fi 전환·세션 만료 실기기 시험 필요.
 
 ## 창구 구별
