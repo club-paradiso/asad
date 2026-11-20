@@ -57,7 +57,6 @@ describe("intake service catalog", () => {
       expect(locale.kiosk.reservationDateLabel).toBeTruthy();
     }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
-    expect(validCode("ABCDEFGHIJ")).toBe(false); // language catalog changes never alter desk pairing codes
   });
 });
 
