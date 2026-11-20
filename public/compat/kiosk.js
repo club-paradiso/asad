@@ -38,7 +38,7 @@
       error("전체화면으로 바꾸지 못했습니다. F11을 눌러 주세요.");
     }
   }
-  var LANGS = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"];
+  var LANGS = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","MN","NE"];
   // Staff -> visitor fixed phrases. The desk sends only a phrase id; the text comes from data.json.
   var NOTICE_POLL_MS=2500,NOTICE_HIDE_MS=30000;
   var notice={shown:null,seq:-1,dismissedSeq:-1,timer:0,hideTimer:0,stopped:false,failures:0,gen:0};
@@ -488,7 +488,7 @@
   document.addEventListener("webkitfullscreenchange",onFullscreenChange);
   var qrCode=A.getQuery("desk").replace(/\s/g,"").toUpperCase();
   if(A.queryCode(qrCode)){state.code=qrCode;state.codeDraft=qrCode;state.step="language";}
-  A.request("GET","/compat/data.json?v=6",null,null,function(err,data){
+  A.request("GET","/compat/data.json?v=7",null,null,function(err,data){
     if (err || !data || !data.locales) {
       A.clear(root).appendChild(message("화면 정보를 불러오지 못했습니다. 직원에게 알려 주세요.","error"));
       return;
