@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { clientAddress, isSameOrigin, readJsonBody } from "@/lib/guard";
 import { RequestRateLimiter } from "@/lib/rate-limit";
-import { reservationFields, validReservation } from "@/intake/reservation";
 import {
-  LIVE_STEPS, intakeStore, validCode, validLanguage,
-  type IntakeLive,
+  LIVE_STEPS, RESERVATION_NO, intakeStore, validCode, validLanguage, validReservationDate,
+  type Booking, type IntakeLanguage, type IntakeLive,
 } from "@/intake/store";
 
 export const runtime = "nodejs";
@@ -22,15 +21,18 @@ const schema = z.object({
   step: z.enum(LIVE_STEPS),
   language: z.string().max(5).optional(),
   serviceIndex: z.number().int().min(0).max(19).optional(),
-  ...reservationFields,
-  booking: reservationFields.booking.optional(),
+  booking: z.enum(["yes", "no", "unsure"]).optional(),
+  // Only completed valid number/date values are mirrored; other-date selection is mirrored immediately.
+  reservationNo: z.string().regex(RESERVATION_NO).optional(),
+  reservationDateMode: z.enum(["today", "other"]).optional(),
+  reservationDate: z.string().refine(validReservationDate).optional(),
   seq: z.number().int().min(1).max(10_000).optional(),
   // Ordering: a random id per kiosk page load plus a counter. No wall clock involved, so a
   // clock correction or a different device can never freeze the mirror. Optional so an
   // already-open older kiosk keeps working.
   epoch: z.string().regex(/^[A-Za-z0-9]{8,32}$/).optional(),
   rev: z.number().int().positive().max(1_000_000_000).optional(),
-}).strict().refine(value => validReservation(value, value.step === "review"));
+}).strict();
 
 /**
  * Visitor screen -> staff mirror. Carries only the same coded choices as a
@@ -44,16 +46,19 @@ export async function POST(request: Request) {
   if (!body.ok) return fail(body.status, body.error);
   const parsed = schema.safeParse(body.value);
   if (!parsed.success || !validCode(parsed.data.code)) return fail(400, "Invalid live state.");
-  const { code, step, language, serviceIndex, booking, reservationNo, reservationDate, seq, epoch, rev } = parsed.data;
+  const { code, step, language, serviceIndex, booking, reservationNo, reservationDateMode, reservationDate, seq, epoch, rev } = parsed.data;
   if (language !== undefined && !validLanguage(language)) return fail(400, "Invalid live state.");
+  if ((reservationNo !== undefined || reservationDateMode !== undefined || reservationDate !== undefined) && booking !== "yes") return fail(400, "Invalid live state.");
+  if (reservationDate !== undefined && (reservationDateMode !== "other" || reservationNo === undefined)) return fail(400, "Invalid live state.");
   const store = intakeStore();
   if (!store) return fail(503, "실시간 접수 저장소가 연결되지 않았습니다.");
 
   const live: IntakeLive = { step, updatedAt: Date.now() };
-  if (language !== undefined) live.language = language;
+  if (language !== undefined) live.language = language as IntakeLanguage;
   if (serviceIndex !== undefined) live.serviceIndex = serviceIndex;
-  if (booking !== undefined) live.booking = booking;
+  if (booking !== undefined) live.booking = booking as Booking;
   if (reservationNo !== undefined) live.reservationNo = reservationNo;
+  if (reservationDateMode !== undefined) live.reservationDateMode = reservationDateMode;
   if (reservationDate !== undefined) live.reservationDate = reservationDate;
   if (seq !== undefined) live.seq = seq;
   if (epoch !== undefined && rev !== undefined) { live.epoch = epoch; live.rev = rev; }

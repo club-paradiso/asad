@@ -63,10 +63,14 @@
         "requestNo": "요청 번호",
         "autoReset": "{s}초 뒤 처음 화면으로 돌아갑니다.",
         "sendFailed": "보내지 못했습니다. 다시 눌러 주세요. 계속 안 되면 직원에게 알려 주세요.",
-        "reservationNoLabel": "예약 번호 (선택)",
-        "reservationNoInvalid": "예약 번호를 다시 확인해 주세요.",
+        "reservationNoLabel": "예약 번호 (1~108)",
+        "reservationNoInvalid": "예약번호는 1부터 108까지 입력해 주세요.",
         "erase": "지우기",
-        "counter": "{n}번 창구"
+        "counter": "{n}번 창구",
+        "reservationToday": "오늘 방문 예약",
+        "reservationOtherDate": "다른 날짜로 예약함",
+        "reservationDateLabel": "예약 날짜 (연도·월·일, 숫자 8자리)",
+        "reservationDateInvalid": "예약 날짜를 8자리로 정확히 입력해 주세요."
       },
       "notice": {
         "ok": "확인",
@@ -89,6 +93,13 @@
           "today": "오늘은 처리할 수 없습니다. 다시 방문해 주세요.",
           "interp": "통역이 필요하면 직원에게 말해 주세요."
         }
+      },
+      "nextSteps": {
+        "title": "다음 단계 안내",
+        "form": "통합신청서를 작성해 주세요.",
+        "stamp": "체류기간 연장 수수료 {n}만 원의 수입인지를 구매해 주세요.",
+        "atm": "ATM에서 등록증 발급 비용을 납부해 주세요.",
+        "photo": "통합신청서에 사진을 부착해 주세요."
       }
     },
     "EN": {
@@ -152,10 +163,14 @@
         "requestNo": "Request no.",
         "autoReset": "Returning to the start screen in {s} seconds.",
         "sendFailed": "Could not send. Please tap again. If it keeps failing, please tell a staff member.",
-        "reservationNoLabel": "Reservation number (optional)",
-        "reservationNoInvalid": "Please check the reservation number.",
+        "reservationNoLabel": "Reservation number (1–108)",
+        "reservationNoInvalid": "Enter a reservation number from 1 to 108.",
         "erase": "Delete",
-        "counter": "Counter {n}"
+        "counter": "Counter {n}",
+        "reservationToday": "Appointment for today",
+        "reservationOtherDate": "Appointment for another date",
+        "reservationDateLabel": "Appointment date (YYYYMMDD, 8 digits)",
+        "reservationDateInvalid": "Enter a valid 8-digit appointment date."
       },
       "notice": {
         "ok": "OK",
@@ -178,6 +193,13 @@
           "today": "We cannot process this today. Please come back another day.",
           "interp": "If you need an interpreter, please tell a staff member."
         }
+      },
+      "nextSteps": {
+        "title": "Next steps",
+        "form": "Please complete the integrated application form.",
+        "stamp": "Please purchase a revenue stamp for the extension fee of {n} × 10,000 KRW.",
+        "atm": "Please pay the registration card issuance fee at the ATM.",
+        "photo": "Please attach a photo to the application form."
       }
     },
     "ZH-CN": {
@@ -241,10 +263,14 @@
         "requestNo": "申请编号",
         "autoReset": "{s}秒后返回首页。",
         "sendFailed": "发送失败。请再点一次。如仍无法发送，请告知工作人员。",
-        "reservationNoLabel": "预约号码（选填）",
-        "reservationNoInvalid": "请核对预约号码。",
+        "reservationNoLabel": "预约号码（1–108）",
+        "reservationNoInvalid": "请输入1至108之间的预约号码。",
         "erase": "删除",
-        "counter": "{n}号窗口"
+        "counter": "{n}号窗口",
+        "reservationToday": "预约日期为今天",
+        "reservationOtherDate": "预约了其他日期",
+        "reservationDateLabel": "预约日期（年月日，8位数字）",
+        "reservationDateInvalid": "请输入有效的8位预约日期。"
       },
       "notice": {
         "ok": "确认",
@@ -267,6 +293,13 @@
           "today": "今天无法办理。请改日再来。",
           "interp": "如需翻译，请告诉工作人员。"
         }
+      },
+      "nextSteps": {
+        "title": "后续办理事项",
+        "form": "请填写综合申请表。",
+        "stamp": "请购买相当于 {n} × 10,000 韩元延期手续费的印花税票（수입인지）。",
+        "atm": "请在 ATM 缴纳外国人登录证制证费。",
+        "photo": "请将照片贴在申请表上。"
       }
     },
     "ID": {
@@ -330,10 +363,14 @@
         "requestNo": "Nomor permintaan",
         "autoReset": "Kembali ke layar awal dalam {s} detik.",
         "sendFailed": "Gagal mengirim. Silakan ketuk lagi. Jika tetap gagal, beri tahu petugas.",
-        "reservationNoLabel": "Nomor reservasi (opsional)",
-        "reservationNoInvalid": "Periksa kembali nomor reservasi.",
+        "reservationNoLabel": "Nomor reservasi (1–108)",
+        "reservationNoInvalid": "Masukkan nomor reservasi dari 1 hingga 108.",
         "erase": "Hapus",
-        "counter": "Loket {n}"
+        "counter": "Loket {n}",
+        "reservationToday": "Janji temu untuk hari ini",
+        "reservationOtherDate": "Janji temu pada tanggal lain",
+        "reservationDateLabel": "Tanggal janji temu (YYYYMMDD, 8 angka)",
+        "reservationDateInvalid": "Masukkan tanggal janji temu 8 angka yang valid."
       },
       "notice": {
         "ok": "OK",
@@ -356,6 +393,13 @@
           "today": "Hari ini tidak dapat diproses. Silakan datang kembali di hari lain.",
           "interp": "Jika memerlukan penerjemah, silakan beri tahu petugas."
         }
+      },
+      "nextSteps": {
+        "title": "Langkah selanjutnya",
+        "form": "Silakan isi formulir permohonan terpadu.",
+        "stamp": "Silakan beli materai pembayaran (수입인지) untuk biaya perpanjangan sebesar {n} × 10.000 KRW.",
+        "atm": "Bayar biaya penerbitan kartu registrasi di ATM.",
+        "photo": "Tempelkan foto pada formulir permohonan."
       }
     },
     "HI": {
@@ -419,10 +463,14 @@
         "requestNo": "अनुरोध संख्या",
         "autoReset": "{s} सेकंड में शुरुआती स्क्रीन पर लौटेंगे।",
         "sendFailed": "भेजा नहीं जा सका। कृपया फिर से दबाएँ। फिर भी न हो तो कर्मचारी को बताएँ।",
-        "reservationNoLabel": "आरक्षण संख्या (वैकल्पिक)",
-        "reservationNoInvalid": "कृपया आरक्षण संख्या जाँचें।",
+        "reservationNoLabel": "आरक्षण नंबर (1–108)",
+        "reservationNoInvalid": "कृपया 1 से 108 तक आरक्षण नंबर दर्ज करें।",
         "erase": "मिटाएँ",
-        "counter": "काउंटर {n}"
+        "counter": "काउंटर {n}",
+        "reservationToday": "आज के लिए अपॉइंटमेंट",
+        "reservationOtherDate": "किसी और तारीख का अपॉइंटमेंट",
+        "reservationDateLabel": "अपॉइंटमेंट की तारीख (YYYYMMDD, 8 अंक)",
+        "reservationDateInvalid": "कृपया 8 अंकों की सही तारीख दर्ज करें।"
       },
       "notice": {
         "ok": "ठीक है",
@@ -445,6 +493,13 @@
           "today": "आज यह काम नहीं हो सकता। कृपया किसी और दिन आएँ।",
           "interp": "दुभाषिये की ज़रूरत हो तो कर्मचारी को बताएँ।"
         }
+      },
+      "nextSteps": {
+        "title": "अगले चरण",
+        "form": "कृपया एकीकृत आवेदन पत्र भरें।",
+        "stamp": "अवधि बढ़ाने के शुल्क के लिए {n} × 10,000 KRW का राजस्व स्टाम्प (수입인지) खरीदें।",
+        "atm": "पंजीकरण कार्ड जारी करने का शुल्क ATM पर जमा करें।",
+        "photo": "आवेदन पत्र पर फ़ोटो चिपकाएँ।"
       }
     },
     "VI": {
@@ -508,10 +563,14 @@
         "requestNo": "Số yêu cầu",
         "autoReset": "Quay về màn hình đầu sau {s} giây.",
         "sendFailed": "Không gửi được. Vui lòng chạm lại. Nếu vẫn lỗi, hãy báo nhân viên.",
-        "reservationNoLabel": "Số đặt lịch (không bắt buộc)",
-        "reservationNoInvalid": "Vui lòng kiểm tra lại số đặt lịch.",
+        "reservationNoLabel": "Số đặt lịch (1–108)",
+        "reservationNoInvalid": "Nhập số đặt lịch từ 1 đến 108.",
         "erase": "Xóa",
-        "counter": "Quầy số {n}"
+        "counter": "Quầy số {n}",
+        "reservationToday": "Lịch hẹn hôm nay",
+        "reservationOtherDate": "Lịch hẹn vào ngày khác",
+        "reservationDateLabel": "Ngày hẹn (YYYYMMDD, 8 chữ số)",
+        "reservationDateInvalid": "Hãy nhập ngày hẹn hợp lệ gồm 8 chữ số."
       },
       "notice": {
         "ok": "OK",
@@ -534,6 +593,13 @@
           "today": "Hôm nay không thể xử lý. Vui lòng quay lại vào ngày khác.",
           "interp": "Nếu cần phiên dịch, vui lòng báo cho nhân viên."
         }
+      },
+      "nextSteps": {
+        "title": "Các bước tiếp theo",
+        "form": "Vui lòng điền đơn đăng ký tổng hợp.",
+        "stamp": "Vui lòng mua tem lệ phí (수입인지) cho phí gia hạn {n} × 10.000 KRW.",
+        "atm": "Nộp phí cấp thẻ đăng ký tại máy ATM.",
+        "photo": "Dán ảnh vào đơn đăng ký."
       }
     },
     "JA": {
@@ -597,10 +663,14 @@
         "requestNo": "受付番号",
         "autoReset": "{s}秒後に最初の画面に戻ります。",
         "sendFailed": "送信できませんでした。もう一度押してください。続く場合は職員にお知らせください。",
-        "reservationNoLabel": "予約番号（任意）",
-        "reservationNoInvalid": "予約番号をご確認ください。",
+        "reservationNoLabel": "予約番号（1～108）",
+        "reservationNoInvalid": "予約番号は1～108で入力してください。",
         "erase": "削除",
-        "counter": "{n}番窓口"
+        "counter": "{n}番窓口",
+        "reservationToday": "本日の予約",
+        "reservationOtherDate": "別の日の予約",
+        "reservationDateLabel": "予約日（年月日・数字8桁）",
+        "reservationDateInvalid": "正しい予約日を数字8桁で入力してください。"
       },
       "notice": {
         "ok": "OK",
@@ -623,6 +693,13 @@
           "today": "本日は処理できません。改めてお越しください。",
           "interp": "通訳が必要な場合は職員にお知らせください。"
         }
+      },
+      "nextSteps": {
+        "title": "次の手続き",
+        "form": "統合申請書を記入してください。",
+        "stamp": "滞在期間延長手数料 {n}万ウォン分の収入印紙を購入してください。",
+        "atm": "ATMで外国人登録証の発行費用を納付してください。",
+        "photo": "申請書に写真を貼ってください。"
       }
     },
     "TH": {
@@ -686,10 +763,14 @@
         "requestNo": "หมายเลขคำขอ",
         "autoReset": "จะกลับไปหน้าแรกใน {s} วินาที",
         "sendFailed": "ส่งไม่สำเร็จ กรุณากดอีกครั้ง หากยังไม่ได้ กรุณาแจ้งเจ้าหน้าที่",
-        "reservationNoLabel": "หมายเลขการจอง (ไม่บังคับ)",
-        "reservationNoInvalid": "กรุณาตรวจสอบหมายเลขการจอง",
+        "reservationNoLabel": "หมายเลขการจอง (1–108)",
+        "reservationNoInvalid": "กรุณากรอกหมายเลข 1 ถึง 108",
         "erase": "ลบ",
-        "counter": "ช่องบริการที่ {n}"
+        "counter": "ช่องบริการที่ {n}",
+        "reservationToday": "นัดหมายสำหรับวันนี้",
+        "reservationOtherDate": "นัดหมายวันอื่น",
+        "reservationDateLabel": "วันที่นัดหมาย (YYYYMMDD, ตัวเลข 8 หลัก)",
+        "reservationDateInvalid": "กรุณากรอกวันที่นัดหมาย 8 หลักให้ถูกต้อง"
       },
       "notice": {
         "ok": "ตกลง",
@@ -712,6 +793,13 @@
           "today": "วันนี้ไม่สามารถดำเนินการได้ กรุณามาใหม่ในวันอื่น",
           "interp": "หากต้องการล่าม กรุณาแจ้งเจ้าหน้าที่"
         }
+      },
+      "nextSteps": {
+        "title": "ขั้นตอนถัดไป",
+        "form": "กรุณากรอกแบบฟอร์มคำร้องรวม",
+        "stamp": "กรุณาซื้ออากรแสตมป์ (수입인지) สำหรับค่าธรรมเนียมต่ออายุการพำนัก {n} × 10,000 วอน",
+        "atm": "ชำระค่าธรรมเนียมออกบัตรทะเบียนคนต่างด้าวที่ตู้ ATM",
+        "photo": "ติดรูปถ่ายลงในแบบฟอร์มคำร้อง"
       }
     },
     "RU": {
@@ -775,10 +863,14 @@
         "requestNo": "Номер запроса",
         "autoReset": "Возврат на начальный экран через {s} с.",
         "sendFailed": "Не удалось отправить. Нажмите ещё раз. Если ошибка повторится, сообщите сотруднику.",
-        "reservationNoLabel": "Номер записи (необязательно)",
-        "reservationNoInvalid": "Проверьте номер записи.",
+        "reservationNoLabel": "Номер записи (1–108)",
+        "reservationNoInvalid": "Введите номер записи от 1 до 108.",
         "erase": "Стереть",
-        "counter": "Окно {n}"
+        "counter": "Окно {n}",
+        "reservationToday": "Запись на сегодня",
+        "reservationOtherDate": "Запись на другую дату",
+        "reservationDateLabel": "Дата записи (ГГГГММДД, 8 цифр)",
+        "reservationDateInvalid": "Введите корректную дату из 8 цифр."
       },
       "notice": {
         "ok": "OK",
@@ -801,95 +893,413 @@
           "today": "Сегодня это оформить нельзя. Приходите, пожалуйста, в другой день.",
           "interp": "Если нужен переводчик, скажите сотруднику."
         }
+      },
+      "nextSteps": {
+        "title": "Следующие действия",
+        "form": "Пожалуйста, заполните единую форму заявления.",
+        "stamp": "Купите гербовую марку (수입인지) на сумму {n} × 10 000 KRW для оплаты продления срока пребывания.",
+        "atm": "Оплатите выдачу регистрационной карты в банкомате ATM.",
+        "photo": "Прикрепите фотографию к заявлению."
       }
     },
-    "UZ": {
-      "name": "O‘zbekcha",
+    "FIL": {
+      "name": "Filipino",
       "heading": [
-        "Bugun qanday masala bilan keldingiz?",
-        "Boshqa xizmatlar"
+        "Ano ang maitutulong namin sa iyo ngayon?",
+        "Iba pang serbisyo"
       ],
       "instructions": [
-        "Kerakli xizmatni bosing.",
-        "Quyidagi xizmatlardan birini tanlang."
+        "Pindutin ang serbisyong kailangan mo.",
+        "Pumili ng serbisyo sa ibaba."
       ],
       "services": [
-        "Koreyada qolish muddatini uzaytirish",
-        "Yashash manzili o‘zgarganini bildirish",
-        "Pasport / chet ellik ro‘yxati maʼlumotlarini o‘zgartirish",
-        "Yashash maqomini o‘zgartirish / olish",
-        "Chet ellikni ilk ro‘yxatga olish / Koreyadagi yashash joyini bildirish",
-        "Chet ellik ro‘yxat kartasini qayta olish",
-        "Chet ellik ro‘yxat kartasini olib ketish",
-        "Ish joyini o‘zgartirish / qo‘shish",
-        "Yashash maqomidan tashqari faoliyatga ruxsat",
-        "Immigratsiyaga oid faktlar haqida maʼlumotnoma olish",
-        "Ixtiyoriy chiqish haqida oldindan xabar berish",
-        "Qochqin deb tan olish uchun ariza",
-        "Qochqinlik qaroriga eʼtiroz bildirish",
-        "Chiqish taqiqi / to‘xtatilishini tekshirish",
-        "Axborotni oshkor qilishni so‘rash",
-        "Yetishmayotgan hujjatlarni topshirish",
-        "Qayta kirish ruxsatini olish",
-        "Ariza ko‘rib chiqilishi holatini so‘rash",
-        "Boshqa savollar va maslahat",
-        "Telefon raqami o‘zgarganini xabar qilish"
+        "Pagpapalawig ng panahon ng pananatili",
+        "Pag-uulat ng pagbabago ng tirahan",
+        "Pag-update ng pasaporte o detalye ng rehistrasyon",
+        "Pagbabago o pagkuha ng status ng pananatili",
+        "Unang rehistrasyon ng dayuhan / ulat ng paninirahan",
+        "Muling pag-isyu ng registration card",
+        "Pagkuha ng registration card",
+        "Pagbabago o pagdagdag ng lugar ng trabaho",
+        "Pahintulot sa aktibidad na hindi sakop ng status ng pananatili",
+        "Pagkuha ng sertipiko mula sa imigrasyon",
+        "Paunang pag-uulat ng boluntaryong pag-alis",
+        "Aplikasyon para kilalanin bilang refugee",
+        "Paghahain ng pagtutol sa desisyon sa refugee",
+        "Pagtatanong tungkol sa pagbabawal o pagpigil sa pag-alis",
+        "Paghiling ng pagsisiwalat ng impormasyon",
+        "Pagsumite ng karagdagang dokumento",
+        "Pahintulot na muling pumasok sa Korea",
+        "Pagtatanong sa estado ng aplikasyon",
+        "Iba pang katanungan",
+        "Pag-uulat ng pagbabago ng numero ng telepono"
       ],
       "review": {
-        "reviewTitle": "Tanlangan xizmatni tekshiring",
-        "reviewHelp": "Xodimga yuborishdan oldin tekshiring.",
-        "serviceLabel": "Tanlangan xizmat",
-        "reservationTitle": "HiKorea orqali tashrifga yozilganmisiz?",
-        "reservationHelp": "Xodim yozuvni tekshiradi. Bilmasangiz ham davom eting.",
-        "answerYes": "Ha",
-        "answerNo": "Yo‘q",
-        "answerUnsure": "Bilmayman",
-        "sendLabel": "XODIM TEKSHIRUVIGA YUBORISH →",
-        "privacy": "Demo ism va pasport raqamini yig‘maydi.",
-        "waitingTitle": "So‘rov yuborish namoyishi",
-        "waitingHelp": "Bu Figma prototipi haqiqiy so‘rov yubormaydi.",
-        "waitingTicket": "Navbat taloni hali berilmadi.",
-        "waitingNote": "Haqiqiy tashrifda xodim tasdig‘ini kuting.",
-        "waitingHome": "BOSHIGA QAYTISH",
-        "phoneChangeNote": "Bu ekran xodimga faqat tashrif maqsadini yuboradi. Telefon raqamini bu yerda kiritib yoki o‘zgartirib bo‘lmaydi. Xodim ko‘rsatmalariga amal qiling."
+        "reviewTitle": "Suriin ang napiling serbisyo.",
+        "reviewHelp": "Pakisuri ang impormasyon bago ipadala sa kawani.",
+        "serviceLabel": "NAPILING SERBISYO",
+        "reservationTitle": "May appointment ka ba sa HiKorea?",
+        "reservationHelp": "Susuriin ng kawani ang appointment. Puwede kang magpatuloy kahit hindi sigurado.",
+        "answerYes": "Oo, may appointment",
+        "answerNo": "Walang appointment",
+        "answerUnsure": "Hindi sigurado",
+        "sendLabel": "IPADALA SA KAWANI →",
+        "privacy": "Hindi kinokolekta rito ang pangalan o numero ng pasaporte.",
+        "waitingTitle": "Preview ng pagpapadala ng kahilingan",
+        "waitingHelp": "Walang aktuwal na kahilingang ipinapadala sa demo.",
+        "waitingTicket": "Wala pang naibibigay na queue number.",
+        "waitingNote": "Hintayin ang kumpirmasyon ng kawani.",
+        "waitingHome": "BUMALIK SA SIMULA",
+        "phoneChangeNote": "Ipinapadala lamang ng screen na ito ang dahilan ng pagbisita. Hindi rito maaaring baguhin ang numero ng telepono. Ituturo ng kawani ang proseso."
       },
       "kiosk": {
-        "moreServices": "Boshqa xizmatlar (11–20)",
-        "firstServices": "Oldingi xizmatlar (1–10)",
-        "changeLanguage": "Tilni o‘zgartirish",
-        "changeService": "Boshqa xizmatni tanlash",
-        "sending": "Yuborilmoqda…",
-        "sentTitle": "Xodimga yuborildi",
-        "sentBody": "Biroz kuting. Xodim tashrif maqsadingiz va bronni tekshirib, sizga navbat talonini beradi.",
-        "requestNo": "So‘rov raqami",
-        "autoReset": "{s} soniyadan keyin bosh ekranga qaytiladi.",
-        "sendFailed": "Yuborib bo‘lmadi. Yana bir marta bosing. Takrorlansa, xodimga ayting.",
-        "reservationNoLabel": "Bron raqami (ixtiyoriy)",
-        "reservationNoInvalid": "Bron raqamini tekshiring.",
-        "erase": "O‘chirish",
-        "counter": "{n}-oyna"
+        "moreServices": "Iba pang serbisyo (11–20)",
+        "firstServices": "Mga naunang serbisyo (1–10)",
+        "changeLanguage": "Baguhin ang wika",
+        "changeService": "Pumili ng ibang serbisyo",
+        "sending": "Ipinapadala…",
+        "sentTitle": "Naipadala sa kawani",
+        "sentBody": "Sandaling maghintay. Susuriin ng kawani ang iyong pakay at appointment bago magbigay ng queue number.",
+        "requestNo": "Numero ng kahilingan",
+        "autoReset": "Babalik sa simula sa loob ng {s} segundo.",
+        "sendFailed": "Hindi naipadala. Pindutin muli o ipaalam sa kawani.",
+        "reservationNoLabel": "Numero ng appointment (1–108)",
+        "reservationNoInvalid": "Maglagay ng numero mula 1 hanggang 108.",
+        "erase": "Burahin",
+        "counter": "Counter {n}",
+        "reservationToday": "Appointment ngayong araw",
+        "reservationOtherDate": "Appointment sa ibang petsa",
+        "reservationDateLabel": "Petsa ng appointment (YYYYMMDD, 8 digit)",
+        "reservationDateInvalid": "Maglagay ng wastong 8-digit na petsa."
       },
       "notice": {
         "ok": "OK",
         "texts": {
-          "ticket": "Iltimos, navbat raqamini olib, kuting.",
-          "call": "Raqamingiz ekranda chiqqanda, darchaga boring. Oldindan yozilgan bo‘lsangiz, o‘z yozilish ma’lumotlaringizni tekshiring.",
-          "moment": "Iltimos, biroz kuting.",
-          "counter": "Iltimos, {n}-darchaga boring.",
-          "floor3": "Iltimos, 3-qavatga (3F) chiqing.",
-          "back4": "Iltimos, orqadagi binoning 4-qavatiga (4F) boring.",
-          "visit": "Hibsdagi shaxs bilan uchrashuvga yozilish orqadagi binoning 1-qavatida (1F) amalga oshiriladi.",
-          "resvNeed": "Bu xizmat uchun HiKorea’da tashrifga oldindan yozilish kerak. Yozilib, keyin qayta keling.",
-          "resvShow": "Iltimos, yozilish ekranini (yozilish raqamini) ko‘rsating.",
-          "docs": "Iltimos, olib kelgan hujjatlaringizni ko‘rsating.",
-          "form": "Iltimos, umumiy ariza shaklini (Application Form) to‘ldiring.",
-          "passport": "Iltimos, pasport va chet ellik ro‘yxatga olish kartangizni tayyorlang.",
-          "photo": "Hujjat uchun surat kerak.",
-          "fee": "Bu xizmat uchun yig‘im to‘lanadi. Ko‘rsatmaga muvofiq to‘lang.",
-          "online": "Bu xizmatga HiKorea orqali onlayn ariza berish mumkin.",
-          "today": "Bugun buni rasmiylashtirib bo‘lmaydi. Iltimos, boshqa kuni keling.",
-          "interp": "Tarjimon kerak bo‘lsa, xodimga ayting."
+          "ticket": "Kumuha ng queue number at maghintay.",
+          "call": "Kapag lumabas ang iyong numero sa screen, pumunta sa counter. Tingnan ang detalye ng appointment kung mayroon.",
+          "moment": "Sandaling maghintay.",
+          "counter": "Pumunta sa Counter {n}.",
+          "floor3": "Pumunta sa ika-3 palapag (3F).",
+          "back4": "Pumunta sa ika-4 na palapag (4F) ng gusali sa likod.",
+          "visit": "Magparehistro para sa pagdalaw sa taong nakakulong sa ika-1 palapag (1F) ng gusali sa likod.",
+          "resvNeed": "Kailangan ng appointment sa HiKorea. Mag-book at bumalik.",
+          "resvShow": "Ipakita ang screen ng appointment (numero ng booking).",
+          "docs": "Ipakita ang mga dokumentong dala mo.",
+          "form": "Punan ang application form.",
+          "passport": "Ihanda ang pasaporte at registration card.",
+          "photo": "Kailangan ng ID photo.",
+          "fee": "May bayad ang serbisyong ito. Sundin ang tagubilin ng kawani.",
+          "online": "Maaaring mag-apply online sa HiKorea.",
+          "today": "Hindi ito maaasikaso ngayon. Bumalik sa ibang araw.",
+          "interp": "Sabihin sa kawani kung kailangan mo ng interpreter."
         }
+      },
+      "nextSteps": {
+        "title": "Mga susunod na gagawin",
+        "form": "Punan ang integrated application form.",
+        "stamp": "Bumili ng revenue stamp para sa extension fee na {n} × 10,000 KRW.",
+        "atm": "Bayaran ang bayad sa pag-isyu ng registration card sa ATM.",
+        "photo": "Idikit ang larawan sa application form."
+      }
+    },
+    "SI": {
+      "name": "සිංහල",
+      "heading": [
+        "අද ඔබ පැමිණියේ කුමන සේවාවක් සඳහාද?",
+        "වෙනත් සේවා"
+      ],
+      "instructions": [
+        "අවශ්‍ය සේවාව තෝරන්න.",
+        "පහත සේවාවක් තෝරන්න."
+      ],
+      "services": [
+        "රැඳී සිටීමේ කාලය දීර්ඝ කිරීම",
+        "ලිපිනය වෙනස් කිරීම වාර්තා කිරීම",
+        "විදේශ ගමන් බලපත්‍ර / ලියාපදිංචි තොරතුරු වෙනස් කිරීම",
+        "රැඳී සිටීමේ තත්ත්වය වෙනස් කිරීම / ලබා ගැනීම",
+        "පළමු විදේශික ලියාපදිංචිය / දේශීය පදිංචි වාර්තාව",
+        "විදේශික ලියාපදිංචි කාඩ්පත නැවත නිකුත් කිරීම",
+        "විදේශික ලියාපදිංචි කාඩ්පත ලබා ගැනීම",
+        "සේවා ස්ථානය වෙනස් කිරීම / එකතු කිරීම",
+        "වීසා තත්ත්වයෙන් බැහැර ක්‍රියාකාරකම් සඳහා අවසරය",
+        "ආගමන තොරතුරු සහතිකයක් ලබා ගැනීම",
+        "ස්වේච්ඡාවෙන් පිටත්වීම කලින් දැනුම් දීම",
+        "සරණාගත පිළිගැනීම සඳහා අයදුම් කිරීම",
+        "සරණාගත තීරණයට විරෝධය ඉදිරිපත් කිරීම",
+        "පිටවීමේ තහනම / අත්හිටුවීම පරීක්ෂා කිරීම",
+        "තොරතුරු හෙළිදරව් කිරීම සඳහා ඉල්ලීම",
+        "අමතර ලේඛන ඉදිරිපත් කිරීම",
+        "නැවත ඇතුළුවීමේ අවසරය සඳහා අයදුම් කිරීම",
+        "අයදුම්පත් සලකා බැලීමේ තත්ත්වය විමසීම",
+        "වෙනත් විමසීම්",
+        "දුරකථන අංකය වෙනස් කිරීම වාර්තා කිරීම"
+      ],
+      "review": {
+        "reviewTitle": "තෝරාගත් සේවාව පරීක්ෂා කරන්න.",
+        "reviewHelp": "කාර්ය මණ්ඩලයට යැවීමට පෙර තොරතුරු පරීක්ෂා කරන්න.",
+        "serviceLabel": "තෝරාගත් සේවාව",
+        "reservationTitle": "HiKorea හරහා හමුවීමක් වෙන් කළාද?",
+        "reservationHelp": "කාර්ය මණ්ඩලය වෙන්කිරීම පරීක්ෂා කරයි. නොදන්නා විටත් ඉදිරියට යා හැක.",
+        "answerYes": "ඔව්, වෙන් කළා",
+        "answerNo": "වෙන් කර නැත",
+        "answerUnsure": "විශ්වාස නැත",
+        "sendLabel": "කාර්ය මණ්ඩලයට යවන්න →",
+        "privacy": "මෙහි නම හෝ විදේශ ගමන් බලපත්‍ර අංකය ලබා නොගනී.",
+        "waitingTitle": "ඉල්ලීම යැවීමේ පෙරදසුන",
+        "waitingHelp": "මෙය ආදර්ශ තිරයකි; සැබෑ ඉල්ලීමක් නොයවයි.",
+        "waitingTicket": "පෝලිම් අංකයක් නිකුත් කර නැත.",
+        "waitingNote": "කාර්ය මණ්ඩලයේ උපදෙස් බලා සිටින්න.",
+        "waitingHome": "මුලට යන්න",
+        "phoneChangeNote": "මෙම තිරයෙන් පැමිණීමේ හේතුව පමණක් දන්වයි. මෙහි දුරකථන අංකය වෙනස් කළ නොහැක. ක්‍රියාවලිය කාර්ය මණ්ඩලයෙන් විමසන්න."
+      },
+      "kiosk": {
+        "moreServices": "වෙනත් සේවා (11–20)",
+        "firstServices": "පෙර සේවා (1–10)",
+        "changeLanguage": "භාෂාව වෙනස් කරන්න",
+        "changeService": "වෙනත් සේවාවක් තෝරන්න",
+        "sending": "යවමින්…",
+        "sentTitle": "කාර්ය මණ්ඩලයට යවා ඇත",
+        "sentBody": "මොහොතක් රැඳී සිටින්න. පැමිණීමේ හේතුව හා වෙන්කිරීම පරීක්ෂා කර පෝලිම් අංකයක් ලබා දෙනු ඇත.",
+        "requestNo": "ඉල්ලීම් අංකය",
+        "autoReset": "තත්පර {s} කින් මුල් තිරයට යයි.",
+        "sendFailed": "යැවීමට නොහැකි විය. නැවත උත්සාහ කරන්න හෝ කාර්ය මණ්ඩලයට කියන්න.",
+        "reservationNoLabel": "වෙන්කිරීමේ අංකය (1–108)",
+        "reservationNoInvalid": "1 සිට 108 දක්වා අංකයක් ඇතුළත් කරන්න.",
+        "erase": "මකන්න",
+        "counter": "කවුන්ටරය {n}",
+        "reservationToday": "අදට වෙන් කර ඇත",
+        "reservationOtherDate": "වෙනත් දිනයකට වෙන් කර ඇත",
+        "reservationDateLabel": "වෙන්කළ දිනය (YYYYMMDD, ඉලක්කම් 8)",
+        "reservationDateInvalid": "නිවැරදි ඉලක්කම් 8ක දිනයක් ඇතුළත් කරන්න."
+      },
+      "notice": {
+        "ok": "හරි",
+        "texts": {
+          "ticket": "පෝලිම් අංකයක් ලබාගෙන රැඳී සිටින්න.",
+          "call": "තිරයේ ඔබේ අංකය පෙන්වූ විට කවුන්ටරයට යන්න. වෙන්කිරීමක් ඇත්නම් තොරතුරු පරීක්ෂා කරන්න.",
+          "moment": "මොහොතක් රැඳී සිටින්න.",
+          "counter": "කවුන්ටරය {n} වෙත යන්න.",
+          "floor3": "3 වන මහලට (3F) යන්න.",
+          "back4": "පසුපස ගොඩනැගිල්ලේ 4 වන මහලට (4F) යන්න.",
+          "visit": "පසුපස ගොඩනැගිල්ලේ 1 වන මහලේ (1F) රඳවා සිටින පුද්ගලයෙකු බැලීමට ලියාපදිංචි වන්න.",
+          "resvNeed": "මෙම සේවාවට HiKorea හමුවීමක් අවශ්‍යයි. වෙන් කර නැවත එන්න.",
+          "resvShow": "වෙන්කිරීමේ තිරය සහ අංකය පෙන්වන්න.",
+          "docs": "ගෙනා ලේඛන පෙන්වන්න.",
+          "form": "අයදුම්පත පුරවන්න.",
+          "passport": "විදේශ ගමන් බලපත්‍රය හා ලියාපදිංචි කාඩ්පත සූදානම් කරන්න.",
+          "photo": "හැඳුනුම්පත් ඡායාරූපයක් අවශ්‍යයි.",
+          "fee": "මෙම සේවාව සඳහා ගාස්තුවක් ඇත. උපදෙස් අනුව ගෙවන්න.",
+          "online": "HiKorea හි මාර්ගගතව අයදුම් කළ හැක.",
+          "today": "අද මෙය කළ නොහැක. වෙනත් දිනක එන්න.",
+          "interp": "භාෂා පරිවර්තකයෙකු අවශ්‍ය නම් කාර්ය මණ්ඩලයට කියන්න."
+        }
+      },
+      "nextSteps": {
+        "title": "ඊළඟ පියවර",
+        "form": "ඒකාබද්ධ අයදුම්පත පුරවන්න.",
+        "stamp": "රැඳී සිටීම දීර්ඝ කිරීමේ ගාස්තුව සඳහා {n} × 10,000 KRW වටිනා ආදායම් මුද්දරයක් මිලදී ගන්න.",
+        "atm": "ලියාපදිංචි කාඩ්පත නිකුත් කිරීමේ ගාස්තුව ATM යන්ත්‍රයෙන් ගෙවන්න.",
+        "photo": "අයදුම්පතට ඡායාරූපයක් අලවන්න."
+      }
+    },
+    "KM": {
+      "name": "ភាសាខ្មែរ",
+      "heading": [
+        "ថ្ងៃនេះអ្នកមកទទួលសេវាអ្វី?",
+        "សេវាផ្សេងទៀត"
+      ],
+      "instructions": [
+        "សូមចុចសេវាដែលអ្នកត្រូវការ។",
+        "សូមជ្រើសរើសសេវាខាងក្រោម។"
+      ],
+      "services": [
+        "បន្តរយៈពេលស្នាក់នៅ",
+        "ជូនដំណឹងអំពីការផ្លាស់ប្តូរអាសយដ្ឋាន",
+        "កែប្រែព័ត៌មានលិខិតឆ្លងដែន / ការចុះឈ្មោះ",
+        "ផ្លាស់ប្តូរ / ទទួលប្រភេទសិទ្ធិស្នាក់នៅ",
+        "ចុះឈ្មោះជនបរទេសលើកដំបូង / រាយការណ៍ទីលំនៅ",
+        "ស្នើសុំប័ណ្ណចុះឈ្មោះជនបរទេសឡើងវិញ",
+        "មកទទួលប័ណ្ណចុះឈ្មោះជនបរទេស",
+        "ផ្លាស់ប្តូរ / បន្ថែមកន្លែងធ្វើការ",
+        "សុំអនុញ្ញាតធ្វើសកម្មភាពក្រៅប្រភេទស្នាក់នៅ",
+        "សុំលិខិតបញ្ជាក់ពីអន្តោប្រវេសន៍",
+        "ជូនដំណឹងជាមុនអំពីការចាកចេញដោយស្ម័គ្រចិត្ត",
+        "ដាក់ពាក្យសុំទទួលស្គាល់ជនភៀសខ្លួន",
+        "ដាក់បណ្តឹងតវ៉ាលើសេចក្តីសម្រេចជនភៀសខ្លួន",
+        "ពិនិត្យបម្រាម / ការផ្អាកចាកចេញពីប្រទេស",
+        "ស្នើសុំបង្ហាញព័ត៌មាន",
+        "ដាក់ឯកសារបន្ថែម",
+        "សុំការអនុញ្ញាតចូលប្រទេសឡើងវិញ",
+        "សាកសួរស្ថានភាពពិនិត្យពាក្យ",
+        "សំណួរផ្សេងៗ",
+        "ជូនដំណឹងអំពីការផ្លាស់ប្តូរលេខទូរស័ព្ទ"
+      ],
+      "review": {
+        "reviewTitle": "ពិនិត្យសេវាដែលបានជ្រើសរើស",
+        "reviewHelp": "សូមពិនិត្យព័ត៌មានមុនផ្ញើទៅបុគ្គលិក។",
+        "serviceLabel": "សេវាដែលជ្រើសរើស",
+        "reservationTitle": "តើអ្នកបានកក់ពេលនៅ HiKorea ហើយឬនៅ?",
+        "reservationHelp": "បុគ្គលិកនឹងពិនិត្យការកក់។ បើមិនប្រាកដក៏អាចបន្តបាន។",
+        "answerYes": "បានកក់ហើយ",
+        "answerNo": "មិនបានកក់",
+        "answerUnsure": "មិនប្រាកដ",
+        "sendLabel": "ផ្ញើឱ្យបុគ្គលិកពិនិត្យ →",
+        "privacy": "អេក្រង់នេះមិនប្រមូលឈ្មោះ ឬលេខលិខិតឆ្លងដែនទេ។",
+        "waitingTitle": "បង្ហាញសាកល្បងការផ្ញើសំណើ",
+        "waitingHelp": "អេក្រង់សាកល្បងនេះមិនផ្ញើសំណើពិតទេ។",
+        "waitingTicket": "មិនទាន់ចេញលេខរង់ចាំទេ។",
+        "waitingNote": "សូមរង់ចាំការណែនាំពីបុគ្គលិក។",
+        "waitingHome": "ត្រឡប់ទៅដើម",
+        "phoneChangeNote": "អេក្រង់នេះផ្ញើតែគោលបំណងមកទទួលសេវា។ មិនអាចប្តូរលេខទូរស័ព្ទនៅទីនេះទេ។ សូមសួរបុគ្គលិក។"
+      },
+      "kiosk": {
+        "moreServices": "សេវាផ្សេងទៀត (11–20)",
+        "firstServices": "សេវាមុន (1–10)",
+        "changeLanguage": "ប្តូរភាសា",
+        "changeService": "ជ្រើសសេវាផ្សេង",
+        "sending": "កំពុងផ្ញើ…",
+        "sentTitle": "បានផ្ញើទៅបុគ្គលិក",
+        "sentBody": "សូមរង់ចាំបន្តិច។ បុគ្គលិកនឹងពិនិត្យគោលបំណងនិងការកក់ រួចផ្តល់លេខរង់ចាំ។",
+        "requestNo": "លេខសំណើ",
+        "autoReset": "ត្រឡប់ទៅដើមក្នុង {s} វិនាទី។",
+        "sendFailed": "ផ្ញើមិនបាន។ សូមចុចម្តងទៀត ឬប្រាប់បុគ្គលិក។",
+        "reservationNoLabel": "លេខកក់ (1–108)",
+        "reservationNoInvalid": "សូមបញ្ចូលលេខពី 1 ដល់ 108។",
+        "erase": "លុប",
+        "counter": "បញ្ជរ {n}",
+        "reservationToday": "កក់សម្រាប់ថ្ងៃនេះ",
+        "reservationOtherDate": "កក់សម្រាប់ថ្ងៃផ្សេង",
+        "reservationDateLabel": "ថ្ងៃកក់ (YYYYMMDD, ៨ ខ្ទង់)",
+        "reservationDateInvalid": "សូមបញ្ចូលកាលបរិច្ឆេទត្រឹមត្រូវ ៨ ខ្ទង់។"
+      },
+      "notice": {
+        "ok": "យល់ព្រម",
+        "texts": {
+          "ticket": "សូមយកលេខរង់ចាំ ហើយរង់ចាំ។",
+          "call": "ពេលលេខអ្នកបង្ហាញលើអេក្រង់ សូមទៅបញ្ជរ។ បើបានកក់ សូមពិនិត្យព័ត៌មានកក់។",
+          "moment": "សូមរង់ចាំបន្តិច។",
+          "counter": "សូមទៅបញ្ជរ {n}។",
+          "floor3": "សូមទៅជាន់ទី 3 (3F)។",
+          "back4": "សូមទៅជាន់ទី 4 (4F) នៃអាគារខាងក្រោយ។",
+          "visit": "សូមចុះឈ្មោះសួរសុខទុក្ខអ្នកត្រូវឃុំខ្លួននៅជាន់ទី 1 (1F) នៃអាគារខាងក្រោយ។",
+          "resvNeed": "សេវានេះត្រូវការកក់ពេល HiKorea។ សូមកក់ហើយត្រឡប់មកវិញ។",
+          "resvShow": "សូមបង្ហាញអេក្រង់កក់ និងលេខកក់។",
+          "docs": "សូមបង្ហាញឯកសារដែលបានយកមក។",
+          "form": "សូមបំពេញទម្រង់ពាក្យសុំ។",
+          "passport": "សូមរៀបចំលិខិតឆ្លងដែន និងប័ណ្ណចុះឈ្មោះជនបរទេស។",
+          "photo": "ត្រូវការរូបថតអត្តសញ្ញាណ។",
+          "fee": "សេវានេះមានថ្លៃសេវា។ សូមបង់តាមការណែនាំ។",
+          "online": "អាចដាក់ពាក្យតាមអ៊ីនធឺណិតនៅ HiKorea។",
+          "today": "ថ្ងៃនេះមិនអាចដំណើរការបានទេ។ សូមមកថ្ងៃផ្សេង។",
+          "interp": "បើត្រូវការអ្នកបកប្រែ សូមប្រាប់បុគ្គលិក។"
+        }
+      },
+      "nextSteps": {
+        "title": "ជំហានបន្ទាប់",
+        "form": "សូមបំពេញទម្រង់ពាក្យសុំរួម។",
+        "stamp": "សូមទិញត្រាបង់ថ្លៃរដ្ឋបាលសម្រាប់បន្តការស្នាក់នៅ តម្លៃ {n} × 10,000 KRW។",
+        "atm": "សូមបង់ថ្លៃចេញប័ណ្ណចុះឈ្មោះនៅម៉ាស៊ីន ATM។",
+        "photo": "សូមភ្ជាប់រូបថតទៅនឹងទម្រង់ពាក្យសុំ។"
+      }
+    },
+    "MY": {
+      "name": "မြန်မာဘာသာ",
+      "heading": [
+        "ယနေ့ ဘာကိစ္စအတွက် လာရောက်ပါသလဲ။",
+        "အခြားဝန်ဆောင်မှုများ"
+      ],
+      "instructions": [
+        "လိုအပ်သည့်ဝန်ဆောင်မှုကို နှိပ်ပါ။",
+        "အောက်ပါဝန်ဆောင်မှုများထဲမှ ရွေးချယ်ပါ။"
+      ],
+      "services": [
+        "နေထိုင်ခွင့်ကာလ တိုးမြှင့်ခြင်း",
+        "နေရပ်လိပ်စာ ပြောင်းလဲမှု တိုင်ကြားခြင်း",
+        "နိုင်ငံကူးလက်မှတ် / မှတ်ပုံတင်အချက်အလက် ပြင်ဆင်ခြင်း",
+        "နေထိုင်ခွင့်အမျိုးအစား ပြောင်းလဲခြင်း / ရယူခြင်း",
+        "နိုင်ငံခြားသား ပထမအကြိမ် မှတ်ပုံတင်ခြင်း / ပြည်တွင်းနေထိုင်မှု သတင်းပို့ခြင်း",
+        "နိုင်ငံခြားသားမှတ်ပုံတင်ကတ် ပြန်လည်ထုတ်ပေးရန်",
+        "နိုင်ငံခြားသားမှတ်ပုံတင်ကတ် လာယူရန်",
+        "အလုပ်နေရာ ပြောင်းလဲခြင်း / ထပ်တိုးခြင်း",
+        "နေထိုင်ခွင့်အမျိုးအစားပြင်ပ လှုပ်ရှားမှုခွင့်ပြုချက်",
+        "လူဝင်မှုကြီးကြပ်ရေး အချက်အလက်ထောက်ခံစာ",
+        "မိမိဆန္ဒဖြင့် ထွက်ခွာမည်ကို ကြိုတင်အကြောင်းကြားခြင်း",
+        "ဒုက္ခသည်အဖြစ် အသိအမှတ်ပြုရန် လျှောက်ထားခြင်း",
+        "ဒုက္ခသည်ဆုံးဖြတ်ချက်ကို ကန့်ကွက်တင်ပြခြင်း",
+        "နိုင်ငံမှထွက်ခွာခွင့် တားမြစ် / ဆိုင်းငံ့မှု စစ်ဆေးခြင်း",
+        "သတင်းအချက်အလက် ထုတ်ဖော်ပေးရန် တောင်းဆိုခြင်း",
+        "ထပ်ဆောင်းစာရွက်စာတမ်း တင်သွင်းခြင်း",
+        "ပြန်လည်ဝင်ရောက်ခွင့် လျှောက်ထားခြင်း",
+        "လျှောက်လွှာစစ်ဆေးမှု အခြေအနေ မေးမြန်းခြင်း",
+        "အခြားမေးမြန်းချက်များ",
+        "ဖုန်းနံပါတ် ပြောင်းလဲမှု တိုင်ကြားခြင်း"
+      ],
+      "review": {
+        "reviewTitle": "ရွေးချယ်ထားသော ဝန်ဆောင်မှုကို စစ်ဆေးပါ။",
+        "reviewHelp": "ဝန်ထမ်းထံ မပို့မီ အချက်အလက်ကို စစ်ဆေးပါ။",
+        "serviceLabel": "ရွေးချယ်ထားသော ဝန်ဆောင်မှု",
+        "reservationTitle": "HiKorea မှ ရက်ချိန်းယူထားပါသလား။",
+        "reservationHelp": "ဝန်ထမ်းက ရက်ချိန်းကို စစ်ဆေးပါမည်။ မသေချာလျှင်လည်း ဆက်လုပ်နိုင်ပါသည်။",
+        "answerYes": "ရက်ချိန်းရှိပါသည်",
+        "answerNo": "ရက်ချိန်းမရှိပါ",
+        "answerUnsure": "မသေချာပါ",
+        "sendLabel": "ဝန်ထမ်းထံ ပို့ပါ →",
+        "privacy": "ဤနေရာတွင် နာမည်နှင့် နိုင်ငံကူးလက်မှတ်နံပါတ် မကောက်ယူပါ။",
+        "waitingTitle": "တောင်းဆိုချက်ပို့ခြင်း အစမ်းပြသမှု",
+        "waitingHelp": "ဤအစမ်းပြသမှုမှ တကယ့်တောင်းဆိုချက် မပို့ပါ။",
+        "waitingTicket": "တန်းစီနံပါတ် မထုတ်ပေးရသေးပါ။",
+        "waitingNote": "ဝန်ထမ်း၏ညွှန်ကြားချက်ကို စောင့်ပါ။",
+        "waitingHome": "အစသို့ ပြန်သွားရန်",
+        "phoneChangeNote": "ဤမျက်နှာပြင်မှ လာရောက်ရသည့်အကြောင်းရင်းသာ ပေးပို့ပါသည်။ ဖုန်းနံပါတ်ကို ဤနေရာတွင် မပြောင်းနိုင်ပါ။ ဝန်ထမ်းထံ မေးမြန်းပါ။"
+      },
+      "kiosk": {
+        "moreServices": "အခြားဝန်ဆောင်မှုများ (11–20)",
+        "firstServices": "ယခင်ဝန်ဆောင်မှုများ (1–10)",
+        "changeLanguage": "ဘာသာစကားပြောင်းရန်",
+        "changeService": "အခြားဝန်ဆောင်မှုရွေးရန်",
+        "sending": "ပို့နေပါသည်…",
+        "sentTitle": "ဝန်ထမ်းထံ ပို့ပြီးပါပြီ",
+        "sentBody": "ခဏစောင့်ပါ။ ဝန်ထမ်းက လာရောက်ရသည့်အကြောင်းရင်းနှင့် ရက်ချိန်းကို စစ်ဆေးပြီး တန်းစီနံပါတ်ပေးပါမည်။",
+        "requestNo": "တောင်းဆိုချက်နံပါတ်",
+        "autoReset": "{s} စက္ကန့်အတွင်း အစသို့ ပြန်သွားပါမည်။",
+        "sendFailed": "မပို့နိုင်ပါ။ ထပ်နှိပ်ပါ သို့မဟုတ် ဝန်ထမ်းကို ပြောပါ။",
+        "reservationNoLabel": "ရက်ချိန်းနံပါတ် (1–108)",
+        "reservationNoInvalid": "1 မှ 108 အတွင်း နံပါတ်ရိုက်ထည့်ပါ။",
+        "erase": "ဖျက်ရန်",
+        "counter": "ကောင်တာ {n}",
+        "reservationToday": "ယနေ့အတွက် ရက်ချိန်း",
+        "reservationOtherDate": "အခြားရက်အတွက် ရက်ချိန်း",
+        "reservationDateLabel": "ရက်ချိန်းရက်စွဲ (YYYYMMDD, ဂဏန်း ၈ လုံး)",
+        "reservationDateInvalid": "မှန်ကန်သော ၈ လုံးပါရက်စွဲကို ထည့်ပါ။"
+      },
+      "notice": {
+        "ok": "ဟုတ်ကဲ့",
+        "texts": {
+          "ticket": "တန်းစီနံပါတ်ယူပြီး စောင့်ပါ။",
+          "call": "မျက်နှာပြင်တွင် သင့်နံပါတ်ပေါ်လာလျှင် ကောင်တာသို့သွားပါ။ ရက်ချိန်းရှိလျှင် အချက်အလက်ကို စစ်ဆေးပါ။",
+          "moment": "ခဏစောင့်ပါ။",
+          "counter": "ကောင်တာ {n} သို့ သွားပါ။",
+          "floor3": "၃ လွှာ (3F) သို့ သွားပါ။",
+          "back4": "အနောက်အဆောက်အအုံ ၄ လွှာ (4F) သို့ သွားပါ။",
+          "visit": "အနောက်အဆောက်အအုံ ၁ လွှာ (1F) တွင် ထိန်းသိမ်းခံထားရသူကို သွားတွေ့ရန် စာရင်းသွင်းပါ။",
+          "resvNeed": "ဤဝန်ဆောင်မှုအတွက် HiKorea ရက်ချိန်းလိုပါသည်။ ရက်ချိန်းယူပြီး ပြန်လာပါ။",
+          "resvShow": "ရက်ချိန်းမျက်နှာပြင်နှင့် နံပါတ်ကို ပြပါ။",
+          "docs": "ယူလာသောစာရွက်စာတမ်းများကို ပြပါ။",
+          "form": "လျှောက်လွှာဖောင် ဖြည့်ပါ။",
+          "passport": "နိုင်ငံကူးလက်မှတ်နှင့် နိုင်ငံခြားသားမှတ်ပုံတင်ကတ်ကို ပြင်ဆင်ထားပါ။",
+          "photo": "ဓာတ်ပုံတစ်ပုံ လိုအပ်ပါသည်။",
+          "fee": "ဤဝန်ဆောင်မှုအတွက် အခကြေးငွေရှိပါသည်။ ညွှန်ကြားချက်အတိုင်း ပေးချေပါ။",
+          "online": "HiKorea တွင် အွန်လိုင်းမှ လျှောက်ထားနိုင်ပါသည်။",
+          "today": "ယနေ့ ဆောင်ရွက်မရပါ။ အခြားရက်တွင် ပြန်လာပါ။",
+          "interp": "စကားပြန်လိုအပ်ပါက ဝန်ထမ်းကို ပြောပါ။"
+        }
+      },
+      "nextSteps": {
+        "title": "နောက်ထပ်လုပ်ဆောင်ရန်",
+        "form": "ပေါင်းစပ်လျှောက်လွှာဖောင်ကို ဖြည့်ပါ။",
+        "stamp": "နေထိုင်ခွင့်ကာလတိုးမြှင့်ခအတွက် {n} × 10,000 KRW တန်ဖိုးရှိ ဝင်ငွေတံဆိပ်ခေါင်း ဝယ်ပါ။",
+        "atm": "မှတ်ပုံတင်ကတ် ထုတ်ပေးခကို ATM စက်တွင် ပေးချေပါ။",
+        "photo": "လျှောက်လွှာဖောင်တွင် ဓာတ်ပုံ ကပ်ပါ။"
       }
     },
     "MN": {
@@ -953,10 +1363,14 @@
         "requestNo": "Хүсэлтийн дугаар",
         "autoReset": "{s} секундын дараа эхлэл рүү буцна.",
         "sendFailed": "Илгээж чадсангүй. Дахин дарна уу. Үргэлжилбэл ажилтанд хэлнэ үү.",
-        "reservationNoLabel": "Захиалгын дугаар (заавал биш)",
-        "reservationNoInvalid": "Захиалгын дугаараа шалгана уу.",
+        "reservationNoLabel": "Захиалгын дугаар (1–108)",
+        "reservationNoInvalid": "1-ээс 108 хүртэлх дугаар оруулна уу.",
         "erase": "Устгах",
-        "counter": "{n}-р цонх"
+        "counter": "{n}-р цонх",
+        "reservationToday": "Өнөөдрийн цаг захиалга",
+        "reservationOtherDate": "Өөр өдрийн цаг захиалга",
+        "reservationDateLabel": "Захиалсан өдөр (YYYYMMDD, 8 орон)",
+        "reservationDateInvalid": "8 оронтой зөв огноо оруулна уу."
       },
       "notice": {
         "ok": "OK",
@@ -979,6 +1393,13 @@
           "today": "Өнөөдөр шийдвэрлэх боломжгүй. Өөр өдөр дахин ирнэ үү.",
           "interp": "Орчуулагч хэрэгтэй бол ажилтанд хэлнэ үү."
         }
+      },
+      "nextSteps": {
+        "title": "Дараагийн алхамууд",
+        "form": "Нэгдсэн өргөдлийн маягтыг бөглөнө үү.",
+        "stamp": "Оршин суух хугацаа сунгах хураамжид {n} × 10,000 KRW-ийн тэмдэгтийн хураамжийн марк (수입인지) авна уу.",
+        "atm": "Бүртгэлийн карт гаргах төлбөрийг ATM машинаар төлнө үү.",
+        "photo": "Өргөдлийн маягтад зургаа наана уу."
       }
     },
     "NE": {
@@ -1042,10 +1463,14 @@
         "requestNo": "अनुरोध नम्बर",
         "autoReset": "{s} सेकेन्डमा सुरुको स्क्रिनमा फर्किन्छ।",
         "sendFailed": "पठाउन सकिएन। फेरि थिच्नुहोस्। फेरि पनि भएन भने कर्मचारीलाई भन्नुहोस्।",
-        "reservationNoLabel": "आरक्षण नम्बर (ऐच्छिक)",
-        "reservationNoInvalid": "कृपया आरक्षण नम्बर जाँच्नुहोस्।",
+        "reservationNoLabel": "आरक्षण नम्बर (१–१०८)",
+        "reservationNoInvalid": "कृपया १ देखि १०८ सम्मको नम्बर लेख्नुहोस्।",
         "erase": "मेटाउनुहोस्",
-        "counter": "काउन्टर {n}"
+        "counter": "काउन्टर {n}",
+        "reservationToday": "आजको अपोइन्टमेन्ट",
+        "reservationOtherDate": "अर्को मितिको अपोइन्टमेन्ट",
+        "reservationDateLabel": "अपोइन्टमेन्ट मिति (YYYYMMDD, ८ अंक)",
+        "reservationDateInvalid": "कृपया सही ८ अंकको मिति लेख्नुहोस्।"
       },
       "notice": {
         "ok": "ठिक छ",
@@ -1068,6 +1493,13 @@
           "today": "आज यो काम हुन सक्दैन। कृपया अर्को दिन आउनुहोस्।",
           "interp": "दोभाषे चाहिएमा कर्मचारीलाई भन्नुहोस्।"
         }
+      },
+      "nextSteps": {
+        "title": "अर्को चरणहरू",
+        "form": "कृपया एकीकृत आवेदन फाराम भर्नुहोस्।",
+        "stamp": "बसाइ अवधि थप्ने शुल्कका लागि {n} × 10,000 KRW बराबरको राजस्व टिकट (수입인지) किन्नुहोस्।",
+        "atm": "दर्ता कार्ड जारी गर्ने शुल्क ATM मा तिर्नुहोस्।",
+        "photo": "आवेदन फाराममा फोटो टाँस्नुहोस्।"
       }
     }
   },

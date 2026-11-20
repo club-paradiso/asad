@@ -3,7 +3,7 @@ import liveCatalog from "../../public/compat/data.json";
 import demoCatalog from "../../apps/visitor-intake/data.json";
 import {
   __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
-  validCode, INTAKE_TTL_MS, NOTICE_IDS,
+  validCode, validLanguage, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS, NEXT_STEP_IDS,
 } from "./store";
 import {
   POST as createSession, GET as readSession, PATCH as markSession,
@@ -32,7 +32,16 @@ afterEach(() => __setIntakeStore(null));
 describe("intake service catalog", () => {
   it("keeps live and demo catalogs aligned with 20 translated services", () => {
     expect(liveCatalog).toEqual(demoCatalog);
-    expect(Object.keys(liveCatalog.locales)).toHaveLength(12);
+    expect(Object.keys(liveCatalog.locales)).toHaveLength(15);
+    for (const code of ["FIL", "SI", "KM", "MY"] as const) {
+      expect(validLanguage(code)).toBe(true);
+      expect(liveCatalog.locales[code].name).toBeTruthy();
+    }
+    expect(liveCatalog.locales).toHaveProperty("HI");
+    expect(liveCatalog.locales).not.toHaveProperty("UZ");
+    expect(validLanguage("HI")).toBe(true);
+    expect(validLanguage("UZ")).toBe(false);
+    expect(Object.keys(liveCatalog.locales).filter(code => code === "HI")).toHaveLength(1);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(locale.services).toHaveLength(20);
       expect(locale.services[19]).toBeTruthy();
@@ -40,9 +49,9 @@ describe("intake service catalog", () => {
     }
   });
 
-  it("localizes every visitor-facing kiosk control in all 12 languages", () => {
+  it("localizes every visitor-facing kiosk control in all 15 languages", () => {
     const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
-    expect(keys).toHaveLength(14);
+    expect(keys).toHaveLength(18);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(Object.keys(locale.kiosk).sort()).toEqual(keys);
       for (const value of Object.values(locale.kiosk)) {
@@ -51,13 +60,19 @@ describe("intake service catalog", () => {
       }
       expect(locale.kiosk.autoReset).toContain("{s}");
       expect(locale.kiosk.counter).toContain("{n}");
+      expect(locale.kiosk.reservationDateLabel).toBeTruthy();
     }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
+    for (const locale of Object.values(liveCatalog.locales)) {
+      expect(Object.keys(locale.nextSteps).sort()).toEqual(["title", ...NEXT_STEP_IDS].sort());
+      for (const text of Object.values(locale.nextSteps)) expect(text.trim()).not.toBe("");
+      expect(locale.nextSteps.stamp).toContain("{n}");
+    }
   });
 });
 
 describe("staff notice phrases", () => {
-  it("translates every fixed phrase in all 12 languages and lists each one exactly once for staff", () => {
+  it("translates every fixed phrase in all 15 languages and lists each one exactly once for staff", () => {
     const cfg = liveCatalog.notices;
     const listed = cfg.groups.flatMap(g => g.items.map(i => i.id));
     expect([...listed].sort()).toEqual([...NOTICE_IDS].sort());
@@ -189,24 +204,24 @@ describe("intake cross-device API", () => {
 
     expect((await submit(post("/api/intake/submission", {
       code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes",
-      reservationNo: "108",
+      reservationNo: "108", reservationDate: "2026-12-02",
     }))).status).toBe(201);
     expect((await submit(post("/api/intake/submission", {
       code: two.code, requestId: crypto.randomUUID(), language: "VI", serviceIndex: 1, booking: "no",
     }))).status).toBe(201);
-    // A reservation number only goes with "booked", and must be in range.
+    // Reservation numbers are integers from 1 to 108, and dates require a number.
     expect((await submit(post("/api/intake/submission", {
-      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "no", reservationNo: "1",
+      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "no", reservationNo: "12",
     }))).status).toBe(400);
     expect((await submit(post("/api/intake/submission", {
       code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes", reservationNo: "12 34<script>",
     }))).status).toBe(400);
 
     const a = await (await readSession(staff("/api/intake/session?code=" + one.code, one.staffToken))).json() as
-      { station: number; entries: Array<{ station: number; reservationNo?: string }> };
+      { station: number; entries: Array<{ station: number; reservationNo?: string; reservationDate?: string }> };
     expect(a.station).toBe(3);
     expect(a.entries).toHaveLength(1);
-    expect(a.entries[0]).toMatchObject({ station: 3, reservationNo: "108" });
+    expect(a.entries[0]).toMatchObject({ station: 3, reservationNo: "108", reservationDate: "2026-12-02" });
     const b = await (await readSession(staff("/api/intake/session?code=" + two.code, two.staffToken))).json() as
       { entries: Array<{ station: number; reservationNo?: string }> };
     expect(b.entries).toHaveLength(1);
@@ -214,51 +229,32 @@ describe("intake cross-device API", () => {
     expect(b.entries[0]).not.toHaveProperty("reservationNo");
   });
 
-  it("accepts 1–108, requires a real date and number for other-day bookings, and preserves stored legacy entries", async () => {
-    const memory = createMemoryIntakeStore();
-    __setIntakeStore(memory);
-    const { session: { code }, staffToken } = await memory.create();
-    await memory.modify(code, session => {
-      session.entries.push({
-        seq: session.nextSeq++, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0,
-        booking: "yes", reservationNo: "AB12-3456", receivedAt: Date.now(),
-        verification: "unchecked", ticket: "pending",
-      });
-    });
-    const send = (values: object, requestId = crypto.randomUUID()) => submit(post("/api/intake/submission", {
-      code, requestId, language: "EN", serviceIndex: 0, booking: "yes", ...values,
-    }));
-    for (const reservationNo of ["0", "109", "1.5", "01", "AB12", 1]) {
-      expect((await send({ reservationNo })).status).toBe(400);
+  it("validates 1–108 appointment sequence numbers and genuine calendar dates", async () => {
+    expect(RESERVATION_NO.test("1")).toBe(true);
+    expect(RESERVATION_NO.test("108")).toBe(true);
+    for (const bad of ["0", "00", "01", "109", "999", "12A", "12-3", ""]) {
+      expect(RESERVATION_NO.test(bad)).toBe(false);
     }
-    const other = { booking: "other", reservationNo: "1", reservationDate: "2028-02-29" };
-    for (const values of [
-      { ...other, reservationDate: "2027-02-29" },
-      { ...other, reservationDate: "2028-04-31" },
-      { ...other, reservationDate: "0000-01-01" },
-      { ...other, reservationDate: undefined },
-      { ...other, reservationNo: undefined },
-      { ...other, booking: "yes" },
-    ]) expect((await send(values)).status).toBe(400);
-
-    expect((await send({ reservationNo: "1" })).status).toBe(201);
-    const id = crypto.randomUUID();
-    expect(await (await send(other, id)).json()).toEqual({ accepted: true, seq: 3 });
-    expect(await (await send(other, id)).json()).toEqual({ accepted: true, seq: 3 });
-
-    const live = (values: object) => postLive(post("/api/intake/live", {
-      code, step: "review", language: "EN", serviceIndex: 0, ...values,
-    }));
-    expect((await live({ booking: "other" })).status).toBe(200);
-    expect((await live({ ...other, reservationNo: "109" })).status).toBe(400);
-    expect((await live({ ...other, reservationDate: undefined })).status).toBe(400);
-    expect((await live({ ...other, reservationDate: "1900-02-29" })).status).toBe(400);
-    expect((await live(other)).status).toBe(200);
-    const desk = await (await readSession(staff("/api/intake/session?code=" + code, staffToken))).json();
-    expect(desk.live).toMatchObject(other);
-    expect(desk.entries).toHaveLength(3);
-    expect(desk.entries[0]).toMatchObject({ reservationNo: "AB12-3456" });
-    expect(desk.entries[2]).toMatchObject(other);
+    expect(validReservationDate("2028-02-29")).toBe(true);
+    for (const bad of ["2026-02-29", "2026-04-31", "2026-00-01", "2026-13-01", "2026-11-00", "2026-1-20", "1999-01-01", "2099-02-29"]) {
+      expect(validReservationDate(bad)).toBe(false);
+    }
+    const store = createMemoryIntakeStore();
+    __setIntakeStore(store);
+    const { session: { code }, staffToken } = await store.create();
+    const base = { code, language: "KO", serviceIndex: 0, booking: "yes" };
+    for (const reservationNo of ["0", "01", "109", "abc", "1-2", "999"]) {
+      expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationNo }))).status).toBe(400);
+    }
+    for (const reservationDate of ["2026-02-30", "2026-11-31", "2026-1-20"]) {
+      expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationNo: "8", reservationDate }))).status).toBe(400);
+    }
+    expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationDate: "2026-12-02" }))).status).toBe(400);
+    expect((await submit(post("/api/intake/submission", { ...base, booking: "no", requestId: crypto.randomUUID(), reservationNo: "10", reservationDate: "2026-12-02" }))).status).toBe(400);
+    expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationNo: "1", reservationDate: "2028-02-29" }))).status).toBe(201);
+    const saved = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    const { entries } = await saved.json() as { entries: Array<{ reservationNo?: string; reservationDate?: string }> };
+    expect(entries[0]).toMatchObject({ reservationNo: "1", reservationDate: "2028-02-29" });
   });
 
   it("mirrors the visitor's current screen to the staff desk only", async () => {
@@ -275,6 +271,14 @@ describe("intake cross-device API", () => {
     const read = await readSession(staff("/api/intake/session?code=" + code, staffToken));
     const { live } = await read.json() as { live: Record<string, unknown> };
     expect(live).toMatchObject({ step: "review", language: "VI", serviceIndex: 4, booking: "no" });
+    expect((await postLive(post("/api/intake/live", {
+      code, step: "review", language: "KO", serviceIndex: 4, booking: "yes",
+      reservationNo: "108", reservationDateMode: "other", reservationDate: "2026-12-02",
+    }))).status).toBe(200);
+    const withDate = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await withDate.json() as { live: Record<string, unknown> }).live).toMatchObject({
+      reservationNo: "108", reservationDateMode: "other", reservationDate: "2026-12-02",
+    });
     expect(typeof live.updatedAt).toBe("number");
 
     // Out-of-order delivery within one kiosk page: an older revision arriving late is ignored.
@@ -296,6 +300,10 @@ describe("intake cross-device API", () => {
       { code, step: "services", language: "XX" },
       { code, step: "review", serviceIndex: 20 },
       { code, step: "review", note: "passport M1234567" },
+      { code, step: "review", booking: "yes", reservationNo: "109" },
+      { code, step: "review", booking: "yes", reservationNo: "1", reservationDateMode: "other", reservationDate: "2026-02-30" },
+      { code, step: "review", booking: "yes", reservationNo: "1", reservationDateMode: "today", reservationDate: "2026-12-02" },
+      { code, step: "review", booking: "no", reservationDateMode: "other" },
     ]) expect((await postLive(post("/api/intake/live", bad))).status).toBe(400);
     expect((await postLive(post("/api/intake/live", { code: "ABCDEFGHJK", step: "language" }))).status).toBe(404);
     expect((await postLive(new Request(HOST + "/api/intake/live", {
@@ -320,6 +328,44 @@ describe("intake cross-device API", () => {
       }),
     }));
     expect(blocked.status).toBe(403);
+  });
+
+  it("allows only staff to show a validated multi-step checklist and an explicit fee", async () => {
+    const store = createMemoryIntakeStore();
+    __setIntakeStore(store);
+    const { session: { code }, staffToken } = await store.create();
+    const send = (body: object, token: string | null = staffToken) => postNotice(new Request(HOST + "/api/intake/notice", {
+      method: "POST",
+      headers: token ? { ...headers, "x-asad-intake-staff-token": token } : headers,
+      body: JSON.stringify(body),
+    }));
+    const good = { code, id: "nextSteps", steps: ["form", "stamp", "atm", "photo"], feeManwon: 6 };
+    expect((await send(good, null)).status).toBe(401);
+    expect((await send(good, "q".repeat(43))).status).toBe(403);
+    for (const bad of [
+      { code, id: "nextSteps" },
+      { code, id: "nextSteps", steps: [] },
+      { code, id: "nextSteps", steps: ["form", "form"] },
+      { code, id: "nextSteps", steps: ["form", "unknown"] },
+      { code, id: "nextSteps", steps: ["stamp"] },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: 0 },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: 1000 },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: 2.5 },
+      { code, id: "nextSteps", steps: ["stamp"], feeManwon: "6" },
+      { code, id: "nextSteps", steps: ["form"], feeManwon: 6 },
+      { ...good, visitorName: "should-not-store" },
+      { ...good, counter: 3 },
+    ]) expect((await send(bad)).status).toBe(400);
+    expect((await send(good)).status).toBe(200);
+    const visitor = await readNotice(new Request(HOST + "/api/intake/notice?code=" + code));
+    expect((await visitor.json() as { notice: unknown }).notice).toMatchObject({
+      id: "nextSteps", steps: ["form", "stamp", "atm", "photo"], feeManwon: 6,
+    });
+    expect((await send({ code, id: "nextSteps", steps: ["photo"] })).status).toBe(200);
+    expect((await (await readNotice(new Request(HOST + "/api/intake/notice?code=" + code))).json() as {
+      notice: { steps: string[]; feeManwon?: number };
+    }).notice).toMatchObject({ steps: ["photo"] });
+    expect((await send({ code, id: null })).status).toBe(200);
   });
 
   it("lets only the staff desk show or clear a fixed phrase on the visitor screen", async () => {

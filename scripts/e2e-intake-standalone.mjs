@@ -28,13 +28,15 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
   try{
     await staff.goto(pathToFileURL(path).toString());
     await staff.getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
-    if(await staff.locator(".langGrid .tile").count()!==12)throw Error("Must show 12 languages on one page");
+    if(await staff.locator(".langGrid .tile").count()!==15)throw Error("Must show 15 languages on one page");
 
+    for(const title of ["Filipino","සිංහල","ភាសាខ្មែរ","မြန်မာဘာသာ"])
+      if(await staff.getByRole("button",{name:title,exact:true}).count()!==1)throw Error("Offline language missing: "+title);
     await staff.getByRole("button",{name:"English"}).click();
     if(await staff.locator(".grid .tile").count()!==10)throw Error("First service page must have 10 services");
     await staff.getByRole("button",{name:/Extend my period of stay/}).click();
     await staff.getByRole("heading",{name:"Have you booked a visit on HiKorea?"}).waitFor();
-    await staff.getByRole("button",{name:"Booked for today"}).click();
+    await staff.getByRole("button",{name:"Yes, booked"}).click();
     await staff.getByRole("button",{name:/직원에게 보여주기/}).click();
     await staff.getByRole("heading",{name:"Please show this screen to staff"}).waitFor();
     await staff.getByRole("button",{name:"BACK TO START"}).click();
@@ -43,7 +45,7 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     await staff.getByRole("button",{name:"보조 모니터 열기"}).click();
     const visitor=await nextPage;
     await visitor.locator("#display-app").getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
-    if(await visitor.locator("#display-app .langGrid .tile").count()!==12)throw Error("Visitor window did not mirror language list");
+    if(await visitor.locator("#display-app .langGrid .tile").count()!==15)throw Error("Visitor window did not mirror language list");
 
     await visitor.getByRole("button",{name:"English"}).click();
     await staff.getByRole("heading",{name:"How can we help you today?"}).waitFor();
@@ -86,7 +88,7 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     await visitor.getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
     if(network.length)throw Error("Unexpected network requests: "+network.join(", "));
     if(errors.length)throw Error("Browser errors: "+errors.join(" / "));
-    console.log("PASS "+name+": fully offline file://, bilingual service, popup sync, phone-change disclaimer, other-date keypad and reset");
+    console.log("PASS "+name+": fully offline file://, 15 languages, popup sync, other-date keypad, reset");
   } finally {
     await context.close();
     await browser.close();

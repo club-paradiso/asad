@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { clientAddress, isSameOrigin, readJsonBody } from "@/lib/guard";
 import { RequestRateLimiter } from "@/lib/rate-limit";
-import { reservationFields, validReservation } from "@/intake/reservation";
 import {
-  INTAKE_MAX_ENTRIES, intakeStore, validCode, validLanguage,
+  INTAKE_MAX_ENTRIES, RESERVATION_NO, intakeStore, validCode, validLanguage, validReservationDate,
+  type Booking, type IntakeLanguage,
 } from "@/intake/store";
 
 export const runtime = "nodejs";
@@ -20,8 +20,14 @@ const schema = z.object({
   requestId: z.string().uuid(),
   language: z.string().max(5),
   serviceIndex: z.number().int().min(0).max(19),
-  ...reservationFields,
-}).strict().refine(value => validReservation(value));
+  booking: z.enum(["yes", "no", "unsure"]),
+  // Sequence 1..108 and optional non-today booking date, both self-reported.
+  reservationNo: z.string().regex(RESERVATION_NO).optional(),
+  reservationDate: z.string().refine(validReservationDate).optional(),
+}).strict().refine(v =>
+  (v.reservationNo === undefined || v.booking === "yes") &&
+  (v.reservationDate === undefined || (v.booking === "yes" && v.reservationNo !== undefined))
+);
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) return fail(403, "Invalid origin.");
@@ -33,22 +39,24 @@ export async function POST(request: Request) {
   if (!parsed.success || !validCode(parsed.data.code) || !validLanguage(parsed.data.language)) {
     return fail(400, "잘못된 접수 요청입니다.");
   }
-  const { code, requestId, language, serviceIndex, booking, reservationNo, reservationDate } = parsed.data;
   const store = intakeStore();
   if (!store) return fail(503, "실시간 접수 저장소가 연결되지 않았습니다.");
 
   try {
     let seq = 0, full = false;
-    const s = await store.modify(code, current => {
+    const s = await store.modify(parsed.data.code, current => {
       // A network retry with the same requestId does not create duplicate queue entries.
-      const old = current.entries.find(e => e.requestId === requestId);
+      const old = current.entries.find(e => e.requestId === parsed.data.requestId);
       if (old) { seq = old.seq; return false; }
       if (current.entries.length >= INTAKE_MAX_ENTRIES) { full = true; return false; }
       seq = current.nextSeq++;
       current.entries.push({
-        seq, requestId, language, serviceIndex, booking,
-        ...(reservationNo ? { reservationNo } : {}),
-        ...(reservationDate ? { reservationDate } : {}),
+        seq, requestId: parsed.data.requestId,
+        language: parsed.data.language as IntakeLanguage,
+        serviceIndex: parsed.data.serviceIndex,
+        booking: parsed.data.booking as Booking,
+        ...(parsed.data.reservationNo ? { reservationNo: parsed.data.reservationNo } : {}),
+        ...(parsed.data.reservationDate ? { reservationDate: parsed.data.reservationDate } : {}),
         ...(current.station ? { station: current.station } : {}),
         receivedAt: Date.now(),
         verification: "unchecked", ticket: "pending",

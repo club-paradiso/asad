@@ -9,11 +9,12 @@
   var FAST_MS=1000,SLOW_MS=2500,FAST_WINDOW_MS=60000;
   var state={code:"",token:"",expiresAt:0,entries:[],live:null,busy:false,error:"",notice:"",online:false,
     pollTimer:0,stopped:false,data:null,station:"",setupOpen:false,lastChangeAt:0,
-    phrase:null,noticeBusy:false,counterPicker:false,noticeError:""};
+    phrase:null,noticeBusy:false,counterPicker:false,noticeError:"",
+    nextChecks:{form:false,stamp:false,atm:false,photo:false},nextFee:""};
   var LANG_KO={"KO":"한국어","EN":"영어","ZH-CN":"중국어(간체)","ID":"인도네시아어","HI":"힌디어","VI":"베트남어",
-    "JA":"일본어","TH":"태국어","RU":"러시아어","UZ":"우즈베크어","MN":"몽골어","NE":"네팔어"};
-  var BOOKING={yes:"예약함",other:"다른 날짜로 예약함",no:"예약 안 함",unsure:"모름"};
-  var BOOKING_LIST={yes:"예약함",other:"다른 날짜로 예약함",no:"예약 안 함",unsure:"예약 모름"};
+    "JA":"일본어","TH":"태국어","RU":"러시아어","FIL":"필리핀어","SI":"싱할라어","KM":"크메르어","MY":"미얀마어","MN":"몽골어","NE":"네팔어"};
+  var BOOKING={yes:"예약함",no:"예약 안 함",unsure:"모름"};
+  var BOOKING_LIST={yes:"예약함",no:"예약 안 함",unsure:"예약 모름"};
   // One fixed color per counter so desks (and their requests) are told apart at a glance.
   var COUNTER_COLORS=["#087d70","#2456c4","#7b3fc1","#b4520e","#b02f6e","#3d7a1d"];
   function counterColor(n){ if(!Number(n))return "#3f5f62"; return COUNTER_COLORS[(Number(n)-1+COUNTER_COLORS.length)%COUNTER_COLORS.length]; }
@@ -177,16 +178,21 @@
   }
   function noticeLabel(n){
     if(!n)return "";
+    if(n.id==="nextSteps")return "다음 단계 "+(n.steps?n.steps.length:0)+"건";
     var cfg=state.data && state.data.notices;
     var label=n.id;
     if(cfg)for(var g=0;g<cfg.groups.length;g++)for(var i=0;i<cfg.groups[g].items.length;i++)
       if(cfg.groups[g].items[i].id===n.id)label=cfg.groups[g].items[i].label;
     return n.id==="counter" && n.counter ? n.counter+"번 "+label : label;
   }
-  function sendNotice(id,counter){
+  function sendNotice(id,counter,steps,feeManwon){
     if(state.noticeBusy || !state.code)return;
     var body={code:state.code,id:id};
     if(id==="counter")body.counter=counter;
+    if(id==="nextSteps"){
+      body.steps=steps;
+      if(feeManwon!==null && typeof feeManwon!=="undefined")body.feeManwon=feeManwon;
+    }
     state.noticeBusy=true;state.noticeError="";state.counterPicker=false;render();
     A.request("POST","/api/intake/notice",body,auth(),function(err,data,status){
       state.noticeBusy=false;
@@ -196,6 +202,52 @@
       state.lastChangeAt=Date.now();
       render();
     });
+  }
+  function showNextSteps(){
+    if(state.noticeBusy)return;
+    var choices=["form","stamp","atm","photo"],selected=[];
+    for(var i=0;i<choices.length;i++)if(state.nextChecks[choices[i]])selected.push(choices[i]);
+    if(!selected.length){state.noticeError="안내할 항목을 한 개 이상 선택해 주세요.";render();return;}
+    var fee=null;
+    if(state.nextChecks.stamp){
+      if(!/^[1-9][0-9]{0,2}$/.test(state.nextFee) || Number(state.nextFee)>999){
+        state.noticeError="연장 수수료 금액을 만 원 단위 정수로 입력해 주세요 (1~999).";render();return;
+      }
+      fee=Number(state.nextFee);
+    }
+    sendNotice("nextSteps",null,selected,fee);
+  }
+  function nextStepsPanel(){
+    var section=A.el("div",null,"nextStepsPanel");
+    section.appendChild(A.el("h3","응대 후 · 다음 단계 안내"));
+    section.appendChild(text("민원인에게 안내할 항목을 체크하고, 화면에 보여주세요. 체크는 완료 여부가 아닌 안내 항목 선택입니다.","muted"));
+    var names={form:"통합신청서 작성",stamp:"연장 수수료 수입인지 구매",atm:"ATM에서 등록증 발급 비용 납부",photo:"사진 부착"};
+    var keys=["form","stamp","atm","photo"];
+    var grid=A.el("div",null,"nextStepsChecks");
+    for(var i=0;i<keys.length;i++){
+      (function(k){
+        var label=A.el("label",null,"nextStepsCheck");
+        var check=A.el("input");check.type="checkbox";check.checked=!!state.nextChecks[k];
+        check.disabled=state.noticeBusy;
+        check.onchange=function(){state.nextChecks[k]=check.checked;state.noticeError="";render();};
+        label.appendChild(check);label.appendChild(A.el("span",names[k]));
+        grid.appendChild(label);
+      })(keys[i]);
+    }
+    section.appendChild(grid);
+    if(state.nextChecks.stamp){
+      var field=A.el("label",null,"nextFeeField");
+      field.appendChild(A.el("span","연장 수수료 (만원 단위)"));
+      var input=A.el("input");input.type="number";input.min="1";input.max="999";input.step="1";
+      input.inputMode="numeric";input.placeholder="예: 6 → 6만원";input.value=state.nextFee;
+      input.disabled=state.noticeBusy;
+      input.oninput=function(){state.nextFee=input.value;};
+      field.appendChild(input);section.appendChild(field);
+    }
+    var show=A.btn(state.noticeBusy?"전송 중…":"선택 항목 민원인에게 보여주기",showNextSteps,"btn primary");
+    show.disabled=state.noticeBusy;
+    section.appendChild(A.actions(show));
+    return section;
   }
   function noticePanel(){
     var cfg=state.data && state.data.notices;
@@ -211,6 +263,7 @@
     }
     section.appendChild(head);
     if(state.noticeError){var e=text(state.noticeError,"alert");e.setAttribute("role","alert");section.appendChild(e);}
+    section.appendChild(nextStepsPanel());
     for(var g=0;g<cfg.groups.length;g++){
       var group=cfg.groups[g];
       var row=A.el("div",null,"noticeGroup");
@@ -255,10 +308,7 @@
     if(!live)status="민원인 화면 연결 전";
     else if(live.step==="language")status="언어 고르는 중";
     else if(live.step==="services")status="업무 고르는 중";
-    else if(live.step==="review"){
-      if(live.booking==="other" && !live.reservationDate)status="예약 날짜와 번호 입력 중";
-      else status=live.booking?"보내기 직전":"예약 여부 고르는 중";
-    }
+    else if(live.step==="review")status=live.booking?"보내기 직전":"예약 여부 고르는 중";
     else status="요청 받음"+(live.seq?" #"+live.seq:"");
     var head=A.el("div",null,"mirrorHead");
     A.add(head,A.el("span","민원인 화면","mirrorLabel"),
@@ -267,14 +317,17 @@
     var hasLang=!!(live && live.language);
     var hasService=!!(live && typeof live.serviceIndex==="number");
     var hasBooking=!!(live && live.booking);
-    var hasResv=!!(live && live.reservationNo);
-    var reservation=hasResv?(live.reservationDate?live.reservationDate+" · ":"")+live.reservationNo:"—";
+    var hasResv=!!(live && live.booking==="yes" && live.reservationNo);
+    var bookingDate=live && live.booking==="yes" ?
+      (live.reservationDate || (live.reservationDateMode==="other"?"날짜 입력 중":
+        live.reservationDateMode==="today"?"오늘(민원인 응답)":"—")) : "—";
     var facts=A.el("div",null,"facts");
     A.add(facts,
       fact("언어",hasLang?langName(live.language):"—",!hasLang),
       fact("업무",hasService?serviceName(live.serviceIndex):"—",!hasService),
       fact("하이코리아 예약",hasBooking?BOOKING[live.booking]:"—",!hasBooking),
-      fact(live && live.reservationDate?"예약 날짜 · 예약번호":"예약 번호",reservation,!hasResv));
+      fact("예약 번호",hasResv?live.reservationNo+"번":"—",!hasResv),
+      fact("예약 날짜",bookingDate,bookingDate==="—"));
     A.add(card,head,h,facts);
     return card;
   }
@@ -293,7 +346,7 @@
         A.el("span","#"+e.seq,"reqSeq"),
         A.el("span",clock(e.receivedAt),"reqTime"),
         A.el("strong",serviceName(e.serviceIndex),"reqService"),
-        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking]+(e.reservationDate?" · "+e.reservationDate+" · 예약번호":"")+(e.reservationNo?" "+e.reservationNo:""),"reqMeta"));
+        A.el("span",langName(e.language)+" · "+BOOKING_LIST[e.booking]+(e.reservationNo?" · "+e.reservationNo+"번":"")+(e.reservationDate?" · 다른 날짜 "+e.reservationDate:""),"reqMeta"));
       list.appendChild(row);
     }
     section.appendChild(list);
@@ -353,7 +406,7 @@
       }else A.storageRemove(KEY);
     }catch(e){A.storageRemove(KEY);}
   }
-  A.request("GET","/compat/data.json?v=5",null,null,function(err,data){
+  A.request("GET","/compat/data.json?v=8",null,null,function(err,data){
     if(!err && data && data.locales)state.data=data;
     if(err)state.notice="업무 이름 목록을 불러오지 못해 번호로 표시합니다.";
     render();

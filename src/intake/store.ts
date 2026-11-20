@@ -10,11 +10,22 @@ const EVAL_RETRIES = 6;
 
 /** Counter numbers shown in the office. */
 export const STATION_MIN = 1, STATION_MAX = 30;
+/** Visitor-entered HiKorea appointment sequence number (not an official booking lookup). */
+export const RESERVATION_NO = /^(?:[1-9]|[1-9][0-9]|10[0-8])$/;
+/** Optional alternative appointment date; no date is stored for a same-day self-report. */
+export function validReservationDate(value: string): boolean {
+  if (!/^20\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(value)) return false;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= days[month - 1];
+}
 
-export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","UZ","MN","NE"] as const;
+export const LANGUAGES = ["KO","EN","ZH-CN","ID","HI","VI","JA","TH","RU","FIL","SI","KM","MY","MN","NE"] as const;
 export type IntakeLanguage = typeof LANGUAGES[number];
-export const BOOKING_OPTIONS = ["yes", "no", "unsure", "other"] as const;
-export type Booking = typeof BOOKING_OPTIONS[number];
+export type Booking = "yes" | "no" | "unsure";
 export type Verification = "unchecked" | "confirmed" | "unclear" | "exempt";
 export type Ticket = "pending" | "held" | "issued";
 
@@ -41,6 +52,7 @@ export type IntakeLive = {
   serviceIndex?: number;
   booking?: Booking;
   reservationNo?: string;
+  reservationDateMode?: "today" | "other";
   reservationDate?: string;
   seq?: number;
   epoch?: string;
@@ -55,7 +67,12 @@ export const NOTICE_IDS = [
 ] as const;
 export type NoticeId = typeof NOTICE_IDS[number];
 export const NOTICE_COUNTER_MIN = 1, NOTICE_COUNTER_MAX = 30;
-export type IntakeNotice = { id: NoticeId; counter?: number; n: number; at: number };
+/** Only these predefined tasks can be sent. Never pass free-text visitor instructions. */
+export const NEXT_STEP_IDS = ["form", "stamp", "atm", "photo"] as const;
+export type NextStepId = typeof NEXT_STEP_IDS[number];
+export type IntakeNotice =
+  | { id: NoticeId; counter?: number; n: number; at: number }
+  | { id: "nextSteps"; steps: NextStepId[]; feeManwon?: number; n: number; at: number };
 
 export type IntakeSession = {
   live?: IntakeLive;
