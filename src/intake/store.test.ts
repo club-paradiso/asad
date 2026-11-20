@@ -3,7 +3,7 @@ import liveCatalog from "../../public/compat/data.json";
 import demoCatalog from "../../apps/visitor-intake/data.json";
 import {
   __setIntakeStore, createMemoryIntakeStore, isStaff, publicEntries,
-  validCode, INTAKE_TTL_MS, NOTICE_IDS,
+  validCode, validReservationDate, RESERVATION_NO, INTAKE_TTL_MS, NOTICE_IDS,
 } from "./store";
 import {
   POST as createSession, GET as readSession, PATCH as markSession,
@@ -42,7 +42,7 @@ describe("intake service catalog", () => {
 
   it("localizes every visitor-facing kiosk control in all 12 languages", () => {
     const keys = Object.keys(liveCatalog.locales.KO.kiosk).sort();
-    expect(keys).toHaveLength(14);
+    expect(keys).toHaveLength(18);
     for (const locale of Object.values(liveCatalog.locales)) {
       expect(Object.keys(locale.kiosk).sort()).toEqual(keys);
       for (const value of Object.values(locale.kiosk)) {
@@ -51,6 +51,7 @@ describe("intake service catalog", () => {
       }
       expect(locale.kiosk.autoReset).toContain("{s}");
       expect(locale.kiosk.counter).toContain("{n}");
+      expect(locale.kiosk.reservationDateLabel).toBeTruthy();
     }
     expect(liveCatalog.locales.KO.services[19]).toBe("전화번호(연락처) 변경 신고");
   });
@@ -189,29 +190,57 @@ describe("intake cross-device API", () => {
 
     expect((await submit(post("/api/intake/submission", {
       code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes",
-      reservationNo: "ab12-3456",
+      reservationNo: "108", reservationDate: "2026-12-02",
     }))).status).toBe(201);
     expect((await submit(post("/api/intake/submission", {
       code: two.code, requestId: crypto.randomUUID(), language: "VI", serviceIndex: 1, booking: "no",
     }))).status).toBe(201);
-    // A reservation number only goes with "booked", and must be letters, digits or hyphens.
+    // Reservation numbers are integers from 1 to 108, and dates require a number.
     expect((await submit(post("/api/intake/submission", {
-      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "no", reservationNo: "1234",
+      code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "no", reservationNo: "12",
     }))).status).toBe(400);
     expect((await submit(post("/api/intake/submission", {
       code: one.code, requestId: crypto.randomUUID(), language: "EN", serviceIndex: 0, booking: "yes", reservationNo: "12 34<script>",
     }))).status).toBe(400);
 
     const a = await (await readSession(staff("/api/intake/session?code=" + one.code, one.staffToken))).json() as
-      { station: number; entries: Array<{ station: number; reservationNo?: string }> };
+      { station: number; entries: Array<{ station: number; reservationNo?: string; reservationDate?: string }> };
     expect(a.station).toBe(3);
     expect(a.entries).toHaveLength(1);
-    expect(a.entries[0]).toMatchObject({ station: 3, reservationNo: "AB12-3456" });
+    expect(a.entries[0]).toMatchObject({ station: 3, reservationNo: "108", reservationDate: "2026-12-02" });
     const b = await (await readSession(staff("/api/intake/session?code=" + two.code, two.staffToken))).json() as
       { entries: Array<{ station: number; reservationNo?: string }> };
     expect(b.entries).toHaveLength(1);
     expect(b.entries[0].station).toBe(7);
     expect(b.entries[0]).not.toHaveProperty("reservationNo");
+  });
+
+  it("validates 1–108 appointment sequence numbers and genuine calendar dates", async () => {
+    expect(RESERVATION_NO.test("1")).toBe(true);
+    expect(RESERVATION_NO.test("108")).toBe(true);
+    for (const bad of ["0", "00", "01", "109", "999", "12A", "12-3", ""]) {
+      expect(RESERVATION_NO.test(bad)).toBe(false);
+    }
+    expect(validReservationDate("2028-02-29")).toBe(true);
+    for (const bad of ["2026-02-29", "2026-04-31", "2026-00-01", "2026-13-01", "2026-11-00", "2026-1-20", "1999-01-01", "2099-02-29"]) {
+      expect(validReservationDate(bad)).toBe(false);
+    }
+    const store = createMemoryIntakeStore();
+    __setIntakeStore(store);
+    const { session: { code }, staffToken } = await store.create();
+    const base = { code, language: "KO", serviceIndex: 0, booking: "yes" };
+    for (const reservationNo of ["0", "01", "109", "abc", "1-2", "999"]) {
+      expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationNo }))).status).toBe(400);
+    }
+    for (const reservationDate of ["2026-02-30", "2026-11-31", "2026-1-20"]) {
+      expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationNo: "8", reservationDate }))).status).toBe(400);
+    }
+    expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationDate: "2026-12-02" }))).status).toBe(400);
+    expect((await submit(post("/api/intake/submission", { ...base, booking: "no", requestId: crypto.randomUUID(), reservationNo: "10", reservationDate: "2026-12-02" }))).status).toBe(400);
+    expect((await submit(post("/api/intake/submission", { ...base, requestId: crypto.randomUUID(), reservationNo: "1", reservationDate: "2028-02-29" }))).status).toBe(201);
+    const saved = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    const { entries } = await saved.json() as { entries: Array<{ reservationNo?: string; reservationDate?: string }> };
+    expect(entries[0]).toMatchObject({ reservationNo: "1", reservationDate: "2028-02-29" });
   });
 
   it("mirrors the visitor's current screen to the staff desk only", async () => {
@@ -228,6 +257,14 @@ describe("intake cross-device API", () => {
     const read = await readSession(staff("/api/intake/session?code=" + code, staffToken));
     const { live } = await read.json() as { live: Record<string, unknown> };
     expect(live).toMatchObject({ step: "review", language: "VI", serviceIndex: 4, booking: "no" });
+    expect((await postLive(post("/api/intake/live", {
+      code, step: "review", language: "KO", serviceIndex: 4, booking: "yes",
+      reservationNo: "108", reservationDateMode: "other", reservationDate: "2026-12-02",
+    }))).status).toBe(200);
+    const withDate = await readSession(staff("/api/intake/session?code=" + code, staffToken));
+    expect((await withDate.json() as { live: Record<string, unknown> }).live).toMatchObject({
+      reservationNo: "108", reservationDateMode: "other", reservationDate: "2026-12-02",
+    });
     expect(typeof live.updatedAt).toBe("number");
 
     // Out-of-order delivery within one kiosk page: an older revision arriving late is ignored.
@@ -249,6 +286,10 @@ describe("intake cross-device API", () => {
       { code, step: "services", language: "XX" },
       { code, step: "review", serviceIndex: 20 },
       { code, step: "review", note: "passport M1234567" },
+      { code, step: "review", booking: "yes", reservationNo: "109" },
+      { code, step: "review", booking: "yes", reservationNo: "1", reservationDateMode: "other", reservationDate: "2026-02-30" },
+      { code, step: "review", booking: "yes", reservationNo: "1", reservationDateMode: "today", reservationDate: "2026-12-02" },
+      { code, step: "review", booking: "no", reservationDateMode: "other" },
     ]) expect((await postLive(post("/api/intake/live", bad))).status).toBe(400);
     expect((await postLive(post("/api/intake/live", { code: "ABCDEFGHJK", step: "language" }))).status).toBe(404);
     expect((await postLive(new Request(HOST + "/api/intake/live", {
