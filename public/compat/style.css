@@ -28,7 +28,11 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-align:c
 .stationPicker select{border:2px solid #bdd5d0;border-radius:12px;background:#fff;color:#193b3e;min-height:45px;padding:8px 12px;font:inherit}
 .stationPicker select:focus{outline:3px solid #e7b04b;outline-offset:2px}
 .queueItem.needsReview{border-left:5px solid #d89831}
-.displayBar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #d8e6e2;border-radius:14px;padding:8px 16px;margin-bottom:16px}
+.displayBar{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid #d8e6e2;border-radius:14px;padding:8px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(13,61,62,.08)}
+.displayBar .fullscreen-status{flex:1 1 270px;min-width:180px}
+.displayBar .fullscreen-toggle{white-space:nowrap}
+@media(max-width:560px){.displayBar{padding:8px 10px}.displayBar .fullscreen-status{flex-basis:100%;order:3;font-size:12px;margin:0}.displayBar .fullscreen-toggle{margin-left:auto}}
+html:fullscreen,html:-webkit-full-screen{background:#f6f9f9}
 .displayBar .muted{margin:4px 0}.displayBar .btn{min-height:45px;font-size:15px;padding:8px 16px}
 body.visitor.display-mode .container{max-width:1300px}
 body.visitor.display-mode .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -36,7 +40,7 @@ footer{font-size:13px;color:#637e7c;border-top:1px solid #d8e6e2;padding:18px 4%
 @media(min-width:800px){.hero h1{font-size:44px}.site-head img{width:360px}}
 @media(max-width:560px){.site-head img{width:220px}.container{padding:18px 3%}.hero{padding:22px 17px}.hero h1{font-size:29px}.grid{gap:8px}.tile{padding:10px;font-size:16px;min-height:90px;gap:7px}.num{min-width:26px;width:26px;height:28px;font-size:12px}.choiceGrid{grid-template-columns:1fr}.actions{flex-direction:column}.columns>div{min-width:160px}.code{font-size:25px}}
 .langGrid .tile{justify-content:center;text-align:center;font-size:22px}
-.displayBar.is-hidden{display:none}
+/* Fullscreen controls stay visible so kiosk users can exit without a keyboard. */
 .question{font-size:26px;line-height:1.4;margin:26px 0 6px}
 .seq{font-size:20px;font-weight:bold;color:#087d70;margin:0}
 .note{background:#fff7e8;color:#6b4a14;border-radius:12px;padding:12px 14px;line-height:1.6;font-size:16px}

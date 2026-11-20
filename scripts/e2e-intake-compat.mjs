@@ -97,6 +97,26 @@ for (const [name,engine] of [["chromium",chromium],["webkit",webkit]]) {
     await staff.getByRole("button",{name:"시작",exact:true}).click({timeout:4000});
     await staff.getByRole("heading",{name:"3번 창구",exact:true}).waitFor({timeout:6000});
     await staff.getByText(code,{exact:true}).waitFor({timeout:6000});
+    // The same fullscreen control must exist on iPad's normal QR URL, not just ?display=1.
+    const fullButton=visitor.getByRole("button",{name:"전체화면",exact:true});
+    await fullButton.waitFor();
+    await visitor.evaluate(() => {
+      const root=document.documentElement;
+      root.requestFullscreen=() => {
+        Object.defineProperty(document,"fullscreenElement",{configurable:true,value:root});
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      };
+      document.exitFullscreen=() => {
+        Object.defineProperty(document,"fullscreenElement",{configurable:true,value:null});
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      };
+    });
+    await fullButton.click();
+    await visitor.getByRole("button",{name:"전체화면 종료"}).waitFor();
+    await visitor.getByRole("button",{name:"전체화면 종료"}).click();
+    await fullButton.waitFor();
     const qr=staff.getByRole("img",{name:"iPad 연결 QR코드"});
     await qr.waitFor({state:"visible"});
     const qrUrl=await qr.getAttribute("src");

@@ -28,6 +28,25 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
   try{
     await staff.goto(pathToFileURL(path).toString());
     await staff.getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
+    // Fullscreen is requested only from a user gesture in the actual target window.
+    // Stub the browser API so both Chromium and WebKit exercise deterministic enter/exit UI.
+    await staff.evaluate(() => {
+      const root=document.documentElement;
+      root.requestFullscreen=() => {
+        Object.defineProperty(document,"fullscreenElement",{configurable:true,value:root});
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      };
+      document.exitFullscreen=() => {
+        Object.defineProperty(document,"fullscreenElement",{configurable:true,value:null});
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      };
+    });
+    await staff.getByRole("button",{name:"직원 화면 전체화면"}).click();
+    await staff.getByRole("button",{name:"전체화면 종료"}).waitFor();
+    await staff.getByRole("button",{name:"전체화면 종료"}).click();
+    await staff.getByRole("button",{name:"직원 화면 전체화면"}).waitFor();
     if(await staff.locator(".langGrid .tile").count()!==15)throw Error("Must show 15 languages on one page");
 
     for(const title of ["Filipino","සිංහල","ភាសាខ្មែរ","မြန်မာဘာသာ"])
@@ -45,6 +64,27 @@ for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
     await staff.getByRole("button",{name:"보조 모니터 열기"}).click();
     const visitor=await nextPage;
     await visitor.locator("#display-app").getByRole("heading",{name:"언어를 선택하세요"}).waitFor();
+    if(await visitor.getByRole("button",{name:"전체화면",exact:true}).count()!==1)
+      throw Error("Visitor popup has no independent fullscreen action");
+    await visitor.evaluate(() => {
+      const root=document.documentElement;
+      root.requestFullscreen=() => {
+        Object.defineProperty(document,"fullscreenElement",{configurable:true,value:root});
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      };
+      document.exitFullscreen=() => {
+        Object.defineProperty(document,"fullscreenElement",{configurable:true,value:null});
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      };
+    });
+    await visitor.getByRole("button",{name:"전체화면",exact:true}).click();
+    await visitor.getByRole("button",{name:"전체화면 종료"}).waitFor();
+    if(await staff.getByRole("button",{name:"직원 화면 전체화면"}).count()!==1)
+      throw Error("Visitor fullscreen must not change staff window");
+    await visitor.getByRole("button",{name:"전체화면 종료"}).click();
+    await visitor.getByRole("button",{name:"전체화면",exact:true}).waitFor();
     if(await visitor.locator("#display-app .langGrid .tile").count()!==15)throw Error("Visitor window did not mirror language list");
 
     await visitor.getByRole("button",{name:"English"}).click();
